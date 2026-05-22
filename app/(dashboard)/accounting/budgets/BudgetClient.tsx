@@ -222,13 +222,13 @@ export function BudgetClient({
       {/* Strategic Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div className="space-y-2">
-          <div className="flex items-center gap-3 text-emerald-600 font-semibold tracking-tight text-[10px] uppercase bg-emerald-50 w-fit px-4 py-2 rounded-full border border-emerald-100 mb-2">
+          <div className="flex items-center gap-3 text-emerald-600 font-black tracking-widest text-[10px] uppercase bg-emerald-50 w-fit px-4 py-2 rounded-full border border-emerald-100 mb-2">
              <Target size={14} />
              Financial Planning Unit
           </div>
-          <h1 className="text-4xl font-semibold text-slate-900 tracking-tight tracking-tighter">Budgeting & Analysis</h1>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight tracking-tighter">Budgeting & Analysis</h1>
           <p className="text-slate-500 font-medium">Kendalikan pengeluaran operasional dengan pagu anggaran yang terukur.</p>
-          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-[10px] font-semibold tracking-tight ${
+          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-[10px] font-black uppercase tracking-widest ${
             activeBranchName
               ? 'bg-blue-50 text-blue-700 border-blue-100'
               : 'bg-amber-50 text-amber-700 border-amber-100'
@@ -237,7 +237,7 @@ export function BudgetClient({
             {scopeLabel}
           </div>
           {isPeriodClosed && (
-            <div className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-[10px] font-semibold tracking-tight text-rose-700">
+            <div className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-rose-700">
               <AlertCircle size={12} />
               Periode Terkunci
             </div>
@@ -279,10 +279,10 @@ export function BudgetClient({
       </div>
 
       {!hasActiveBranch && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
+        <div className="rounded-[32px] border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
           <AlertCircle className="text-amber-600 mt-0.5" size={18} />
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-amber-900 uppercase tracking-tight">Mode Read-Only</p>
+            <p className="text-sm font-black text-amber-900 uppercase tracking-widest">Mode Read-Only</p>
             <p className="text-sm font-medium text-amber-800">
               Pilih satu unit aktif terlebih dahulu untuk menyusun atau mengubah budget. Dalam mode ini data masih tampil sebagai ringkasan {scopeLabel.toLowerCase()}.
             </p>
@@ -294,10 +294,10 @@ export function BudgetClient({
       )}
 
       {isPeriodClosed && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-6 py-5 flex items-start gap-4">
+        <div className="rounded-[32px] border border-rose-200 bg-rose-50 px-6 py-5 flex items-start gap-4">
           <AlertCircle className="text-rose-600 mt-0.5" size={18} />
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-rose-900 uppercase tracking-tight">Periode Terkunci</p>
+            <p className="text-sm font-black text-rose-900 uppercase tracking-widest">Periode Terkunci</p>
             <p className="text-sm font-medium text-rose-800">
               {periodLockMessage}
             </p>
@@ -326,11 +326,11 @@ export function BudgetClient({
                   return (
                     <motion.div 
                       key={row.account_code} 
-                      className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-200 transition-all group"
+                      className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm hover:border-blue-200 transition-all group"
                     >
                        <div className="flex justify-between items-start mb-6">
                           <div>
-                             <p className="text-[10px] font-semibold text-slate-400 tracking-tight uppercase">{row.account_code}</p>
+                             <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">{row.account_code}</p>
                              <h4 className="font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase italic tracking-tighter">{row.account_name}</h4>
                           </div>
                           {isOver ? (
@@ -350,7 +350,7 @@ export function BudgetClient({
                           <div className="flex justify-between items-end">
                              <div className="space-y-1">
                                 <p className="text-[9px] font-bold text-slate-300 uppercase">Actual Spend</p>
-                                <p className="text-lg font-semibold text-slate-900">{formatRupiah(row.actual_amount)}</p>
+                                <p className="text-lg font-black text-slate-900">{formatRupiah(row.actual_amount)}</p>
                              </div>
                              <div className="text-right">
                                 <p className="text-[9px] font-bold text-slate-300 uppercase">Budget Goal</p>
@@ -367,7 +367,7 @@ export function BudgetClient({
                           </div>
 
                           <div className="flex justify-between items-center bg-slate-50/50 p-4 rounded-2xl">
-                             <span className="text-[10px] font-semibold text-slate-400 tracking-tight uppercase">Realization</span>
+                             <span className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Realization</span>
                              <span className={`text-sm font-black ${isOver ? 'text-rose-600' : 'text-blue-600'}`}>{percent.toFixed(1)}%</span>
                           </div>
                        </div>
@@ -376,7 +376,7 @@ export function BudgetClient({
                })}
             </div>
             {analysisRows.length === 0 && (
-              <div className="py-32 text-center bg-white rounded-2xl border-2 border-dashed border-slate-100 italic font-bold text-slate-300 tracking-tight">
+              <div className="py-32 text-center bg-white rounded-[50px] border-2 border-dashed border-slate-100 italic font-bold text-slate-300 uppercase tracking-widest">
                  No budget realization data for this period.
               </div>
             )}
@@ -384,12 +384,12 @@ export function BudgetClient({
         ) : (
           <motion.div 
             key="edit"
-            className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden"
+            className="bg-white rounded-[50px] border border-slate-100 shadow-sm overflow-hidden"
           >
              {!hasActiveBranch ? (
                <div className="p-16 text-center space-y-4">
                  <AlertCircle size={28} className="mx-auto text-amber-500" />
-                 <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Pilih Unit Aktif</h3>
+                 <h3 className="text-xl font-black text-slate-900 tracking-tight">Pilih Unit Aktif</h3>
                  <p className="text-sm font-medium text-slate-500 max-w-xl mx-auto">
                    Budget sekarang disimpan per unit. Pilih satu unit aktif dari header sebelum melakukan alokasi budget bulanan.
                  </p>
@@ -400,7 +400,7 @@ export function BudgetClient({
              ) : isPeriodClosed ? (
                <div className="p-16 text-center space-y-4">
                  <AlertCircle size={28} className="mx-auto text-rose-500" />
-                 <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Periode Budget Terkunci</h3>
+                 <h3 className="text-xl font-black text-slate-900 tracking-tight">Periode Budget Terkunci</h3>
                  <p className="text-sm font-medium text-slate-500 max-w-xl mx-auto">
                    {periodLockMessage}
                  </p>
@@ -419,7 +419,7 @@ export function BudgetClient({
              ) : (
               <>
                 <div className="p-10 border-b border-slate-50 flex justify-between items-center">
-                  <h3 className="text-2xl font-semibold text-slate-900 flex items-center gap-4">
+                  <h3 className="text-2xl font-black text-slate-900 flex items-center gap-4">
                     <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
                       <Plus size={24} />
                     </div>
@@ -433,7 +433,7 @@ export function BudgetClient({
                 <div className="p-10">
                   {hasBudgetableAccounts ? (
                     <div className="grid grid-cols-1 gap-4">
-                      <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-6 py-5">
+                      <div className="rounded-[32px] border border-blue-100 bg-blue-50/70 px-6 py-5">
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-700">Info Realisasi</p>
                         <p className="mt-2 text-sm font-medium leading-relaxed text-blue-900">
                           Tab ini hanya untuk menyimpan pagu budget. Pembayaran yang sudah dicatat tidak mengubah angka alokasi di form ini, dan akan muncul pada tab
@@ -455,14 +455,14 @@ export function BudgetClient({
                         const hasRealizationSnapshot = savedBudgetAmount !== 0 || actualAmount !== 0
 
                         return (
-                          <div key={account.id} className="flex flex-col md:flex-row md:items-center gap-6 p-6 hover:bg-slate-50 rounded-xl transition-all group">
+                          <div key={account.id} className="flex flex-col md:flex-row md:items-center gap-6 p-6 hover:bg-slate-50 rounded-[32px] transition-all group">
                             <div className="w-64">
-                              <p className="text-[10px] font-semibold text-slate-300 uppercase tracking-tight mb-1">{account.code}</p>
+                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">{account.code}</p>
                               <p className="font-black text-slate-800 uppercase italic group-hover:text-blue-600 transition-colors truncate">{account.name}</p>
                               <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">
                                 {getAllocationDescription(account)}
                               </p>
-                              <div className="mt-3 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold tracking-tight text-slate-500">
+                              <div className="mt-3 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
                                 {getAllocationCategory(account)}
                               </div>
                             </div>
@@ -487,18 +487,18 @@ export function BudgetClient({
                                   className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 text-sm font-black outline-none transition-all placeholder:text-slate-300"
                                 />
                               </div>
-                              <p className="mt-2 text-[10px] font-semibold tracking-tight text-slate-400">
+                              <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
                                 Tekan Enter atau klik Simpan untuk menyimpan alokasi.
                               </p>
                               {hasRealizationSnapshot ? (
                                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                                  <div className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold tracking-tight text-slate-600">
+                                  <div className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
                                     Budget Tersimpan {formatRupiah(savedBudgetAmount)}
                                   </div>
-                                  <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[10px] font-semibold tracking-tight text-blue-700">
+                                  <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-blue-700">
                                     Realisasi {formatRupiah(actualAmount)}
                                   </div>
-                                  <div className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold tracking-tight ${
+                                  <div className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
                                     varianceAmount > 0
                                       ? 'bg-rose-50 text-rose-700'
                                       : varianceAmount < 0
@@ -534,12 +534,12 @@ export function BudgetClient({
                       })}
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-8 py-12 text-center space-y-4">
+                    <div className="rounded-[32px] border border-dashed border-slate-200 bg-slate-50 px-8 py-12 text-center space-y-4">
                       <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mx-auto text-slate-500">
                         <AlertCircle size={24} />
                       </div>
                       <div className="space-y-2 max-w-2xl mx-auto">
-                        <h4 className="text-xl font-semibold text-slate-900 tracking-tight">Akun budget belum tersedia</h4>
+                        <h4 className="text-xl font-black text-slate-900 tracking-tight">Akun budget belum tersedia</h4>
                         <p className="text-sm font-medium text-slate-500">
                           Halaman ini hanya menampilkan akun pendapatan dan beban. Organisasi aktif Anda belum memiliki akun CoA yang bisa dialokasikan untuk budget.
                         </p>

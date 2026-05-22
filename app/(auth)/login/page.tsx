@@ -4,7 +4,7 @@ import React, { useState, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signIn, signInWithNik, requestPasswordReset } from '@/modules/auth/actions/auth.actions'
 import Link from 'next/link'
-import { Building2, IdCard, ArrowRight, Eye, EyeOff, ShieldCheck, X } from 'lucide-react'
+import { Building2, IdCard, ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 
 function LoginForm() {
@@ -22,64 +22,67 @@ function LoginForm() {
   const submitResetRequest = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!resetNik.trim()) return
+
     setIsResetModalOpen(false)
     setResetLoading(true)
     const res = await requestPasswordReset(resetNik)
     setResetLoading(false)
+
     if (res.success) {
-      setResetMsg({ type: 'success', text: 'Permintaan reset terkirim. Hubungi Admin HRD untuk mendapatkan sandi baru.' })
+      setResetMsg({ type: 'success', text: `Permintaan reset terkirim. Silakan hubungi Admin HRD untuk mendapatkan sandi baru.` })
     } else {
       setResetMsg({ type: 'error', text: res.error || 'Gagal mengirim permintaan.' })
     }
+    
     setResetNik('')
     setTimeout(() => setResetMsg(null), 10000)
   }
 
-  const inputClass = 'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 bg-slate-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 focus:bg-white transition-all'
-  const inputClassEmerald = 'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 bg-slate-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 focus:bg-white transition-all'
-
   return (
     <div>
-      {/* Header */}
-      <div className="mb-7">
-        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Masuk ke Akun</h2>
-        <p className="text-slate-400 text-sm mt-1">Pilih mode akses sesuai peran Anda.</p>
+      <div className="mb-8">
+        <h2 className="text-2xl font-black text-white tracking-tight">Ruang Kendali</h2>
+        <p className="text-slate-400 text-sm mt-1 font-medium">Buka akses untuk melanjutkan sesi aman Anda.</p>
       </div>
 
       {/* Tab Switcher */}
-      <div className="flex p-1 bg-slate-100 border border-slate-200 rounded-2xl mb-6 gap-1">
-        {(['bisnis', 'karyawan'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all duration-200 ${
-              tab === t
-                ? t === 'bisnis'
-                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200'
-                  : 'bg-white text-emerald-600 shadow-sm border border-slate-200'
-                : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            {t === 'bisnis' ? <Building2 size={13} /> : <IdCard size={13} />}
-            {t === 'bisnis' ? 'Admin Bisnis' : 'Karyawan'}
-          </button>
-        ))}
+      <div className="flex gap-2 p-1.5 bg-slate-950/50 border border-white/5 rounded-2xl mb-8 shadow-inner">
+        <button
+          onClick={() => setTab('bisnis')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-300 ${
+            tab === 'bisnis'
+              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-[0_0_15px_rgba(37,99,235,0.2)]'
+              : 'text-slate-500 hover:text-slate-300 border border-transparent'
+          }`}
+        >
+          <Building2 size={14} />
+          Admin Bisnis
+        </button>
+        <button
+          onClick={() => setTab('karyawan')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-300 ${
+            tab === 'karyawan'
+              ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+              : 'text-slate-500 hover:text-slate-300 border border-transparent'
+          }`}
+        >
+          <IdCard size={14} />
+          Panel Staf
+        </button>
       </div>
 
       {/* Error Banner */}
       {error && (
-        <div className="mb-5 px-4 py-3 rounded-xl text-xs font-medium leading-relaxed bg-rose-50 text-rose-600 border border-rose-100">
+        <div className="mb-6 px-4 py-3 rounded-xl text-xs font-bold leading-relaxed bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-start gap-3">
+          <div className="mt-0.5 animate-pulse">■</div>
           {decodeURIComponent(error)}
         </div>
       )}
 
       {/* Reset Message */}
       {resetMsg && (
-        <div className={`mb-5 px-4 py-3 rounded-xl text-xs font-medium leading-relaxed border ${
-          resetMsg.type === 'success'
-            ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-            : 'bg-rose-50 text-rose-600 border-rose-100'
-        }`}>
+        <div className={`mb-6 px-4 py-3 rounded-xl text-xs font-bold leading-relaxed flex items-start gap-3 ${resetMsg.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+          <div className="mt-0.5">{resetMsg.type === 'success' ? '✓' : '■'}</div>
           {resetMsg.text}
         </div>
       )}
@@ -88,32 +91,33 @@ function LoginForm() {
         {tab === 'bisnis' ? (
           <motion.div
             key="bisnis"
-            initial={{ opacity: 0, x: -8 }}
+            initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 8 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
           >
-            <form action={signIn} className="space-y-4">
+            {/* ── BUSINESS OWNER LOGIN ── */}
+            <form action={signIn} className="space-y-5">
               <input type="hidden" name="redirectTo" value={searchParams.get('redirectTo') || ''} />
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Email</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Email Bisnis</label>
                 <input
                   name="email"
                   type="email"
                   autoComplete="email"
                   required
                   autoFocus={tab === 'bisnis'}
-                  placeholder="nama@perusahaan.com"
-                  className={inputClass}
+                  placeholder="arsitek@perusahaan.com"
+                  className="w-full px-4 py-3.5 rounded-xl border border-white/10 text-sm font-semibold text-white bg-slate-900/50 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all shadow-inner"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Password</label>
-                  <Link href="/forgot-password" className="text-[10px] text-blue-500 hover:text-blue-600 transition-colors">
-                    Lupa password?
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Sandi Keamanan</label>
+                  <Link href="/forgot-password" className="text-[10px] text-blue-400 font-bold hover:text-blue-300 transition-colors uppercase tracking-widest">
+                    Lupa Sandi?
                   </Link>
                 </div>
                 <div className="relative">
@@ -123,71 +127,72 @@ function LoginForm() {
                     autoComplete="current-password"
                     required
                     placeholder="••••••••"
-                    className={`${inputClass} pr-11`}
+                    className="w-full px-4 py-3.5 pr-11 rounded-xl border border-white/10 text-sm font-semibold text-white bg-slate-900/50 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all shadow-inner"
                   />
-                  <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                  <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full mt-1 py-3.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2.5 hover:opacity-90 active:scale-[0.98] transition-all bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-100"
+                className="w-full mt-2 py-4 rounded-xl text-[13px] font-black text-white uppercase tracking-widest flex items-center justify-center gap-3 hover:opacity-90 active:scale-[0.98] transition-all bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] border border-white/10"
               >
-                Masuk
-                <ArrowRight size={15} />
+                Inisialisasi Kendali
+                <ArrowRight size={16} />
               </button>
             </form>
 
-            <div className="mt-7 pt-6 border-t border-slate-100 space-y-3 text-center">
-              <p className="text-sm text-slate-500">
-                Belum punya akun?{' '}
-                <Link href="/register" className="text-blue-600 font-semibold hover:text-blue-700 transition-colors">
-                  Daftar gratis
+            <div className="mt-8 pt-6 border-t border-white/5 space-y-4 text-center">
+              <p className="text-sm text-slate-500 font-medium">
+                Belum terdaftar di ekosistem kami?{' '}
+                <Link href="/register" className="text-white font-bold hover:text-blue-400 transition-colors">
+                  Daftar Sekarang
                 </Link>
               </p>
               <Link
                 href="/demo"
-                className="inline-flex w-full justify-center items-center gap-2 px-5 py-3 bg-slate-50 text-slate-500 text-xs font-medium rounded-xl hover:bg-slate-100 hover:text-slate-700 transition-all border border-slate-200"
+                className="inline-flex w-full justify-center items-center gap-2 px-5 py-3.5 bg-slate-800/50 text-slate-300 text-[11px] font-black rounded-xl hover:bg-slate-700/50 hover:text-white transition-all border border-white/5 uppercase tracking-[0.15em]"
               >
-                Coba Demo Dulu
+                🎮 Coba Lingkungan Demo
               </Link>
             </div>
           </motion.div>
         ) : (
           <motion.div
             key="karyawan"
-            initial={{ opacity: 0, x: 8 }}
+            initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -8 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
           >
-            <form action={signInWithNik} className="space-y-4">
+            {/* ── EMPLOYEE LOGIN ── */}
+            <form action={signInWithNik} className="space-y-5">
               <input type="hidden" name="redirectTo" value={searchParams.get('redirectTo') || ''} />
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Nomor Induk Karyawan</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Nomor Induk Karyawan</label>
                 <input
                   name="nik"
                   type="text"
                   required
                   autoFocus={tab === 'karyawan'}
-                  placeholder="Contoh: NIZ-001"
-                  className={`${inputClassEmerald} uppercase`}
+                  placeholder="NOMOR PROTOKOL, MISAL: NIZ-001"
+                  className="w-full px-4 py-3.5 rounded-xl border border-white/10 text-sm font-black text-white bg-slate-900/50 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all uppercase shadow-inner"
                 />
               </div>
 
-              <div className="space-y-1.5">
+               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Password</label>
-                  <button
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Sandi Otorisasi</label>
+                  <button 
                     type="button"
                     onClick={() => setIsResetModalOpen(true)}
                     disabled={resetLoading}
-                    className="text-[10px] text-emerald-600 hover:text-emerald-700 transition-colors"
+                    className="text-[10px] text-emerald-400 font-bold hover:text-emerald-300 transition-colors uppercase tracking-widest"
                   >
-                    {resetLoading ? 'Memproses...' : 'Lupa password?'}
+                    {resetLoading ? 'Menyinkronkan...' : 'Lupa sandi?'}
                   </button>
                 </div>
                 <div className="relative">
@@ -196,100 +201,70 @@ function LoginForm() {
                     type={showPass ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
-                    className={`${inputClassEmerald} pr-11`}
+                    className="w-full px-4 py-3.5 pr-11 rounded-xl border border-white/10 text-sm font-semibold text-white bg-slate-900/50 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all shadow-inner"
                   />
-                  <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                  <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full mt-1 py-3.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2.5 hover:opacity-90 active:scale-[0.98] transition-all bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-100"
+                className="w-full mt-2 py-4 rounded-xl text-[13px] font-black text-emerald-950 uppercase tracking-widest flex items-center justify-center gap-3 hover:opacity-90 active:scale-[0.98] transition-all bg-gradient-to-r from-emerald-400 to-teal-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-emerald-300/50"
               >
-                Masuk
-                <ArrowRight size={15} />
+                Akses Platform
+                <ArrowRight size={16} />
               </button>
             </form>
 
-            <p className="mt-7 pt-6 border-t border-slate-100 text-center text-sm text-slate-500">
-              Login sebagai pemilik bisnis?{' '}
-              <button type="button" onClick={() => setTab('bisnis')} className="text-slate-800 font-semibold hover:text-blue-600 transition-colors">
-                Ganti mode
+            <p className="mt-8 pt-6 border-t border-white/5 text-center text-xs text-slate-500 font-medium">
+              Akses khusus otoritas pemilik?{' '}
+              <button type="button" onClick={() => setTab('bisnis')} className="text-white font-bold hover:text-emerald-400 transition-colors">
+                Ganti Otorisasi
               </button>
             </p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Reset Password Modal */}
+      {/* ── CUSTOM RESET PASSWORD MODAL ── */}
       <AnimatePresence>
         {isResetModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div
-              key="backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-              onClick={() => setIsResetModalOpen(false)}
-            />
-            <motion.div
-              key="modal"
-              initial={{ scale: 0.96, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.96, opacity: 0, y: 16 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="relative w-full max-w-sm bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl shadow-slate-200"
-            >
-              <button
-                onClick={() => setIsResetModalOpen(false)}
-                className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all"
-              >
-                <X size={15} />
-              </button>
-
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
-                  <ShieldCheck size={22} />
+           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+             <motion.div key="backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl" onClick={() => setIsResetModalOpen(false)} />
+             <motion.div key="content" initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="relative w-full max-w-sm bg-slate-900 border border-white/10 rounded-[32px] p-8 shadow-2xl overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
+                <div className="absolute top-[-20%] left-[-20%] w-[50%] h-[50%] bg-emerald-500/20 blur-[80px] rounded-full pointer-events-none" />
+                
+                <div className="relative flex flex-col items-center text-center gap-4 mb-8 mt-2">
+                   <div className="w-16 h-16 rounded-[20px] bg-slate-800 border border-white/5 text-emerald-400 flex items-center justify-center shadow-inner">
+                      <ShieldCheck size={28} />
+                   </div>
+                   <div>
+                      <h3 className="text-xl font-black text-white tracking-tight">Otorisasi Reset</h3>
+                      <p className="text-[10px] font-black text-emerald-500/70 uppercase tracking-[0.2em] mt-2">Sinkronisasi Pihak Berwenang</p>
+                   </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Reset Password</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Masukkan NIK Anda untuk melanjutkan</p>
-                </div>
-              </div>
-
-              <form onSubmit={submitResetRequest} className="space-y-5">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Nomor Induk Karyawan</label>
-                  <input
-                    required
-                    autoFocus
-                    value={resetNik}
-                    onChange={(e) => setResetNik(e.target.value)}
-                    placeholder="Contoh: NIZ-0042"
-                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium uppercase text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 focus:bg-white transition-all placeholder:normal-case placeholder:font-normal placeholder:text-slate-400"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsResetModalOpen(false)}
-                    className="flex-1 py-3 text-xs font-semibold text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-all active:scale-95"
-                  >
-                    Kirim Permintaan
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
+                <form onSubmit={submitResetRequest} className="relative space-y-6">
+                   <div className="space-y-2 text-left">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ketik Nomor Induk Anda</label>
+                      <input 
+                         required
+                         autoFocus
+                         value={resetNik}
+                         onChange={(e) => setResetNik(e.target.value)}
+                         placeholder="Cth: NIZ-0042"
+                         className="w-full px-5 py-4 bg-slate-950/50 border border-white/10 rounded-2xl text-sm font-black uppercase text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all placeholder:normal-case placeholder:font-medium placeholder:text-slate-600 shadow-inner"
+                      />
+                   </div>
+                   <div className="flex gap-4 pt-2">
+                      <button type="button" onClick={() => setIsResetModalOpen(false)} className="flex-1 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 border border-white/5 rounded-2xl transition-all">Batal</button>
+                      <button type="submit" className="flex-1 py-4 bg-emerald-500 text-emerald-950 text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-all active:scale-95 disabled:opacity-50">Kirim Sinyal</button>
+                   </div>
+                </form>
+             </motion.div>
+           </div>
         )}
       </AnimatePresence>
     </div>
@@ -298,11 +273,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center p-8 text-xs text-slate-400 animate-pulse">
-        Memuat...
-      </div>
-    }>
+    <Suspense fallback={<div className="flex items-center justify-center p-8 text-xs font-black uppercase text-slate-500 tracking-widest animate-pulse">Inisialisasi Link...</div>}>
       <LoginForm />
     </Suspense>
   )

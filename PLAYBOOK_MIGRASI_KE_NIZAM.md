@@ -137,65 +137,56 @@ Kalau user HRIS/payroll, tambah:
 
 ## Template Sheet Yang Disarankan
 
-Gunakan template CSV resmi di [templates/migrasi/](./templates/migrasi/). Kalau user masih pakai Excel, bagikan file [NIZAM_Migration_Template.xlsx](./templates/migrasi/NIZAM_Migration_Template.xlsx).
+Kalau user masih pakai Excel, minta file dipisah per sheet:
 
-Sheet wajib untuk semua client:
+1. `coa_mapping`
+2. `customers`
+3. `suppliers`
+4. `products`
+5. `warehouses`
+6. `opening_stock`
+7. `opening_ar`
+8. `opening_ap`
+9. `opening_cash_bank`
+10. `fixed_assets`
+11. `bom`
+12. `employees`
 
-1. `01_coa_mapping` — mapping CoA lama ke CoA NIZAM
-2. `02_customers` — master pelanggan
-3. `03_suppliers` — master supplier
-4. `04_products` — master produk dengan kolom GL mapping
-5. `05_warehouses` — gudang
-6. `06_opening_stock` — stok awal per produk per gudang
-7. `07_opening_ar` — piutang outstanding per invoice
-8. `08_opening_ap` — hutang outstanding per invoice
-9. `09_opening_cash_bank` — saldo kas dan bank
-10. `15_opening_balances_gl` — saldo awal akun GL lain (modal, laba ditahan, dll)
-
-Sheet tambahan sesuai modul:
-
-11. `10_fixed_assets` — aset tetap dengan metode perolehan
-12. `11_bom` — Bill of Materials (manufaktur)
-13. `12_employees` — karyawan aktif (HRIS)
-14. `13_construction_projects` — proyek konstruksi berjalan (modul Construction)
-15. `14_fleet_assets` — armada kendaraan (modul Fleet)
-
-Kolom penting yang sering terlewat:
+Minimal kolom penting:
 
 ### `products`
 
-1. `sku` — kode produk unik
-2. `product_name` — nama produk
-3. `type` — `INVENTORY` atau `SERVICE`
-4. `category` — `Bahan`, `Setengah Jadi`, `Siap Jual`, `Pelengkap`, `Layanan`
-5. `unit` — satuan
-6. `purchase_price` — harga beli default
-7. `selling_price` — harga jual default
-8. `warehouse_default` — gudang default
-9. `income_account_code` — akun pendapatan (opsional, kuat disarankan)
-10. `cogs_account_code` — akun HPP (opsional, kuat disarankan)
-11. `asset_account_code` — akun persediaan (opsional, kuat disarankan)
+1. `sku`
+2. `name`
+3. `category`
+4. `unit`
+5. `purchase_price`
+6. `selling_price`
+7. `warehouse_default`
 
-### `opening_ar` dan `opening_ap`
+### `opening_stock`
 
-1. `customer_name` / `supplier_name`
-2. `invoice_number` / `bill_number`
-3. `invoice_date` / `bill_date`
+1. `sku`
+2. `warehouse`
+3. `qty`
+4. `unit_cost`
+5. `total_value`
+
+### `opening_ar`
+
+1. `customer_name`
+2. `invoice_number`
+3. `invoice_date`
 4. `due_date`
 5. `outstanding_amount`
-6. `currency_code` — default `IDR`, isi jika ada mata uang asing
-7. `exchange_rate` — kurs pada tanggal cut-off jika bukan IDR
 
-### `opening_balances_gl`
+### `opening_ap`
 
-Untuk semua akun selain kas/bank:
-
-1. `account_code`
-2. `account_name`
-3. `normal_balance` — `DEBIT` atau `CREDIT`
-4. `opening_amount` — nilai positif
-
-Semua saldo awal dari template 09 dan 15 akan dijurnal otomatis oleh sistem melalui fungsi `apply_opening_balances()`. Pastikan total debit = total kredit sebelum apply.
+1. `supplier_name`
+2. `bill_number`
+3. `bill_date`
+4. `due_date`
+5. `outstanding_amount`
 
 ---
 
@@ -236,14 +227,12 @@ Semua saldo awal dari template 09 dan 15 akan dijurnal otomatis oleh sistem mela
 
 ### Tahap 5: Saldo Awal
 
-1. Input saldo kas dan bank via template `09_opening_cash_bank`.
-2. Input saldo awal akun GL lain via template `15_opening_balances_gl` (modal, laba ditahan, dll).
-3. Input stok awal per produk per gudang via template `06_opening_stock`.
-4. Input piutang outstanding per invoice via template `07_opening_ar`.
-5. Input hutang outstanding per invoice via template `08_opening_ap`.
-6. Input aset tetap jika dipakai via template `10_fixed_assets`.
-7. Setelah semua saldo awal diinput, jalankan fungsi `apply_opening_balances()` dari menu pengaturan NIZAM.
-8. Sistem akan otomatis membuat jurnal pembuka `OPENING_BALANCE` — verifikasi total debit = total kredit.
+1. Input saldo kas dan bank.
+2. Input stok awal per produk per gudang.
+3. Input piutang outstanding.
+4. Input hutang outstanding.
+5. Input aset tetap jika dipakai.
+6. Input jurnal pembuka agar neraca balance.
 
 ### Tahap 6: Validasi
 
@@ -301,51 +290,6 @@ Pilih salah satu pendekatan:
 Default yang lebih baik:
 
 `per invoice outstanding`, jika datanya tersedia.
-
----
-
-## Aturan Khusus Untuk User Multi-Mata Uang
-
-Jika client punya transaksi dalam mata uang asing (USD, SGD, MYR, dll):
-
-1. Aktifkan fitur multi-currency di pengaturan organisasi NIZAM.
-2. Daftarkan mata uang yang dipakai di `org_allowed_currencies`.
-3. Isi kurs pada tanggal cut-off di `exchange_rates`.
-4. Pada template `07_opening_ar` dan `08_opening_ap`, isi kolom `currency_code` dan `exchange_rate`.
-5. Saldo awal piutang/hutang valas akan dikonversi ke IDR menggunakan kurs cut-off.
-
-Catatan:
-
-1. `exchange_rate` di template berarti 1 unit mata uang asing = berapa IDR.
-2. Contoh: `currency_code = USD`, `exchange_rate = 16000` artinya 1 USD = Rp 16.000.
-3. `opening_amount` di template tetap diisi dalam mata uang asli (bukan IDR).
-
----
-
-## Aturan Khusus Untuk Client Konstruksi
-
-Jika client pakai modul Construction:
-
-1. Minta daftar proyek yang masih berjalan saat cut-off.
-2. Isi template `13_construction_projects`.
-3. Kolom `project_type`: `ARCHITECT`, `CONTRACTOR`, `DESIGN_BUILD`, `INTERIOR`, atau `CONSULTING`.
-4. Kolom `project_status` saat migrasi: biasanya `EXECUTION` atau `PLANNING`.
-5. `contract_value` adalah nilai kontrak total, bukan yang sudah dibayar.
-6. `estimated_cost` adalah perkiraan biaya total proyek.
-7. Setelah proyek masuk, input progres dan penagihan berjalan dari tanggal cut-off.
-
----
-
-## Aturan Khusus Untuk Client Fleet Dan Rental
-
-Jika client pakai modul Fleet:
-
-1. Minta daftar armada kendaraan aktif.
-2. Isi template `14_fleet_assets`.
-3. Kolom `fleet_type`: `CAR`, `MOTORCYCLE`, `TRUCK`, `BUS`, `HEAVY_EQUIPMENT`, atau `OTHER`.
-4. Kolom `odometer` isi posisi saat cut-off.
-5. Kolom `daily_rate` isi tarif sewa harian default.
-6. Booking yang masih aktif saat cut-off perlu diinput manual setelah armada masuk.
 
 ---
 
@@ -451,4 +395,3 @@ Untuk operasional harian tim onboarding, gunakan juga:
 
 1. [CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md](./CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md)
 2. [templates/migrasi/README.md](./templates/migrasi/README.md)
-3. [templates/migrasi/NIZAM_Migration_Template.xlsx](./templates/migrasi/NIZAM_Migration_Template.xlsx)

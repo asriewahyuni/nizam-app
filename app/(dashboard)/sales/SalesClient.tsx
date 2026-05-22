@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil, Globe } from 'lucide-react'
+import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createSaleEntry, createSaleFulfillmentDrafts, deliverSale, voidSale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
@@ -13,7 +13,6 @@ import { QRCodeSVG } from 'qrcode.react'
 
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
-import CurrencyPicker from '@/components/shared/CurrencyPicker'
 import { getEditableLineDiscountAmount, getStoredLineDiscountAmount, inferStoredLineDiscountMode } from '@/lib/commerce/discounts'
 import { formatDate, formatRupiah } from '@/lib/utils'
 import { getCommissionSchemeLabel, getResellerDisplayName, getResellerSubtitle } from '@/modules/sales/lib/commission'
@@ -385,8 +384,6 @@ export default function SalesClient({
   const [customerId, setCustomerId] = useState('')
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState('')
-  const [currencyCode, setCurrencyCode] = useState('IDR')
-  const [exchangeRate, setExchangeRate] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
   const [resellerId, setResellerId] = useState('')
   const [paymentTerm, setPaymentTerm] = useState<'TEMPO' | 'LUNAS'>('TEMPO')
@@ -475,8 +472,6 @@ export default function SalesClient({
     setDpPercent('0')
     setDpAmount('0')
     setDpAccountId('')
-    setCurrencyCode('IDR')
-    setExchangeRate(null)
     setError(null)
   }
 
@@ -681,8 +676,6 @@ export default function SalesClient({
       })),
       other_charge_amount: calculatedOtherChargeAmount,
       shariah_mode: resolvedShariahMode,
-      currency_code: currencyCode,
-      exchange_rate: exchangeRate,
       mode: isDraftSave ? 'DRAFT' : 'PUBLISH',
       draft_id: editingDraftSaleId || undefined,
       lines: usableLines.map(l => ({
@@ -1112,11 +1105,6 @@ export default function SalesClient({
                        <button onClick={() => setViewSale(s)} className="text-xs font-black text-blue-600 tracking-tighter hover:underline">
                          {s.sale_number}
                        </button>
-                       {s.currency_code && s.currency_code !== 'IDR' && (
-                         <span className="ml-2 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                           <Globe size={8} />{s.currency_code}
-                         </span>
-                       )}
                        <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(s.sale_date, 'short')}</div>
                        <div className="text-[10px] font-bold text-slate-500 mt-1">
                          Diproses: <span className="text-slate-700">{s.processor_name || '-'}</span>
@@ -1134,7 +1122,7 @@ export default function SalesClient({
                        </div>
                        {pickRelation(s.sales_resellers) && (
                          <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-black text-indigo-700">
-                           <span className="tracking-tight">Reseller</span>
+                           <span className="uppercase tracking-widest">Reseller</span>
                            <span className="truncate">{getResellerDisplayName(pickRelation(s.sales_resellers))}</span>
                          </div>
                        )}
@@ -1156,7 +1144,7 @@ export default function SalesClient({
                                      Faktur: {formatRupiah(s.grand_total - totalReturned)}
                                    </div>
                                 )}
-                                <div className={`text-[9px] font-semibold tracking-tight ${s.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                <div className={`text-[9px] font-black uppercase tracking-widest ${s.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}>
                                   {s.payment_status === 'PAID' ? 'Lunas' : s.payment_status === 'PARTIAL' ? 'Angsuran / Sisa' : 'Unpaid'}
                                 </div>
                                 {totalReturned > 0 && (
@@ -1221,13 +1209,13 @@ export default function SalesClient({
                                setLoading(false);
                              }}
                              disabled={loading}
-                             className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white text-[10px] font-semibold tracking-tight rounded-xl hover:bg-purple-700 transition-all shadow-lg shadow-purple-100 disabled:opacity-50" title="Auto-Generate BoM & SPK dari SO">
+                             className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-purple-700 transition-all shadow-lg shadow-purple-100 disabled:opacity-50" title="Auto-Generate BoM & SPK dari SO">
                              <Factory size={14}/> {loading ? 'Memproses...' : 'Proses Produksi'}
                            </button>
                          )}
 
                          {s.payment_status !== 'PAID' && (s.status === 'FINISHED' || ((isSaleSalam(s) || String(s?.shariah_mode || '').trim().toUpperCase() === 'ISTISHNA') && s.status === 'ORDERED')) && (
-                           <button onClick={() => handleOpenPayment(s)} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-[10px] font-semibold tracking-tight rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
+                           <button onClick={() => handleOpenPayment(s)} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
                              <DollarSign size={14}/> Terima Bayar
                            </button>
                          )}
@@ -1262,9 +1250,9 @@ export default function SalesClient({
                 <form onSubmit={handleCreateSale} className="space-y-6">
                   {/* HEADER SALES */}
                   {/* HEADER SALES & PAYMENT GUARDRAIL */}
-                  <div className="flex flex-col md:flex-row gap-4 p-5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
+                  <div className="flex flex-col md:flex-row gap-4 p-5 bg-slate-50 rounded-[28px] border border-slate-100 shadow-inner">
                     <div className="flex-1 space-y-2">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Mode Transaksi</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Mode Transaksi</label>
                       <select value={shariahMode} onChange={(e) => setShariahMode(e.target.value as any)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-blue-600 shadow-sm focus:border-blue-500 transition-all">
                          <option value="CASH">PENJUALAN LANGSUNG / STOK SIAP</option>
                          {shariahMode === 'SALAM' && <option value="SALAM">PENJUALAN SALAM (OTOMATIS)</option>}
@@ -1276,7 +1264,7 @@ export default function SalesClient({
                     </div>
 
                     <div className="flex-1 space-y-2">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Customer / Klien</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Customer / Klien</label>
                       <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-slate-900 shadow-sm focus:border-blue-500 transition-all">
                          <option value="">Pilih Customer...</option>
                          {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -1284,7 +1272,7 @@ export default function SalesClient({
                     </div>
 
                     <div className="w-full md:w-48 space-y-2">
-                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Metode Bayar</label>
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Metode Bayar</label>
                        <div className="flex p-1 bg-white border border-slate-200 rounded-2xl h-[52px]">
                           <button 
                              type="button" 
@@ -1311,34 +1299,21 @@ export default function SalesClient({
                     </div>
 
                     <div className="w-full md:w-40 space-y-2">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Tgl Faktur</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Tgl Faktur</label>
                       <input type="date" required value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-blue-500 transition-all" />
                     </div>
 
                     {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM' || shariahMode === 'ISTISHNA') && (
                        <div className="w-full md:w-40 space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                         <label className="text-[10px] font-semibold text-amber-500 uppercase tracking-tight block px-1">{shariahMode === 'SALAM' || shariahMode === 'ISTISHNA' ? 'Target Kirim' : 'Jatuh Tempo'}</label>
+                         <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block px-1">{shariahMode === 'SALAM' || shariahMode === 'ISTISHNA' ? 'Target Kirim' : 'Jatuh Tempo'}</label>
                          <input type="date" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-amber-50/50 font-bold text-slate-900 shadow-sm focus:border-amber-500 transition-all" />
                        </div>
                     )}
-
-                    <div className="w-full md:w-32 space-y-2">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Mata Uang</label>
-                      <CurrencyPicker
-                        orgId={orgId}
-                        value={currencyCode}
-                        onChange={(code, rate) => {
-                          setCurrencyCode(code)
-                          setExchangeRate(code === 'IDR' ? null : (rate || null))
-                        }}
-                        showRate
-                      />
-                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 p-5 bg-indigo-50/60 rounded-xl border border-indigo-100">
+                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 p-5 bg-indigo-50/60 rounded-[28px] border border-indigo-100">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-semibold text-indigo-500 uppercase tracking-tight block px-1">Reseller / Perusahaan Mitra</label>
+                      <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block px-1">Reseller / Perusahaan Mitra</label>
                       <select value={resellerId} onChange={(e) => setResellerId(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-indigo-200 rounded-2xl outline-none text-sm bg-white font-black text-slate-900 shadow-sm focus:border-indigo-500 transition-all">
                         <option value="">Tanpa reseller (direct customer)</option>
                         {resellers.map((reseller: any) => (
@@ -1352,10 +1327,10 @@ export default function SalesClient({
                       </p>
                     </div>
 
-                    <div className="rounded-xl border border-white/70 bg-white/80 px-5 py-4">
+                    <div className="rounded-[24px] border border-white/70 bg-white/80 px-5 py-4">
                       {selectedReseller ? (
                         <div className="space-y-2">
-                          <div className="text-[10px] font-semibold tracking-tight text-slate-400">Snapshot Komisi Saat SO Dibuat</div>
+                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Snapshot Komisi Saat SO Dibuat</div>
                           <div className="text-sm font-black text-slate-900">{getResellerDisplayName(selectedReseller)}</div>
                           <div className="text-[11px] font-bold text-slate-500">{getResellerSubtitle(selectedReseller)}</div>
                           <div className="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700">
@@ -1367,7 +1342,7 @@ export default function SalesClient({
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <div className="text-[10px] font-semibold tracking-tight text-slate-400">Mode Direct Sales</div>
+                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Mode Direct Sales</div>
                           <div className="text-sm font-black text-slate-900">Invoice tidak terhubung reseller</div>
                           <div className="text-[11px] font-bold text-slate-500">
                             Pilih reseller jika transaksi ini berasal dari personal reseller atau perusahaan mitra.
@@ -1416,7 +1391,7 @@ export default function SalesClient({
                                   />
                                ) : (
                                   <div className="space-y-1">
-                                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Persentase DP (%)</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Persentase DP (%)</label>
                                     <div className="relative">
                                       <input type="number" min="0" max="100" step="any" value={dpPercent} onChange={e => setDpPercent(e.target.value)} className="w-full h-[52px] px-4 pr-10 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-amber-500 transition-all" />
                                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">%</span>
@@ -1446,7 +1421,7 @@ export default function SalesClient({
                   {/* LINE ITEMS */}
                   <div className="space-y-3">
                     <div className="flex justify-between items-center mb-2">
-                      <label className="text-[10px] font-bold text-slate-400 tracking-tight">Detail Penjualan (Items)</label>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Detail Penjualan (Items)</label>
                       <button type="button" onClick={handleAddLine} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
                         <Plus size={14}/> Tambah Baris
                       </button>
@@ -1459,7 +1434,7 @@ export default function SalesClient({
                       ))}
                     </datalist>
 
-                    <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-400 tracking-tight">
+                    <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                        <div className="col-span-4">Barang / Jasa</div>
                        <div className="col-span-2">Qty Kuintitas</div>
                        <div className="col-span-3">Harga Jual / Satuan</div>
@@ -1475,7 +1450,7 @@ export default function SalesClient({
                       <div key={line.id} className={`grid grid-cols-1 sm:grid-cols-12 gap-2 items-start bg-white p-3 sm:p-0 border sm:border-0 ${isStockShortage ? 'border-amber-400 bg-amber-50 rounded-xl' : 'border-slate-100 rounded-xl sm:rounded-none'}`}>
                         
                         <div className="sm:col-span-4">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 tracking-tight block mb-1">Barang / Jasa</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Barang / Jasa</label>
                           <input 
                             required 
                             list="product_sales_suggestions" 
@@ -1502,7 +1477,7 @@ export default function SalesClient({
 
                         <div className="col-span-2 flex gap-2">
                           <div className="w-full">
-                            <label className="sm:hidden text-[10px] font-bold text-slate-400 tracking-tight block mb-1">Qty</label>
+                            <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Qty</label>
                             <input 
                               type="number" required min="1" step="any"
                               value={line.quantity || ''} 
@@ -1514,7 +1489,7 @@ export default function SalesClient({
                         </div>
 
                         <div className="sm:col-span-3">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 tracking-tight block mb-1">Harga Jual / Satuan</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Harga Jual / Satuan</label>
                           <CurrencyInput
                             label=""
                             value={line.unit_price}
@@ -1525,7 +1500,7 @@ export default function SalesClient({
                         </div>
 
                         <div className="sm:col-span-2">
-                           <label className="sm:hidden text-[10px] font-bold text-slate-400 tracking-tight block mb-1">Potongan Harga / {line.unit} (Rp)</label>
+                           <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Potongan Harga / {line.unit} (Rp)</label>
                           <CurrencyInput
                             label=""
                             value={line.discount_amount}
@@ -1806,7 +1781,7 @@ export default function SalesClient({
                 </p>
 
                 <div className="space-y-2 mb-8">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Gudang Aktif di {activeBranchName || 'Unit Terpilih'}</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Gudang Aktif di {activeBranchName || 'Unit Terpilih'}</label>
                   <select
                     value={deliveryWarehouseId}
                     onChange={(e) => setDeliveryWarehouseId(e.target.value)}
@@ -1853,17 +1828,17 @@ export default function SalesClient({
                 <div className="p-6 overflow-y-auto space-y-6">
                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-400 tracking-tight px-1">Nota Retur (Tax Sync)</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Nota Retur (Tax Sync)</label>
                         <input value={notaRetur} onChange={(e) => setNotaRetur(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold text-slate-700 focus:bg-white focus:border-amber-200 transition-all" />
                       </div>
                       <div className="space-y-1.5 opacity-50">
-                        <label className="text-[10px] font-bold text-slate-400 tracking-tight px-1">Customer</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Customer</label>
                         <div className="px-4 py-3 bg-slate-100 rounded-2xl text-sm font-bold text-slate-600">{selectedSaleForReturn.contacts?.name}</div>
                       </div>
                    </div>
 
                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-400 tracking-tight px-1">Pilih Barang yang Dikembalikan</label>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Pilih Barang yang Dikembalikan</label>
                       <div className="divide-y divide-slate-50 border border-slate-50 rounded-2xl overflow-hidden">
                         {selectedSaleForReturn.sales_items.map((it: any) => (
                            <div key={it.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
@@ -1886,7 +1861,7 @@ export default function SalesClient({
                    </div>
 
                    <div className="space-y-4 px-6">
-                      <label className="text-[10px] font-bold text-slate-400 tracking-tight px-1">Mode Pengembalian Dana</label>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Mode Pengembalian Dana</label>
                       
                       {selectedSaleForReturn?.payment_status !== 'PAID' ? (
                          <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex flex-col gap-1">
@@ -1912,7 +1887,7 @@ export default function SalesClient({
 
                           {refundMode === 'CASH' && (
                             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-1.5 pt-2">
-                              <label className="text-[10px] font-bold text-slate-400 tracking-tight px-1">Keluar dari Akun Kas/Bank</label>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Keluar dari Akun Kas/Bank</label>
                               <select 
                                 value={refundAccountId}
                                 onChange={(e) => setRefundAccountId(e.target.value)}
@@ -1996,7 +1971,7 @@ export default function SalesClient({
                     <div className="flex flex-col text-left">
                        <div className="flex items-center gap-4">
                           <img src={companyProfile.logo} alt="Logo Perusahaan" className="w-14 h-14 object-contain" />
-                          <h2 className="text-2xl font-semibold text-slate-900 uppercase tracking-tighter">{companyProfile.name}</h2>
+                          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{companyProfile.name}</h2>
                        </div>
                        <p className="text-xs font-medium text-slate-700 max-w-[350px] mt-1">{companyProfile.address}</p>
                        <div className="flex items-center gap-4 mt-2 text-[10px] font-bold text-slate-500">
@@ -2020,7 +1995,7 @@ export default function SalesClient({
                    <div className="p-6 overflow-y-auto w-full print:overflow-visible print:px-0 print:py-0">
                    <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
                       <div>
-                         <p className="text-slate-400 text-[10px] font-semibold tracking-tight mb-1 print:text-slate-600">Customer / Klien</p>
+                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">Customer / Klien</p>
                          <p className="font-bold text-slate-900">{viewSale.contacts?.name || 'Unknown'}</p>
                          {printMode === 'DELIVERY_ORDER' && (
                            <div className="mt-2 space-y-2 text-[11px] leading-relaxed">
@@ -2044,7 +2019,7 @@ export default function SalesClient({
                          )}
                       </div>
                       <div className="text-right">
-                         <p className="text-slate-400 text-[10px] font-semibold tracking-tight mb-1 print:text-slate-600">{printMode === 'DELIVERY_ORDER' ? 'Tanggal Dokumen' : 'Tanggal & Status'}</p>
+                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">{printMode === 'DELIVERY_ORDER' ? 'Tanggal Dokumen' : 'Tanggal & Status'}</p>
                          {printMode === 'DELIVERY_ORDER' ? (
                            <>
                              <p className="font-bold text-slate-900 mb-1">Tgl Order: {formatDate(viewSale.sale_date, 'long')}</p>
@@ -2063,11 +2038,11 @@ export default function SalesClient({
                    <table className="w-full mb-6 relative border-collapse print:border print:border-slate-200">
                      <thead className="border-y border-slate-100 bg-slate-50/50 print:bg-slate-100 print:text-slate-900">
                         <tr>
-                           <th className="py-3 px-2 text-left text-[10px] font-bold text-slate-400 tracking-tight print:text-slate-900 print:border print:border-slate-200">Deskripsi Barang/Jasa</th>
-                           <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 tracking-tight print:text-slate-900 print:border print:border-slate-200 w-24">Qty</th>
-                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 tracking-tight print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Harga</th>
-                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 tracking-tight print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Diskon</th>
-                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 tracking-tight print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Total</th>
+                           <th className="py-3 px-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200">Deskripsi Barang/Jasa</th>
+                           <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200 w-24">Qty</th>
+                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Harga</th>
+                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Diskon</th>
+                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Total</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50 text-xs">
@@ -2116,12 +2091,12 @@ export default function SalesClient({
                    <div className={`${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>
                       {viewSale.sales_payments && viewSale.sales_payments.length > 0 && (
                          <div className="mt-6 border border-emerald-100 bg-emerald-50/50 rounded-2xl p-4 print:border-slate-200 print:bg-white">
-                            <h4 className="text-xs font-bold text-emerald-800 tracking-tight mb-3 flex items-center gap-1 print:text-slate-800"><DollarSign size={14}/> Histori Pembayaran / Pelunasan</h4>
+                            <h4 className="text-xs font-bold text-emerald-800 uppercase tracking-widest mb-3 flex items-center gap-1 print:text-slate-800"><DollarSign size={14}/> Histori Pembayaran / Pelunasan</h4>
                             <div className="space-y-2">
                                {viewSale.sales_payments.map((p: any, i: number) => (
                                   <div key={i} className="flex justify-between text-xs text-emerald-700 bg-white p-2 rounded-xl border border-emerald-100 shadow-sm print:text-slate-800 print:border-slate-200">
                                      <span>{p.amount > 0 ? formatCurrency(p.amount) : 'Diskon Payment: ' + formatCurrency(p.discount_amount)}</span>
-                                     <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full tracking-tight print:bg-slate-100 print:text-slate-800">Sukses</span>
+                                     <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-wider print:bg-slate-100 print:text-slate-800">Sukses</span>
                                   </div>
                                ))}
                             </div>
@@ -2143,7 +2118,7 @@ export default function SalesClient({
                        {approvalQr ? (
                          <div className="flex flex-col items-center gap-1">
                            <QRCodeSVG value={approvalQr} size={72} level="H" fgColor="#1e293b" />
-                           <p className="text-[8px] font-semibold text-slate-400 uppercase tracking-tight">Disetujui &amp; Ditandatangani Digital</p>
+                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Disetujui &amp; Ditandatangani Digital</p>
                            <p className="text-[7px] text-slate-300 font-mono">{viewSale.id}</p>
                          </div>
                        ) : (
@@ -2183,10 +2158,10 @@ export default function SalesClient({
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowPaymentModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
               
-              <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+              <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
                 <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-emerald-50/50">
                     <div>
-                       <h3 className="text-xl font-semibold text-slate-900">Terima Pembayaran</h3>
+                       <h3 className="text-xl font-black text-slate-900">Terima Pembayaran</h3>
                        <p className="text-xs text-slate-400 font-bold mt-1 uppercase">Faktur: {selectedSaleForPayment.sale_number}</p>
                     </div>
                     <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-white rounded-full transition-colors text-slate-400 hover:text-rose-500">
@@ -2199,13 +2174,13 @@ export default function SalesClient({
                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
                       <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200">
                         <div className="text-xs font-bold text-slate-400 uppercase">Sisa Tagihan</div>
-                        <div className="text-xl font-semibold text-emerald-600">
+                        <div className="text-xl font-black text-emerald-600">
                           {formatCurrency(getOutstandingAmount(selectedSaleForPayment))}
                         </div>
                       </div>
                       
                       <div className="space-y-2">
-                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Rincian Faktur</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Rincian Faktur</label>
                         <div className="bg-white rounded-xl border border-slate-100 overflow-hidden divide-y divide-slate-50">
                            {selectedSaleForPayment.sales_items?.map((item: any) => (
                              <div key={item.id} className="p-3 flex justify-between items-center text-xs">

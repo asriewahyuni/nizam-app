@@ -216,7 +216,7 @@ export function BranchManagementClient({
       {/* ── Header ── */}
       <motion.div variants={cardAnim} className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             <MapPin size={32} className="text-emerald-500" />
             Unit Operasional
           </h1>
@@ -249,7 +249,7 @@ export function BranchManagementClient({
       {hasSingleUnit && branches[0] && (
         <motion.div
           variants={cardAnim}
-          className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-6 text-sm text-slate-600 shadow-sm"
+          className="rounded-[28px] border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-6 text-sm text-slate-600 shadow-sm"
         >
           <p className="font-semibold text-slate-800">
             <span className="font-mono">Unit Utama</span> adalah konteks default internal organisasi.
@@ -273,7 +273,7 @@ export function BranchManagementClient({
             <motion.div
               key={branch.id}
               variants={cardAnim}
-              className="bg-white rounded-xl p-8 border border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-100 group transition-all flex flex-col"
+              className="bg-white rounded-[32px] p-8 border border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-100 group transition-all flex flex-col"
             >
               {/* Top row: icon + status + actions */}
               <div className="flex justify-between items-start mb-6">
@@ -310,11 +310,11 @@ export function BranchManagementClient({
               {/* Branch Info */}
               <div className="space-y-4 flex-1">
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-900 group-hover:text-emerald-600 transition-colors">{branch.name}</h3>
+                  <h3 className="text-xl font-black text-slate-900 group-hover:text-emerald-600 transition-colors">{branch.name}</h3>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <p className="text-xs font-bold text-slate-400 tracking-[0.2em] uppercase">{branch.code}</p>
                     {isMainUnit && (
-                      <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-tight text-emerald-700">
+                      <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">
                         Unit Default
                       </span>
                     )}
@@ -386,9 +386,9 @@ export function BranchManagementClient({
         })}
 
         {branches.length === 0 && (
-          <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 flex flex-col items-center justify-center space-y-4">
+          <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50 flex flex-col items-center justify-center space-y-4">
             <MapPin size={48} className="text-slate-300" />
-            <h3 className="text-lg font-semibold text-slate-700">Belum Ada Unit</h3>
+            <h3 className="text-lg font-black text-slate-700">Belum Ada Unit</h3>
             <p className="text-sm text-slate-500">Klik tombol di atas untuk menambahkan unit operasional pertama.</p>
           </div>
         )}
@@ -405,10 +405,10 @@ export function BranchManagementClient({
             />
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl p-10 overflow-hidden"
+              className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden"
             >
               <div className="flex items-center justify-between mb-8">
-                <h3 className="text-2xl font-semibold text-slate-900 flex items-center gap-4">
+                <h3 className="text-2xl font-black text-slate-900 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
                     <Plus size={24} />
                   </div>
@@ -420,19 +420,19 @@ export function BranchManagementClient({
               </div>
               <form onSubmit={handleAddBranch} className="space-y-5">
                 <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Nama Unit</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Unit</label>
                   <input name="name" required placeholder="Cth: Unit Distribusi Jakarta" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-emerald-500 font-bold transition-all shadow-inner" />
                 </div>
                 <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Kode Unit</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kode Unit</label>
                   <input name="code" required placeholder="Cth: JKT-DIST" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-emerald-500 font-bold uppercase transition-all shadow-inner" />
                 </div>
                 <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Alamat Lengkap</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Alamat Lengkap</label>
                   <textarea name="address" placeholder="Tulis alamat operasional unit ini..." className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-emerald-500 text-sm h-24 transition-all shadow-inner resize-none" />
                 </div>
                 <div className="pt-4">
-                  <button type="submit" disabled={loading} className="w-full py-5 bg-slate-900 text-white font-black rounded-xl shadow-xl hover:shadow-2xl transition-all relative overflow-hidden group disabled:opacity-60">
+                  <button type="submit" disabled={loading} className="w-full py-5 bg-slate-900 text-white font-black rounded-[20px] shadow-xl hover:shadow-2xl transition-all relative overflow-hidden group disabled:opacity-60">
                     <span className="relative z-10">{loading ? 'Memproses...' : 'Daftarkan Unit Sekarang'}</span>
                     <div className="absolute inset-0 bg-emerald-500 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300" />
                   </button>
@@ -454,10 +454,10 @@ export function BranchManagementClient({
             />
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl p-10 overflow-hidden"
+              className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden"
             >
               <div className="flex items-center justify-between mb-8">
-                <h3 className="text-2xl font-semibold text-slate-900 flex items-center gap-4">
+                <h3 className="text-2xl font-black text-slate-900 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center">
                     <Pencil size={22} />
                   </div>
@@ -469,22 +469,22 @@ export function BranchManagementClient({
               </div>
               <form onSubmit={handleEditBranch} className="space-y-5">
                 <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Nama Unit</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Unit</label>
                   <input name="name" required defaultValue={editingBranch.name} placeholder="Nama unit" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold transition-all shadow-inner" />
                 </div>
                 <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Kode Unit</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kode Unit</label>
                   <input name="code" required defaultValue={editingBranch.code} placeholder="Kode unit" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold uppercase transition-all shadow-inner" />
                 </div>
                 <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Alamat Lengkap</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Alamat Lengkap</label>
                   <textarea name="address" defaultValue={editingBranch.address || ''} placeholder="Alamat operasional..." className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 text-sm h-24 transition-all shadow-inner resize-none" />
                 </div>
                 <div className="flex gap-3 pt-4">
-                  <button type="button" onClick={() => setEditingBranch(null)} className="flex-1 py-4 rounded-2xl font-semibold text-xs uppercase tracking-tight text-slate-500 hover:bg-slate-100 transition-all border border-slate-200">
+                  <button type="button" onClick={() => setEditingBranch(null)} className="flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all border border-slate-200">
                     Batal
                   </button>
-                  <button type="submit" disabled={editLoading} className="flex-1 py-4 rounded-2xl bg-blue-600 text-white font-semibold text-xs uppercase tracking-tight shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50">
+                  <button type="submit" disabled={editLoading} className="flex-1 py-4 rounded-2xl bg-blue-600 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50">
                     {editLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
                   </button>
                 </div>
@@ -505,15 +505,15 @@ export function BranchManagementClient({
             />
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md bg-white rounded-xl shadow-2xl p-8"
+              className="relative w-full max-w-md bg-white rounded-[32px] shadow-2xl p-8"
             >
                 <div className="flex items-start gap-4 mb-6">
                   <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
                     <AlertTriangle size={24} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900 mb-1">Tidak Dapat Menghapus Unit</h3>
-                    <p className="text-xs font-semibold text-slate-400 tracking-tight">Terdapat data yang masih terhubung</p>
+                    <h3 className="text-lg font-black text-slate-900 mb-1">Tidak Dapat Menghapus Unit</h3>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Terdapat data yang masih terhubung</p>
                   </div>
                 </div>
               <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 mb-6">
@@ -521,7 +521,7 @@ export function BranchManagementClient({
               </div>
               <button
                 onClick={() => setErrorModal(null)}
-                className="w-full py-4 rounded-2xl bg-slate-900 text-white font-semibold text-xs uppercase tracking-tight hover:bg-black transition-all"
+                className="w-full py-4 rounded-2xl bg-slate-900 text-white font-black text-xs uppercase tracking-widest hover:bg-black transition-all"
               >
                 Mengerti
               </button>

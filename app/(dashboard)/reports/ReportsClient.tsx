@@ -174,14 +174,8 @@ export default function ReportsClient({
     () => buildBalanceTreeRows(balanceSheet?.liabilities || [], showEmptyAccounts),
     [balanceSheet?.liabilities, showEmptyAccounts]
   )
-  // Akun 3002 (Laba Ditahan) dan 3004 (Prive/Dividen) disembunyikan di neraca syariah —
-  // fungsinya digantikan oleh akun Syirkah (3110, 3120, 3130).
-  const SYARIAH_HIDDEN_EQUITY_CODES = ['3002', '3004']
-  const syariahEquity = (balanceSheet?.equity || []).filter(
-    (acc: any) => !SYARIAH_HIDDEN_EQUITY_CODES.includes(String(acc?.code || ''))
-  )
   const equityTreeRows = useMemo(
-    () => buildBalanceTreeRows(syariahEquity, showEmptyAccounts),
+    () => buildBalanceTreeRows(balanceSheet?.equity || [], showEmptyAccounts),
     [balanceSheet?.equity, showEmptyAccounts]
   )
 
@@ -195,7 +189,7 @@ export default function ReportsClient({
           <div className="min-w-0 flex items-center gap-2">
             <span className={`truncate ${row.hasChildren ? 'text-slate-700 font-bold' : 'text-slate-600 font-medium'}`}>{row.name}</span>
             {row.isSystemComputed && (
-              <span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 text-[9px] font-semibold tracking-tight text-amber-700 border border-amber-100">
+              <span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-amber-700 border border-amber-100">
                 Otomatis
               </span>
             )}
@@ -248,11 +242,11 @@ export default function ReportsClient({
       <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Status Struktur</span>
-          <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-tight ${isParentOrg ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
+          <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wider ${isParentOrg ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
             {isParentOrg ? 'Induk (Holding)' : 'Entitas Anak'}
           </span>
           {isConsolidated && (
-            <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-tight text-indigo-700">
+            <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-indigo-700">
               Mode Konsolidasi Aktif
             </span>
           )}
@@ -370,14 +364,14 @@ export default function ReportsClient({
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                   <BarChart size={18} className="text-blue-500"/> Laporan Laba Rugi
                 </h3>
-                <div className="text-xs font-bold text-slate-400 tracking-tight">Periode: Current Month</div>
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Periode: Current Month</div>
               </div>
               
               <div className="p-8 space-y-10">
                 {/* Revenue Section */}
                 <motion.div variants={item} className="space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <span className="text-sm font-semibold text-slate-400 uppercase tracking-tight">Pendapatan</span>
+                    <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Pendapatan</span>
                     <span className="text-sm font-bold text-emerald-600">{formatRupiah(profitLoss.totalRevenue)}</span>
                   </div>
                   <div className="space-y-2">
@@ -393,7 +387,7 @@ export default function ReportsClient({
                 {/* Expenses Section */}
                 <motion.div variants={item} className="space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <span className="text-sm font-semibold text-slate-400 uppercase tracking-tight">Beban & Biaya Operasional</span>
+                    <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Beban & Biaya Operasional</span>
                     <span className="text-sm font-bold text-rose-600">({formatRupiah(profitLoss.totalExpenses)})</span>
                   </div>
                   <div className="space-y-2">
@@ -409,10 +403,10 @@ export default function ReportsClient({
                 {/* Summary Section */}
                 <motion.div variants={item} className="pt-8 border-t-2 border-slate-900 flex justify-between items-center">
                   <div className="flex flex-col">
-                    <span className="text-xl font-semibold text-slate-900 uppercase">Laba (Rugi) Bersih</span>
+                    <span className="text-xl font-black text-slate-900 uppercase">Laba (Rugi) Bersih</span>
                     <span className="text-xs text-slate-400 font-medium italic">Net Income for the period</span>
                   </div>
-                  <div className={`px-6 py-3 rounded-2xl text-2xl font-semibold ${profitLoss.netProfit >= 0 ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-rose-500 text-white shadow-lg shadow-rose-200'}`}>
+                  <div className={`px-6 py-3 rounded-2xl text-2xl font-black ${profitLoss.netProfit >= 0 ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-rose-500 text-white shadow-lg shadow-rose-200'}`}>
                     {formatRupiah(profitLoss.netProfit)}
                   </div>
                 </motion.div>
@@ -458,17 +452,17 @@ export default function ReportsClient({
                   items: cashFlow.fcfItems
                 },
               ].map((m) => (
-                <div key={m.title} className="bg-white rounded-xl p-8 border border-slate-100 shadow-sm space-y-4 flex flex-col relative overflow-hidden group">
+                <div key={m.title} className="bg-white rounded-[32px] p-8 border border-slate-100 shadow-sm space-y-4 flex flex-col relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-blue-50 transition-colors" />
                   <div className="flex items-center justify-between relative z-10">
                     <div className={`w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center ${m.color}`}>
                       <m.icon size={24} />
                     </div>
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight bg-slate-50 px-3 py-1 rounded-full">{m.metric}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full">{m.metric}</span>
                   </div>
                   <div className="space-y-1 relative z-10">
-                    <p className="text-xs font-bold text-slate-400 tracking-tight">{m.title}</p>
-                    <h4 className={`text-2xl font-semibold ${m.value >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{m.title}</p>
+                    <h4 className={`text-2xl font-black ${m.value >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
                       {formatRupiah(m.value)}
                     </h4>
                     <p className="text-[10px] text-slate-400 font-medium leading-relaxed h-8">{m.hint}</p>
@@ -485,13 +479,13 @@ export default function ReportsClient({
               ))}
             </div>
 
-            <div className="bg-slate-900 rounded-2xl p-10 text-white flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative shadow-2xl shadow-blue-500/20">
+            <div className="bg-slate-900 rounded-[40px] p-10 text-white flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative shadow-2xl shadow-blue-500/20">
                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-[100px] -mr-40 -mt-40" />
                <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] -ml-20 -mb-20" />
                
                <div className="relative z-10 space-y-2">
                  <div className="flex items-center gap-3">
-                    <h3 className="text-3xl font-semibold tracking-tight">Net Cash Flow</h3>
+                    <h3 className="text-3xl font-black tracking-tight">Net Cash Flow</h3>
                     <div className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-black shadow-sm ${cashFlow.netChangeTrend === 'UP' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
                       <Triangle 
                         size={10} 
@@ -501,25 +495,25 @@ export default function ReportsClient({
                       <span>{cashFlow.netChangeTrend === 'UP' ? 'NAIK' : 'TURUN'} {Math.abs(cashFlow.changePercent || 0).toFixed(1)}%</span>
                     </div>
                  </div>
-                 <p className="text-sm text-slate-400 font-medium font-mono opacity-80 tracking-tight">Total liquidity changes for current period</p>
+                 <p className="text-sm text-slate-400 font-medium font-mono opacity-80 uppercase tracking-widest">Total liquidity changes for current period</p>
                </div>
 
                <div className="relative z-10 text-5xl font-black tracking-tighter text-blue-400 flex flex-col items-end gap-1">
                  {formatRupiah(cashFlow.netChange)}
-                 <div className="text-[10px] text-slate-500 font-semibold tracking-tight opacity-60">Real-time Balance Match</div>
+                 <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest opacity-60">Real-time Balance Match</div>
                </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-10 border border-slate-100 shadow-sm relative overflow-hidden">
+            <div className="bg-white rounded-[40px] p-10 border border-slate-100 shadow-sm relative overflow-hidden">
                <div className="absolute top-0 left-0 w-2 h-full bg-blue-600" />
-               <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-tight mb-8 flex items-center gap-2">
+               <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-8 flex items-center gap-2">
                  <FileText size={18} className="text-blue-600"/> Insight & Analisis Kinerja
                </h4>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="p-8 rounded-xl bg-slate-50 border border-slate-100 space-y-4 hover:border-blue-200 transition-colors">
+                  <div className="p-8 rounded-[32px] bg-slate-50 border border-slate-100 space-y-4 hover:border-blue-200 transition-colors">
                      <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xs">A</div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-tight">Kualitas Laba vs Kas</p>
+                        <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Kualitas Laba vs Kas</p>
                      </div>
                      <p className="text-sm text-slate-700 leading-relaxed font-medium">
                        {cashFlow.ocf > profitLoss.netProfit ? 
@@ -527,10 +521,10 @@ export default function ReportsClient({
                         "Waspada: Laba bersih di atas kertas belum sepenuhnya cair menjadi kas. Periksa piutang Anda atau stok yang menumpuk."}
                      </p>
                   </div>
-                  <div className="p-8 rounded-xl bg-slate-50 border border-slate-100 space-y-4 hover:border-emerald-200 transition-colors">
+                  <div className="p-8 rounded-[32px] bg-slate-50 border border-slate-100 space-y-4 hover:border-emerald-200 transition-colors">
                      <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-black text-xs">B</div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-tight">Arah Investasi</p>
+                        <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Arah Investasi</p>
                      </div>
                      <p className="text-sm text-slate-700 leading-relaxed font-medium">
                        {cashFlow.icf < 0 ? 
@@ -554,7 +548,7 @@ export default function ReportsClient({
             <div className="space-y-6">
                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100">
-                    <h3 className="font-semibold text-slate-400 text-xs uppercase tracking-tight">Aktiva (Aset)</h3>
+                    <h3 className="font-black text-slate-400 text-xs uppercase tracking-widest">Aktiva (Aset)</h3>
                   </div>
                   <div className="p-8 space-y-3">
                     {renderBalanceRows(assetTreeRows)}
@@ -570,7 +564,7 @@ export default function ReportsClient({
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100">
-                    <h3 className="font-semibold text-slate-400 text-xs uppercase tracking-tight">Kewajiban & Ekuitas</h3>
+                    <h3 className="font-black text-slate-400 text-xs uppercase tracking-widest">Kewajiban & Ekuitas</h3>
                   </div>
                   <div className="p-8 space-y-6">
                     {/* Liabilities */}
@@ -581,6 +575,9 @@ export default function ReportsClient({
                     {/* Equity */}
                     <div className="space-y-2">
                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Modal</p>
+                       <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                         Akun <span className="font-mono font-black">3002</span> menampung laba/rugi periode lampau atau periode yang sudah ditutup, sedangkan <span className="font-mono font-black">3003</span> menampung laba/rugi periode berjalan. Beban utilitas tetap dicatat di laba rugi, lalu dampaknya mengurangi laba periode berjalan di neraca.
+                       </p>
                        {renderBalanceRows(equityTreeRows)}
                     </div>
                     
@@ -589,7 +586,7 @@ export default function ReportsClient({
                       <span className="font-black text-lg">
                         {formatRupiah(
                           balanceSheet.liabilities.reduce((s:any, x:any) => s + (x.balance || 0), 0) +
-                          syariahEquity.reduce((s:any, x:any) => s + (x.balance || 0), 0)
+                          balanceSheet.equity.reduce((s:any, x:any) => s + (x.balance || 0), 0)
                         )}
                       </span>
                     </div>
@@ -615,12 +612,12 @@ export default function ReportsClient({
               initial={{ scale: 0.9, opacity: 0, y: 20 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-              className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl p-10 overflow-hidden"
+              className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden"
             >
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h3 className="text-2xl font-semibold text-slate-900">{detailModal.title}</h3>
-                  <p className="text-[10px] font-bold text-slate-400 tracking-tight mt-1">Rincian Arus Kas Langsung</p>
+                  <h3 className="text-2xl font-black text-slate-900">{detailModal.title}</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Rincian Arus Kas Langsung</p>
                 </div>
                 <button 
                    onClick={() => setDetailModal(prev => ({ ...prev, show: false }))}
@@ -690,8 +687,8 @@ export default function ReportsClient({
               </div>
 
               <div className="mt-8 pt-6 border-t border-slate-100 flex justify-between items-center">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-tight">Total Kontribusi</span>
-                <span className="text-lg font-semibold text-slate-900">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Total Kontribusi</span>
+                <span className="text-lg font-black text-slate-900">
                   {formatRupiah(detailModal.items.reduce((s, x) => s + x.amount, 0))}
                 </span>
               </div>

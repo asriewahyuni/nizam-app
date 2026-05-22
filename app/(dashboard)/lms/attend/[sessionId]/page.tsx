@@ -26,7 +26,7 @@ export default async function SessionAttendancePage(props: {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
         <XCircle className="h-16 w-16 text-red-500" />
-        <h1 className="mt-6 text-2xl font-semibold text-slate-900">Sesi Tidak Ditemukan</h1>
+        <h1 className="mt-6 text-2xl font-black text-slate-900">Sesi Tidak Ditemukan</h1>
         <p className="mt-2 text-slate-500">Sesi ini mungkin sudah dihapus atau tidak tersedia.</p>
       </div>
     )
@@ -44,7 +44,7 @@ export default async function SessionAttendancePage(props: {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
         <XCircle className="h-16 w-16 text-red-500" />
-        <h1 className="mt-6 text-2xl font-semibold text-slate-900">Akses Ditolak</h1>
+        <h1 className="mt-6 text-2xl font-black text-slate-900">Akses Ditolak</h1>
         <p className="mt-2 text-slate-500">Anda tidak terdaftar dalam batch <strong>{session.lms_course_batches?.name}</strong>.</p>
       </div>
     )
@@ -65,7 +65,7 @@ export default async function SessionAttendancePage(props: {
       {isDuplicate ? (
         <>
           <CheckCircle2 className="h-16 w-16 text-emerald-500" />
-          <h1 className="mt-6 text-2xl font-semibold text-slate-900">Sudah Hadir</h1>
+          <h1 className="mt-6 text-2xl font-black text-slate-900">Sudah Hadir</h1>
           <p className="mt-2 text-slate-500">
             Anda sudah melakukan presensi sebelumnya untuk sesi <strong>{session.title}</strong>.
           </p>
@@ -73,13 +73,13 @@ export default async function SessionAttendancePage(props: {
       ) : error ? (
         <>
           <XCircle className="h-16 w-16 text-red-500" />
-          <h1 className="mt-6 text-2xl font-semibold text-slate-900">Gagal Mencatat Presensi</h1>
+          <h1 className="mt-6 text-2xl font-black text-slate-900">Gagal Mencatat Presensi</h1>
           <p className="mt-2 text-slate-500">{error.message}</p>
         </>
       ) : (
         <>
           <CheckCircle2 className="h-16 w-16 text-emerald-500" />
-          <h1 className="mt-6 text-2xl font-semibold text-slate-900">Presensi Berhasil!</h1>
+          <h1 className="mt-6 text-2xl font-black text-slate-900">Presensi Berhasil!</h1>
           <p className="mt-2 text-slate-500">
             Kehadiran Anda pada sesi <strong>{session.title}</strong> telah tercatat.
           </p>

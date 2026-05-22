@@ -54,11 +54,11 @@ export function ParetoClient({ orgId, data }: ParetoClientProps) {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
         <div className="space-y-2">
-          <div className="flex items-center gap-3 text-amber-600 font-semibold tracking-tight text-xs uppercase bg-amber-50 w-fit px-4 py-2 rounded-full border border-amber-100 mb-2">
+          <div className="flex items-center gap-3 text-amber-600 font-black tracking-widest text-xs uppercase bg-amber-50 w-fit px-4 py-2 rounded-full border border-amber-100 mb-2">
              <Target size={14} strokeWidth={3} />
              Analisis Pareto (80/20)
           </div>
-          <h1 className="text-4xl font-semibold text-slate-900 tracking-tight">Optimasi Laba Produk</h1>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Optimasi Laba Produk</h1>
           <p className="text-slate-500 font-medium text-lg max-w-2xl">
             Identifikasi 20% produk yang menghasilkan 80% pendapatan Anda untuk fokus stok dan pemasaran.
           </p>
@@ -67,18 +67,18 @@ export function ParetoClient({ orgId, data }: ParetoClientProps) {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-         <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+         <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
                <Package size={24} />
             </div>
             <div>
-               <p className="text-xs font-semibold text-slate-400 uppercase tracking-tight">Kontribusi Produk</p>
-               <h3 className="text-4xl font-semibold text-slate-900 mt-1">{paretoAnalysis.top20Count} <span className="text-lg text-slate-400">Items</span></h3>
+               <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Kontribusi Produk</p>
+               <h3 className="text-4xl font-black text-slate-900 mt-1">{paretoAnalysis.top20Count} <span className="text-lg text-slate-400">Items</span></h3>
                <p className="text-xs font-bold text-slate-500 mt-2">Menghasilkan 80% dari total omzet.</p>
             </div>
          </div>
 
-         <div className="bg-slate-900 p-8 rounded-2xl shadow-2xl space-y-4 relative overflow-hidden">
+         <div className="bg-slate-900 p-8 rounded-[40px] shadow-2xl space-y-4 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-10">
                <Trophy size={100} />
             </div>
@@ -86,26 +86,26 @@ export function ParetoClient({ orgId, data }: ParetoClientProps) {
                <Trophy size={24} />
             </div>
             <div className="relative z-10">
-               <p className="text-xs font-semibold text-amber-500 uppercase tracking-tight">Revenue Terkonsentrasi</p>
-               <h3 className="text-3xl font-semibold text-white mt-1">{formatRupiah(paretoAnalysis.top20Revenue)}</h3>
+               <p className="text-xs font-black text-amber-500 uppercase tracking-widest">Revenue Terkonsentrasi</p>
+               <h3 className="text-3xl font-black text-white mt-1">{formatRupiah(paretoAnalysis.top20Revenue)}</h3>
                <p className="text-xs font-bold text-slate-400 mt-2">Nilai ekonomi tinggi dari grup Pareto.</p>
             </div>
          </div>
 
-         <div className="bg-emerald-500 p-8 rounded-2xl shadow-sm space-y-4 text-white">
+         <div className="bg-emerald-500 p-8 rounded-[40px] shadow-sm space-y-4 text-white">
             <div className="w-12 h-12 rounded-2xl bg-white/20 text-white flex items-center justify-center">
                <TrendingUp size={24} />
             </div>
             <div>
-               <p className="text-xs font-semibold opacity-60 uppercase tracking-tight">Total Sales Analyzed</p>
-               <h3 className="text-3xl font-semibold mt-1">{formatRupiah(paretoAnalysis.totalRevenue)}</h3>
+               <p className="text-xs font-black opacity-60 uppercase tracking-widest">Total Sales Analyzed</p>
+               <h3 className="text-3xl font-black mt-1">{formatRupiah(paretoAnalysis.totalRevenue)}</h3>
                <p className="text-xs font-bold opacity-80 mt-2">Data penjualan 3 bulan terakhir.</p>
             </div>
          </div>
       </div>
 
       {/* Pareto Curve Chart */}
-      <div className="bg-white rounded-2xl p-10 border border-slate-100 shadow-sm space-y-8">
+      <div className="bg-white rounded-[40px] p-10 border border-slate-100 shadow-sm space-y-8">
          <div className="flex justify-between items-center">
             <h3 className="font-black text-xl text-slate-900 flex items-center gap-3">
                <BarChart3 className="text-blue-600" />
@@ -163,7 +163,7 @@ export function ParetoClient({ orgId, data }: ParetoClientProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
          {/* Strategic Recommendation */}
-         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+         <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
             <div className="p-8 border-b border-slate-50 bg-slate-50/30">
                <h3 className="font-black text-slate-900 text-xl flex items-center gap-3">
                   <Lightbulb className="text-amber-500" />
@@ -204,13 +204,13 @@ export function ParetoClient({ orgId, data }: ParetoClientProps) {
          </div>
 
          {/* Detailed Data List */}
-         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+         <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
             <div className="p-8 border-b border-slate-50 bg-slate-50/30">
                <h3 className="font-black text-slate-900 text-xl">Daftar Kontribusi Produk</h3>
             </div>
             <div className="flex-1 overflow-x-auto">
                <table className="w-full text-left">
-                  <thead className="bg-slate-50 text-[10px] uppercase font-semibold tracking-tight text-slate-400 border-b border-slate-100">
+                  <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-100">
                      <tr>
                         <th className="px-8 py-5">Produk</th>
                         <th className="px-6 py-5 text-right">Qty</th>

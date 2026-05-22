@@ -1,23 +1,3 @@
-/**
- * ============================================================================
- * 🚨 AI AGENTS: AUTH MIDDLEWARE — INTERNAL AUTH MODE ACTIVE 🚨
- * ============================================================================
- *
- * Production mode: AUTH_PROVIDER=internal (HARDCODED in .env permanently)
- *
- * The `createServerClient` from '@supabase/ssr' below is DEAD CODE — only
- * reachable if AUTH_PROVIDER != 'internal', which is NEVER the case in
- * production or any active environment.
- *
- * Active code path: see `if (getAuthProvider() === 'internal')` block,
- * which handles ALL real requests using cookie-based Internal Auth.
- *
- * The Supabase SSR import is kept only to avoid breaking the dead branch
- * during typecheck. There is NO Supabase Cloud connection in production.
- *
- * ============================================================================
- */
-
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSupabasePublicConfig } from '@/lib/supabase/config'
@@ -135,13 +115,6 @@ export async function updateSession(request: NextRequest) {
 
   // Avoid expensive auth lookup on public routes.
   if (!authPage && !protectedPage) {
-    return supabaseResponse
-  }
-
-  // ── Preview mode: bypass all auth checks ──
-  // PREVIEW_MODE=true makes ALL pages accessible without session.
-  // Hanya aktif di local dev + tunnel, tidak pernah di production.
-  if (process.env.PREVIEW_MODE === 'true') {
     return supabaseResponse
   }
 

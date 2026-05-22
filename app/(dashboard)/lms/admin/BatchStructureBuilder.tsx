@@ -86,7 +86,7 @@ export default function BatchStructureBuilder() {
 
         {/* Column headers */}
         {costStructure.length > 0 && (
-          <div className="grid grid-cols-[1fr_100px_80px_90px_32px] gap-2 px-4 py-2 text-[10px] font-semibold tracking-tight text-slate-400 border-b border-slate-100">
+          <div className="grid grid-cols-[1fr_100px_80px_90px_32px] gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
             <span>Komponen</span>
             <span>Jumlah (Rp)</span>
             <span>Pajak</span>

@@ -8,10 +8,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  serverExternalPackages: ['pg', 'dns', 'fs', 'net', 'tls'],
-  webpack: (config) => {
-    return config
-  },
 }
 
 const canUploadSourceMaps = Boolean(

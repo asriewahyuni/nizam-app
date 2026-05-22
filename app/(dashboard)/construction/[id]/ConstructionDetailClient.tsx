@@ -16,21 +16,17 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { formatDate, formatRupiah } from '@/lib/utils'
-import { BudgetVariancePanel } from './BudgetVariancePanel'
 import {
   deleteConstructionBillingTerm,
   deleteConstructionBudgetItem,
   deleteConstructionChangeOrder,
   deleteConstructionProgressLog,
-  deleteConstructionStage,
-  generateInvoiceFromBillingTerm,
   submitConstructionChangeOrderApproval,
   updateConstructionProjectSnapshot,
   upsertConstructionBillingTerm,
   upsertConstructionBudgetItem,
   upsertConstructionChangeOrder,
   upsertConstructionProgressLog,
-  upsertConstructionStage,
 } from '@/modules/construction/actions/construction.actions'
 import type {
   ConstructionBillingBasisType,
@@ -49,7 +45,6 @@ import type {
   ConstructionProjectRecord,
   ConstructionProjectSnapshotInput,
   ConstructionProjectStageRecord,
-  ConstructionStageStatus,
 } from '@/modules/construction/lib/construction'
 
 type ContactOption = {
@@ -106,17 +101,6 @@ type BillingFormState = {
   invoiceReference: string
   dueDate: string
   paidDate: string
-  notes: string
-}
-
-type StageFormState = {
-  id?: string
-  stageCode: string
-  stageName: string
-  weightPercent: number
-  status: ConstructionStageStatus
-  plannedStartDate: string
-  plannedEndDate: string
   notes: string
 }
 
@@ -177,46 +161,6 @@ const approvalStatusStyles: Record<string, string> = {
   CANCELLED: 'bg-slate-100 text-slate-600 border-slate-200',
 }
 
-const projectStatusLabels: Record<string, string> = {
-  PLANNING: 'Perencanaan',
-  TENDER: 'Lelang',
-  DESIGN: 'Desain',
-  EXECUTION: 'Eksekusi',
-  HANDOVER: 'Serah Terima',
-  COMPLETED: 'Selesai',
-  ON_HOLD: 'Ditunda',
-  CANCELLED: 'Dibatalkan',
-}
-
-const stageStatusLabels: Record<string, string> = {
-  NOT_STARTED: 'Belum Mulai',
-  IN_PROGRESS: 'Berjalan',
-  BLOCKED: 'Terhambat',
-  DONE: 'Selesai',
-}
-
-const changeOrderStatusLabels: Record<string, string> = {
-  PROPOSED: 'Diusulkan',
-  IN_REVIEW: 'Ditinjau',
-  APPROVED: 'Disetujui',
-  REJECTED: 'Ditolak',
-  IMPLEMENTED: 'Dilaksanakan',
-}
-
-const billingStatusLabels: Record<string, string> = {
-  PLANNED: 'Direncanakan',
-  READY_TO_BILL: 'Siap Tagih',
-  BILLED: 'Tertagih',
-  PAID: 'Lunas',
-}
-
-const approvalStatusLabels: Record<string, string> = {
-  PENDING: 'Menunggu',
-  APPROVED: 'Disetujui',
-  REJECTED: 'Ditolak',
-  CANCELLED: 'Dibatalkan',
-}
-
 const projectTypeLabels: Record<string, string> = {
   ARCHITECT: 'Arsitek',
   CONTRACTOR: 'Kontraktor',
@@ -273,18 +217,6 @@ function emptyProgressForm(): ProgressFormState {
     summary: '',
     issueNotes: '',
     evidenceUrlsText: '',
-  }
-}
-
-function emptyStageForm(): StageFormState {
-  return {
-    stageCode: '',
-    stageName: '',
-    weightPercent: 0,
-    status: 'NOT_STARTED',
-    plannedStartDate: '',
-    plannedEndDate: '',
-    notes: '',
   }
 }
 
@@ -349,24 +281,6 @@ function getCurrencyDeltaClass(value: number, positiveClass: string, negativeCla
   return 'text-slate-600'
 }
 
-async function handleGenerateInvoiceFromBillingTerm(
-  orgId: string,
-  projectId: string,
-  billingTermId: string,
-  onSuccess: () => void
-) {
-  const result = await generateInvoiceFromBillingTerm(orgId, projectId, billingTermId)
-  if (result.error) {
-    alert(`Error: ${result.error}`)
-    return
-  }
-
-  if (result.invoiceNumber) {
-    alert(`✅ Invoice ${result.invoiceNumber} berhasil dibuat!`)
-    onSuccess()
-  }
-}
-
 export function ConstructionDetailClient({
   orgId,
   project,
@@ -383,26 +297,21 @@ export function ConstructionDetailClient({
   const [isSavingProgress, startProgressTransition] = useTransition()
   const [isSavingBilling, startBillingTransition] = useTransition()
   const [isSavingChangeOrder, startChangeOrderTransition] = useTransition()
-  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false)
   const [submittingApprovalId, setSubmittingApprovalId] = useState<string | null>(null)
 
   const [showBudgetModal, setShowBudgetModal] = useState(false)
   const [showProgressModal, setShowProgressModal] = useState(false)
   const [showBillingModal, setShowBillingModal] = useState(false)
   const [showChangeOrderModal, setShowChangeOrderModal] = useState(false)
-  const [showStageModal, setShowStageModal] = useState(false)
 
   const [budgetError, setBudgetError] = useState('')
   const [progressError, setProgressError] = useState('')
   const [billingError, setBillingError] = useState('')
   const [changeOrderError, setChangeOrderError] = useState('')
   const [projectError, setProjectError] = useState('')
-  const [stageError, setStageError] = useState('')
 
   const [budgetForm, setBudgetForm] = useState<BudgetFormState>(emptyBudgetForm)
   const [progressForm, setProgressForm] = useState<ProgressFormState>(emptyProgressForm)
-  const [stageForm, setStageForm] = useState<StageFormState>(emptyStageForm)
-  const [isSavingStage, startStageTransition] = useTransition()
   const [billingForm, setBillingForm] = useState<BillingFormState>(emptyBillingForm(billingTerms.length + 1))
   const [changeOrderForm, setChangeOrderForm] = useState<ChangeOrderFormState>(
     emptyChangeOrderForm(`CO-${String(changeOrders.length + 1).padStart(3, '0')}`)
@@ -503,19 +412,6 @@ export function ConstructionDetailClient({
     setShowProgressModal(true)
   }
 
-  const handleGenerateInvoice = async (term: ConstructionBillingTermRecord) => {
-    setIsGeneratingInvoice(true)
-    try {
-      await handleGenerateInvoiceFromBillingTerm(orgId, project.id, term.id, () => {
-        startTransition(() => {
-          router.refresh()
-        })
-      })
-    } finally {
-      setIsGeneratingInvoice(false)
-    }
-  }
-
   const openCreateBillingModal = () => {
     setBillingError('')
     setBillingForm(emptyBillingForm(billingTerms.length + 1))
@@ -539,27 +435,6 @@ export function ConstructionDetailClient({
       notes: term.notes || '',
     })
     setShowBillingModal(true)
-  }
-
-  const openCreateStageModal = () => {
-    setStageError('')
-    setStageForm(emptyStageForm())
-    setShowStageModal(true)
-  }
-
-  const openEditStageModal = (stage: ConstructionProjectStageRecord) => {
-    setStageError('')
-    setStageForm({
-      id: stage.id,
-      stageCode: stage.stageCode,
-      stageName: stage.stageName,
-      weightPercent: stage.weightPercent,
-      status: stage.status,
-      plannedStartDate: stage.plannedStartDate || '',
-      plannedEndDate: stage.plannedEndDate || '',
-      notes: stage.notes || '',
-    })
-    setShowStageModal(true)
   }
 
   const openCreateChangeOrderModal = () => {
@@ -602,40 +477,6 @@ export function ConstructionDetailClient({
         router.refresh()
       })
     })
-  }
-
-  const handleStageSave = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setStageError('')
-    startStageTransition(async () => {
-      const result = await upsertConstructionStage(orgId, project.id, {
-        id: stageForm.id,
-        stageCode: stageForm.stageCode,
-        stageName: stageForm.stageName,
-        weightPercent: stageForm.weightPercent,
-        status: stageForm.status,
-        plannedStartDate: stageForm.plannedStartDate || null,
-        plannedEndDate: stageForm.plannedEndDate || null,
-        notes: stageForm.notes || null,
-      })
-      if (result.error) {
-        setStageError(result.error)
-        return
-      }
-      setShowStageModal(false)
-      setStageForm(emptyStageForm())
-      startTransition(() => { router.refresh() })
-    })
-  }
-
-  const handleStageDelete = async (stageId: string) => {
-    if (!confirm('Hapus tahap ini? Item RAB yang tautkan ke tahap ini akan dilepas.')) return
-    const result = await deleteConstructionStage(orgId, project.id, stageId)
-    if (result.error) {
-      alert(`Error: ${result.error}`)
-      return
-    }
-    startTransition(() => { router.refresh() })
   }
 
   const handleBudgetSave = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -845,7 +686,7 @@ export function ConstructionDetailClient({
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
-      <section className="relative overflow-hidden rounded-2xl border border-[#d7d2c9] bg-[radial-gradient(circle_at_top_left,_rgba(224,122,95,0.22),_transparent_36%),linear-gradient(135deg,_#17324d_0%,_#254b63_54%,_#efe3cd_155%)] px-6 py-7 text-white shadow-xl shadow-slate-900/10 md:px-8 md:py-9">
+      <section className="relative overflow-hidden rounded-[36px] border border-[#d7d2c9] bg-[radial-gradient(circle_at_top_left,_rgba(224,122,95,0.22),_transparent_36%),linear-gradient(135deg,_#17324d_0%,_#254b63_54%,_#efe3cd_155%)] px-6 py-7 text-white shadow-xl shadow-slate-900/10 md:px-8 md:py-9">
         <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
         <div className="relative flex flex-col gap-6">
           <div className="flex flex-wrap items-center gap-3">
@@ -869,7 +710,7 @@ export function ConstructionDetailClient({
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.9fr]">
             <div>
-              <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{project.projectName}</h1>
+              <h1 className="text-3xl font-black tracking-tight md:text-4xl">{project.projectName}</h1>
               <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-white/80">
                 {project.clientName || 'Belum ada kontak klien terhubung'}.
                 {' '}
@@ -878,13 +719,13 @@ export function ConstructionDetailClient({
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-white/15 bg-white/10 p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Progres Tahap</div>
-                <div className="mt-2 text-3xl font-semibold tracking-tight">{totals.weightedProgress.toFixed(1)}%</div>
+              <div className="rounded-[24px] border border-white/15 bg-white/10 p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Progress Stage</div>
+                <div className="mt-2 text-3xl font-black tracking-tight">{totals.weightedProgress.toFixed(1)}%</div>
               </div>
-              <div className="rounded-xl border border-white/15 bg-white/10 p-4">
+              <div className="rounded-[24px] border border-white/15 bg-white/10 p-4">
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Termin Billing</div>
-                <div className="mt-2 text-3xl font-semibold tracking-tight">{billingTerms.length}</div>
+                <div className="mt-2 text-3xl font-black tracking-tight">{billingTerms.length}</div>
               </div>
             </div>
           </div>
@@ -892,62 +733,62 @@ export function ConstructionDetailClient({
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Nilai Kontrak</div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Contract Value</div>
             <Wallet size={18} className="text-[#e07a5f]" />
           </div>
-          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(project.contractValue)}</div>
+          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(project.contractValue)}</div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB Rencana</div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB Planned</div>
             <ClipboardList size={18} className="text-[#254b63]" />
           </div>
-          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(totals.plannedTotal)}</div>
+          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(totals.plannedTotal)}</div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Biaya Aktual</div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Actual Cost</div>
             <BarChart3 size={18} className="text-[#3b6b5a]" />
           </div>
-          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(totals.actualTotal)}</div>
+          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(totals.actualTotal)}</div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tagihan Rencana</div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Billing Planned</div>
             <Wallet size={18} className="text-[#6a8d73]" />
           </div>
-          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(totals.totalBillingAmount)}</div>
+          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(totals.totalBillingAmount)}</div>
           <div className="mt-2 text-xs font-bold text-slate-500">
-            Dibayar: {formatRupiah(totals.paidBillingAmount)}
+            Paid: {formatRupiah(totals.paidBillingAmount)}
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">CO Disetujui</div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Approved CO</div>
             <Pencil size={18} className="text-[#d97706]" />
           </div>
-          <div className={`mt-3 text-2xl font-semibold tracking-tight ${getCurrencyDeltaClass(totals.approvedChangeOrderContractDelta, 'text-emerald-700', 'text-rose-700')}`}>
+          <div className={`mt-3 text-2xl font-black tracking-tight ${getCurrencyDeltaClass(totals.approvedChangeOrderContractDelta, 'text-emerald-700', 'text-rose-700')}`}>
             {formatSignedCurrency(totals.approvedChangeOrderContractDelta)}
           </div>
           <div className="mt-2 text-xs font-bold text-slate-500">
-            Terbuka: {totals.openChangeOrders} • Dampak biaya: {formatSignedCurrency(totals.approvedChangeOrderCostDelta)}
+            Open: {totals.openChangeOrders} • Cost impact: {formatSignedCurrency(totals.approvedChangeOrderCostDelta)}
           </div>
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.95fr]">
         <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-6 flex items-center justify-between gap-4">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB / BoQ</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Analisis Budget vs Actual</h2>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Budget & Actual Cost</h2>
               </div>
               <button
                 type="button"
@@ -959,17 +800,91 @@ export function ConstructionDetailClient({
               </button>
             </div>
 
-            <BudgetVariancePanel
-              budgetItems={budgetItems}
-              onEditItem={(item) => openEditBudgetModal(item)}
-            />
+            <div className="mt-6 overflow-x-auto">
+              <table className="min-w-full border-separate border-spacing-y-3">
+                <thead>
+                  <tr className="text-left text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    <th className="px-3">Item</th>
+                    <th className="px-3">Tahap</th>
+                    <th className="px-3">Plan</th>
+                    <th className="px-3">Actual</th>
+                    <th className="px-3">Variance</th>
+                    <th className="px-3">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {budgetItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm font-medium text-slate-500">
+                        Belum ada item RAB. Tambahkan material, upah, subkon, atau alat untuk project ini.
+                      </td>
+                    </tr>
+                  ) : (
+                    budgetItems.map((item) => {
+                      const variance = item.actualTotal - item.plannedTotal
+
+                      return (
+                        <tr key={item.id} className="rounded-[24px] bg-slate-50">
+                          <td className="rounded-l-[24px] px-3 py-4 align-top">
+                            <div className="font-black text-slate-900">{item.description}</div>
+                            <div className="mt-1 text-xs font-medium text-slate-500">
+                              {budgetCategoryLabels[item.category]}{item.uom ? ` • ${item.uom}` : ''}{item.vendorName ? ` • ${item.vendorName}` : ''}
+                            </div>
+                          </td>
+                          <td className="px-3 py-4 align-top text-sm font-bold text-slate-700">
+                            {item.stageName || 'Belum ditautkan'}
+                          </td>
+                          <td className="px-3 py-4 align-top">
+                            <div className="text-sm font-black text-slate-900">{formatRupiah(item.plannedTotal)}</div>
+                            <div className="mt-1 text-xs font-medium text-slate-500">
+                              {item.plannedQuantity} x {formatRupiah(item.plannedUnitCost)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-4 align-top">
+                            <div className="text-sm font-black text-slate-900">{formatRupiah(item.actualTotal)}</div>
+                            <div className="mt-1 text-xs font-medium text-slate-500">
+                              {item.actualQuantity} x {formatRupiah(item.actualUnitCost)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-4 align-top">
+                            <div className={`text-sm font-black ${variance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              {formatRupiah(variance)}
+                            </div>
+                          </td>
+                          <td className="rounded-r-[24px] px-3 py-4 align-top">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openEditBudgetModal(item)}
+                                className="rounded-2xl bg-white p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                                aria-label="Edit item budget"
+                              >
+                                <Pencil size={16} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteBudgetItem(item.id)}
+                                className="rounded-2xl bg-white p-2 text-rose-500 transition hover:bg-rose-50"
+                                aria-label="Hapus item budget"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Log Progress</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Catatan Lapangan Harian</h2>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Progress Log</div>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Catatan Lapangan Harian</h2>
               </div>
               <button
                 type="button"
@@ -983,12 +898,12 @@ export function ConstructionDetailClient({
 
             <div className="mt-6 space-y-4">
               {progressLogs.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
+                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
                   Belum ada log harian. Mulai catat progres lapangan, cuaca, issue, dan bukti pekerjaan.
                 </div>
               ) : (
                 progressLogs.map((log) => (
-                  <article key={log.id} className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
+                  <article key={log.id} className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1004,7 +919,7 @@ export function ConstructionDetailClient({
                             </span>
                           ) : null}
                         </div>
-                        <h3 className="text-lg font-semibold tracking-tight text-slate-900">{log.summary}</h3>
+                        <h3 className="text-lg font-black tracking-tight text-slate-900">{log.summary}</h3>
                         {log.weather ? (
                           <div className="text-sm font-bold text-slate-500">Cuaca: {log.weather}</div>
                         ) : null}
@@ -1053,11 +968,11 @@ export function ConstructionDetailClient({
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Perubahan Pekerjaan</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Register Perubahan Scope</h2>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Change Order</div>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Register Perubahan Scope</h2>
               </div>
               <button
                 type="button"
@@ -1071,7 +986,7 @@ export function ConstructionDetailClient({
 
             <div className="mt-6 space-y-4">
               {changeOrders.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
+                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
                   Belum ada change order. Catat pekerjaan tambah/kurang, revisi desain, atau perpanjangan waktu di sini.
                 </div>
               ) : (
@@ -1083,7 +998,7 @@ export function ConstructionDetailClient({
                   )
 
                   return (
-                  <article key={changeOrder.id} className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
+                  <article key={changeOrder.id} className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1091,7 +1006,7 @@ export function ConstructionDetailClient({
                             {changeOrder.referenceNo || 'Tanpa Ref'}
                           </span>
                           <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${changeOrderStatusStyles[changeOrder.status] || changeOrderStatusStyles.PROPOSED}`}>
-                            {changeOrderStatusLabels[changeOrder.status] || changeOrder.status}
+                            {changeOrder.status}
                           </span>
                           <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">
                             {changeOrderTypeLabels[changeOrder.changeType] || changeOrder.changeType}
@@ -1103,13 +1018,13 @@ export function ConstructionDetailClient({
                           ) : null}
                           {changeOrder.approvalStatus ? (
                             <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${approvalStatusStyles[changeOrder.approvalStatus] || approvalStatusStyles.CANCELLED}`}>
-                              Approval: {approvalStatusLabels[changeOrder.approvalStatus] || changeOrder.approvalStatus}
+                              Approval {changeOrder.approvalStatus}
                             </span>
                           ) : null}
                         </div>
 
                         <div>
-                          <h3 className="text-lg font-semibold tracking-tight text-slate-900">{changeOrder.title}</h3>
+                          <h3 className="text-lg font-black tracking-tight text-slate-900">{changeOrder.title}</h3>
                           <div className="mt-1 text-sm font-medium text-slate-500">
                             Request: {changeOrder.requestedDate ? formatDate(changeOrder.requestedDate, 'short') : 'Belum diisi'}
                             {changeOrder.effectiveDate ? ` • Berlaku: ${formatDate(changeOrder.effectiveDate, 'short')}` : ''}
@@ -1126,7 +1041,7 @@ export function ConstructionDetailClient({
                             </div>
                           </div>
                           <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Delta Biaya</div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Delta Cost</div>
                             <div className={`mt-1 font-black ${getCurrencyDeltaClass(changeOrder.estimatedCostDelta, 'text-rose-700', 'text-emerald-700')}`}>
                               {formatSignedCurrency(changeOrder.estimatedCostDelta)}
                             </div>
@@ -1182,93 +1097,57 @@ export function ConstructionDetailClient({
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Ringkasan Tahap</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Tahap Pekerjaan</h2>
-              </div>
-              <button
-                type="button"
-                onClick={openCreateStageModal}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#254b63] px-4 py-3 text-sm font-black text-white transition hover:bg-[#1e3d52]"
-              >
-                <Plus size={16} />
-                Tambah Tahap
-              </button>
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Stage Breakdown</div>
+            <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Tahap Pekerjaan</h2>
+
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+              {stages.map((stage) => (
+                <article key={stage.id} className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{stage.stageCode}</div>
+                      <h3 className="mt-2 text-lg font-black tracking-tight text-slate-900">{stage.stageName}</h3>
+                    </div>
+                    <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${stageStatusStyles[stage.status] || stageStatusStyles.NOT_STARTED}`}>
+                      {stage.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-5 flex items-end justify-between">
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Bobot</div>
+                      <div className="mt-2 text-2xl font-black tracking-tight text-slate-900">{stage.weightPercent}%</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Progress</div>
+                      <div className="mt-2 text-2xl font-black tracking-tight text-slate-900">{stage.progressPercent}%</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[#254b63] via-[#3b6b5a] to-[#e07a5f]"
+                      style={{ width: `${Math.min(Math.max(stage.progressPercent, 0), 100)}%` }}
+                    />
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between text-xs font-medium text-slate-500">
+                    <span>{stage.plannedStartDate ? formatDate(stage.plannedStartDate, 'short') : 'Mulai TBD'}</span>
+                    <span>{stage.plannedEndDate ? formatDate(stage.plannedEndDate, 'short') : 'Target TBD'}</span>
+                  </div>
+                </article>
+              ))}
             </div>
-
-            {stages.length === 0 ? (
-              <div className="mt-6 rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm font-medium text-slate-400">
-                Belum ada tahap. Klik &ldquo;Tambah Tahap&rdquo; untuk memulai.
-              </div>
-            ) : (
-              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-                {stages.map((stage) => (
-                  <article key={stage.id} className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{stage.stageCode}</div>
-                        <h3 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">{stage.stageName}</h3>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${stageStatusStyles[stage.status] || stageStatusStyles.NOT_STARTED}`}>
-                          {stageStatusLabels[stage.status] || stage.status}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => openEditStageModal(stage)}
-                          className="rounded-xl bg-slate-100 p-1.5 text-slate-500 transition hover:bg-slate-200"
-                          aria-label="Edit tahap"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleStageDelete(stage.id)}
-                          className="rounded-xl bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100"
-                          aria-label="Hapus tahap"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 flex items-end justify-between">
-                      <div>
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Bobot</div>
-                        <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{stage.weightPercent}%</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Progress</div>
-                        <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{stage.progressPercent}%</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#254b63] via-[#3b6b5a] to-[#e07a5f]"
-                        style={{ width: `${Math.min(Math.max(stage.progressPercent, 0), 100)}%` }}
-                      />
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-between text-xs font-medium text-slate-500">
-                      <span>{stage.plannedStartDate ? formatDate(stage.plannedStartDate, 'short') : 'Mulai TBD'}</span>
-                      <span>{stage.plannedEndDate ? formatDate(stage.plannedEndDate, 'short') : 'Target TBD'}</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 
         <aside className="space-y-6">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Snapshot Project</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Update Ringkasan</h2>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Update Ringkasan</h2>
               </div>
               <button
                 type="button"
@@ -1299,14 +1178,14 @@ export function ConstructionDetailClient({
                     onChange={(event) => setProjectForm((prev) => ({ ...prev, projectStatus: event.target.value as ConstructionProjectSnapshotInput['projectStatus'] }))}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
-                    <option value="PLANNING">Perencanaan</option>
-                    <option value="TENDER">Lelang</option>
-                    <option value="DESIGN">Desain</option>
-                    <option value="EXECUTION">Eksekusi</option>
-                    <option value="HANDOVER">Serah Terima</option>
-                    <option value="COMPLETED">Selesai</option>
-                    <option value="ON_HOLD">Ditunda</option>
-                    <option value="CANCELLED">Dibatalkan</option>
+                    <option value="PLANNING">Planning</option>
+                    <option value="TENDER">Tender</option>
+                    <option value="DESIGN">Design</option>
+                    <option value="EXECUTION">Execution</option>
+                    <option value="HANDOVER">Handover</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="ON_HOLD">On Hold</option>
+                    <option value="CANCELLED">Cancelled</option>
                   </select>
                 </label>
 
@@ -1379,7 +1258,7 @@ export function ConstructionDetailClient({
               </div>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Estimasi Biaya</span>
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Estimasi Cost</span>
                 <input
                   type="number"
                   min="0"
@@ -1439,11 +1318,11 @@ export function ConstructionDetailClient({
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Termin Billing</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Jadwal Penagihan</h2>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Jadwal Penagihan</h2>
               </div>
               <button
                 type="button"
@@ -1457,12 +1336,12 @@ export function ConstructionDetailClient({
 
             <div className="mt-6 space-y-4">
               {billingTerms.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
+                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
                   Belum ada termin billing. Tambahkan DP, progress billing, final, atau retensi.
                 </div>
               ) : (
                 billingTerms.map((term) => (
-                  <article key={term.id} className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
+                  <article key={term.id} className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1470,30 +1349,30 @@ export function ConstructionDetailClient({
                             Termin {term.sequenceNo}
                           </span>
                           <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${billingStatusStyles[term.status] || billingStatusStyles.PLANNED}`}>
-                            {billingStatusLabels[term.status] || term.status}
+                            {term.status}
                           </span>
                           <span className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-700">
                             {billingBasisLabels[term.basisType] || term.basisType}
                           </span>
                         </div>
 
-                        <h3 className="text-lg font-semibold tracking-tight text-slate-900">{term.termLabel}</h3>
+                        <h3 className="text-lg font-black tracking-tight text-slate-900">{term.termLabel}</h3>
                         <div className="grid grid-cols-2 gap-3 text-sm font-medium text-slate-600 md:grid-cols-3">
                           <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Jumlah</div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Amount</div>
                             <div className="mt-1 font-black text-slate-900">{formatRupiah(term.billingAmount)}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">% Tagihan</div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Billing %</div>
                             <div className="mt-1 font-black text-slate-900">{term.billingPercent}%</div>
                           </div>
                           <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Target Progres</div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Target Progress</div>
                             <div className="mt-1 font-black text-slate-900">{term.progressTargetPercent}%</div>
                           </div>
                         </div>
                         <div className="text-sm font-medium text-slate-500">
-                          Jatuh Tempo: {term.dueDate ? formatDate(term.dueDate, 'short') : 'Belum diisi'}
+                          Due: {term.dueDate ? formatDate(term.dueDate, 'short') : 'Belum diisi'}
                           {term.invoiceReference ? ` • Invoice: ${term.invoiceReference}` : ''}
                         </div>
                         {term.notes ? (
@@ -1502,17 +1381,6 @@ export function ConstructionDetailClient({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {term.status === 'READY_TO_BILL' && !term.invoiceReference ? (
-                          <button
-                            type="button"
-                            onClick={() => handleGenerateInvoice(term)}
-                            disabled={isGeneratingInvoice}
-                            className="rounded-2xl bg-emerald-50 px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            title="Generate invoice untuk termin ini"
-                          >
-                            {isGeneratingInvoice ? '⏳' : '📄'} Invoice
-                          </button>
-                        ) : null}
                         <button
                           type="button"
                           onClick={() => openEditBillingModal(term)}
@@ -1537,7 +1405,7 @@ export function ConstructionDetailClient({
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Timeline</div>
             <div className="mt-4 space-y-4">
               <div className="flex items-start gap-3">
@@ -1575,11 +1443,11 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB / BoQ</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
                   {budgetForm.id ? 'Edit Item Budget' : 'Tambah Item Budget'}
                 </h2>
               </div>
@@ -1593,7 +1461,7 @@ export function ConstructionDetailClient({
               </button>
             </div>
 
-            <form onSubmit={handleBudgetSave} className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
+            <form onSubmit={handleBudgetSave} className="space-y-5 px-6 py-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
                   <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tahap</span>
@@ -1749,141 +1617,6 @@ export function ConstructionDetailClient({
         </div>
       ) : null}
 
-      {showStageModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"
-            onClick={() => setShowStageModal(false)}
-            aria-label="Tutup modal"
-          />
-
-          <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5">
-              <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tahap Pekerjaan</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-                  {stageForm.id ? 'Edit Tahap' : 'Tambah Tahap'}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowStageModal(false)}
-                className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
-                aria-label="Tutup"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleStageSave} className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
-              <div className="grid grid-cols-2 gap-4">
-                <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Kode Tahap</span>
-                  <input
-                    value={stageForm.stageCode}
-                    onChange={(e) => setStageForm((prev) => ({ ...prev, stageCode: e.target.value }))}
-                    placeholder="mis. FOUNDATION"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold uppercase text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
-                    required
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Status</span>
-                  <select
-                    value={stageForm.status}
-                    onChange={(e) => setStageForm((prev) => ({ ...prev, status: e.target.value as ConstructionStageStatus }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
-                  >
-                    <option value="NOT_STARTED">Belum Mulai</option>
-                    <option value="IN_PROGRESS">Berjalan</option>
-                    <option value="BLOCKED">Terhambat</option>
-                    <option value="DONE">Selesai</option>
-                  </select>
-                </label>
-              </div>
-
-              <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Nama Tahap</span>
-                <input
-                  value={stageForm.stageName}
-                  onChange={(e) => setStageForm((prev) => ({ ...prev, stageName: e.target.value }))}
-                  placeholder="mis. Pekerjaan Pondasi"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
-                  required
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Bobot (%)</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={stageForm.weightPercent}
-                  onChange={(e) => setStageForm((prev) => ({ ...prev, weightPercent: Number(e.target.value) || 0 }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
-                />
-              </label>
-
-              <div className="grid grid-cols-2 gap-4">
-                <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Mulai Plan</span>
-                  <input
-                    type="date"
-                    value={stageForm.plannedStartDate}
-                    onChange={(e) => setStageForm((prev) => ({ ...prev, plannedStartDate: e.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Selesai Plan</span>
-                  <input
-                    type="date"
-                    value={stageForm.plannedEndDate}
-                    onChange={(e) => setStageForm((prev) => ({ ...prev, plannedEndDate: e.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
-                  />
-                </label>
-              </div>
-
-              <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Catatan</span>
-                <textarea
-                  value={stageForm.notes}
-                  onChange={(e) => setStageForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  className="h-20 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
-                />
-              </label>
-
-              {stageError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
-                  {stageError}
-                </div>
-              ) : null}
-
-              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 md:flex-row md:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowStageModal(false)}
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingStage}
-                  className="rounded-2xl bg-[#254b63] px-5 py-3 text-sm font-black text-white shadow-lg shadow-[#254b63]/20 transition hover:bg-[#1e3d52] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSavingStage ? 'Menyimpan...' : 'Simpan Tahap'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-
       {showProgressModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
@@ -1893,12 +1626,12 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Log Progress</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-                  {progressForm.id ? 'Edit Log Progress' : 'Tambah Log Progress'}
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Progress Log</div>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                  {progressForm.id ? 'Edit Progress Log' : 'Tambah Progress Log'}
                 </h2>
               </div>
               <button
@@ -2029,12 +1762,12 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-3xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-3xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Perubahan Pekerjaan</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-                  {changeOrderForm.id ? 'Edit Perubahan Pekerjaan' : 'Tambah Perubahan Pekerjaan'}
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Change Order</div>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                  {changeOrderForm.id ? 'Edit Change Order' : 'Tambah Change Order'}
                 </h2>
               </div>
               <button
@@ -2108,18 +1841,18 @@ export function ConstructionDetailClient({
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, status: event.target.value as ConstructionChangeOrderStatus }))}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
-                    <option value="PROPOSED">Diusulkan</option>
-                    <option value="IN_REVIEW">Ditinjau</option>
-                    <option value="APPROVED">Disetujui</option>
-                    <option value="REJECTED">Ditolak</option>
-                    <option value="IMPLEMENTED">Dilaksanakan</option>
+                    <option value="PROPOSED">Proposed</option>
+                    <option value="IN_REVIEW">In Review</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="REJECTED">Rejected</option>
+                    <option value="IMPLEMENTED">Implemented</option>
                   </select>
                 </label>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tanggal Permintaan</span>
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Requested Date</span>
                   <input
                     type="date"
                     value={changeOrderForm.requestedDate}
@@ -2129,7 +1862,7 @@ export function ConstructionDetailClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tanggal Persetujuan</span>
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Approved Date</span>
                   <input
                     type="date"
                     value={changeOrderForm.approvedDate}
@@ -2139,7 +1872,7 @@ export function ConstructionDetailClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tanggal Efektif</span>
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Effective Date</span>
                   <input
                     type="date"
                     value={changeOrderForm.effectiveDate}
@@ -2162,7 +1895,7 @@ export function ConstructionDetailClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Delta Biaya</span>
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Delta Cost</span>
                   <input
                     type="number"
                     step="0.01"
@@ -2238,11 +1971,11 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Termin Billing</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
                   {billingForm.id ? 'Edit Termin Billing' : 'Tambah Termin Billing'}
                 </h2>
               </div>
@@ -2303,17 +2036,17 @@ export function ConstructionDetailClient({
                     onChange={(event) => setBillingForm((prev) => ({ ...prev, status: event.target.value as ConstructionBillingStatus }))}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
-                    <option value="PLANNED">Direncanakan</option>
-                    <option value="READY_TO_BILL">Siap Tagih</option>
-                    <option value="BILLED">Tertagih</option>
-                    <option value="PAID">Lunas</option>
+                    <option value="PLANNED">Planned</option>
+                    <option value="READY_TO_BILL">Ready to Bill</option>
+                    <option value="BILLED">Billed</option>
+                    <option value="PAID">Paid</option>
                   </select>
                 </label>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Target Progres %</span>
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Target Progress %</span>
                   <input
                     type="number"
                     min="0"
@@ -2326,7 +2059,7 @@ export function ConstructionDetailClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">% Tagihan</span>
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Billing %</span>
                   <input
                     type="number"
                     min="0"
@@ -2353,7 +2086,7 @@ export function ConstructionDetailClient({
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Jatuh Tempo</span>
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Due Date</span>
                   <input
                     type="date"
                     value={billingForm.dueDate}
@@ -2363,7 +2096,7 @@ export function ConstructionDetailClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tanggal Lunas</span>
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Paid Date</span>
                   <input
                     type="date"
                     value={billingForm.paidDate}
@@ -2374,7 +2107,7 @@ export function ConstructionDetailClient({
               </div>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Referensi Invoice</span>
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Invoice Reference</span>
                 <input
                   value={billingForm.invoiceReference}
                   onChange={(event) => setBillingForm((prev) => ({ ...prev, invoiceReference: event.target.value }))}

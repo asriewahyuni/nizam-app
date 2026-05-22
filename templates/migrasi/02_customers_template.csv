@@ -1,6 +1,1 @@
 customer_code,customer_name,phone,email,address,city,payment_term_days,npwp,is_active,notes
-CUST-001,PT Maju Bersama,02112345678,finance@majubersama.co.id,"Jl. Sudirman No. 12, Lantai 5",Jakarta,30,01.234.567.8-901.000,TRUE,Pelanggan utama - bayar rutin
-CUST-002,CV Sejahtera Mandiri,02298765432,info@sejahteramandiri.com,"Jl. Gatot Subroto No. 88",Surabaya,14,,TRUE,
-CUST-003,Toko Berkah Jaya,081234567890,berkahjaya@gmail.com,"Jl. Pasar Baru No. 5",Bandung,7,,TRUE,Bayar tunai
-CUST-004,UD Nusantara Trading,02187654321,nusantara.trading@email.com,"Jl. Raya Industri No. 33",Semarang,45,02.345.678.9-012.000,TRUE,
-CUST-005,Koperasi Serba Usaha Maju,02156781234,ksu.maju@koperasi.id,"Jl. Koperasi No. 7",Yogyakarta,30,,TRUE,Pembayaran via transfer

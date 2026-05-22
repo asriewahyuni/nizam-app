@@ -19,7 +19,6 @@ import {
 } from 'lucide-react'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { createServiceOrder, updateServiceStatus } from '@/modules/services/actions/service.actions'
-import { PageHeader, StatCard, StatusBadge, SafeButton, SectionCard, FormField, FormInput, FormSelect, FormTextarea } from '@/components/ui/NizamUI'
 
 interface ServiceOrderClientProps {
   orgId: string
@@ -27,20 +26,12 @@ interface ServiceOrderClientProps {
   contacts: any[]
 }
 
-const statusLabel: Record<string, string> = {
-  PENDING: 'Antri',
-  IN_PROGRESS: 'Dikerjakan',
-  ON_HOLD: 'Ditahan',
-  COMPLETED: 'Selesai',
-  CANCELLED: 'Batal',
-}
-
-const statusVariant: Record<string, string> = {
-  PENDING: 'neutral',
-  IN_PROGRESS: 'info',
-  ON_HOLD: 'warning',
-  COMPLETED: 'success',
-  CANCELLED: 'danger',
+const statusColors = {
+  PENDING: 'bg-slate-50 text-slate-400 border-slate-100',
+  IN_PROGRESS: 'bg-[#003366]/10 text-[#003366] border-[#003366]/20',
+  ON_HOLD: 'bg-amber-50 text-amber-600 border-amber-100',
+  COMPLETED: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+  CANCELLED: 'bg-rose-50 text-rose-600 border-rose-100'
 }
 
 export function ServiceOrderClient({ orgId, orders, contacts }: ServiceOrderClientProps) {
@@ -63,40 +54,44 @@ export function ServiceOrderClient({ orgId, orders, contacts }: ServiceOrderClie
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto space-y-10">
       
       {/* Header */}
-      <PageHeader
-        title="Job Order & Jasa"
-        subtitle="Pengelolaan Perintah Kerja untuk Industri Layanan & Jasa."
-        icon={<Briefcase size={32} />}
-        iconColor="text-blue-600"
-        actions={
-          <SafeButton onClick={() => setShowModal(true)}>
-            <Plus size={18} /> Terbitkan Job Order
-          </SafeButton>
-        }
-      />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+             <Briefcase size={32} className="text-[#003366]" />
+             Job Order & Jasa
+          </h1>
+          <p className="text-sm text-slate-500 font-medium">Pengelolaan Perintah Kerja untuk Industri Layanan & Jasa.</p>
+        </div>
+
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-6 py-3 bg-[#003366] text-white text-sm font-bold rounded-2xl hover:bg-[#002d5a] shadow-xl shadow-[#003366]/10 transition-all">
+           <Plus size={18} /> Terbitkan Job Order
+        </button>
+      </div>
 
       {/* Main List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
          {orders.length === 0 ? (
-           <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold italic">
+           <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-bold italic">
              Belum ada antrian pekerjaan jasa.
            </div>
          ) : (
            orders.map(order => (
-             <motion.div key={order.id} whileHover={{ y: -5 }} className="bg-white rounded-xl p-8 border border-slate-100 shadow-sm relative overflow-hidden group">
+             <motion.div key={order.id} whileHover={{ y: -5 }} className="bg-white rounded-[32px] p-8 border border-slate-100 shadow-sm relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-all rotate-12">
                    <ClipboardList size={100} strokeWidth={1} />
                 </div>
                 <div className="flex justify-between items-start mb-6">
-                   <StatusBadge label={statusLabel[order.status as keyof typeof statusLabel] || order.status} variant={(statusVariant[order.status as keyof typeof statusVariant] as any) || 'neutral'} />
-                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">{order.job_number}</p>
+                   <span className={`px-4 py-1.5 text-[10px] font-black rounded-full uppercase tracking-tighter border ${statusColors[order.status as keyof typeof statusColors]}`}>
+                      {order.status}
+                   </span>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{order.job_number}</p>
                 </div>
 
                 <div className="space-y-4">
                    <div>
-                      <h3 className="text-xl font-semibold text-slate-900 group-hover:text-[#003366] transition-colors line-clamp-2">{order.description}</h3>
+                      <h3 className="text-xl font-black text-slate-900 group-hover:text-[#003366] transition-colors line-clamp-2">{order.description}</h3>
                       <div className="flex items-center gap-2 mt-2">
-                         <div className="w-5 h-5 bg-slate-100 rounded-full flex items-center justify-center text-[8px] font-semibold text-slate-400 uppercase">
+                         <div className="w-5 h-5 bg-slate-100 rounded-full flex items-center justify-center text-[8px] font-black text-slate-400 uppercase">
                             {order.contact?.name?.[0]}
                          </div>
                          <p className="text-xs font-bold text-slate-500">{order.contact?.name}</p>
@@ -108,15 +103,15 @@ export function ServiceOrderClient({ orgId, orders, contacts }: ServiceOrderClie
 
                 <div className="mt-8 pt-8 border-t border-slate-50 flex items-center justify-between">
                    <div className="flex flex-col">
-                      <p className="text-[10px] font-bold text-slate-400 tracking-tight">Est. Cost</p>
-                      <p className="text-sm font-semibold text-slate-900">{formatRupiah(order.estimated_cost)}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Est. Cost</p>
+                      <p className="text-sm font-black text-slate-900">{formatRupiah(order.estimated_cost)}</p>
                    </div>
                    <div className="flex items-center gap-2">
                       {order.status === 'PENDING' && (
-                        <SafeButton onClick={() => updateServiceStatus(orgId, order.id, 'IN_PROGRESS')} variant="primary" size="sm">Mulai</SafeButton>
+                        <button onClick={() => updateServiceStatus(orgId, order.id, 'IN_PROGRESS')} className="px-4 py-2 bg-[#003366] text-white text-[10px] font-black uppercase rounded-lg">Mulai</button>
                       )}
                       {order.status === 'IN_PROGRESS' && (
-                        <SafeButton onClick={() => updateServiceStatus(orgId, order.id, 'COMPLETED')} variant="success" size="sm">Selesai</SafeButton>
+                        <button onClick={() => updateServiceStatus(orgId, order.id, 'COMPLETED')} className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-lg">Selesai</button>
                       )}
                       <button className="p-2 bg-slate-50 text-slate-300 hover:text-slate-600 rounded-lg transition"><MoreVertical size={16} /></button>
                    </div>
@@ -131,40 +126,47 @@ export function ServiceOrderClient({ orgId, orders, contacts }: ServiceOrderClie
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl p-8 overflow-hidden">
+             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl p-8 overflow-hidden">
                 <div className="flex items-center justify-between mb-8">
-                   <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
+                   <h3 className="text-xl font-black text-slate-900 flex items-center gap-3">
                       <Plus size={20} className="text-[#003366]" /> Terbitkan SPK Jasa
                    </h3>
                    <button onClick={() => setShowModal(false)} className="text-slate-400"><X size={20} /></button>
                 </div>
                 <form onSubmit={handleCreateOrder} className="space-y-6">
-                   <FormField label="No. Job (Internal)">
-                     <FormInput name="job_number" required placeholder="JOB-XXXXX" defaultValue={`JOB-${Date.now().toString().slice(-6)}`} />
-                   </FormField>
-                   <FormField label="Pilih Pelanggan" required>
-                     <FormSelect name="contact_id" required>
-                       <option value="">-- Customer --</option>
-                       {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                     </FormSelect>
-                   </FormField>
-                   <FormField label="Deskripsi Pekerjaan" required>
-                     <FormInput name="description" required placeholder="Cth: Perbaikan AC Split 2 PK" />
-                   </FormField>
-                   <div className="grid grid-cols-2 gap-4">
-                     <FormField label="Estimasi Biaya">
-                       <FormInput name="estimated_cost" type="number" placeholder="0" />
-                     </FormField>
-                     <FormField label="Tgl Mulai" required>
-                       <FormInput name="start_date" type="date" required defaultValue={new Date().toISOString().split('T')[0]} />
-                     </FormField>
+                   <div className="space-y-1.5 text-left">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">No. Job (Internal)</label>
+                      <input name="job_number" required placeholder="JOB-XXXXX" defaultValue={`JOB-${Date.now().toString().slice(-6)}`} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-[#003366] font-bold" />
                    </div>
-                   <FormField label="Catatan Tambahan">
-                     <FormTextarea name="notes" placeholder="Tulis instruksi khusus..." />
-                   </FormField>
-                   <SafeButton type="submit" disabled={loading} className="w-full justify-center">
-                     {loading ? 'Memproses...' : 'Terbitkan Sekarang'}
-                   </SafeButton>
+                   <div className="space-y-1.5 text-left">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Pelanggan</label>
+                      <select name="contact_id" required className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-[#003366] font-bold">
+                         <option value="">-- Customer --</option>
+                         {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                   </div>
+                   <div className="space-y-1.5 text-left">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Deskripsi Pekerjaan *</label>
+                      <input name="description" required placeholder="Cth: Perbaikan AC Split 2 PK" className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:border-[#003366] font-bold" />
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5 text-left">
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Estimasi Biaya</label>
+                         <input name="estimated_cost" type="number" placeholder="0" className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-[#003366] font-bold" />
+                      </div>
+                      <div className="space-y-1.5 text-left">
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tgl Mulai</label>
+                         <input name="start_date" type="date" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-[#003366] font-bold" />
+                      </div>
+                   </div>
+                   <div className="space-y-1.5 text-left">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Catatan Tambahan</label>
+                      <textarea name="notes" placeholder="Tulis instruksi khusus..." className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-[#003366] text-sm h-24" />
+                   </div>
+                   <button type="submit" disabled={loading} className="w-full py-5 bg-[#003366] text-white font-black rounded-2xl shadow-xl shadow-[#003366]/10 mt-4 overflow-hidden relative group">
+                      <span className="relative z-10">{loading ? 'Processing...' : 'Terbitkan Sekarang'}</span>
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 group-hover:scale-110 transition-transform" />
+                   </button>
                 </form>
              </motion.div>
           </div>

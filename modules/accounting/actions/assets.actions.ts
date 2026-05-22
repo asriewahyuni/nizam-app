@@ -144,9 +144,6 @@ export async function createFixedAsset(orgId: string, assetData: any) {
 
   if (assetError) {
     (console as any).error('Error creating fixed asset:', assetError)
-    if (assetError.message?.includes('fixed_assets_org_id_code_key')) {
-      return { error: `Kode aset "${finalAssetData.code}" sudah digunakan oleh aset lain. Silakan ganti kode aset.` }
-    }
     return { error: assetError.message }
   }
 
@@ -156,15 +153,17 @@ export async function createFixedAsset(orgId: string, assetData: any) {
       return { error: 'Akun PPN Masukan harus dipilih jika ada pajak!' }
   }
 
-  // 3. OTOMATIS JURNAL PEROLEHAN ASET TETAP (Enterprise Engine)
-  const description = `Perolehan Aset Tetap: ${asset.name} (${asset.code})`
-
+  // 3. OTOMATIS JURNAL KAPITALISASI (Enterprise Engine)
+  const description = `Kapitalisasi Aset: ${asset.name} (${asset.code})`
+  const isCapitalized = assetData.should_capitalize_tax || false
+  const totalFunding = asset.purchase_price + (isCapitalized ? 0 : taxAmount)
+  
   const journalLines: any[] = [
-    {
-      account_id: asset.asset_account_id,
-      debit: Number(asset.purchase_price),
-      credit: 0,
-      memo: `Perolehan Aset Tetap (Base) - ${asset.name}`
+    { 
+      account_id: asset.asset_account_id, 
+      debit: asset.purchase_price, 
+      credit: 0, 
+      memo: `Perolehan Aset Tetap (Base) - ${asset.name}` 
     }
   ]
 
@@ -176,11 +175,7 @@ export async function createFixedAsset(orgId: string, assetData: any) {
       memo: `PPN Masukan Perolehan Aset - ${asset.code}`
     })
   }
-
-  // Hitung total debit dari semua baris — dipakai sebagai kredit sumber dana
-  // agar jurnal selalu balance (pajak terpisah: kredit = base + pajak; kapitalisasi: kredit = base+pajak yg sudah masuk ke purchase_price)
-  const totalDebit = journalLines.reduce((sum: number, l: any) => sum + (Number(l.debit) || 0), 0)
-
+  
   if (source_lines && source_lines.length > 0) {
     source_lines.forEach((sl: any) => {
       journalLines.push({
@@ -191,11 +186,11 @@ export async function createFixedAsset(orgId: string, assetData: any) {
       })
     })
   } else if (source_account_id) {
-    journalLines.push({
-      account_id: source_account_id,
-      debit: 0,
-      credit: totalDebit,
-      memo: `Pembiayaan Aset - ${asset.code}`
+    journalLines.push({ 
+      account_id: source_account_id, 
+      debit: 0, 
+      credit: totalFunding, 
+      memo: `Pembiayaan Aset - ${asset.code}` 
     })
   }
 

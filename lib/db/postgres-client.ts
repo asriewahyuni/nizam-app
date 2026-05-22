@@ -539,15 +539,8 @@ class PostgresQueryBuilder {
       const alias = aliasRaw.split('!')[0]
       const relTable = relTableRaw.split('!')[0]
 
-      // Only add alias_id if this is a forward FK (baseTable.alias_id → relTable).
-      // For backref (one-to-many) relations, the FK goes from relTable back to baseTable —
-      // adding alias_id (e.g. items_id) would reference a non-existent column and break the SELECT.
-      const isBackref = Array.from(_fkCache.entries()).some(
-        ([k, v]) => k.startsWith(relTable + '.') && v === baseTable
-      )
-      if (!isBackref) {
-        requiredColumns.add(`${alias}_id`)
-      }
+      // Alias-based fallback tetap dipakai karena banyak query mengikuti pola branch -> branch_id, product -> product_id.
+      requiredColumns.add(`${alias}_id`)
 
       for (const [key, value] of _fkCache.entries()) {
         if (!key.startsWith(baseTable + '.') || value !== relTable) continue

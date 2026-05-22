@@ -1,6 +1,1 @@
 supplier_code,supplier_name,phone,email,address,city,payment_term_days,npwp,is_active,notes
-SUP-001,PT Bahan Prima Nusantara,02145678901,purchase@bahanprima.co.id,"Jl. Industri Raya No. 100",Jakarta,30,03.456.789.0-123.000,TRUE,Supplier bahan baku utama
-SUP-002,UD Logistik Andalan,02234567890,logistik@andalan.com,"Jl. Pelabuhan No. 22",Surabaya,14,,TRUE,
-SUP-003,CV Sumber Makmur,0818765432,sumbermakmur@gmail.com,"Jl. Raya Makmur No. 15",Bandung,7,,TRUE,Supplier lokal - bayar tunai
-SUP-004,PT Indo Packaging,02187651234,indent@indopack.co.id,"Kawasan Industri MM2100 Blok A-5",Bekasi,45,04.567.890.1-234.000,TRUE,Supplier kemasan
-SUP-005,Importir Global Trade Ltd,02167890123,import@globaltrade.co.id,"Jl. TB Simatupang No. 45",Jakarta,60,05.678.901.2-345.000,TRUE,Import bahan khusus - multi currency

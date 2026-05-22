@@ -390,35 +390,9 @@ function normalizeCode(value: string | null | undefined) {
   return String(value || '')
     .trim()
     .toUpperCase()
-    .replace(/[^A-Z0-9.\-]/g, '-')
+    .replace(/[^A-Z0-9-]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
-}
-
-// Normalizes various date formats to YYYY-MM-DD.
-// Handles: Date object, Excel serial number, DD/MM/YYYY, D/M/YYYY, YYYY/MM/DD, DD-MM-YYYY.
-function normalizeDate(value: unknown, fallback: string): string {
-  if (value instanceof Date) {
-    return value.toISOString().slice(0, 10)
-  }
-  if (typeof value === 'number' && value > 0) {
-    // Excel serial date: days since 1900-01-00 (with leap year bug)
-    const date = new Date((value - 25569) * 86400 * 1000)
-    return date.toISOString().slice(0, 10)
-  }
-  const s = String(value || '').trim()
-  if (!s) return fallback
-  // Already YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-  // YYYY/MM/DD
-  if (/^\d{4}\/\d{2}\/\d{2}$/.test(s)) return s.replace(/\//g, '-')
-  // DD/MM/YYYY or D/M/YYYY
-  const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
-  // DD-MM-YYYY
-  const dmyDash = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
-  if (dmyDash) return `${dmyDash[3]}-${dmyDash[2].padStart(2, '0')}-${dmyDash[1].padStart(2, '0')}`
-  return fallback
 }
 
 function parseBoolean(value: string | null | undefined, fallback = true) {
@@ -427,49 +401,10 @@ function parseBoolean(value: string | null | undefined, fallback = true) {
   return normalized === 'TRUE'
 }
 
-function sanitizeNumericString(value: string): string {
-  let cleaned = value.trim()
-  if (!cleaned) return cleaned
-  cleaned = cleaned.replace(/^rp\.?\s*/i, '').replace(/\s+/g, '')
-  if (!cleaned) return cleaned
-
-  const hasDot = cleaned.includes('.')
-  const hasComma = cleaned.includes(',')
-
-  if (hasDot && hasComma) {
-    const lastDot = cleaned.lastIndexOf('.')
-    const lastComma = cleaned.lastIndexOf(',')
-    if (lastComma > lastDot) {
-      // ID: "1.000.000,50"
-      cleaned = cleaned.replace(/\./g, '').replace(',', '.')
-    } else {
-      // EN: "1,000,000.50"
-      cleaned = cleaned.replace(/,/g, '')
-    }
-  } else if (hasComma) {
-    const parts = cleaned.split(',')
-    if (parts.length > 2 || (parts[1] && parts[1].length === 3)) {
-      cleaned = cleaned.replace(/,/g, '')
-    } else {
-      cleaned = cleaned.replace(',', '.')
-    }
-  } else if (hasDot) {
-    const parts = cleaned.split('.')
-    if (parts.length > 2) {
-      cleaned = cleaned.replace(/\./g, '')
-    } else if (parts[1] && parts[1].length === 3 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
-      cleaned = cleaned.replace('.', '')
-    }
-  }
-  return cleaned
-}
-
 function parseNumber(value: string | null | undefined) {
-  const raw = String(value || '').trim()
-  if (!raw) return 0
-  const clean = sanitizeNumericString(raw)
-  if (!clean) return 0
-  const parsed = Number(clean)
+  const normalized = String(value || '').trim()
+  if (!normalized) return 0
+  const parsed = Number(normalized)
   return Number.isFinite(parsed) ? parsed : 0
 }
 
@@ -656,18 +591,12 @@ function resolveCoaAccountType(value: string) {
     aset: 'ASSET',
     liabilitas: 'LIABILITY',
     hutang: 'LIABILITY',
-    kewajiban: 'LIABILITY',
     ekuitas: 'EQUITY',
-    modal: 'EQUITY',
     pendapatan: 'REVENUE',
-    pemasukan: 'REVENUE',
-    penjualan: 'REVENUE',
-    income: 'REVENUE',
     hpp: 'EXPENSE',
     beban: 'EXPENSE',
     'beban operasional': 'EXPENSE',
     'beban lainnya': 'EXPENSE',
-    biaya: 'EXPENSE',
   }
 
   return mapping[normalizeLookup(value)] || null
@@ -798,10 +727,11 @@ export async function importCoaMigration(
         continue
       }
 
-      // tipe_akun opsional — default ke HEADER untuk level 1, DETAIL untuk level lainnya
-      const resolvedType = ['HEADER', 'DETAIL'].includes(rowType)
-        ? rowType
-        : level === 1 ? 'HEADER' : 'DETAIL'
+      if (!['HEADER', 'DETAIL'].includes(rowType)) {
+        summary.skipped += 1
+        summary.errors.push(`Baris ${row.rowNumber}: tipe_akun harus HEADER atau DETAIL.`)
+        continue
+      }
 
       if (level === 1 && parentCode) {
         summary.skipped += 1
@@ -824,11 +754,7 @@ export async function importCoaMigration(
       const parentAccount = parentCode ? accountByCode.get(parentCode) || null : null
       if (parentCode && !parentAccount?.id) {
         summary.skipped += 1
-        summary.errors.push(
-          `Baris ${row.rowNumber}: parent_kode "${parentCode}" belum ditemukan di sistem atau di baris level sebelumnya. ` +
-          `Pastikan baris parent sudah diisi di level yang lebih rendah dan diproses sebelum baris ini. ` +
-          `Contoh: akun level 2 harus punya parent_kode akun level 1, level 3 parent_kode level 2.`
-        )
+        summary.errors.push(`Baris ${row.rowNumber}: parent_kode ${parentCode} belum ditemukan di sistem atau di baris level sebelumnya.`)
         continue
       }
 
@@ -888,8 +814,8 @@ export async function importCoaMigration(
         const savedAccount = updatedAccount as ExistingCoaImportRecord
         accountByCode.set(code, savedAccount)
         summary.updated += 1
-        if (resolvedType === 'HEADER') summary.headerRows += 1
-        if (resolvedType === 'DETAIL') summary.detailRows += 1
+        if (rowType === 'HEADER') summary.headerRows += 1
+        if (rowType === 'DETAIL') summary.detailRows += 1
 
         try {
           const syncResult = await syncParentAccountToDescendants(orgId, savedAccount, {
@@ -1445,7 +1371,7 @@ export async function importOpeningStockMigration(
     const warehouseInput = String(row.values.warehouse_name || '').trim()
     const batchNumber = String(row.values.batch_number || '').trim() || null
     const binName = String(row.values.bin_name || '').trim()
-    const rawQty = parseNumber(row.values.qty)
+    const rawQty = Number(String(row.values.qty || '').trim())
     const rawUnitCost = String(row.values.unit_cost || '').trim()
     const rawTotalValue = String(row.values.total_value || '').trim()
 
@@ -1491,8 +1417,8 @@ export async function importOpeningStockMigration(
       continue
     }
 
-    const providedTotalValue = rawTotalValue ? parseNumber(rawTotalValue) : NaN
-    const providedUnitCost = rawUnitCost ? parseNumber(rawUnitCost) : NaN
+    const providedTotalValue = rawTotalValue ? Number(rawTotalValue) : NaN
+    const providedUnitCost = rawUnitCost ? Number(rawUnitCost) : NaN
     const totalValue = Number.isFinite(providedTotalValue) && providedTotalValue > 0
       ? Number(providedTotalValue.toFixed(2))
       : Number.isFinite(providedUnitCost) && providedUnitCost >= 0
@@ -1995,7 +1921,7 @@ export async function importOpeningArMigration(
     const dueDate = String(row.values.due_date || '').trim() || invoiceDate
     const branchName = String(row.values.branch_name || '').trim()
     const notes = String(row.values.notes || '').trim()
-    const outstandingAmount = parseNumber(row.values.outstanding_amount)
+    const outstandingAmount = Number(String(row.values.outstanding_amount || '').trim())
 
     if (!customerName) {
       summary.skipped += 1
@@ -2281,7 +2207,7 @@ export async function importOpeningApMigration(
     const dueDate = String(row.values.due_date || '').trim() || billDate
     const branchName = String(row.values.branch_name || '').trim()
     const notes = String(row.values.notes || '').trim()
-    const outstandingAmount = parseNumber(row.values.outstanding_amount)
+    const outstandingAmount = Number(String(row.values.outstanding_amount || '').trim())
 
     if (!supplierName) {
       summary.skipped += 1
@@ -2565,17 +2491,14 @@ export async function importOpeningCashBankMigration(
   for (const row of payload.openingCashBankRows) {
     const accountCode = String(row.values.account_code || '').trim()
     const accountName = String(row.values.account_name || '').trim()
-    // Terima KAS (template v2.1+) maupun CASH (lama)
-    const accountTypeRaw = String(row.values.account_type || '').trim().toUpperCase()
+    const accountType = String(row.values.account_type || '').trim().toUpperCase()
     const branchName = String(row.values.branch_name || '').trim()
     const notes = String(row.values.notes || '').trim()
-    // opening_amount (v2.1+) dengan fallback ke balance (lama)
-    const balanceRaw = String(row.values.opening_amount || row.values.balance || '').trim()
-    const balance = Number(sanitizeNumericString(balanceRaw))
+    const balance = Number(String(row.values.balance || '').trim())
 
-    if (!['KAS', 'BANK', 'CASH'].includes(accountTypeRaw)) {
+    if (!['CASH', 'BANK'].includes(accountType)) {
       summary.skipped += 1
-      summary.errors.push(`Baris ${row.rowNumber}: account_type harus KAS atau BANK.`)
+      summary.errors.push(`Baris ${row.rowNumber}: account_type harus CASH atau BANK.`)
       continue
     }
 
@@ -2837,13 +2760,13 @@ export async function importFixedAssetsMigration(
   for (const row of payload.fixedAssetRows) {
     const assetName = String(row.values.asset_name || '').trim()
     const assetCodeInput = String(row.values.asset_code || '').trim()
-    const acquisitionDate = normalizeDate(row.values.acquisition_date, journalDate)
+    const acquisitionDate = String(row.values.acquisition_date || '').trim() || journalDate
     const branchName = String(row.values.branch_name || '').trim()
     const notes = String(row.values.notes || '').trim()
-    const acquisitionCost = parseNumber(row.values.acquisition_cost)
-    const accumulatedDepreciation = parseNumber(row.values.accumulated_depreciation)
-    const residualValue = parseNumber(row.values.residual_value)
-    const usefulLifeInput = parseNumber(row.values.useful_life_months)
+    const acquisitionCost = Number(String(row.values.acquisition_cost || '').trim())
+    const accumulatedDepreciation = Number(String(row.values.accumulated_depreciation || '').trim() || '0')
+    const residualValue = Number(String(row.values.residual_value || '').trim() || '0')
+    const usefulLifeInput = Number(String(row.values.useful_life_months || '').trim() || '0')
 
     if (!assetName) {
       summary.skipped += 1
@@ -3159,7 +3082,7 @@ export async function importManufacturingMigration(
       const componentSku = String(row.values.component_sku || '').trim()
       const componentName = String(row.values.component_name || '').trim()
       const componentUnit = String(row.values.component_unit || '').trim() || null
-      const componentQty = parseNumber(row.values.component_qty)
+      const componentQty = Number(String(row.values.component_qty || '').trim())
 
       const componentProduct =
         (componentSku ? productBySku.get(normalizeCode(componentSku)) : null) ||
@@ -3319,9 +3242,9 @@ export async function importEmployeesMigration(
     const phone = String(row.values.phone || '').trim()
     const department = String(row.values.department || '').trim()
     const position = String(row.values.position || '').trim()
-    const joinDate = normalizeDate(row.values.join_date, new Date().toISOString().slice(0, 10))
+    const joinDate = String(row.values.join_date || '').trim() || new Date().toISOString().slice(0, 10)
     const employmentStatusInput = String(row.values.employment_status || '').trim()
-    const basicSalary = parseNumber(row.values.basic_salary)
+    const basicSalary = Number(String(row.values.basic_salary || '').trim() || '0')
     const isActive = parseBoolean(row.values.is_active, true)
 
     if (!employeeName) {
@@ -3373,8 +3296,7 @@ export async function importEmployeesMigration(
     const { error: employeeError } = await supabase.from('employees').insert(employeeInsert)
     if (employeeError) {
       summary.skipped += 1
-      const reason = employeeError instanceof Error ? employeeError.message : String(employeeError)
-      summary.errors.push(`Baris ${row.rowNumber}: gagal membuat karyawan ${employeeName} — ${reason}.`)
+      summary.errors.push(`Baris ${row.rowNumber}: gagal membuat karyawan ${employeeName}.`)
       continue
     }
 

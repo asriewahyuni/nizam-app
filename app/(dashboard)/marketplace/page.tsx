@@ -8,10 +8,9 @@ import {
 import {
   CORE_MODULES,
   OPERATIONAL_MODULES,
-  ADDON_MODULES,
   type ModuleDefinition,
 } from '@/modules/marketplace/lib/module-registry'
-import { CheckCircle2, Lock, ArrowRight, Sparkles, ShieldCheck, Zap, Circle, Building2 } from 'lucide-react'
+import { CheckCircle2, Lock, ArrowRight, Sparkles, ShieldCheck, Zap, Circle } from 'lucide-react'
 import { DeactivateModuleButton } from './DeactivateModuleButton'
 import { ActivateModuleButton } from './ActivateModuleButton'
 import { ActivateCoreModuleButton } from './ActivateCoreModuleButton'
@@ -34,10 +33,6 @@ export default async function MarketplacePage() {
   if (!orgData) return redirect('/onboarding')
   if (!['owner', 'admin'].includes(orgData.role)) return redirect('/dashboard')
 
-  // Unit/child org can also manage their own modules independently.
-  // Each org (parent or child) controls its own module selection.
-  const isChildOrg = !!(orgData.org as any).parent_org_id
-
   const [instances, pricing] = await Promise.all([
     getOrgModuleInstances(orgData.org.id),
     getOperationalModulePricing(),
@@ -47,7 +42,6 @@ export default async function MarketplacePage() {
   const instanceMap = new Map((instances as any[]).map(i => [i.module_key, i]))
 
   function getModuleState(mod: ModuleDefinition): ModuleState {
-    if (mod.comingSoon) return 'locked'
     const instance = instanceMap.get(mod.key) as any
     if (instance?.status === 'DISABLED') return 'inactive'
     const isEnabled = enabledModules.some(m => moduleNameMatches(m, mod.key))
@@ -63,32 +57,15 @@ export default async function MarketplacePage() {
   return (
     <div className="space-y-10">
 
-      {/* ── Child Org Banner ── */}
-      {isChildOrg && (
-        <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-              <Building2 className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Organisasi Anak / Cabang</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Kamu bisa mengelola modul secara mandiri. Aktivasi modul hanya berlaku untuk unit ini.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── Hero ── */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-8 text-white shadow-2xl">
+      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-8 text-white shadow-2xl">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl opacity-10 -mr-32 -mt-32" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500 rounded-full blur-3xl opacity-10 -ml-20 -mb-20" />
         <div className="relative">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3 py-1.5 text-[10px] font-semibold tracking-tight mb-4">
-            <Sparkles className="h-3 w-3" /> Model Hub
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest mb-4">
+            <Sparkles className="h-3 w-3" /> Modul Marketplace
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight">Pilih Operasional Bisnis Anda</h1>
+          <h1 className="text-3xl font-black tracking-tight">Pilih Operasional Bisnis Anda</h1>
           <p className="mt-2 text-slate-300 text-sm font-medium max-w-xl">
             Modul inti sudah aktif. Pilih modul operasional untuk mendefinisikan model bisnis Anda.
           </p>
@@ -120,10 +97,10 @@ export default async function MarketplacePage() {
             <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
               <ShieldCheck className="h-3 w-3 text-emerald-600" />
             </div>
-            <span className="text-sm font-semibold text-slate-900">Modul Inti</span>
+            <span className="text-sm font-black text-slate-900">Modul Inti</span>
           </div>
           <div className="flex-1 h-px bg-slate-200" />
-          <span className="text-xs text-slate-400 font-medium">Termasuk dalam paket · Accounting &amp; Finance tidak dapat dinonaktifkan</span>
+          <span className="text-xs text-slate-400 font-medium">Selalu aktif — sudah termasuk dalam paket</span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {CORE_MODULES.map(mod => {
@@ -140,7 +117,7 @@ export default async function MarketplacePage() {
             <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
               <Zap className="h-3 w-3 text-blue-600" />
             </div>
-            <span className="text-sm font-semibold text-slate-900">Modul Operasional</span>
+            <span className="text-sm font-black text-slate-900">Modul Operasional</span>
           </div>
           <div className="flex-1 h-px bg-slate-200" />
         </div>
@@ -161,7 +138,7 @@ export default async function MarketplacePage() {
           ].map((item, idx, arr) => (
             <div key={item.step} className="flex items-center gap-1">
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
-                <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0">
+                <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-[8px] font-black text-white flex-shrink-0">
                   {item.step}
                 </div>
                 <span className="text-[10px] font-bold text-slate-500">{item.label}</span>
@@ -195,53 +172,12 @@ export default async function MarketplacePage() {
           })}
         </div>
       </section>
-
-      {/* ── MODUL ADD-ON ── */}
-      <section>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-full bg-pink-100 flex items-center justify-center">
-              <Sparkles className="h-3 w-3 text-pink-600" />
-            </div>
-            <span className="text-sm font-semibold text-slate-900">Add-on</span>
-          </div>
-          <div className="flex-1 h-px bg-slate-200" />
-        </div>
-        <p className="text-xs text-slate-500 mb-4">
-          Tambahan fungsional yang bisa diaktifkan bersamaan dengan modul utama.
-        </p>
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {ADDON_MODULES.map(mod => {
-            const state = getModuleState(mod)
-            const price = pricing[mod.key]
-            const instance = instanceMap.get(mod.key) as any
-            const readyAt = instance?.ready_at ?? null
-            const unmetRequirements = (mod.requires || []).filter(
-              req => !enabledModules.some(m => moduleNameMatches(m, req))
-            )
-            return (
-              <OperationalModuleCard
-                key={mod.key}
-                mod={mod}
-                state={state}
-                price={price}
-                readyAt={readyAt}
-                unmetRequirements={unmetRequirements}
-              />
-            )
-          })}
-        </div>
-      </section>
     </div>
   )
 }
 
-// Modul inti yang tidak boleh dinonaktifkan — fondasi sistem ERP
-const MINIMUM_CORE_KEYS = new Set(['Accounting', 'Finance'])
-
 // ── Core Module Card ─────────────────────────────────────────────────────────
 function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: boolean }) {
-  const isMinimum = MINIMUM_CORE_KEYS.has(mod.key)
   return (
     <div className={`flex items-center gap-4 rounded-2xl border px-5 py-4 transition-all ${
       enabled
@@ -259,12 +195,9 @@ function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: bool
       </div>
 
       {enabled ? (
-        <div className="flex-shrink-0 flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 text-[9px] font-semibold tracking-tight text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
-            <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
-          </span>
-          {!isMinimum && <DeactivateModuleButton moduleKey={mod.key} moduleName={mod.name} />}
-        </div>
+        <span className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
+          <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
+        </span>
       ) : (
         <ActivateCoreModuleButton moduleKey={mod.key} />
       )}
@@ -317,7 +250,7 @@ function OperationalModuleCard({
           {mod.icon}
         </div>
         <div className="pr-20">
-          <h3 className="text-base font-semibold text-slate-900 leading-tight">{mod.name}</h3>
+          <h3 className="text-base font-black text-slate-900 leading-tight">{mod.name}</h3>
           <p className="text-xs font-semibold text-slate-400 mt-0.5">{mod.tagline}</p>
         </div>
       </div>
@@ -351,7 +284,7 @@ function OperationalModuleCard({
       {/* ── Harga (jika sudah diset di SaaS) ── */}
       {price !== undefined && !isReady && !isPending && (
         <div className="mt-4 pt-4 border-t border-slate-100 flex items-baseline gap-1.5">
-          <span className="text-lg font-semibold text-slate-900">{formatRp(price)}</span>
+          <span className="text-lg font-black text-slate-900">{formatRp(price)}</span>
           <span className="text-xs text-slate-400 font-medium">/ bulan</span>
         </div>
       )}
@@ -362,7 +295,7 @@ function OperationalModuleCard({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <span className="text-xs font-semibold text-emerald-700">Modul Aktif</span>
+              <span className="text-xs font-black text-emerald-700">Modul Aktif</span>
             </div>
             {readyAt && (
               <span className="text-[10px] text-slate-400 font-medium">
@@ -421,7 +354,7 @@ function OperationalModuleCard({
             </div>
           )}
           {isPending && (
-            <a href={`${mod.href}/onboarding`} className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-amber-100 hover:bg-amber-600 transition-all">
+            <a href={`/marketplace/setup/${mod.key}`} className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-amber-100 hover:bg-amber-600 transition-all">
               Selesaikan Setup <ArrowRight className="h-4 w-4" />
             </a>
           )}
@@ -459,7 +392,7 @@ function StatusPill({
     emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   }
   return (
-    <span className={`inline-flex items-center gap-1 text-[9px] font-semibold tracking-tight border px-2 py-1 rounded-full ${colors[color]}`}>
+    <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest border px-2 py-1 rounded-full ${colors[color]}`}>
       {icon} {label}
     </span>
   )

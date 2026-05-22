@@ -1,19 +1,22 @@
 'use client'
 
 import { formatRupiah, getInitials } from '@/lib/utils'
+import type { RuntimeDatabaseMode, RuntimeDatabaseSourceKey } from '@/lib/db/runtime-target'
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
-import { Building2, Bell, Menu, MapPin, ChevronDown, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Zap } from 'lucide-react'
+import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Database, CircleDot } from 'lucide-react'
 import { VersionIntegrityButton } from '@/components/shared/VersionIntegrityButton'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import Link from 'next/link'
 import type { Organization } from '@/types/database.types'
+import type { AiTokenHeaderSummary } from '@/modules/ai/lib/ai-token'
 import type { BSCDeckSummary } from '@/modules/accounting/actions/bsc.actions'
 import type { DeckCashSummary } from '@/modules/accounting/actions/reports.actions'
 import {
   getHeaderNavigationData,
   getHeaderPendingApprovals,
+  getHeaderTokenSummary,
 } from '@/modules/organization/actions/dashboard-shell.actions'
 import { getOrganizationDeckData, type OrganizationDeckData } from '@/modules/organization/actions/org-deck.actions'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
@@ -45,11 +48,13 @@ interface AppHeaderProps {
   allowAllBranchSelection?: boolean
   canManageBranches?: boolean
   pendingApprovals?: number
+  aiTokens?: AiTokenHeaderSummary | null
   orgBscSummaries?: Record<string, BSCDeckSummary>
   orgBranchesByOrgId?: Record<string, BranchSummary[]>
   orgCashSummaries?: Record<string, DeckCashSummary>
   branchCashSummaries?: Record<string, DeckCashSummary>
-  planName?: string
+  runtimeDatabaseMode?: RuntimeDatabaseMode
+  runtimeDatabaseSource?: RuntimeDatabaseSourceKey
 }
 
 type PendingContextSwitch =
@@ -244,6 +249,42 @@ function getDeckMetricValueClass(valueLabel: string, compact: boolean): string {
   return 'text-[11px]'
 }
 
+function getRuntimeDatabaseBadgeMeta(
+  mode: RuntimeDatabaseMode,
+  source: RuntimeDatabaseSourceKey
+) {
+  switch (mode) {
+    case 'local-postgres':
+      return {
+        label: 'DB Local',
+        description: `Mode lokal aktif via ${source}`,
+        className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        dotClassName: 'text-emerald-500',
+      }
+    case 'railway-postgres':
+      return {
+        label: 'DB Railway',
+        description: `Mode Railway aktif via ${source}`,
+        className: 'border-sky-200 bg-sky-50 text-sky-700',
+        dotClassName: 'text-sky-500',
+      }
+    case 'remote-postgres':
+      return {
+        label: 'DB Remote',
+        description: `Mode remote aktif via ${source}`,
+        className: 'border-violet-200 bg-violet-50 text-violet-700',
+        dotClassName: 'text-violet-500',
+      }
+    default:
+      return {
+        label: 'DB Unknown',
+        description: 'Sumber database runtime belum terbaca',
+        className: 'border-slate-200 bg-slate-100 text-slate-600',
+        dotClassName: 'text-slate-400',
+      }
+  }
+}
+
 export function AppHeader({
   user,
   jobTitle,
@@ -259,16 +300,19 @@ export function AppHeader({
   allowAllBranchSelection = true,
   canManageBranches = false,
   pendingApprovals: initialPendingApprovals = 0,
+  aiTokens: initialAiTokens = null,
   orgBscSummaries = EMPTY_BSC_SUMMARIES,
   orgBranchesByOrgId = EMPTY_BRANCH_MAP,
   orgCashSummaries = EMPTY_CASH_SUMMARIES,
   branchCashSummaries = EMPTY_CASH_SUMMARIES,
-  planName,
+  runtimeDatabaseMode = 'missing',
+  runtimeDatabaseSource = 'missing',
 }: AppHeaderProps) {
   const router = useRouter()
   const [isCreatingBranch, startCreateBranchTransition] = useTransition()
   const [isUpdatingHierarchy, startHierarchyTransition] = useTransition()
   const [pendingContextSwitch, setPendingContextSwitch] = useState<PendingContextSwitch | null>(null)
+  const [isTokenPopupOpen, setIsTokenPopupOpen] = useState(false)
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false)
   const [isOrgDeckOpen, setIsOrgDeckOpen] = useState(false)
   const [orgFeedback, setOrgFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -278,6 +322,7 @@ export function AppHeader({
   const [branchFeedback, setBranchFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [isLoadingOrgDeckData, startOrgDeckDataTransition] = useTransition()
   const [isLoadingNavigationContext, setIsLoadingNavigationContext] = useState(false)
+  const [isLoadingTokenSummary, setIsLoadingTokenSummary] = useState(false)
   const [expandedDeckOrgIds, setExpandedDeckOrgIds] = useState<Record<string, boolean>>({})
   const [orgDeckBranchOffsets, setOrgDeckBranchOffsets] = useState<Record<string, OrgDeckBranchOffset>>({})
   const [orgDeckZoom, setOrgDeckZoom] = useState(1)
@@ -285,6 +330,7 @@ export function AppHeader({
   const [organizations, setOrganizations] = useState<AccessibleOrganization[]>(initialOrganizations)
   const [branches, setBranches] = useState<BranchSummary[]>(initialBranches)
   const [headerPendingApprovals, setHeaderPendingApprovals] = useState(initialPendingApprovals)
+  const [aiTokens, setAiTokens] = useState<AiTokenHeaderSummary | null>(initialAiTokens)
   const hasInitialOrgDeckData = Boolean(
     Object.keys(orgBranchesByOrgId).length ||
     Object.keys(orgBscSummaries).length ||
@@ -307,6 +353,7 @@ export function AppHeader({
   )
   const orgDeckLinks = useMemo(() => buildOrgDeckLinks(organizations), [organizations])
   const [orgDeckPositions, setOrgDeckPositions] = useState<Record<string, OrgDeckPosition>>(initialOrgDeckPositions)
+  const tokenPopupRef = useRef<HTMLDivElement | null>(null)
   const orgMenuRef = useRef<HTMLDivElement | null>(null)
   const branchMenuRef = useRef<HTMLDivElement | null>(null)
   const orgDeckPanelRef = useRef<HTMLDivElement | null>(null)
@@ -351,6 +398,8 @@ export function AppHeader({
   const orgDeckBranchCashSummaries = orgDeckData.branchCashSummaries
 
   const isLoadingNavRef = useRef(false)
+  const isLoadingTokenRef = useRef(false)
+
   const loadNavigationContext = useCallback(async () => {
     if (hasLoadedNavigationContext || isLoadingNavRef.current) return
 
@@ -370,10 +419,31 @@ export function AppHeader({
     }
   }, [activeOrgId, hasLoadedNavigationContext])
 
+  const loadTokenSummary = useCallback(async () => {
+    if (aiTokens || isLoadingTokenRef.current) return
+
+    isLoadingTokenRef.current = true
+    setIsLoadingTokenSummary(true)
+    try {
+      const tokenSummary = await getHeaderTokenSummary(activeOrgId)
+      setAiTokens(tokenSummary)
+    } catch (error) {
+      console.error('[AppHeader] Failed to load AI token summary:', error)
+    } finally {
+      isLoadingTokenRef.current = false
+      setIsLoadingTokenSummary(false)
+    }
+  }, [activeOrgId, aiTokens])
+
   const prewarmNavigationContext = useCallback(() => {
     if (hasLoadedNavigationContext || isLoadingNavigationContext) return
     void loadNavigationContext()
   }, [hasLoadedNavigationContext, isLoadingNavigationContext, loadNavigationContext])
+
+  const prewarmTokenSummary = useCallback(() => {
+    if (aiTokens || isLoadingTokenSummary) return
+    void loadTokenSummary()
+  }, [aiTokens, isLoadingTokenSummary, loadTokenSummary])
 
   const handleOrgMenuToggle = useCallback(() => {
     setOrgFeedback(null)
@@ -393,6 +463,14 @@ export function AppHeader({
     }
     setIsBranchMenuOpen(next)
   }, [isBranchMenuOpen, loadNavigationContext])
+
+  const handleTokenPopupToggle = useCallback(() => {
+    const next = !isTokenPopupOpen
+    if (next) {
+      void loadTokenSummary()
+    }
+    setIsTokenPopupOpen(next)
+  }, [isTokenPopupOpen, loadTokenSummary])
 
   const handleOrgChange = async (orgId: string) => {
     if (orgId === activeOrgId) return
@@ -624,6 +702,20 @@ export function AppHeader({
   const initials = getInitials(user.fullName || user.email)
   const hasRequests = headerPendingApprovals > 0
   const isPlatformAdmin = isPlatformAdminEmail(user.email)
+  const runtimeDatabaseBadge = useMemo(
+    () => getRuntimeDatabaseBadgeMeta(runtimeDatabaseMode, runtimeDatabaseSource),
+    [runtimeDatabaseMode, runtimeDatabaseSource]
+  )
+
+  const tokenSummary = useMemo(() => ({
+    balance: aiTokens?.balanceTokens || 0,
+    threshold: aiTokens?.lowBalanceThreshold || 0,
+    generationLeft: aiTokens?.estimatedGenerationLeft || 0,
+    used: aiTokens?.totalUsedTokens || 0,
+  }), [aiTokens])
+
+  const isLowBalance = tokenSummary.threshold > 0 && tokenSummary.balance <= tokenSummary.threshold
+
   // Sync ulang saat org/branch aktif berubah.
   // Pakai activeOrgId/activeBranchId (primitives) bukan object props agar tidak infinite re-render.
   useEffect(() => {
@@ -631,6 +723,7 @@ export function AppHeader({
     setBranches(initialBranches)
     setHasLoadedNavigationContext(initialOrganizations.length > 0 || initialBranches.length > 0)
     setHeaderPendingApprovals(initialPendingApprovals)
+    setAiTokens(initialAiTokens)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeOrgId, activeBranchId])
 
@@ -666,6 +759,20 @@ export function AppHeader({
       setHeaderPendingApprovals(signal.pendingCount)
     })
   }, [activeBranchId, activeOrgId])
+
+  useEffect(() => {
+    if (!isTokenPopupOpen) return
+
+    const onClickOutside = (event: MouseEvent) => {
+      const targetNode = event.target as Node
+      if (!tokenPopupRef.current?.contains(targetNode)) {
+        setIsTokenPopupOpen(false)
+      }
+    }
+
+    window.addEventListener('mousedown', onClickOutside)
+    return () => window.removeEventListener('mousedown', onClickOutside)
+  }, [isTokenPopupOpen])
 
   useEffect(() => {
     if (!isOrgMenuOpen) return
@@ -1135,19 +1242,22 @@ export function AppHeader({
               onFocus={prewarmNavigationContext}
               onTouchStart={prewarmNavigationContext}
               onPointerDown={prewarmNavigationContext}
-              className="group flex items-center gap-2.5 pl-2 pr-3 py-1.5 bg-gradient-to-br from-[#003366]/5 to-slate-50 border border-[#003366]/12 rounded-2xl shadow-sm hover:shadow-md hover:from-[#003366]/8 hover:to-slate-50 hover:border-[#003366]/20 transition-all duration-200 disabled:cursor-wait disabled:opacity-70"
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm hover:bg-slate-100/70 transition-all disabled:cursor-wait disabled:opacity-70"
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#003366] to-[#0055aa] flex items-center justify-center text-white shrink-0 shadow-md">
-                {pendingContextSwitch?.kind === 'org' ? <LoaderCircle size={13} className="animate-spin" /> : <Building2 size={13} />}
+              <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#003366] shrink-0 shadow-sm">
+                {pendingContextSwitch?.kind === 'org' ? <LoaderCircle size={14} className="animate-spin" /> : <Building2 size={14} />}
               </div>
               <div className="flex flex-col overflow-hidden">
-                <span className="text-[8.5px] text-[#003366]/50 font-black uppercase tracking-[0.16em] leading-none mb-0.5">Organisasi</span>
-                <span className="text-[12.5px] font-black text-slate-900 leading-none truncate max-w-[130px]">{org.name}</span>
-                <span className="text-[8.5px] font-black uppercase tracking-[0.16em] text-[#003366]/60 mt-0.5 leading-none">
-                  {effectiveActiveOrgRole} · {activeOrgIsParent ? 'Parent' : 'Child'}
+                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter leading-none mb-0.5">Organisasi Aktif</span>
+                <span className="text-xs font-black text-slate-900 leading-none truncate max-w-[140px]">{org.name}</span>
+                <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 mt-1 leading-none">
+                  {effectiveActiveOrgRole}
+                </span>
+                <span className="text-[9px] font-semibold text-slate-500 mt-1 leading-none truncate max-w-[170px]">
+                  {activeOrgIsParent ? 'PARENT' : 'CHILD'} • {activeOrgHierarchyLabel}
                 </span>
               </div>
-              <ChevronDown size={11} className={`text-[#003366]/40 shrink-0 transition-transform duration-200 ${isOrgMenuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={12} className={`text-slate-400 ml-1 transition-transform ${isOrgMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isOrgMenuOpen && (
@@ -1429,23 +1539,21 @@ export function AppHeader({
               onFocus={prewarmNavigationContext}
               onTouchStart={prewarmNavigationContext}
               onPointerDown={prewarmNavigationContext}
-              className="group flex items-center gap-2.5 pl-2 pr-3 py-1.5 bg-gradient-to-br from-emerald-50 to-teal-50/60 border border-emerald-200/70 rounded-2xl shadow-sm hover:shadow-md hover:from-emerald-50 hover:to-teal-50 hover:border-emerald-300/60 transition-all duration-200 disabled:cursor-wait disabled:opacity-70"
+              className="flex items-center gap-2 px-3 py-1.5 bg-[#003366]/5/50 border border-[#003366]/10 rounded-xl hover:bg-[#003366]/5 transition-all shadow-sm disabled:cursor-wait disabled:opacity-70"
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shrink-0 shadow-md">
-                {pendingContextSwitch?.kind === 'branch'
-                  ? <LoaderCircle size={13} className="animate-spin" />
-                  : <MapPin size={13} />}
-              </div>
+              {pendingContextSwitch?.kind === 'branch'
+                ? <LoaderCircle size={14} className="text-[#003366] shrink-0 animate-spin" />
+                : <MapPin size={14} className="text-[#003366] shrink-0" />}
               <div className="flex flex-col overflow-hidden">
-                <span className="text-[8.5px] text-emerald-600/70 font-black uppercase tracking-[0.16em] leading-none mb-0.5">Unit Kerja</span>
-                <span className="text-[12.5px] font-black text-slate-900 leading-none truncate max-w-[140px]">
+                <span className="text-[9px] text-[#003366]/60 font-bold uppercase tracking-tighter leading-none mb-0.5">Unit Terpilih</span>
+                <span className="text-xs font-black text-blue-900 leading-none truncate max-w-[150px]">
                   {branchHeadline}
                 </span>
-                <span className="text-[8.5px] font-black uppercase tracking-[0.16em] text-emerald-600/60 mt-0.5 leading-none">
+                <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#003366]/45 mt-1 leading-none">
                   {branchCaption}
                 </span>
               </div>
-              <ChevronDown size={11} className={`text-emerald-500/60 shrink-0 transition-transform duration-200 ${isBranchMenuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={12} className={`text-[#003366]/60 ml-1 transition-transform ${isBranchMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isBranchMenuOpen && (
@@ -1584,19 +1692,14 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-6">
-        <div className="hidden sm:block">
-          <VersionIntegrityButton />
+        <div
+          title={runtimeDatabaseBadge.description}
+          className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all ${runtimeDatabaseBadge.className}`}
+        >
+          <Database size={14} />
+          <span className="hidden sm:inline">{runtimeDatabaseBadge.label}</span>
+          <CircleDot size={12} className={runtimeDatabaseBadge.dotClassName} />
         </div>
-
-        {planName && (
-          <Link
-            href="/billing"
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700 hover:bg-indigo-100 transition-colors"
-          >
-            <Zap size={11} className="text-indigo-500" />
-            {planName}
-          </Link>
-        )}
 
         {isPlatformAdmin && (
           <Link
@@ -1608,11 +1711,83 @@ export function AppHeader({
           </Link>
         )}
 
+        <div ref={tokenPopupRef} className="relative">
+          <button
+            type="button"
+            onClick={handleTokenPopupToggle}
+            onMouseEnter={prewarmTokenSummary}
+            onFocus={prewarmTokenSummary}
+            onTouchStart={prewarmTokenSummary}
+            onPointerDown={prewarmTokenSummary}
+            className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all ${
+              isLowBalance
+                ? 'border-amber-300 bg-amber-50 text-amber-700'
+                : 'border-indigo-200 bg-indigo-50 text-indigo-700'
+            }`}
+          >
+            <Coins size={14} />
+            <span>
+              AI {isLoadingTokenSummary && !aiTokens ? '...' : tokenSummary.balance.toLocaleString('id-ID')}
+            </span>
+          </button>
+
+          {isTokenPopupOpen && (
+            <div className="absolute right-0 top-full z-50 mt-2 w-[290px] rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">AI Token Wallet</div>
+                  <div className="mt-1 text-xl font-black tracking-tight text-slate-900">
+                    {isLoadingTokenSummary && !aiTokens ? 'Memuat...' : tokenSummary.balance.toLocaleString('id-ID')}
+                  </div>
+                </div>
+                <div className={`rounded-full px-2 py-1 text-[9px] font-black uppercase ${isLowBalance ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  {isLowBalance ? 'Low' : 'Healthy'}
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Estimasi Generate</div>
+                  <div className="mt-1 text-sm font-black text-slate-900">
+                    {isLoadingTokenSummary && !aiTokens ? '...' : `${tokenSummary.generationLeft.toLocaleString('id-ID')}x`}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Total Terpakai</div>
+                  <div className="mt-1 text-sm font-black text-slate-900">
+                    {isLoadingTokenSummary && !aiTokens ? '...' : tokenSummary.used.toLocaleString('id-ID')}
+                  </div>
+                </div>
+              </div>
+
+              <p className="mt-3 text-[11px] font-medium leading-relaxed text-slate-500">
+                {isLowBalance
+                  ? 'Token AI menipis. Lanjutkan pekerjaan tanpa hambatan dengan top up token.'
+                  : 'Token AI cukup untuk kebutuhan generate saat ini.'}
+              </p>
+
+              <Link
+                href="/billing?section=ai-token"
+                onClick={() => setIsTokenPopupOpen(false)}
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-white hover:bg-indigo-600 transition-all"
+              >
+                <Sparkles size={12} />
+                Top Up Token AI
+              </Link>
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center gap-2 pr-6 border-r border-slate-100">
           <Link href="/accounting/approvals" className={`relative w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${hasRequests ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-white border-slate-100 text-slate-400'}`}>
             <Bell size={16} />
             {hasRequests && <div className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-rose-500 border-2 border-white flex items-center justify-center text-[9px] font-black text-white">{headerPendingApprovals}</div>}
           </Link>
+        </div>
+
+        {/* Version Integrity Button */}
+        <div className="hidden sm:flex">
+          <VersionIntegrityButton />
         </div>
 
         <div className="flex items-center gap-3">
@@ -1908,7 +2083,7 @@ export function AppHeader({
                                           ? 'bg-white/10 text-slate-100'
                                           : 'bg-slate-100 text-slate-600'
                                     }`}>
-                                      {bscIsReady ? `${bscSummary?.overall_score_100 ?? 0}` : 'Nizametrics'}
+                                      {bscIsReady ? `${bscSummary?.overall_score_100 ?? 0}` : 'BSC -'}
                                     </div>
                                     <button
                                       type="button"
@@ -1925,7 +2100,7 @@ export function AppHeader({
                                           ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
                                           : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                                       }`}
-                                      aria-label="Tampilkan 4 perspektif Nizametrics"
+                                      aria-label="Tampilkan 4 perspektif BSC"
                                     >
                                       <ChevronDown size={14} className={`transition-transform ${isPerspectiveExpanded ? 'rotate-180' : ''}`} />
                                     </button>
@@ -2024,8 +2199,8 @@ export function AppHeader({
                               isActiveCard ? 'text-slate-300' : 'text-slate-500'
                             }`}>
                               {bscHasError
-                                ? 'Ringkasan Nizametrics belum bisa dibaca untuk organisasi ini.'
-                                : 'Belum ada global score Nizametrics yang siap ditampilkan.'}
+                                ? 'Ringkasan BSC belum bisa dibaca untuk organisasi ini.'
+                                : 'Belum ada global score BSC yang siap ditampilkan.'}
                             </div>
                           )}
 

@@ -66,7 +66,7 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
       {/* Header section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
              <ShieldAlert size={28} className="text-indigo-600" />
              Audit Integritas
           </h1>
@@ -86,13 +86,13 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
       {/* Audit Scorecards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
          {/* Unbalanced Journals */}
-         <div className={`p-8 rounded-2xl border-2 transition-all shadow-sm flex flex-col justify-between h-full bg-white ${stats.unbalancedCount > 0 ? 'border-rose-100 shadow-rose-50' : 'border-emerald-100 shadow-emerald-50'}`}>
+         <div className={`p-8 rounded-[40px] border-2 transition-all shadow-sm flex flex-col justify-between h-full bg-white ${stats.unbalancedCount > 0 ? 'border-rose-100 shadow-rose-50' : 'border-emerald-100 shadow-emerald-50'}`}>
             <div className="space-y-4">
                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${stats.unbalancedCount > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
                   <Scale size={32} />
                </div>
                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Jurnal Unbalanced</h3>
+                  <h3 className="text-lg font-black text-slate-900">Jurnal Unbalanced</h3>
                   <p className="text-sm font-bold text-slate-400">Ketidakseimbangan Debit vs Kredit Buku Besar.</p>
                </div>
             </div>
@@ -113,18 +113,18 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
          </div>
 
          {/* Inventory Variance */}
-         <div className={`p-8 rounded-2xl border-2 transition-all shadow-sm flex flex-col justify-between h-full bg-white ${Math.abs(stats.inventoryVariance) > 10 ? 'border-amber-100 shadow-amber-50' : 'border-emerald-100 shadow-emerald-50'}`}>
+         <div className={`p-8 rounded-[40px] border-2 transition-all shadow-sm flex flex-col justify-between h-full bg-white ${Math.abs(stats.inventoryVariance) > 10 ? 'border-amber-100 shadow-amber-50' : 'border-emerald-100 shadow-emerald-50'}`}>
             <div className="space-y-4">
                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${Math.abs(stats.inventoryVariance) > 10 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
                   <PackageSearch size={32} />
                </div>
                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Selisih Persediaan</h3>
+                  <h3 className="text-lg font-black text-slate-900">Selisih Persediaan</h3>
                   <p className="text-sm font-bold text-slate-400">Total Variance Fiskal vs Ledger Persediaan (1301-1399).</p>
                </div>
             </div>
             <div className="mt-8 flex items-end justify-between">
-               <span className={`text-2xl font-semibold ${Math.abs(stats.inventoryVariance) > 10 ? 'text-amber-600 font-mono' : 'text-emerald-600 font-mono'}`}>
+               <span className={`text-2xl font-black ${Math.abs(stats.inventoryVariance) > 10 ? 'text-amber-600 font-mono' : 'text-emerald-600 font-mono'}`}>
                   {Math.abs(stats.inventoryVariance) <= 10 ? formatCurrency(0) : formatCurrency(stats.inventoryVariance)}
                </span>
                <div className="flex items-center gap-2 text-slate-500 font-black text-xs uppercase">
@@ -134,13 +134,13 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
          </div>
 
          {/* Late Depreciation */}
-         <div className={`p-8 rounded-2xl border-2 transition-all shadow-sm flex flex-col justify-between h-full bg-white ${stats.overdueAssetCount > 0 ? 'border-indigo-100 shadow-indigo-50' : 'border-emerald-100 shadow-emerald-50'}`}>
+         <div className={`p-8 rounded-[40px] border-2 transition-all shadow-sm flex flex-col justify-between h-full bg-white ${stats.overdueAssetCount > 0 ? 'border-indigo-100 shadow-indigo-50' : 'border-emerald-100 shadow-emerald-50'}`}>
             <div className="space-y-4">
                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${stats.overdueAssetCount > 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'}`}>
                   <Calculator size={32} />
                </div>
                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Depresiasi Tertunda</h3>
+                  <h3 className="text-lg font-black text-slate-900">Depresiasi Tertunda</h3>
                   <p className="text-sm font-bold text-slate-400">Aset Berjalan yang belum disusutkan bulan ini.</p>
                </div>
             </div>
@@ -165,7 +165,7 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
          
          {/* 1. Unbalanced Journals Table */}
-         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+         <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
             <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
                <h3 className="font-black text-slate-900 text-xl flex items-center gap-3">
                   <Scale className="text-rose-500" />
@@ -177,7 +177,7 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
                {data.unbalanced.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full p-20 opacity-30">
                      <CheckCircle2 size={48} className="text-emerald-500 mb-4" />
-                     <p className="font-bold text-slate-600 tracking-tight text-xs">Semua Jurnal Balance!</p>
+                     <p className="font-bold text-slate-600 uppercase tracking-widest text-xs">Semua Jurnal Balance!</p>
                   </div>
                ) : (
                   <table className="w-full text-left">
@@ -218,7 +218,7 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
          </div>
 
          {/* 2. Overdue Assets Table */}
-         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+         <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
             <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
                <h3 className="font-black text-slate-900 text-xl flex items-center gap-3">
                   <Landmark className="text-indigo-500" />
@@ -230,7 +230,7 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
                {data.overdueAssets.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full p-20 opacity-30">
                      <CheckCircle2 size={48} className="text-emerald-500 mb-4" />
-                     <p className="font-bold text-slate-600 tracking-tight text-xs">Penyusutan Up to Date!</p>
+                     <p className="font-bold text-slate-600 uppercase tracking-widest text-xs">Penyusutan Up to Date!</p>
                   </div>
                ) : (
                   <table className="w-full text-left">
@@ -263,7 +263,7 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
       </div>
 
       {/* 3. Inventory Discrepancy (Full Width) */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
          <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
             <h3 className="font-black text-slate-900 text-xl flex items-center gap-3">
                <PackageSearch className="text-amber-500" />

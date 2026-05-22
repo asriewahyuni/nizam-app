@@ -1,6 +1,6 @@
 'use client'
 
-import React, { startTransition, useState, useEffect, useRef } from 'react'
+import React, { startTransition, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Landmark, Building2, CarFront, Monitor, Plus, Calculator, History, Trash2, Calendar, FileText, X, Printer, QrCode, Pencil, DollarSign, AlertTriangle } from 'lucide-react'
 import Barcode from 'react-barcode'
@@ -14,7 +14,6 @@ interface AssetClientProps {
   activeBranchId?: string | null
   activeBranchName?: string | null
   initialAssets: any[]
-  totalAssetCount: number
   coa: any[]
 }
 
@@ -32,7 +31,7 @@ function SearchableSelect({ label, options, value, onChange, placeholder, requir
 
   return (
     <div className="space-y-2 relative">
-      <label className="text-[10px] font-semibold tracking-tight text-slate-400 px-1">{label}</label>
+      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">{label}</label>
       <div 
         onClick={() => setIsOpen(!isOpen)}
         className="w-full bg-slate-50/50 border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-900 text-[11px] cursor-pointer hover:border-blue-200 transition-all flex justify-between items-center h-[52px]"
@@ -80,7 +79,6 @@ export function AssetClient({
   activeBranchId = null,
   activeBranchName = null,
   initialAssets,
-  totalAssetCount,
   coa,
 }: AssetClientProps) {
   const router = useRouter()
@@ -135,16 +133,15 @@ export function AssetClient({
     should_capitalize_tax: false,
   })
 
-  // Auto Code logic — uses total org-wide count (not branch count) to avoid cross-branch duplicates
+  // Auto Code logic
   React.useEffect(() => {
     if (showModal && !editingAssetId) {
        const year = new Date().getFullYear()
-       const sessionAdded = assets.length - initialAssets.length
-       const count = totalAssetCount + sessionAdded + 1
+       const count = assets.length + 1
        const paddedCount = count.toString().padStart(4, '0')
        setFormData(prev => ({ ...prev, code: `AST-${year}-${paddedCount}` }))
     }
-  }, [showModal, editingAssetId, totalAssetCount, assets.length])
+  }, [showModal, editingAssetId, assets.length])
 
   // Filters
   const assetAccounts = coa.filter(a => a.type === 'ASSET' && a.normal_balance === 'DEBIT' && a.code.startsWith('15'))
@@ -362,7 +359,7 @@ export function AssetClient({
       {/* Header section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-semibold text-slate-900 tracking-tight flex items-center gap-4">
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
             <Landmark className="text-blue-600" size={40} />
             Manajemen Aset Tetap
           </h1>
@@ -414,12 +411,12 @@ export function AssetClient({
       </div>
 
       {!activeBranchId && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
+        <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
           <div className="w-12 h-12 rounded-2xl bg-white text-amber-500 border border-amber-100 flex items-center justify-center shrink-0">
             <AlertTriangle size={22} />
           </div>
           <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-amber-900 uppercase tracking-tight">Pilih Unit Aktif</h3>
+            <h3 className="text-sm font-black text-amber-900 uppercase tracking-widest">Pilih Unit Aktif</h3>
             <p className="text-sm font-medium text-amber-800/80">
               Anda sedang melihat aset lintas unit. Pilih satu unit dari header untuk mendaftarkan aset, menjalankan penyusutan, mengubah data, atau melepas aset.
             </p>
@@ -434,9 +431,9 @@ export function AssetClient({
                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
                  <Landmark size={24} />
                </div>
-               <span className="text-xs font-bold text-slate-400 tracking-tight">Total Aset</span>
+               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Aset</span>
             </div>
-            <p className="text-2xl font-semibold text-slate-900">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (a.purchase_price || 0), 0))}</p>
+            <p className="text-2xl font-black text-slate-900">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (a.purchase_price || 0), 0))}</p>
          </div>
 
          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
@@ -444,9 +441,9 @@ export function AssetClient({
                <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
                  <Calculator size={24} />
                </div>
-               <span className="text-xs font-bold text-slate-400 tracking-tight">Akumulasi Penyusutan</span>
+               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Akumulasi Penyusutan</span>
             </div>
-            <p className="text-2xl font-semibold text-rose-600">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (a.accumulated_depreciation || 0), 0))}</p>
+            <p className="text-2xl font-black text-rose-600">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (a.accumulated_depreciation || 0), 0))}</p>
          </div>
 
          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
@@ -454,9 +451,9 @@ export function AssetClient({
                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
                  <Building2 size={24} />
                </div>
-               <span className="text-xs font-bold text-slate-400 tracking-tight">Nilai Buku (Net)</span>
+               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nilai Buku (Net)</span>
             </div>
-            <p className="text-2xl font-semibold text-emerald-600">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (a.current_book_value || 0), 0))}</p>
+            <p className="text-2xl font-black text-emerald-600">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (a.current_book_value || 0), 0))}</p>
          </div>
 
          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md bg-gradient-to-br from-indigo-50/50 to-white overflow-hidden relative group">
@@ -464,14 +461,14 @@ export function AssetClient({
                <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg ring-4 ring-blue-50">
                  <History size={24} />
                </div>
-               <span className="text-xs font-bold text-blue-400 tracking-tight">Next Run</span>
+               <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">Next Run</span>
             </div>
             <p className="text-lg font-bold text-slate-900 italic">Penyusutan Otomatis: <br/> <span className="text-sm font-normal text-slate-500">Setiap Akhir Bulan</span></p>
          </div>
       </div>
 
       {/* Asset Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
          <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
             <h3 className="font-black text-slate-900 text-xl flex items-center gap-3">
                Daftar Inventaris Aset Tetap
@@ -548,7 +545,7 @@ export function AssetClient({
                                      <button disabled={!activeBranchId} onClick={() => handleDelete(asset)} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Hapus Aset"> <Trash2 size={18} /> </button>
                                    </>
                                  ) : (
-                                   <span className="px-3 py-1 text-[10px] font-semibold tracking-tight bg-slate-100 text-slate-400 rounded-full">SOLD</span>
+                                   <span className="px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-400 rounded-full">SOLD</span>
                                  )}
                               </div>
                            </td>
@@ -563,11 +560,11 @@ export function AssetClient({
       {/* REGISTRATION MODAL */}
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl animate-in fade-in duration-300">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
+          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-3xl overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
             <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-               <h2 className="text-2xl font-semibold text-slate-900 flex items-center gap-3">
+               <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
                   {editingAssetId ? <Pencil size={28} className="text-amber-500" /> : <Landmark size={28} className="text-blue-600" />}
-                  {editingAssetId ? 'Perbarui Data Aset' : 'Perolehan Aset Tetap Baru'}
+                  {editingAssetId ? 'Perbarui Data Aset' : 'Kapitalisasi Aset Tetap Baru'}
                </h2>
                <button onClick={() => { setShowModal(false); setEditingAssetId(null); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-900 transition-all shadow-sm"> <X size={20} /> </button>
             </div>
@@ -576,18 +573,18 @@ export function AssetClient({
                {/* 1. Identity */}
                <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold tracking-tight text-slate-400 px-1">Kode Aset / Tag</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Kode Aset / Tag</label>
                     <input required value={formData.code} onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})} className="w-full bg-slate-50/50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-black text-slate-900 focus:border-blue-500 outline-none transition-all" />
                   </div>
                   <div className="space-y-2">
-                     <label className="text-[10px] font-semibold tracking-tight text-slate-400 px-1">Nama Aset Tetap</label>
+                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Nama Aset Tetap</label>
                      <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-slate-50/50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-black text-slate-900 focus:border-blue-500 outline-none transition-all" />
                   </div>
                </div>
 
                <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold tracking-tight text-slate-400 px-1">Kategori / Kelompok</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Kategori / Kelompok</label>
                     <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full bg-slate-50/50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-black text-slate-900 focus:border-blue-500 appearance-none cursor-pointer outline-none">
                        <option>Peralatan & Mesin</option>
                        <option>Kendaraan</option>
@@ -596,15 +593,15 @@ export function AssetClient({
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold tracking-tight text-slate-400 px-1">Tanggal Perolehan</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Tanggal Perolehan</label>
                     <input type="date" required value={formData.purchase_date} onChange={e => setFormData({...formData, purchase_date: e.target.value})} className="w-full bg-slate-50/50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-black text-slate-900 focus:border-blue-500 outline-none transition-all" />
                   </div>
                </div>
 
                {/* 2. Pricing & Tax */}
-               <div className="p-8 bg-blue-50/50 rounded-2xl border-2 border-blue-100 space-y-8">
+               <div className="p-8 bg-blue-50/50 rounded-[40px] border-2 border-blue-100 space-y-8">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-semibold uppercase text-blue-400 tracking-tight">Pricing & Acquisition Model</h4>
+                    <h4 className="text-xs font-black uppercase text-blue-400 tracking-widest">Pricing & Acquisition Model</h4>
                     <div className="flex items-center gap-6">
                        <div className="flex items-center gap-3">
                           <label className="text-[10px] font-black text-slate-400 uppercase">Input Pajak?</label>
@@ -629,20 +626,20 @@ export function AssetClient({
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-semibold text-indigo-900/40 uppercase tracking-tight">Harga Perolehan (Base)</label>
+                        <label className="text-[10px] font-black text-indigo-900/40 uppercase tracking-widest">Harga Perolehan (Base)</label>
                         <div className="relative">
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-indigo-300 text-sm">Rp</span>
                           <input required value={formatThousand(formData.purchase_price)} onChange={e => setFormData({...formData, purchase_price: parseNumber(e.target.value)})} className="w-full bg-white border-2 border-blue-100 rounded-2xl pl-10 pr-4 py-4 font-black text-indigo-900 focus:ring-4 focus:ring-indigo-100 transition-all outline-none text-right" />
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-semibold text-indigo-900/40 uppercase tracking-tight">Nilai Pajak</label>
+                        <label className="text-[10px] font-black text-indigo-900/40 uppercase tracking-widest">Nilai Pajak</label>
                         <div className="w-full bg-blue-100/30 rounded-2xl px-4 py-4 font-black text-blue-400 text-right border-2 border-transparent">
                            {formatCurrency(taxAmount)}
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-semibold text-indigo-900/60 uppercase tracking-tight">Total Tagihan</label>
+                        <label className="text-[10px] font-black text-indigo-900/60 uppercase tracking-widest">Total Tagihan</label>
                         <div className="w-full bg-blue-600 rounded-2xl px-4 py-4 font-black text-white text-right shadow-xl shadow-indigo-100/50 animate-in zoom-in-95">
                            {formatCurrency(totalWithTax)}
                         </div>
@@ -664,14 +661,14 @@ export function AssetClient({
                   {/* 3. RESTORING DEPRECIATION FIELDS */}
                   <div className="grid grid-cols-2 gap-6 pt-4 border-t border-blue-100/50">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-semibold text-indigo-900/40 uppercase tracking-tight">Estimasi Nilai Sisa (Salvage)</label>
+                        <label className="text-[10px] font-black text-indigo-900/40 uppercase tracking-widest">Estimasi Nilai Sisa (Salvage)</label>
                         <div className="relative">
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-indigo-300 text-sm">Rp</span>
                           <input value={formatThousand(formData.salvage_value)} onChange={e => setFormData({...formData, salvage_value: parseNumber(e.target.value)})} className="w-full bg-white border-2 border-blue-100 rounded-2xl pl-10 pr-4 py-4 font-black text-indigo-900 focus:border-blue-500 outline-none transition-all text-right" />
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-semibold text-indigo-900/40 uppercase tracking-tight">Umur Ekonomis (Bulan)</label>
+                        <label className="text-[10px] font-black text-indigo-900/40 uppercase tracking-widest">Umur Ekonomis (Bulan)</label>
                         <input type="number" required value={formData.useful_life_months} onChange={e => setFormData({...formData, useful_life_months: e.target.value})} className="w-full bg-white border-2 border-blue-100 rounded-2xl px-5 py-4 font-black text-indigo-900 focus:border-blue-500 outline-none transition-all" />
                       </div>
                   </div>
@@ -680,8 +677,8 @@ export function AssetClient({
                   {!editingAssetId && (
                      <div className="space-y-6 pt-8 border-t border-blue-100/50">
                         <div className="space-y-3">
-                           <label className="text-[10px] font-semibold tracking-tight text-slate-400">Metode Perolehan / Sumber Dana</label>
-                           <div className="flex p-1.5 bg-slate-100 rounded-xl w-full">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Metode Perolehan / Sumber Dana</label>
+                           <div className="flex p-1.5 bg-slate-100 rounded-[24px] w-full">
                               {(['LUNAS', 'KREDIT', 'SPLIT'] as const).map((m) => (
                                 <button key={m} type="button" onClick={() => setFormData({...formData, payment_method: m})} className={`flex-1 py-3 rounded-2xl text-[10px] font-black transition-all ${formData.payment_method === m ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600'}`} >
                                    {m === 'LUNAS' ? 'LUNAS (KAS)' : m === 'KREDIT' ? 'CICILAN (HUTANG)' : 'SPLIT (KAS + HUTANG)'}
@@ -692,14 +689,14 @@ export function AssetClient({
 
                         {formData.payment_method === 'SPLIT' ? (
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2">
-                              <div className="space-y-4 p-6 bg-emerald-50/50 rounded-xl border-2 border-emerald-100">
+                              <div className="space-y-4 p-6 bg-emerald-50/50 rounded-[32px] border-2 border-emerald-100">
                                  <SearchableSelect label="Kas/Bank (Tunai)" options={cashAccounts} value={formData.cash_account_id} onChange={(val: any) => setFormData({...formData, cash_account_id: val})} placeholder="Pilih rekening..." />
                                  <div className="relative">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-emerald-300 text-xs text-right">Rp</span>
                                   <input type="text" value={formatThousand(formData.cash_amount)} onChange={e => { const val = parseNumber(e.target.value); setFormData({...formData, cash_amount: val, liability_amount: Math.round(totalWithTax - (parseFloat(val) || 0)).toString()}); }} className="w-full bg-white border-2 border-emerald-100 rounded-2xl pl-10 pr-4 py-3 font-black text-emerald-600 outline-none text-right" />
                               </div>
                               </div>
-                              <div className="space-y-4 p-6 bg-rose-50/50 rounded-xl border-2 border-rose-100">
+                              <div className="space-y-4 p-6 bg-rose-50/50 rounded-[32px] border-2 border-rose-100">
                                  <SearchableSelect label="Hutang / Vendor" options={liabilityAccounts} value={formData.liability_account_id} onChange={(val: any) => setFormData({...formData, liability_account_id: val})} placeholder="Pilih akun hutang..." />
                                  <div className="relative">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-rose-300 text-xs">Rp</span>
@@ -736,13 +733,42 @@ export function AssetClient({
       )}
 
       {/* LABEL MODAL */}
-      {showLabelModal && selectedAsset && <LabelPrintModal asset={selectedAsset} onClose={() => setShowLabelModal(false)} />}
+      {showLabelModal && selectedAsset && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300 print:hidden">
+           <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-8 animate-in zoom-in-95">
+              <div className="flex items-center justify-between">
+                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-2"> <Printer className="text-blue-600" /> Label Aset </h2>
+                 <button onClick={() => setShowLabelModal(false)} className="text-slate-400 hover:text-slate-900"> <X size={24} /> </button>
+              </div>
+              <div id="printable-label" className="bg-white border-2 border-slate-100 p-6 rounded-3xl flex flex-col items-center gap-4 text-center">
+                 <h4 className="text-sm font-black text-slate-900 truncate w-full">{selectedAsset.name}</h4>
+                 <div className="p-2 bg-slate-50 rounded-2xl flex flex-col items-center gap-3">
+                    <Barcode value={selectedAsset.code} width={1.2} height={40} fontSize={10} background="transparent" />
+                    <QRCodeCanvas value={`https://nizam.app/asset/${selectedAsset.id}`} size={48} level="H" />
+                 </div>
+                 <p className="text-[10px] font-mono font-bold text-blue-600">{selectedAsset.code}</p>
+              </div>
+              <div className="flex gap-4">
+                 <button onClick={() => setShowLabelModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl" > Tutup </button>
+                 <button onClick={() => window.print()} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2" > <Printer size={18} /> Cetak </button>
+              </div>
+           </div>
+           <style jsx global>{`
+             @media print {
+               body * { visibility: hidden; }
+               #printable-label, #printable-label * { visibility: visible; }
+               #printable-label { position: absolute; left: 0; top: 0; width: 100%; border: none !important; }
+               @page { margin: 0; size: auto; }
+             }
+           `}</style>
+        </div>
+      )}
       {/* DEPRECIATION PREVIEW MODAL */}
       {showPreview && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95">
+           <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95">
               <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                 <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
+                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-3">
                     <History size={24} className="text-blue-600" />
                     Preview Jurnal Penyusutan Otomatis
                  </h2>
@@ -764,7 +790,7 @@ export function AssetClient({
                              </div>
                              <div className="text-right">
                                 <p className="text-xs font-black text-blue-600">{formatCurrency(p.amount)}</p>
-                                <p className="text-[10px] font-bold text-slate-400 tracking-tight">{p.period}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{p.period}</p>
                              </div>
                           </div>
                        ))}
@@ -801,10 +827,10 @@ export function AssetClient({
       {/* DISPOSAL MODAL */}
       {showDisposeModal && selectedAssetForDisposal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+           <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
               <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-emerald-50/40">
                  <div>
-                   <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
+                   <h2 className="text-xl font-black text-slate-900 flex items-center gap-3">
                      <DollarSign size={24} className="text-emerald-600" />
                      Jual / Lepas Aset Tetap
                    </h2>
@@ -817,22 +843,22 @@ export function AssetClient({
                 <div className="p-8 space-y-6">
                   <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-1">Harga Perolehan</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Harga Perolehan</p>
                       <p className="text-sm font-black text-slate-900">{formatCurrency(selectedAssetForDisposal.purchase_price)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-1">Akumulasi Penyusutan</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Akumulasi Penyusutan</p>
                       <p className="text-sm font-black text-rose-500">-{formatCurrency(selectedAssetForDisposal.accumulated_depreciation || 0)}</p>
                     </div>
                     <div className="col-span-2 border-t border-slate-200 pt-4">
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-1">Nilai Buku Saat Ini (NBV)</p>
-                      <p className="text-xl font-semibold text-emerald-600">{formatCurrency(selectedAssetForDisposal.current_book_value || 0)}</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nilai Buku Saat Ini (NBV)</p>
+                      <p className="text-xl font-black text-emerald-600">{formatCurrency(selectedAssetForDisposal.current_book_value || 0)}</p>
                     </div>
                   </div>
 
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-semibold tracking-tight text-slate-400 px-1">Harga Jual Aktual (Rp)</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Harga Jual Aktual (Rp)</label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400 text-sm">Rp</span>
                         <input
@@ -856,7 +882,7 @@ export function AssetClient({
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-semibold tracking-tight text-slate-400 px-1">Tanggal Penjualan</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Tanggal Penjualan</label>
                       <input
                         type="date"
                         value={disposalForm.saleDate}
@@ -866,7 +892,7 @@ export function AssetClient({
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-semibold tracking-tight text-slate-400 px-1">Masuk ke Rekening (Kas/Bank)</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Masuk ke Rekening (Kas/Bank)</label>
                       <select
                         value={disposalForm.cashAccountId}
                         onChange={e => setDisposalForm({...disposalForm, cashAccountId: e.target.value})}
@@ -880,7 +906,7 @@ export function AssetClient({
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-semibold tracking-tight text-slate-400 px-1">Keterangan / Deskripsi Jurnal</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Keterangan / Deskripsi Jurnal</label>
                       <input
                         type="text"
                         value={disposalForm.notes}
@@ -912,7 +938,7 @@ export function AssetClient({
                     <DollarSign size={40} className="text-emerald-600" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-semibold text-slate-900 mb-1">Pelepasan Aset Berhasil!</h3>
+                    <h3 className="text-2xl font-black text-slate-900 mb-1">Pelepasan Aset Berhasil!</h3>
                     <p className="text-sm text-slate-500">Jurnal akuntansi telah diposting secara otomatis.</p>
                   </div>
                   <div className="grid grid-cols-3 gap-4 text-center">
@@ -939,120 +965,4 @@ export function AssetClient({
       )}
     </div>
   )
-}
-
-// ── LABEL PRINT MODAL ─────────────────────────────────────────────────────────
-function LabelPrintModal({ asset, onClose }: { asset: any; onClose: () => void }) {
-  const barcodeRef = useRef<HTMLDivElement>(null)
-  const qrRef = useRef<HTMLDivElement>(null)
-
-  // inject CSS @media print — body-level container biar gak kena React root
-  useEffect(() => {
-    const style = document.createElement('style')
-    style.id = 'nz-print-label-style'
-    style.textContent = `
-#nz-print-asset-label { display: none; }
-@media print {
-  body > :not(#nz-print-asset-label) { display: none !important; }
-  #nz-print-asset-label {
-    display: flex !important;
-    flex-direction: column;
-    align-items: center;
-    gap: 4mm;
-    position: absolute !important;
-    top: 0; left: 0;
-    padding: 4mm;
-    margin: 0;
-    background: white;
-    font-family: sans-serif;
-  }
-  @page { margin: 0; }
-}
-`
-    document.head.appendChild(style)
-    return () => { const el = document.getElementById('nz-print-label-style'); if (el) el.remove() }
-  }, [])
-
-  function handlePrint() {
-    const barcodeDiv = barcodeRef.current
-    const qrDiv = qrRef.current
-    if (!barcodeDiv || !qrDiv) return
-
-    // Ambil barcode (SVG) — outerHTML biar namespace kebawa
-    const barcodeSvg = barcodeDiv.querySelector('svg')
-    const barcodeHtml = barcodeSvg ? barcodeSvg.outerHTML : ''
-
-    // Convert QR canvas → img data URL
-    const qrCanvas = qrDiv.querySelector('canvas')
-    let qrHtml = ''
-    if (qrCanvas) {
-      const img = new Image()
-      img.src = qrCanvas.toDataURL('image/png')
-      img.style.cssText = 'width:48px;height:48px'
-      qrHtml = img.outerHTML
-    }
-
-    // Build container di body level (LGSG di luar React root)
-    let container = document.getElementById('nz-print-asset-label')
-    if (!container) {
-      container = document.createElement('div')
-      container.id = 'nz-print-asset-label'
-      document.body.appendChild(container)
-    }
-
-    container.innerHTML = `
-      <div style="font-size:10pt;font-weight:900;text-align:center;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0f172a">${escHtml(asset.name)}</div>
-      <div style="display:flex;gap:3mm;flex-wrap:wrap;justify-content:center">
-        <div style="border:0.5mm solid #e2e8f0;border-radius:1mm;padding:2mm;display:flex;flex-direction:column;align-items:center;gap:1mm">
-          ${barcodeHtml}
-          <div style="font-size:7pt;font-family:monospace;font-weight:bold;color:#2563eb">${escHtml(asset.code)}</div>
-        </div>
-        <div style="border:0.5mm solid #e2e8f0;border-radius:1mm;padding:2mm;display:flex;flex-direction:column;align-items:center;gap:1mm">
-          ${qrHtml}
-          <div style="font-size:6pt;font-family:sans-serif;color:#64748b;text-align:center;line-height:1.3">Scan untuk<br/>detail aset</div>
-        </div>
-      </div>
-    `
-
-    window.print()
-  }
-
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300">
-       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-6 animate-in zoom-in-95">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-             <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2"> <Printer className="text-blue-600" /> Label Aset </h2>
-             <button onClick={onClose} className="text-slate-400 hover:text-slate-900"> <X size={24} /> </button>
-          </div>
-
-          {/* Preview Label */}
-          <div className="bg-white p-4 flex flex-col items-center gap-4 text-center">
-             <h4 className="text-sm font-black text-slate-900 truncate w-full">{asset.name}</h4>
-             <div className="flex gap-3 flex-wrap justify-center">
-                {/* Barcode + Kode Aset */}
-                <div ref={barcodeRef} className="border border-slate-200 rounded-xl p-3 flex flex-col items-center gap-2">
-                   <Barcode value={asset.code} width={1.2} height={40} fontSize={10} background="transparent" />
-                   <p className="text-[9px] font-mono font-bold text-blue-600">{asset.code}</p>
-                </div>
-                {/* QR + Scan Detail */}
-                <div ref={qrRef} className="border border-slate-200 rounded-xl p-3 flex flex-col items-center gap-2">
-                   <QRCodeCanvas value={`https://nizam.app/asset/${asset.id}`} size={56} level="H" />
-                   <p className="text-[7px] font-medium text-slate-400 leading-tight">Scan untuk<br/>detail aset</p>
-                </div>
-             </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-4">
-             <button onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl hover:bg-slate-200 transition-all" > Tutup </button>
-             <button onClick={handlePrint} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95" > <Printer size={18} /> Cetak </button>
-          </div>
-       </div>
-    </div>
-  )
-}
-
-function escHtml(s: string) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 }

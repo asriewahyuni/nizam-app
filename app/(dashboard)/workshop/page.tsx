@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { getActiveOrg, getActiveBranch } from '@/modules/organization/actions/org.actions'
-import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
   getWorkshopWorkOrders,
   getWorkshopVehicles,
@@ -16,15 +15,7 @@ export default async function WorkshopPage() {
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
 
-  // ── Module Onboarding Guard ──
-  const moduleInstance = await getModuleInstanceStatus(orgData.org.id, 'Workshop')
-  if (!moduleInstance || moduleInstance.status !== 'READY') {
-    return redirect('/workshop/onboarding')
-  }
-
   const orgId = orgData.org.id
-  const activeBranch = await getActiveBranch(orgId)
-  const branchId = activeBranch?.id ?? null
   const supabase = await createClient() as any
 
   const [workOrders, vehicles, contactsResult, invoicesResult, serviceRates, partProducts] = await Promise.all([
@@ -40,7 +31,7 @@ export default async function WorkshopPage() {
       .neq('status', 'VOIDED')
       .order('created_at', { ascending: false }),
     getWorkshopServiceRates(orgId),
-    getWorkshopPartProducts(orgId, branchId),
+    getWorkshopPartProducts(orgId),
   ])
 
   const invoices = (invoicesResult.data || []).map((s: any) => ({

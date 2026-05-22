@@ -126,7 +126,7 @@ function KpiCard({
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
       <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{value}</p>
+      <p className="mt-2 text-2xl font-black tracking-tight text-slate-900">{value}</p>
       <p className="mt-1 text-xs font-medium text-slate-500">{note}</p>
     </div>
   )
@@ -254,7 +254,7 @@ export function WarehouseDetailClient({
 
           <div className="flex flex-col md:flex-row gap-6 md:items-end justify-between">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-semibold tracking-tight">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-black uppercase tracking-widest">
                 <CheckCircle2 size={14} /> Warehouse Aktif
               </div>
               <h1 className="text-4xl sm:text-5xl font-black tracking-tight">{warehouse.name}</h1>
@@ -265,8 +265,8 @@ export function WarehouseDetailClient({
             </div>
 
             <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-4 flex flex-col gap-1 min-w-[200px]">
-              <span className="text-xs font-bold text-slate-400 tracking-tight">Kode WMS</span>
-              <span className="text-3xl font-semibold text-white">{warehouse.code}</span>
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Kode WMS</span>
+              <span className="text-3xl font-black text-white">{warehouse.code}</span>
             </div>
           </div>
         </div>
@@ -275,12 +275,12 @@ export function WarehouseDetailClient({
       {/* Bin Management Section */}
       <div className="space-y-6">
         {binMutationGuardMessage && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
+          <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
             {binMutationGuardMessage} {activeBranchName ? `Unit aktif saat ini: ${activeBranchName}.` : ''}
           </div>
         )}
 
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 px-5 py-5 shadow-sm">
+        <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/80 px-5 py-5 shadow-sm">
           <p className="text-sm font-black text-emerald-950">Master lokasi dan isi bin sekarang dipisah jelas.</p>
           <p className="mt-1 text-sm font-medium text-emerald-800">
             Kode rak, barcode, dan deskripsi tetap jadi master layout. SKU, qty, batch, expiry, dan nilai aset di bawah ini dihitung otomatis dari stok aktif pada bin.
@@ -288,7 +288,7 @@ export function WarehouseDetailClient({
         </div>
 
         {hasUnassignedStock && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-5 shadow-sm">
+          <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-5 shadow-sm">
             <p className="text-sm font-black text-amber-950">Ada stok gudang yang belum ditempatkan ke bin.</p>
             <p className="mt-1 text-sm font-medium text-amber-900">
               Inventory umum tetap menampilkan stok ini, tetapi kartu bin di halaman ini hanya menghitung stok yang sudah punya lokasi bin.
@@ -332,7 +332,7 @@ export function WarehouseDetailClient({
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="space-y-1">
-            <h2 className="text-2xl font-semibold text-slate-900 tracking-tight">Layout Bins & Lorong</h2>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Layout Bins & Lorong</h2>
             <p className="text-slate-500 font-medium text-sm">Pemetaan struktur rak untuk putaway, lengkap dengan isi bin saat ini.</p>
           </div>
 
@@ -379,10 +379,10 @@ export function WarehouseDetailClient({
               const isExpanded = expandedBinId === bin.id
 
               return (
-                <div key={bin.id} className="relative bg-white border border-slate-200 rounded-xl p-5 sm:p-6 hover:border-emerald-500 transition-colors group shadow-sm">
+                <div key={bin.id} className="relative bg-white border border-slate-200 rounded-[28px] p-5 sm:p-6 hover:border-emerald-500 transition-colors group shadow-sm">
                   <div className="flex items-start justify-between gap-4 mb-5">
                     <div className="space-y-3 min-w-0">
-                      <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-semibold tracking-tight uppercase border border-slate-200/60">
+                      <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-black tracking-widest uppercase border border-slate-200/60">
                         {warehouse.code}-{bin.code}
                       </div>
                       <div>
@@ -476,22 +476,22 @@ export function WarehouseDetailClient({
                         </div>
                         <div className="text-left sm:text-right">
                           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">Nilai Aset</p>
-                          <p className="mt-1 text-xl font-semibold text-emerald-950">{formatRupiah(bin.stock_summary.total_asset_value)}</p>
+                          <p className="mt-1 text-xl font-black text-emerald-950">{formatRupiah(bin.stock_summary.total_asset_value)}</p>
                         </div>
                       </div>
 
                       <div className="mt-4 grid grid-cols-2 xl:grid-cols-4 gap-3">
                         <div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-3">
                           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">SKU Aktif</p>
-                          <p className="mt-1 text-lg font-semibold text-slate-900">{bin.stock_summary.sku_count.toLocaleString('id-ID')}</p>
+                          <p className="mt-1 text-lg font-black text-slate-900">{bin.stock_summary.sku_count.toLocaleString('id-ID')}</p>
                         </div>
                         <div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-3">
                           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Qty On-Hand</p>
-                          <p className="mt-1 text-lg font-semibold text-slate-900">{formatQuantity(bin.stock_summary.total_quantity)}</p>
+                          <p className="mt-1 text-lg font-black text-slate-900">{formatQuantity(bin.stock_summary.total_quantity)}</p>
                         </div>
                         <div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-3">
                           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Batch/Lot</p>
-                          <p className="mt-1 text-lg font-semibold text-slate-900">{bin.stock_summary.batch_count.toLocaleString('id-ID')}</p>
+                          <p className="mt-1 text-lg font-black text-slate-900">{bin.stock_summary.batch_count.toLocaleString('id-ID')}</p>
                         </div>
                         <div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-3">
                           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Basis Valuasi</p>
@@ -522,7 +522,7 @@ export function WarehouseDetailClient({
                                   </p>
                                 </div>
                                 <div className="shrink-0 text-right">
-                                  <p className="text-lg font-semibold text-slate-900">{formatQuantity(item.quantity)}</p>
+                                  <p className="text-lg font-black text-slate-900">{formatQuantity(item.quantity)}</p>
                                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Qty</p>
                                 </div>
                               </div>

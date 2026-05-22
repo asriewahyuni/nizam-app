@@ -1020,7 +1020,6 @@ export async function upsertSyirkahContract(orgId: string, payload: any) {
     end_date: normalizeOptionalSyirkahDate(payload.end_date),
     // Kolom JSONB — harus dikirim sebagai JSON string agar pg driver + PostgreSQL bisa parse
     clauses: toJsonbString(payload.clauses),
-    ijab_qobul: toJsonbString(payload.ijab_qobul),
     signed_by: toJsonbString(payload.signed_by),
     signed_at: payload.signed_at ?? null,
     wizard_step: payload.wizard_step ?? null,
@@ -1045,19 +1044,6 @@ export async function upsertSyirkahContract(orgId: string, payload: any) {
   if (error && isMissingColumnError(error, 'profit_sharing_cash_account_id')) {
     const legacyUpsertPayload = { ...upsertPayload }
     delete legacyUpsertPayload.profit_sharing_cash_account_id
-    const retryResult = await supabase
-      .from('syirkah_contracts')
-      .upsert(legacyUpsertPayload)
-      .select()
-      .single()
-
-    data = retryResult.data
-    error = retryResult.error
-  }
-
-  if (error && isMissingColumnError(error, 'ijab_qobul')) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { ijab_qobul: _omitted, ...legacyUpsertPayload } = upsertPayload
     const retryResult = await supabase
       .from('syirkah_contracts')
       .upsert(legacyUpsertPayload)
@@ -2159,27 +2145,4 @@ export async function getSyirkahDashboardData(orgId: string) {
       allMembers: []
     }
   }
-}
-
-// ─── Adendum: Alokasi Hutang ────────────────────────────────────────────────
-
-export async function updateSyirkahDebtAllocation(
-  contractId: string,
-  orgId: string,
-  debtAllocation: number,
-  currentDebt: number,
-) {
-  const supabase = await createClient()
-  const { error } = await supabase
-    .from('syirkah_contracts')
-    .update({
-      debt_allocation: debtAllocation,
-      current_debt: currentDebt,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', contractId)
-    .eq('org_id', orgId)
-
-  if (error) throw new Error(error.message)
-  revalidatePath(`/syirkah/${contractId}`)
 }

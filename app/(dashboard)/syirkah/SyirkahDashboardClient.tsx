@@ -30,13 +30,6 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
     (sum: number, member: any) => sum + Number(member?.profit_share_percentage || 0),
     0
   )
-  // Total modal asal seluruh PEMODAL dari semua kontrak aktif
-  const totalCapitalAllContracts = allMembers.reduce(
-    (sum: number, group: any) =>
-      sum + (group.members || []).reduce((s: number, m: any) => s + Number(m.capital_contribution || 0), 0),
-    0
-  )
-  const showLowProfitWarning = totalCapitalAllContracts > 0 && Number(netProfit || 0) < totalCapitalAllContracts
   const router = useRouter()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isEditingProfitSharing, setIsEditingProfitSharing] = useState(false)
@@ -106,7 +99,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
     <div className="flex flex-col gap-6">
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 border-b-4 border-blue-600 inline-block pb-1">
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 border-b-4 border-blue-600 inline-block pb-1">
             Dashboard Syirkah
           </h1>
           <p className="text-sm text-slate-500 mt-2 font-medium">
@@ -129,7 +122,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
             <TrendingUp size={100} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-blue-200 text-sm font-semibold tracking-tight uppercase mb-1">Total Net Profit</h2>
+            <h2 className="text-blue-200 text-sm font-black tracking-widest uppercase mb-1">Total Net Profit</h2>
             <div className="text-4xl lg:text-5xl font-black text-white tracking-tighter">
               {formatRupiah(netProfit)}
             </div>
@@ -143,13 +136,13 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
         <div className="col-span-1 md:col-span-2 rounded-3xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-start mb-4">
-              <h2 className="text-slate-500 text-sm font-semibold tracking-tight uppercase">Alokasi Hutang Keseluruhan</h2>
+              <h2 className="text-slate-500 text-sm font-black tracking-widest uppercase">Alokasi Hutang Keseluruhan</h2>
               <div className="p-2 bg-rose-50 text-rose-500 rounded-full">
                 <AlertCircle size={18} />
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-semibold text-slate-900 tracking-tighter">{formatRupiah(totalCurrentDebt)}</span>
+              <span className="text-3xl font-black text-slate-900 tracking-tighter">{formatRupiah(totalCurrentDebt)}</span>
               <span className="text-sm font-bold text-slate-400">/ {formatRupiah(totalDebtAllocation)}</span>
             </div>
           </div>
@@ -185,7 +178,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
             <div className="flex items-center gap-3">
               <div className="inline-flex rounded-2xl bg-blue-50 px-4 py-3 text-right">
                 <div>
-                  <span className="block text-[11px] font-semibold tracking-tight text-blue-500">Akad Acuan</span>
+                  <span className="block text-[11px] font-black uppercase tracking-widest text-blue-500">Akad Acuan</span>
                   <span className="block text-sm font-bold text-blue-800">{profitSharingReferenceGroup.contractTitle}</span>
                 </div>
               </div>
@@ -207,27 +200,13 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
           )}
         </div>
 
-        {showLowProfitWarning && (
-          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex gap-3 items-start">
-            <span className="text-amber-500 mt-0.5 text-base leading-none">⚠</span>
-            <div className="space-y-0.5">
-              <p className="text-xs font-black text-amber-800 uppercase tracking-wide">Belum Dibolehkan Bagi Hasil</p>
-              <p className="text-xs text-amber-700 leading-relaxed">
-                Total net profit <span className="font-bold">{formatRupiah(Number(netProfit || 0))}</span> belum melampaui
-                total modal asal <span className="font-bold">{formatRupiah(totalCapitalAllContracts)}</span>.
-                Dalam prinsip syirkah, distribusi laba sebaiknya dilakukan setelah keuntungan melebihi pokok modal.
-              </p>
-            </div>
-          </div>
-        )}
-
         {profitSharingReferenceGroup ? (
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="rounded-3xl bg-slate-900 p-5 text-white shadow-lg">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold tracking-tight text-slate-300">Total Alokasi Bagi Hasil</p>
-                  <div className="mt-2 text-3xl font-semibold tracking-tight">{formatRupiah(totalProfitSharingReference)}</div>
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-300">Total Alokasi Bagi Hasil</p>
+                  <div className="mt-2 text-3xl font-black tracking-tight">{formatRupiah(totalProfitSharingReference)}</div>
                 </div>
                 {!isEditingProfitSharing && (
                   <button
@@ -243,7 +222,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
 
               {isEditingProfitSharing && (
                 <div className="mt-4 rounded-2xl bg-white/10 p-4">
-                  <label className="block text-[11px] font-semibold tracking-tight text-slate-300">
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-300">
                     Nominal Alokasi Baru
                   </label>
                   <input
@@ -310,8 +289,8 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
                       </div>
                     </div>
                     <div className="text-left md:text-right">
-                      <span className="block text-[11px] font-semibold tracking-tight text-slate-400">Estimasi Diterima</span>
-                      <span className="block text-xl font-semibold tracking-tight text-blue-700">
+                      <span className="block text-[11px] font-black uppercase tracking-widest text-slate-400">Estimasi Diterima</span>
+                      <span className="block text-xl font-black tracking-tight text-blue-700">
                         {formatRupiah(Number(member.estimatedProfitAmount || 0))}
                       </span>
                     </div>
@@ -353,7 +332,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-100 text-xs tracking-tight text-slate-400">
+                <tr className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-400">
                   <th className="pb-3 font-black pl-2">Judul Akad</th>
                   <th className="pb-3 font-black">Jenis</th>
                   <th className="pb-3 font-black">Status</th>

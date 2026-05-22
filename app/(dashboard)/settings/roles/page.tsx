@@ -7,7 +7,6 @@ import { SafeButton, ConfirmDialog } from '@/components/ui/NizamUI'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 import {
   deleteOrganizationRole,
-  getActiveOrgEnabledModules,
   getRolesForOrganization,
   reorderOrganizationRoles,
   saveOrganizationRole,
@@ -34,7 +33,7 @@ const MODULE_CATEGORIES = [
     val: 'INSIGHT',
     modules: [
       { id: 'reports', name: 'Laporan Finansial', perms: ['reports:read'] },
-      { id: 'strategy', name: 'Nizametrics', perms: ['strategy:read', 'strategy:write'] },
+      { id: 'strategy', name: 'Strategi & BSC', perms: ['strategy:read', 'strategy:write'] },
       { id: 'forecast', name: 'Proyeksi Arus Kas', perms: ['forecast:read'] },
     ]
   },
@@ -69,13 +68,8 @@ const MODULE_CATEGORIES = [
     modules: [
       { id: 'purchasing', name: 'Pembelian & PO', perms: ['purchasing:read', 'purchasing:write'] },
       { id: 'inventory', name: 'Gudang & Stok', perms: ['inventory:read', 'inventory:write'] },
-      { id: 'warehouse', name: 'Gudang (WMS)', perms: ['warehouse:read', 'warehouse:write'] },
       { id: 'factory', name: 'Manufaktur & BoM', perms: ['factory:read', 'factory:write'] },
-      { id: 'workshop', name: 'Workshop & Service', perms: ['workshop:read', 'workshop:write'] },
-      { id: 'joborder', name: 'Job Order (Jasa)', perms: ['joborder:read', 'joborder:write'] },
-      { id: 'project', name: 'Proyek & Konstruksi', perms: ['project:read', 'project:write'] },
       { id: 'fleet', name: 'Fleet & Rental', perms: ['fleet:read', 'fleet:write'] },
-      { id: 'lms', name: 'LMS / Lembaga Pelatihan', perms: ['lms:read', 'lms:write'] },
       { id: 'syirkah', name: 'Akad Syirkah', perms: ['syirkah:read', 'syirkah:write'] },
     ]
   },
@@ -85,7 +79,6 @@ const MODULE_CATEGORIES = [
     modules: [
       { id: 'crm', name: 'Pelanggan (CRM)', perms: ['crm:read', 'crm:write'] },
       { id: 'pos', name: 'POS (Kasir)', perms: ['pos:read', 'pos:write'] },
-      { id: 'salespage', name: 'Landing Penjualan', perms: ['salespage:read', 'salespage:write'] },
       { id: 'quotation', name: 'Penawaran Harga', perms: ['quotation:read', 'quotation:write'] },
       { id: 'sales', name: 'Penjualan', perms: ['sales:read', 'sales:write'] },
     ]
@@ -97,6 +90,7 @@ const MODULE_CATEGORIES = [
       { id: 'employees', name: 'Karyawan Dasar', perms: ['employees:read', 'employees:write'] },
       { id: 'payroll', name: 'Payroll & Slip Gaji', perms: ['payroll:read', 'payroll:write'] },
       { id: 'attendance', name: 'Absensi & Cuti', perms: ['attendance:read', 'attendance:write'] },
+      { id: 'learning', name: 'Peningkatan Kompetensi', perms: ['learning:read', 'learning:write'] },
     ]
   }
 ]
@@ -114,21 +108,8 @@ export default function RolesManagementPage() {
   const [newRoleDepts, setNewRoleDepts] = useState<string[]>([])
   const [newRoleParent, setNewRoleParent] = useState<string | null>(null)
   const [editingInfo, setEditingInfo] = useState<any>(null)
-  const [enabledModules, setEnabledModules] = useState<string[]>([])
 
   const [confirmDelete, setConfirmDelete] = useState<{ open: boolean, id: string, name: string }>({ open: false, id: '', name: '' })
-
-  /** Modul yang kelihatan di roles cumanya kalau udah aktif (business type & add-on) */
-  const GATED_MODULE_MAP: Record<string, string> = {
-    factory: 'Manufacturing',
-    workshop: 'Workshop',
-    joborder: 'Job Order',
-    project: 'Project & Construction',
-    fleet: 'Fleet & Rental',
-    lms: 'LMS',
-    pos: 'POS',
-    salespage: 'Sales Page',
-  }
 
   const loadData = async (shouldSelectFirst = false) => {
     setLoading(true)
@@ -154,10 +135,6 @@ export default function RolesManagementPage() {
           setActiveRoleId(normalizedRoles[0]?.id || null)
         }
       }
-
-      // Ambil modul yang aktif biar permission checkbox disesuaikan
-      const { modules } = await getActiveOrgEnabledModules()
-      setEnabledModules(modules || [])
     } catch (e: any) {
       setErrorMsg('Terjadi kesalahan fatal: ' + (e.message || 'Unknown Error'))
     }
@@ -188,29 +165,12 @@ export default function RolesManagementPage() {
   const activeRoleDepartmentIds = useMemo(() => normalizeDepartmentIds(activeRole?.department_ids), [activeRole])
   const activeRolePermissions = useMemo(() => normalizePermissions(activeRole?.permissions), [activeRole])
 
-  // FILTERED MODULES — cuma nampilin modul yang udah aktif di org
+  // FILTERED MODULES
   const activeCategories = useMemo(() => {
     if (!activeRole) return []
     if (activeRoleDepartmentIds.length === 0) return []
-
-    const normalizedEnabled = new Set(
-      enabledModules.map((e: string) => e.toLowerCase().replace(/\s+/g, ''))
-    )
-
-    return MODULE_CATEGORIES
-      .filter(cat => activeRoleDepartmentIds.includes(cat.val))
-      .map(cat => ({
-        ...cat,
-        modules: cat.modules.filter((mod: { id: string; name: string; perms: string[] }) => {
-          const registryKey = GATED_MODULE_MAP[mod.id]
-          // Not gated → pillar sub-module, always visible
-          if (!registryKey) return true
-          // Gated → only show if its module key is in enabledModules
-          return normalizedEnabled.has(registryKey.toLowerCase().replace(/\s+/g, ''))
-        })
-      }))
-      .filter(cat => cat.modules.length > 0) // sembunyiin kategori yang semua modulnya nonaktif
-  }, [activeRole, activeRoleDepartmentIds, enabledModules])
+    return MODULE_CATEGORIES.filter(cat => activeRoleDepartmentIds.includes(cat.val))
+  }, [activeRole, activeRoleDepartmentIds])
 
   const togglePermission = async (perm: string) => {
     if (!activeRole || !activeRoleId || !org?.org_id) return
@@ -291,22 +251,22 @@ export default function RolesManagementPage() {
     loadData(true)
   }
 
-  if (loading && roles.length === 0) return <div className="p-20 text-center animate-pulse text-slate-400 font-semibold tracking-tight text-[10px]">Menyinkronkan Struktur...</div>
+  if (loading && roles.length === 0) return <div className="p-20 text-center animate-pulse text-slate-400 font-black uppercase tracking-widest text-[10px]">Menyinkronkan Struktur...</div>
 
   return (
-    <div className="flex h-[calc(100vh-140px)] overflow-hidden bg-slate-50/50 rounded-2xl p-2 border border-slate-100 shadow-2xl relative">
+    <div className="flex h-[calc(100vh-140px)] overflow-hidden bg-slate-50/50 rounded-[48px] p-2 border border-slate-100 shadow-2xl relative">
       
       {/* ERROR BANNER */}
       {errorMsg && (
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[100] bg-rose-500 text-white px-8 py-4 rounded-3xl shadow-2xl flex items-center gap-3 animate-bounce">
           <AlertCircle size={20} />
-          <p className="text-sm font-semibold tracking-tight">{errorMsg}</p>
+          <p className="text-sm font-black uppercase tracking-widest">{errorMsg}</p>
           <button onClick={() => setErrorMsg(null)} className="ml-4 opacity-50 hover:opacity-100"><X size={16} /></button>
         </div>
       )}
 
       {/* SIDEBAR */}
-      <aside className="w-80 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <aside className="w-80 flex flex-col bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-8 border-b border-slate-50">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-lg">
@@ -326,7 +286,7 @@ export default function RolesManagementPage() {
           {roles.length === 0 && !loading && (
             <div className="p-10 text-center space-y-3 opacity-30">
               <Users size={32} className="mx-auto" />
-              <p className="text-[10px] font-semibold tracking-tight">Jabatan Kosong</p>
+              <p className="text-[10px] font-black uppercase tracking-widest">Jabatan Kosong</p>
             </div>
           )}
           <Reorder.Group axis="y" values={roles} onReorder={updateRolesOrder} className="space-y-2">
@@ -337,7 +297,7 @@ export default function RolesManagementPage() {
                   <button onClick={() => setActiveRoleId(role.id)} className={`flex-1 text-left p-4 rounded-3xl transition-all border flex items-center gap-3 ${activeRoleId === role.id ? 'bg-slate-900 text-white border-slate-900 shadow-xl shadow-slate-200' : 'bg-white border-transparent hover:border-slate-200 text-slate-600 shadow-sm'}`}>
                     <GripVertical size={14} className={`${activeRoleId === role.id ? 'text-slate-600' : 'text-slate-300'} opacity-40 group-hover:opacity-100 transition-opacity`} />
                     <div className="flex-1 overflow-hidden">
-                      <h3 className="font-semibold text-[11px] uppercase tracking-tight truncate">{role.name}</h3>
+                      <h3 className="font-black text-[11px] uppercase tracking-wider truncate">{role.name}</h3>
                     </div>
                   </button>
                 </div>
@@ -348,7 +308,7 @@ export default function RolesManagementPage() {
       </aside>
 
       {/* DETAIL PANEL */}
-      <main className="flex-1 flex flex-col h-full bg-white rounded-2xl ml-2 border border-slate-100 relative overflow-hidden">
+      <main className="flex-1 flex flex-col h-full bg-white rounded-[40px] ml-2 border border-slate-100 relative overflow-hidden">
         <AnimatePresence mode="wait">
           {activeRole ? (
             <motion.div key={activeRole.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="h-full flex flex-col">
@@ -358,10 +318,10 @@ export default function RolesManagementPage() {
                     <Users size={28} />
                   </div>
                   <div>
-                    <h1 className="text-2xl font-semibold text-slate-900 tracking-tight mb-2">{activeRole.name}</h1>
+                    <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-2">{activeRole.name}</h1>
                     <div className="flex items-center gap-2">
                        {activeRoleDepartmentIds.map((d: string) => (
-                         <span key={d} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 text-[8px] font-semibold rounded uppercase tracking-tight">{d}</span>
+                         <span key={d} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 text-[8px] font-black rounded uppercase tracking-widest">{d}</span>
                        ))}
                     </div>
                   </div>
@@ -377,12 +337,12 @@ export default function RolesManagementPage() {
               <div className="flex-1 overflow-y-auto p-10 custom-scrollbar pb-32">
                 {activeCategories.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center space-y-6 max-w-md mx-auto py-20">
-                     <div className="w-24 h-24 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-indigo-100">
+                     <div className="w-24 h-24 bg-indigo-50 text-indigo-600 rounded-[40px] flex items-center justify-center shadow-2xl shadow-indigo-100">
                         <Sparkles size={40} />
                      </div>
                      <div>
-                       <h3 className="text-xl font-semibold text-slate-900 uppercase tracking-tight mb-2">Panel Masih Bersih</h3>
-                       <p className="text-xs text-slate-400 font-bold leading-relaxed tracking-tight italic">Silakan klik ikon Pensil (Edit) di atas untuk memilih **Klasifikasi Departemen** agar Bapak bisa mengatur izin jabatan ini Pak.</p>
+                       <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-2">Panel Masih Bersih</h3>
+                       <p className="text-xs text-slate-400 font-bold leading-relaxed uppercase tracking-wider italic">Silakan klik ikon Pensil (Edit) di atas untuk memilih **Klasifikasi Departemen** agar Bapak bisa mengatur izin jabatan ini Pak.</p>
                      </div>
                   </div>
                 ) : (
@@ -403,14 +363,14 @@ export default function RolesManagementPage() {
                                 <div key={mod.id} className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-3xl group hover:border-indigo-100 hover:bg-indigo-50/20 transition-all shadow-sm">
                                     <div>
                                       <p className="font-bold text-xs text-slate-800 leading-none mb-1">{mod.name}</p>
-                                      <p className="text-[8px] text-slate-400 font-semibold tracking-tight">{mod.id}</p>
+                                      <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{mod.id}</p>
                                     </div>
                                     <div className="flex gap-2">
-                                      <button onClick={() => togglePermission(mod.perms[0])} className={`px-5 py-2.5 rounded-xl text-[9px] font-semibold tracking-tight transition-all border ${hasRead ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-100' : 'bg-white text-slate-300 border-slate-100 hover:text-slate-600 hover:border-slate-300'}`}>
+                                      <button onClick={() => togglePermission(mod.perms[0])} className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${hasRead ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-100' : 'bg-white text-slate-300 border-slate-100 hover:text-slate-600 hover:border-slate-300'}`}>
                                         {hasRead && <Check size={10} className="inline mr-1" />} Lihat
                                       </button>
                                       {mod.perms.length > 1 && (
-                                        <button onClick={() => togglePermission(mod.perms[1])} className={`px-5 py-2.5 rounded-xl text-[9px] font-semibold tracking-tight transition-all border ${hasWrite ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-200' : 'bg-white text-slate-300 border-slate-100 hover:text-slate-600 hover:border-slate-300'}`}>
+                                        <button onClick={() => togglePermission(mod.perms[1])} className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${hasWrite ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-200' : 'bg-white text-slate-300 border-slate-100 hover:text-slate-600 hover:border-slate-300'}`}>
                                           {hasWrite && <Check size={10} className="inline mr-1" />} Ubah
                                         </button>
                                       )}
@@ -427,7 +387,7 @@ export default function RolesManagementPage() {
             </motion.div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4">
-              <div className="w-24 h-24 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 shadow-inner">
+              <div className="w-24 h-24 bg-slate-50 rounded-[40px] flex items-center justify-center border border-slate-100 shadow-inner">
                 <Shield size={40} className="opacity-20" />
               </div>
               <p className="text-[10px] font-black uppercase tracking-[0.3em]">Pilih Jabatan untuk Mengatur Izin</p>
@@ -444,7 +404,7 @@ export default function RolesManagementPage() {
             <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/80 backdrop-blur-xl" onClick={resetModal} />
                 <motion.div initial={{ opacity: 0, scale: 0.9, y: 40 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 40 }} className="relative bg-white rounded-[60px] shadow-2xl w-full max-w-xl p-16 border border-white max-h-[90vh] overflow-y-auto custom-scrollbar">
-                   <h3 className="text-3xl font-semibold text-slate-900 mb-10 tracking-tighter uppercase italic">{editingInfo ? 'Edit Profil Jabatan' : 'Tambah Jabatan Baru'}</h3>
+                   <h3 className="text-3xl font-black text-slate-900 mb-10 tracking-tighter uppercase italic">{editingInfo ? 'Edit Profil Jabatan' : 'Tambah Jabatan Baru'}</h3>
                    <form onSubmit={submitRole} className="space-y-10">
                      <div className="space-y-3">
                        <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-[0.3em]">Nama Jabatan</label>
@@ -466,15 +426,15 @@ export default function RolesManagementPage() {
                              <button key={cat.category} type="button" onClick={() => {
                                if (newRoleDepts.includes(cat.val)) setNewRoleDepts(newRoleDepts.filter(d => d !== cat.val))
                                else setNewRoleDepts([...newRoleDepts, cat.val])
-                             }} className={`p-6 rounded-xl text-[10px] font-black uppercase tracking-tight text-center transition-all border-2 flex flex-col items-center justify-center gap-2 ${newRoleDepts.includes(cat.val) ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xl shadow-indigo-200' : 'bg-slate-50 text-slate-300 border-slate-100 hover:border-slate-300'}`}>
+                             }} className={`p-6 rounded-[32px] text-[10px] font-black uppercase tracking-tight text-center transition-all border-2 flex flex-col items-center justify-center gap-2 ${newRoleDepts.includes(cat.val) ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xl shadow-indigo-200' : 'bg-slate-50 text-slate-300 border-slate-100 hover:border-slate-300'}`}>
                                {cat.category}
                              </button>
                           ))}
                         </div>
                      </div>
                      <div className="pt-8 flex gap-4">
-                        <button type="button" onClick={resetModal} className="flex-1 py-6 bg-slate-100 text-slate-500 rounded-3xl font-semibold text-[11px] uppercase tracking-tight hover:bg-slate-200 transition-colors">Batal</button>
-                        <button type="submit" className="flex-1 py-6 bg-indigo-600 text-white rounded-3xl font-semibold text-[11px] uppercase tracking-tight hover:bg-indigo-700 transition-all shadow-2xl shadow-indigo-200">{editingInfo ? 'SIMPAN PERUBAHAN' : 'BUAT JABATAN'}</button>
+                        <button type="button" onClick={resetModal} className="flex-1 py-6 bg-slate-100 text-slate-500 rounded-3xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-200 transition-colors">Batal</button>
+                        <button type="submit" className="flex-1 py-6 bg-indigo-600 text-white rounded-3xl font-black text-[11px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-2xl shadow-indigo-200">{editingInfo ? 'SIMPAN PERUBAHAN' : 'BUAT JABATAN'}</button>
                      </div>
                   </form>
                 </motion.div>

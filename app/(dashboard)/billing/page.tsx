@@ -54,13 +54,17 @@ const PLAN_UI_META: Record<string, { eyebrow: string; summary: string }> = {
     eyebrow: 'Mulai rapi tanpa ribet',
     summary: 'Paling pas untuk bisnis yang ingin penjualan, kasir, pelanggan, dan laporan inti berjalan dalam satu alur ringan.',
   },
-  Mini: {
+  Basic: {
     eyebrow: 'Naik kelas ke operasional yang lebih tertib',
     summary: 'Untuk bisnis yang sudah butuh accounting, finance, inventory, dan purchasing tanpa loncat ke sistem terlalu berat.',
   },
-  Enterprise: {
+  Pro: {
     eyebrow: 'Full core untuk tim yang sudah serius bertumbuh',
     summary: 'Cocok saat HRIS, manufacturing, dan audit mulai jadi kebutuhan operasional harian.',
+  },
+  Enterprise: {
+    eyebrow: 'Untuk skala besar dan kontrol yang lebih luas',
+    summary: 'Paling cocok untuk organisasi yang butuh ruang tumbuh lebih besar, governance lebih rapi, dan ekspansi berlapis.',
   },
   'ABS Special': {
     eyebrow: 'Paket khusus untuk kebutuhan operasional tertentu',
@@ -641,7 +645,7 @@ function BillingContent() {
     provisioningModuleOptions,
   ])
 
-  if (loading) return <div className="p-12 text-center text-slate-400 font-semibold tracking-tight animate-pulse">Memuat Data Billing...</div>
+  if (loading) return <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest animate-pulse">Memuat Data Billing...</div>
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-12">
@@ -652,7 +656,7 @@ function BillingContent() {
         {showCheckoutModal && checkoutInvoice && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeCheckout} className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.96, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden ring-1 ring-slate-200">
+            <motion.div initial={{ scale: 0.96, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl overflow-hidden ring-1 ring-slate-200">
               <div className="p-8 md:p-10 space-y-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className="space-y-2">
@@ -660,7 +664,7 @@ function BillingContent() {
                       <Clock size={14} /> Selesaikan Dalam {formatTime(timeLeft)}
                     </div>
                     <div>
-                      <h3 className="text-2xl font-semibold tracking-tighter text-slate-900">Checkout Pembayaran</h3>
+                      <h3 className="text-2xl font-black tracking-tighter text-slate-900">Checkout Pembayaran</h3>
                       <p className="mt-1 text-sm font-semibold text-slate-500">
                         Review invoice, transfer ke rekening resmi, lalu unggah bukti pembayaran dalam satu alur yang rapi.
                       </p>
@@ -683,7 +687,7 @@ function BillingContent() {
                 )}
 
                 <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Invoice Aktif</p>
                     <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                       <div>
@@ -692,7 +696,7 @@ function BillingContent() {
                       </div>
                       <div className="text-left md:text-right">
                         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Total Tagihan</p>
-                        <p className="text-2xl font-semibold tracking-tighter text-indigo-700">{formatRupiah(checkoutInvoice.amount)}</p>
+                        <p className="text-2xl font-black tracking-tighter text-indigo-700">{formatRupiah(checkoutInvoice.amount)}</p>
                       </div>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
@@ -713,7 +717,7 @@ function BillingContent() {
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-white p-5">
+                  <div className="rounded-[28px] border border-slate-200 bg-white p-5">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Langkah Checkout</p>
                     <div className="mt-4 space-y-3">
                       {[
@@ -732,12 +736,12 @@ function BillingContent() {
                   </div>
                 </div>
 
-                <div className="rounded-xl bg-indigo-600 p-6 text-white shadow-xl">
+                <div className="rounded-[32px] bg-indigo-600 p-6 text-white shadow-xl">
                   <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div className="space-y-2">
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-100">Rekening Tujuan</p>
                       <p className="text-sm font-black uppercase tracking-[0.14em] text-indigo-100">{bankInfo.bank}</p>
-                      <p className="text-3xl font-semibold tracking-tight">{bankInfo.account}</p>
+                      <p className="text-3xl font-black tracking-widest">{bankInfo.account}</p>
                       <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-indigo-100">a.n {bankInfo.name}</p>
                     </div>
                     <button
@@ -752,7 +756,7 @@ function BillingContent() {
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
-                  <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center transition-all hover:border-indigo-300 hover:bg-indigo-50/40">
+                  <div className="border-2 border-dashed border-slate-200 rounded-[32px] p-6 text-center transition-all hover:border-indigo-300 hover:bg-indigo-50/40">
                     <input
                       type="file"
                       id="proof-upload"
@@ -779,14 +783,14 @@ function BillingContent() {
                     <button
                       disabled={processing || !proofFile}
                       onClick={handleManualPayment}
-                      className="min-w-[240px] rounded-xl bg-slate-900 px-6 py-4 text-[11px] font-black uppercase tracking-[0.22em] text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="min-w-[240px] rounded-[28px] bg-slate-900 px-6 py-4 text-[11px] font-black uppercase tracking-[0.22em] text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {processing ? 'Mengirim Bukti...' : 'Konfirmasi Pembayaran'}
                     </button>
                     <Link
                       href={`https://wa.me/${supportInfo.wa}`}
                       target="_blank"
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-6 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
+                      className="inline-flex items-center justify-center gap-2 rounded-[28px] border border-slate-200 px-6 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
                     >
                       Butuh Bantuan Support
                     </Link>
@@ -799,22 +803,22 @@ function BillingContent() {
       </AnimatePresence>
 
       {/* Header & Status Langganan */}
-      <section className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden relative">
+      <section className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden relative">
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-50/50 rounded-full -translate-y-1/2 translate-x-1/2 blur-[80px]" />
 
         <div className="relative p-8 md:p-12 flex flex-col md:flex-row items-center gap-12">
-          <div className="w-64 h-64 rounded-2xl bg-slate-900 flex flex-col items-center justify-center text-white relative shadow-2xl overflow-hidden group">
+          <div className="w-64 h-64 rounded-[48px] bg-slate-900 flex flex-col items-center justify-center text-white relative shadow-2xl overflow-hidden group">
              <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
              <Zap size={48} className="text-amber-400 fill-amber-400/20 mb-4 animate-bounce" />
              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">PAKET ANDA</p>
-             <h2 className="text-3xl font-semibold tracking-tighter uppercase">{activeOrg?.settings?.plan || 'Free'}</h2>
+             <h2 className="text-3xl font-black tracking-tighter uppercase">{activeOrg?.settings?.plan || 'Free'}</h2>
              {inheritsPlanFromHolding && (
-               <div className="mt-2 px-3 py-1 bg-sky-500/15 border border-sky-400/30 rounded-full text-[9px] font-semibold text-sky-200 uppercase tracking-tight">
+               <div className="mt-2 px-3 py-1 bg-sky-500/15 border border-sky-400/30 rounded-full text-[9px] font-black text-sky-200 uppercase tracking-widest">
                  MENGIKUTI HOLDING
                </div>
              )}
              {activeOrg?.settings?.is_demo && (
-               <div className="mt-2 px-3 py-1 bg-amber-500/20 border border-amber-500/50 rounded-full text-[9px] font-semibold text-amber-500 uppercase tracking-tight">
+               <div className="mt-2 px-3 py-1 bg-amber-500/20 border border-amber-500/50 rounded-full text-[9px] font-black text-amber-500 uppercase tracking-widest">
                  SESI DEMO
                </div>
              )}
@@ -824,7 +828,7 @@ function BillingContent() {
             <div className="flex items-start justify-between">
               <div className="space-y-2">
                 <div className="flex items-center gap-3 mb-2">
-                   <h1 className="text-4xl font-semibold text-slate-900 tracking-tighter uppercase italic">NIZAM <span className="text-indigo-600">ERP</span></h1>
+                   <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">NIZAM <span className="text-indigo-600">ERP</span></h1>
                    <div className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full border border-emerald-100">SYSTEM ACTIVE</div>
                 </div>
                 <p className="text-slate-500 font-bold leading-relaxed max-w-xl">
@@ -836,15 +840,15 @@ function BillingContent() {
               </div>
 
               {/* Tagihan Rutin Per Bulan */}
-              <div className="bg-slate-900 p-8 rounded-2xl text-white shadow-2xl border border-white/10 relative overflow-hidden group">
+              <div className="bg-slate-900 p-8 rounded-[40px] text-white shadow-2xl border border-white/10 relative overflow-hidden group">
                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/30 to-transparent opacity-50" />
                  <div className="relative z-10 space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">Tagihan Rutin Per Bulan</p>
                     <div className="flex items-baseline gap-2">
-                       <h3 className="text-3xl font-semibold font-mono tracking-tighter italic">{formatRupiah(totalMonthly)}</h3>
+                       <h3 className="text-3xl font-black font-mono tracking-tighter italic">{formatRupiah(totalMonthly)}</h3>
                        <p className="text-xs font-bold text-slate-400 text-right">/bln</p>
                     </div>
-                    <p className="text-[9px] font-bold text-slate-500 tracking-tight border-t border-white/5 pt-2">
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest border-t border-white/5 pt-2">
                        Include Plan & {activeOrg?.active_addons?.length || 0} Addons
                     </p>
                  </div>
@@ -873,7 +877,7 @@ function BillingContent() {
 
             <div className="flex flex-col gap-6 pt-4 w-full">
                {inheritsPlanFromHolding ? (
-                 <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-6 py-5">
+                 <div className="w-full rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-5">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">Paket Mengikuti Holding</p>
                     <p className="mt-2 text-sm font-bold text-amber-900 leading-relaxed">
                       {inheritedPlanNotice}
@@ -913,7 +917,7 @@ function BillingContent() {
                      <button
                        disabled={applyingVoucher || !voucherCode}
                        onClick={handleApplyVoucher}
-                       className="rounded-2xl bg-slate-900 px-6 py-3 text-xs font-semibold tracking-tight text-white transition hover:bg-indigo-600 disabled:opacity-50 shadow-xl"
+                       className="rounded-2xl bg-slate-900 px-6 py-3 text-xs font-black uppercase tracking-widest text-white transition hover:bg-indigo-600 disabled:opacity-50 shadow-xl"
                      >
                        {applyingVoucher ? 'Memproses...' : 'Apply Voucher'}
                      </button>
@@ -926,13 +930,13 @@ function BillingContent() {
       </section>
 
       {false && (
-      <section id="billing-provisioning" className="rounded-2xl border border-slate-100 bg-white p-6 md:p-8 shadow-xl shadow-slate-200/50">
+      <section id="billing-provisioning" className="rounded-[40px] border border-slate-100 bg-white p-6 md:p-8 shadow-xl shadow-slate-200/50">
         <div className="flex flex-col gap-3 border-b border-slate-100 pb-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-700">
             <Layers3 size={12} /> Provisioning Builder
           </div>
           <div>
-            <h2 className="text-3xl font-semibold tracking-tighter text-slate-900">Flow yang sama seperti provisioning admin, tapi khusus untuk billing</h2>
+            <h2 className="text-3xl font-black tracking-tighter text-slate-900">Flow yang sama seperti provisioning admin, tapi khusus untuk billing</h2>
             <p className="mt-1 text-sm font-semibold text-slate-500">
               Pilih core untuk preview paket, fokuskan module, lalu pilih add-on yang memang kompatibel untuk dibeli lewat checkout.
             </p>
@@ -940,7 +944,7 @@ function BillingContent() {
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.25fr_1.25fr_0.95fr]">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">1. Core</h3>
@@ -964,7 +968,7 @@ function BillingContent() {
                       setSelectedCheckoutItem(buildPackageCheckoutItem(pkg))
                       scrollToSection('billing-checkout')
                     }}
-                    className={`w-full rounded-xl border px-4 py-4 text-left transition-all ${
+                    className={`w-full rounded-[24px] border px-4 py-4 text-left transition-all ${
                       isSelected
                         ? 'border-indigo-200 bg-indigo-50 shadow-sm'
                         : isCurrentFamily
@@ -1000,7 +1004,7 @@ function BillingContent() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">2. Modules</h3>
@@ -1022,7 +1026,7 @@ function BillingContent() {
                 return (
                   <div
                     key={`billing-provisioning-module-${option.value}`}
-                    className={`rounded-xl border px-4 py-4 transition-all ${
+                    className={`rounded-[24px] border px-4 py-4 transition-all ${
                       isFocused
                         ? 'border-indigo-300 bg-indigo-50/80 shadow-sm'
                         : isProvisioned
@@ -1102,7 +1106,7 @@ function BillingContent() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">3. Add-ons</h3>
@@ -1122,7 +1126,7 @@ function BillingContent() {
                   return (
                     <div
                       key={`billing-provisioning-addon-${addon.id}`}
-                      className={`rounded-xl border px-4 py-4 transition-all ${
+                      className={`rounded-[24px] border px-4 py-4 transition-all ${
                         isActive
                           ? 'border-emerald-200 bg-emerald-50/80'
                           : isSelected
@@ -1171,7 +1175,7 @@ function BillingContent() {
                       <div className="mt-4 flex items-center justify-between gap-3">
                         <div>
                           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Harga</p>
-                          <p className="mt-1 text-lg font-semibold text-slate-900">{formatRupiah(addon.price)}</p>
+                          <p className="mt-1 text-lg font-black text-slate-900">{formatRupiah(addon.price)}</p>
                         </div>
                         <button
                           type="button"
@@ -1195,14 +1199,14 @@ function BillingContent() {
                   )
                 })
               ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
+                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
                   Fokuskan satu module dulu untuk melihat add-on yang relevan di billing.
                 </div>
               )}
             </div>
           </div>
 
-          <div id="billing-checkout" className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div id="billing-checkout" className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">4. Summary</h3>
@@ -1222,11 +1226,11 @@ function BillingContent() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                   <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Modules</div>
-                  <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{previewEnabledModules.length}</div>
+                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{previewEnabledModules.length}</div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                   <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Add-ons</div>
-                  <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{previewAddonNames.length}</div>
+                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{previewAddonNames.length}</div>
                 </div>
               </div>
               <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3">
@@ -1236,20 +1240,20 @@ function BillingContent() {
                 </p>
               </div>
               {selectedCheckoutItem ? (
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="rounded-[24px] border border-slate-200 bg-white p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="inline-flex rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-700">
                         {selectedCheckoutItem.label}
                       </div>
-                      <h4 className="mt-3 text-lg font-semibold tracking-tight text-slate-900">{selectedCheckoutItem.name}</h4>
+                      <h4 className="mt-3 text-lg font-black tracking-tight text-slate-900">{selectedCheckoutItem.name}</h4>
                       <p className="mt-2 text-[11px] font-semibold leading-relaxed text-slate-600">
                         {selectedCheckoutItem.description}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Harga</p>
-                      <p className="mt-1 text-xl font-semibold tracking-tight text-slate-900">{formatRupiah(selectedCheckoutItem.price)}</p>
+                      <p className="mt-1 text-xl font-black tracking-tight text-slate-900">{formatRupiah(selectedCheckoutItem.price)}</p>
                       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">/{selectedCheckoutItem.billing}</p>
                     </div>
                   </div>
@@ -1259,7 +1263,7 @@ function BillingContent() {
                   </div>
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
+                <div className="rounded-[24px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Belum Ada Item Dipilih</p>
                   <p className="mt-2 text-[11px] font-semibold leading-relaxed text-slate-600">
                     Pilih core, module, add-on, atau paket token dari builder supaya checkout target muncul di sini.
@@ -1275,21 +1279,21 @@ function BillingContent() {
                 type="button"
                 disabled={processing || Boolean(selectedCheckoutDisabledReason) || !activeOrg || !selectedCheckoutItem}
                 onClick={() => activeOrg && selectedCheckoutItem && handleBuyItem(activeOrg, selectedCheckoutItem)}
-                className="w-full rounded-xl bg-slate-900 px-5 py-4 text-[11px] font-black uppercase tracking-[0.18em] text-white transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-[24px] bg-slate-900 px-5 py-4 text-[11px] font-black uppercase tracking-[0.18em] text-white transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {processing ? 'Membuat Invoice...' : selectedCheckoutItem ? 'Buat Invoice & Lanjut Checkout' : 'Pilih Item Dulu'}
               </button>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                   <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Invoice UNPAID</div>
-                  <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{unpaidInvoiceCount}</div>
+                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{unpaidInvoiceCount}</div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                   <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Metode Bayar</div>
                   <div className="mt-1 text-sm font-black tracking-tight text-slate-900">Transfer Manual</div>
                 </div>
               </div>
-              <div id="ai-token" className="rounded-xl border border-slate-200 bg-white p-4">
+              <div id="ai-token" className="rounded-[24px] border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">AI Token Quick Top Up</p>
@@ -1349,15 +1353,15 @@ function BillingContent() {
 
 
       {/* History Penagihan */}
-      <section id="billing-history" className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
+      <section id="billing-history" className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
         <div className="px-8 py-6 border-b border-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
              <div className="p-2.5 bg-slate-100 rounded-xl">
                <History size={18} className="text-slate-600" />
              </div>
              <div>
-               <h3 className="text-lg font-semibold text-slate-900 tracking-tight">Riwayat Penagihan & Invoice</h3>
-               <p className="text-[10px] font-bold text-slate-400 tracking-tight">Audit log pembayaran paket SaaS</p>
+               <h3 className="text-lg font-black text-slate-900 tracking-tight">Riwayat Penagihan & Invoice</h3>
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Audit log pembayaran paket SaaS</p>
              </div>
           </div>
           <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
@@ -1369,12 +1373,12 @@ function BillingContent() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-tight">No Invoice</th>
-                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Paket / Item</th>
-                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Tgl Terbit</th>
-                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-tight text-right">Nilai Tagihan</th>
-                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-tight text-center">Status</th>
-                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-tight text-right">Aksi</th>
+                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">No Invoice</th>
+                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Paket / Item</th>
+                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Tgl Terbit</th>
+                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Nilai Tagihan</th>
+                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -1447,7 +1451,7 @@ function UsageMetric({ icon: Icon, label, current, max, unit }: any) {
          <span className="text-[10px] font-black text-slate-900 uppercase italic tracking-tighter">{current} / {safeMax} {unit}</span>
        </div>
        <div className="space-y-1">
-         <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight">{label}</p>
+         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
          <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
            <motion.div initial={{ width: 0 }} animate={{ width: `${percentage}%` }} className={`h-full rounded-full ${percentage > 90 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
          </div>
@@ -1464,7 +1468,7 @@ function BillingFlashMessage({ tone, text }: FlashMessage) {
   } as const
 
   return (
-    <div className={`rounded-xl border px-5 py-4 text-sm font-semibold leading-relaxed shadow-sm ${palette[tone]}`}>
+    <div className={`rounded-[28px] border px-5 py-4 text-sm font-semibold leading-relaxed shadow-sm ${palette[tone]}`}>
       {text}
     </div>
   )
@@ -1473,7 +1477,7 @@ function BillingFlashMessage({ tone, text }: FlashMessage) {
 function SubscriptionStatus({ status }: { status: string }) {
   const colors: any = { PAID: 'bg-emerald-50 text-emerald-600 border-emerald-100', UNPAID: 'bg-amber-50 text-amber-600 border-amber-100', EXPIRED: 'bg-rose-50 text-rose-600 border-rose-100' }
   return (
-    <div className={`px-2.5 py-1 rounded-full text-[9px] font-semibold tracking-tight border ${colors[status] || 'bg-slate-50'}`}>
+    <div className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${colors[status] || 'bg-slate-50'}`}>
       {status}
     </div>
   )

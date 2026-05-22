@@ -5,10 +5,10 @@
  */
 'use client'
 
-import React, { useState, useCallback, createContext, useContext } from 'react'
+import React, { useState, useCallback } from 'react'
 import Link, { type LinkProps } from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, CheckCircle2, AlertTriangle, AlertCircle, X } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertTriangle, X } from 'lucide-react'
 
 // ============================================================
 // 1. SAFE ACTION BUTTON
@@ -91,7 +91,7 @@ export function SafeButton({
       onClick={handleClick}
       disabled={loading || done || disabled}
       className={`
-        inline-flex items-center justify-center gap-2 font-semibold transition-all active:scale-95
+        inline-flex items-center justify-center gap-2 font-black transition-all active:scale-95
         disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100
         ${variants[variant]} ${sizes[size]} ${className}
       `}
@@ -149,11 +149,11 @@ export function PageHeader({ tag, title, subtitle, actions, icon, iconColor = 't
           )}
           <div className="space-y-0.5">
             {tag && (
-              <div className="flex items-center gap-2 text-indigo-500 font-semibold tracking-tight text-[10px] bg-indigo-50 w-fit px-3 py-1 rounded-full border border-indigo-100 mb-1">
+              <div className="flex items-center gap-2 text-indigo-500 font-black tracking-[0.2em] text-[8px] uppercase bg-indigo-50 w-fit px-3 py-1 rounded-full border border-indigo-100 mb-1 italic">
                 {tag}
               </div>
             )}
-            <h1 className="text-4xl font-semibold text-slate-900 tracking-tight leading-none">{title}</h1>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{title}</h1>
           </div>
         </div>
         {subtitle && <p className="text-sm text-slate-400 font-medium tracking-tight pl-1">{subtitle}</p>}
@@ -208,10 +208,10 @@ export function StatCard({ label, value, sub, color = 'slate', icon: Icon, alert
     >
       <div className="flex items-start justify-between mb-4 relative z-10">
         <div className="space-y-1">
-          <p className={`text-[10px] font-semibold tracking-tight opacity-60 ${isOrange ? 'text-white' : 'text-slate-400'}`}>
+          <p className={`text-[10px] font-black uppercase tracking-[0.2em] opacity-60 ${isOrange ? 'text-white' : 'text-slate-400'}`}>
             {label}
           </p>
-          <div className={`text-2xl font-bold font-mono tracking-tight truncate ${isOrange ? 'text-white' : 'text-slate-900'}`}>{value}</div>
+          <div className={`text-2xl font-black font-mono tracking-tighter truncate ${isOrange ? 'text-white' : 'text-slate-900'}`}>{value}</div>
         </div>
         {Icon && (
           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 ${iconColors[color]}`}>
@@ -223,7 +223,7 @@ export function StatCard({ label, value, sub, color = 'slate', icon: Icon, alert
       <div className="relative z-10 space-y-3">
         {sub && <p className={`text-[10px] font-bold italic opacity-60 ${isOrange ? 'text-white' : 'text-slate-400'}`}>{sub}</p>}
         {trend && (
-           <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold font-mono border
+           <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black font-mono border
              ${trend.positive ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}
            `}>
              {trend.value}
@@ -258,14 +258,14 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 gap-6 text-center bg-white rounded-2xl border-2 border-dashed border-slate-100 shadow-inner">
+    <div className="flex flex-col items-center justify-center py-24 gap-6 text-center bg-white rounded-[48px] border-2 border-dashed border-slate-100 shadow-inner">
       {Icon && (
-        <div className="w-20 h-20 rounded-xl bg-slate-50 flex items-center justify-center text-slate-300 shadow-inner">
+        <div className="w-20 h-20 rounded-[32px] bg-slate-50 flex items-center justify-center text-slate-300 shadow-inner">
           <Icon size={40} strokeWidth={1.5} />
         </div>
       )}
       <div className="space-y-1">
-        <p className="font-semibold text-slate-900 text-xl tracking-tight">{title}</p>
+        <p className="font-black text-slate-900 text-xl tracking-tight">{title}</p>
         {description && <p className="text-sm text-slate-400 font-medium mt-1 max-w-sm mx-auto leading-relaxed">{description}</p>}
       </div>
       {action && <div className="mt-4">{action}</div>}
@@ -303,7 +303,7 @@ export function SectionHeader({ title, subtitle, actions, icon }: { title: React
           </div>
         )}
         <div>
-          <div className="font-semibold text-slate-900 text-sm tracking-tight">{title}</div>
+          <div className="font-black text-slate-900 text-sm uppercase tracking-widest">{title}</div>
           {subtitle && <div className="text-[10px] text-slate-400 font-bold italic mt-0.5 tracking-tight">{subtitle}</div>}
         </div>
       </div>
@@ -328,7 +328,7 @@ export function StatusBadge({ label, variant = 'neutral' }: { label: string; var
   }
 
   return (
-    <span className={`inline-block px-3 py-1.5 rounded-xl text-[9px] font-semibold tracking-tight border shadow-sm ${styles[variant]}`}>
+    <span className={`inline-block px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border shadow-sm ${styles[variant]}`}>
       {label}
     </span>
   )
@@ -359,7 +359,7 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
             <AlertTriangle size={40} className="text-rose-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-900 text-2xl tracking-tight">{title}</h3>
+            <h3 className="font-black text-slate-900 text-2xl tracking-tighter">{title}</h3>
             <p className="text-sm text-slate-400 font-medium mt-2 leading-relaxed px-2">{message}</p>
           </div>
         </div>
@@ -367,319 +367,11 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
           <SafeButton onClick={onConfirm} variant={variant === 'danger' ? 'danger' : 'primary'} size="lg" className="w-full">
             {confirmLabel}
           </SafeButton>
-          <button onClick={onClose} className="py-4 text-xs font-semibold text-slate-400 tracking-tight hover:text-slate-900 transition-colors">
+          <button onClick={onClose} className="py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">
             Batalkan Aksi
           </button>
         </div>
       </motion.div>
-    </div>
-  )
-}
-
-// ============================================================
-// 10. LOADING SKELETON
-// Skeleton components untuk loading state di semua halaman.
-// ============================================================
-interface SkeletonProps {
-  className?: string
-  width?: string | number
-  height?: string | number
-  rounded?: string
-}
-
-export function Skeleton({ className = '', width, height, rounded = 'rounded-xl' }: SkeletonProps) {
-  return (
-    <div
-      className={`animate-pulse bg-slate-100 ${rounded} ${className}`}
-      style={{ width, height }}
-    />
-  )
-}
-
-export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
-  return (
-    <div className="card space-y-4">
-      {/* Header */}
-      <div className="flex gap-4">
-        {Array.from({ length: cols }).map((_, i) => (
-          <Skeleton key={i} className="h-4 flex-1" rounded="rounded-md" />
-        ))}
-      </div>
-      {/* Rows */}
-      {Array.from({ length: rows }).map((_, r) => (
-        <div key={r} className="flex gap-4 pt-3 border-t border-slate-100">
-          {Array.from({ length: cols }).map((_, c) => (
-            <Skeleton key={c} className="h-3 flex-1" rounded="rounded-md" />
-          ))}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-export function FormSkeleton({ fields = 3 }: { fields?: number }) {
-  return (
-    <div className="card space-y-5">
-      {Array.from({ length: fields }).map((_, i) => (
-        <div key={i} className="space-y-2">
-          <Skeleton className="h-3 w-24" rounded="rounded-md" />
-          <Skeleton className="h-[42px] w-full" rounded="rounded-xl" />
-        </div>
-      ))}
-      <Skeleton className="h-10 w-32 mt-4" rounded="rounded-xl" />
-    </div>
-  )
-}
-
-export function CardSkeleton({ count = 3 }: { count?: number }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="card space-y-3">
-          <Skeleton className="h-3 w-20" rounded="rounded-md" />
-          <Skeleton className="h-8 w-32" rounded="rounded-lg" />
-          <Skeleton className="h-3 w-16" rounded="rounded-md" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ============================================================
-// 11. FORM COMPONENTS
-// Input, Select, Textarea dengan label + error state konsisten.
-// ============================================================
-interface FormFieldProps {
-  label: string
-  error?: string
-  hint?: string
-  required?: boolean
-  children: React.ReactNode
-  className?: string
-}
-
-export function FormField({ label, error, hint, required, children, className = '' }: FormFieldProps) {
-  return (
-    <div className={`space-y-1.5 ${className}`}>
-      <label className="block text-sm font-semibold text-slate-700">
-        {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      {children}
-      {hint && !error && <p className="text-xs text-slate-400">{hint}</p>}
-      {error && <p className="text-xs font-medium text-red-600 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
-    </div>
-  )
-}
-
-interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string
-  error?: string
-  hint?: string
-}
-
-export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
-  ({ label, error, hint, required, className = '', id, ...props }, ref) => {
-    const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined)
-    return (
-      <FormField label={label} error={error} hint={hint} required={required}>
-        <input
-          ref={ref}
-          id={inputId}
-          className={`input ${error ? 'input-error' : ''} ${className}`}
-          {...props}
-        />
-      </FormField>
-    )
-  }
-)
-FormInput.displayName = 'FormInput'
-
-interface FormSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  label?: string
-  error?: string
-  hint?: string
-  options?: { value: string; label: string }[]
-  placeholder?: string
-}
-
-export const FormSelect = React.forwardRef<HTMLSelectElement, FormSelectProps>(
-  ({ label, error, hint, required, options, placeholder, className = '', id, ...props }, ref) => {
-    const selectId = id || (label ? `select-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined)
-    return (
-      <FormField label={label} error={error} hint={hint} required={required}>
-        <select
-          ref={ref}
-          id={selectId}
-          className={`input appearance-none bg-no-repeat ${error ? 'input-error' : ''} ${className}`}
-          style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236b7280'%3e%3cpath d='M8 11L3 6h10l-5 5z'/%3e%3c/svg%3e")`, backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-          {...props}
-        >
-          {placeholder && <option value="" className="text-slate-400">{placeholder}</option>}
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </FormField>
-    )
-  }
-)
-FormSelect.displayName = 'FormSelect'
-
-interface FormTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label?: string
-  error?: string
-  hint?: string
-}
-
-export const FormTextarea = React.forwardRef<HTMLTextAreaElement, FormTextareaProps>(
-  ({ label, error, hint, required, className = '', id, ...props }, ref) => {
-    const textareaId = id || (label ? `textarea-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined)
-    return (
-      <FormField label={label} error={error} hint={hint} required={required}>
-        <textarea
-          ref={ref}
-          id={textareaId}
-          className={`input min-h-[100px] py-3 resize-y ${error ? 'input-error' : ''} ${className}`}
-          {...props}
-        />
-      </FormField>
-    )
-  }
-)
-FormTextarea.displayName = 'FormTextarea'
-
-// ============================================================
-// 12. PAGE SHELL
-// Universal wrapper untuk konsistensi layout tiap halaman.
-// ============================================================
-interface PageShellProps {
-  title: string
-  subtitle?: string
-  children: React.ReactNode
-  actions?: React.ReactNode
-  className?: string
-  isLoading?: boolean
-  skeleton?: React.ReactNode
-}
-
-export function PageShell({ title, subtitle, children, actions, className = '', isLoading, skeleton }: PageShellProps) {
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="section-header">
-          <div>
-            <Skeleton className="h-7 w-48" rounded="rounded-lg" />
-            {subtitle && <Skeleton className="h-4 w-32 mt-2" rounded="rounded-md" />}
-          </div>
-        </div>
-        {skeleton || <CardSkeleton />}
-      </div>
-    )
-  }
-
-  return (
-    <div className={`space-y-6 ${className}`}>
-      <div className="section-header">
-        <div>
-          <h1 className="section-title">{title}</h1>
-          {subtitle && <p className="section-subtitle">{subtitle}</p>}
-        </div>
-        {actions && <div className="flex items-center gap-3">{actions}</div>}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-// ============================================================
-// 13. ERROR BOUNDARY
-// Global error boundary untuk setiap route segment.
-// ============================================================
-interface ErrorBoundaryProps {
-  children: React.ReactNode
-  fallback?: React.ReactNode
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean
-  error: Error | null
-}
-
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props)
-    this.state = { hasError: false, error: null }
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error }
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, errorInfo)
-  }
-
-  render() {
-    if (this.state.hasError) {
-      if (this.props.fallback) return this.props.fallback
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center">
-          <div className="w-20 h-20 rounded-[32px] bg-rose-50 flex items-center justify-center mx-auto shadow-inner mb-6">
-            <AlertTriangle size={40} className="text-rose-600" />
-          </div>
-          <h2 className="text-2xl font-semibold text-slate-900 tracking-tight mb-2">Terjadi Kesalahan</h2>
-          <p className="text-sm text-slate-400 font-medium max-w-md mb-6">
-            Ada yang tidak beres. Tim teknis sudah mendapat notifikasi. Coba refresh halaman.
-          </p>
-          <SafeButton
-            onClick={() => {
-              this.setState({ hasError: false, error: null })
-              window.location.reload()
-            }}
-            variant="primary"
-          >
-            Refresh Halaman
-          </SafeButton>
-          {process.env.NODE_ENV === 'development' && this.state.error && (
-            <pre className="mt-6 p-4 bg-slate-100 rounded-2xl text-xs text-left max-w-lg overflow-auto text-slate-600">
-              {this.state.error.message}
-              {this.state.error.stack}
-            </pre>
-          )}
-        </div>
-      )
-    }
-    return this.props.children
-  }
-}
-
-// ── MODAL ─────────────────────────────────────────────────────────────────
-
-interface ModalProps {
-  show: boolean
-  onClose: () => void
-  title: string
-  children: React.ReactNode
-  size?: 'sm' | 'md' | 'lg'
-}
-
-export function Modal({ show, onClose, title, children, size = 'md' }: ModalProps) {
-  if (!show) return null
-  const sizeClass = size === 'sm' ? 'max-w-md' : size === 'lg' ? 'max-w-2xl' : 'max-w-lg'
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/60" onClick={onClose}>
-      <div className={`bg-[#0e0f12] border border-white/10 rounded-2xl w-full ${sizeClass} shadow-2xl`} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-          <h3 className="text-base font-semibold text-white">{title}</h3>
-          <button onClick={onClose} className="text-white/40 hover:text-white/80 transition-colors">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-        <div className="px-6 py-4">
-          {children}
-        </div>
-      </div>
     </div>
   )
 }

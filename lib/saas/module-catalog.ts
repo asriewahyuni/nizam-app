@@ -288,14 +288,6 @@ export const SAAS_MODULE_COMPATIBILITY_OPTIONS: readonly SaasProvisioningModuleO
     sectionTitle: 'Vertical Modules',
   },
   {
-    value: 'LMS',
-    label: 'LMS',
-    description: 'Lembaga pelatihan, batch, peserta, jadwal, sertifikat, dan pembayaran tuition.',
-    requiredCoreFamily: 'lite',
-    sectionKey: 'vertical_module',
-    sectionTitle: 'Vertical Modules',
-  },
-  {
     value: 'Syirkah',
     label: 'Syirkah',
     description: 'Partnership contract dan workflow syirkah.',
@@ -438,7 +430,7 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
   },
   {
     canonical: 'Reports',
-    aliases: ['reports', 'laporan', 'insight', 'strategy', 'forecast', 'strategi'],
+    aliases: ['reports', 'laporan', 'insight', 'strategy', 'forecast', 'strategi (bsc)'],
   },
   {
     canonical: 'HRIS',

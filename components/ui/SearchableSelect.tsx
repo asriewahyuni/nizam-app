@@ -54,7 +54,7 @@ export function SearchableSelect({
 
   return (
     <div className="space-y-1 relative w-full" ref={containerRef}>
-      <label className="text-[10px] font-semibold tracking-tight text-slate-400 px-1">{label}</label>
+      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">{label}</label>
       <div 
         onClick={() => setIsOpen(!isOpen)}
         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-slate-900 text-[11px] cursor-pointer hover:border-indigo-300 transition-all flex justify-between items-center min-h-[44px]"
@@ -64,7 +64,7 @@ export function SearchableSelect({
             {selectedOption ? (selectedOption.code ? `${selectedOption.code} - ${selectedOption.name}` : selectedOption.name) : placeholder}
           </span>
           {selectedOption?.balance !== undefined && (
-            <span className="text-[9px] text-emerald-600 font-semibold tracking-tight mt-0.5">Saldo: {formatRupiah(selectedOption.balance)}</span>
+            <span className="text-[9px] text-emerald-600 font-black uppercase mt-0.5">Saldo: {formatRupiah(selectedOption.balance)}</span>
           )}
         </div>
         <div className="text-slate-400 text-[8px]">▼</div>
@@ -102,7 +102,7 @@ export function SearchableSelect({
                   </div>
                   <div className="text-right">
                     {opt.balance !== undefined && (
-                       <span className={`text-[10px] font-semibold ${value === opt.id ? 'text-white' : 'text-emerald-600'}`}>
+                       <span className={`text-[10px] font-black ${value === opt.id ? 'text-white' : 'text-emerald-600'}`}>
                          {formatRupiah(opt.balance)}
                        </span>
                     )}

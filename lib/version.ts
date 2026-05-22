@@ -30,11 +30,11 @@ export const NIZAM_VERSION = {
   patch: getPatchCount(),
 } as const
 
-/** Versi lengkap internal: N2.6.3.x */
+/** Versi lengkap internal: N1.7.3.x */
 export const NIZAM_VERSION_FULL = `N${NIZAM_VERSION.core}.${NIZAM_VERSION.module}.${NIZAM_VERSION.addon}.${NIZAM_VERSION.patch}`
 
-/** Versi publik ringkas: N2.6.3 */
+/** Versi publik ringkas: N1.7.3 */
 export const NIZAM_VERSION_SHORT = `N${NIZAM_VERSION.core}.${NIZAM_VERSION.module}.${NIZAM_VERSION.addon}`
 
-/** Label siap pakai untuk UI — NIZAM N2.6.3.x */
+/** Label siap pakai untuk UI — NIZAM N1.7.3.x */
 export const NIZAM_VERSION_LABEL = `NIZAM ${NIZAM_VERSION_FULL}`

@@ -118,9 +118,9 @@ function StatCard({
   hint: string
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{label}</div>
-      <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{value}</div>
+      <div className="mt-3 text-3xl font-black tracking-tight text-slate-900">{value}</div>
       <p className="mt-2 text-sm text-slate-600">{hint}</p>
     </div>
   )
@@ -174,7 +174,7 @@ export default async function CompetencyTrainingDetailPage(props: {
     <div className="space-y-6">
       <section
         id="overview"
-        className="overflow-hidden rounded-xl border border-amber-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_42%),linear-gradient(135deg,#fffbeb_0%,#ffffff_46%,#f0fdfa_100%)] p-6 shadow-sm"
+        className="overflow-hidden rounded-[32px] border border-amber-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_42%),linear-gradient(135deg,#fffbeb_0%,#ffffff_46%,#f0fdfa_100%)] p-6 shadow-sm"
       >
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
@@ -190,7 +190,7 @@ export default async function CompetencyTrainingDetailPage(props: {
               <GraduationCap className="h-3.5 w-3.5" />
               Detail Pelatihan Internal
             </div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">{training.title}</h1>
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">{training.title}</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
               Workspace ini dipakai HR untuk mengelola peserta, jadwal sesi, dan hasil evaluasi per pelatihan pada
               entitas aktif.
@@ -215,11 +215,11 @@ export default async function CompetencyTrainingDetailPage(props: {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-amber-200 bg-white/90 p-4">
+            <div className="rounded-[22px] border border-amber-200 bg-white/90 p-4">
               <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Skill</div>
               <div className="mt-2 text-base font-black text-slate-900">{training.skillCategory}</div>
             </div>
-            <div className="rounded-xl border border-amber-200 bg-white/90 p-4">
+            <div className="rounded-[22px] border border-amber-200 bg-white/90 p-4">
               <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Target Role</div>
               <div className="mt-2 text-base font-black text-slate-900">{training.targetRole || 'Semua role terkait'}</div>
             </div>
@@ -227,28 +227,28 @@ export default async function CompetencyTrainingDetailPage(props: {
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white/90 p-5">
+          <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5">
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Fasilitator</div>
-            <div className="mt-2 text-lg font-semibold text-slate-900">{training.facilitatorName || 'Belum diisi'}</div>
+            <div className="mt-2 text-lg font-black text-slate-900">{training.facilitatorName || 'Belum diisi'}</div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white/90 p-5">
+          <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5">
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Periode</div>
-            <div className="mt-2 text-lg font-semibold text-slate-900">
+            <div className="mt-2 text-lg font-black text-slate-900">
               {training.startDate ? formatDateLabel(training.startDate) : 'Fleksibel'}
             </div>
             <div className="mt-1 text-sm text-slate-600">
               {training.endDate ? `sampai ${formatDateLabel(training.endDate)}` : 'tanpa tanggal selesai'}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white/90 p-5">
+          <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5">
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Durasi</div>
-            <div className="mt-2 text-lg font-semibold text-slate-900">
+            <div className="mt-2 text-lg font-black text-slate-900">
               {training.durationHours > 0 ? `${training.durationHours} jam` : 'Belum ditentukan'}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white/90 p-5">
+          <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5">
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Unit Target</div>
-            <div className="mt-2 text-lg font-semibold text-slate-900">
+            <div className="mt-2 text-lg font-black text-slate-900">
               {training.scopeType === 'BRANCH'
                 ? (training.branchName || training.branchCode || 'Unit aktif')
                 : 'Seluruh entitas aktif'}
@@ -257,14 +257,14 @@ export default async function CompetencyTrainingDetailPage(props: {
         </div>
 
         {training.objective ? (
-          <div className="mt-5 rounded-xl border border-slate-200 bg-white/90 p-5">
+          <div className="mt-5 rounded-[24px] border border-slate-200 bg-white/90 p-5">
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Tujuan Pelatihan</div>
             <p className="mt-3 text-sm leading-6 text-slate-700">{training.objective}</p>
           </div>
         ) : null}
 
         {training.notes ? (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-white/90 p-5">
+          <div className="mt-4 rounded-[24px] border border-slate-200 bg-white/90 p-5">
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Catatan HR</div>
             <p className="mt-3 text-sm leading-6 text-slate-700">{training.notes}</p>
           </div>
@@ -272,37 +272,37 @@ export default async function CompetencyTrainingDetailPage(props: {
       </section>
 
       {searchParams.error ? (
-        <section className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-800 shadow-sm">
+        <section className="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-800 shadow-sm">
           {searchParams.error}
         </section>
       ) : null}
 
       {searchParams.participantSaved === '1' ? (
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
+        <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
           Peserta berhasil ditambahkan atau diperbarui pada pelatihan ini.
         </section>
       ) : null}
 
       {searchParams.participantUpdated === '1' ? (
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
+        <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
           Status peserta berhasil diperbarui.
         </section>
       ) : null}
 
       {searchParams.sessionSaved === '1' ? (
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
+        <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
           Sesi pelatihan baru berhasil dibuat.
         </section>
       ) : null}
 
       {searchParams.sessionUpdated === '1' ? (
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
+        <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
           Status sesi berhasil diperbarui.
         </section>
       ) : null}
 
       {searchParams.evaluationSaved === '1' ? (
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
+        <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
           Evaluasi peserta berhasil disimpan.
         </section>
       ) : null}
@@ -331,17 +331,17 @@ export default async function CompetencyTrainingDetailPage(props: {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <div id="peserta" className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div id="peserta" className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <Users className="h-5 w-5 text-slate-700" />
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Peserta</div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-900">Assignment peserta pelatihan</h2>
+              <h2 className="mt-1 text-xl font-black text-slate-900">Assignment peserta pelatihan</h2>
             </div>
           </div>
 
           {accessContext.canManage ? (
-            <form action={assignCompetencyTrainingParticipant} className="mt-5 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
+            <form action={assignCompetencyTrainingParticipant} className="mt-5 grid gap-4 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
               <input type="hidden" name="trainingId" value={training.id} />
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="text-sm">
@@ -388,7 +388,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                   name="note"
                   rows={3}
                   placeholder="Misalnya batch peserta, alasan penugasan, atau jalur kompetensi."
-                  className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
+                  className="mt-3 w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
                 />
               </label>
 
@@ -405,20 +405,20 @@ export default async function CompetencyTrainingDetailPage(props: {
               </div>
             </form>
           ) : (
-            <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+            <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
               Anda sedang di mode baca. Detail peserta tetap terlihat, tetapi perubahan assignment membutuhkan permission
               `learning:write`.
             </div>
           )}
 
           {trainingDetail.participants.length === 0 ? (
-            <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+            <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
               Belum ada peserta yang ditautkan ke pelatihan ini.
             </div>
           ) : (
             <div className="mt-5 space-y-4">
               {trainingDetail.participants.map((participant) => (
-                <div key={participant.id} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                <div key={participant.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="max-w-3xl">
                       <div className="flex flex-wrap items-center gap-2">
@@ -431,7 +431,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                           </span>
                         ) : null}
                       </div>
-                      <h3 className="mt-3 text-lg font-semibold text-slate-900">{participant.employeeName}</h3>
+                      <h3 className="mt-3 text-lg font-black text-slate-900">{participant.employeeName}</h3>
                       <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-600">
                         {participant.employeeNik ? <span>NIK: {participant.employeeNik}</span> : null}
                         {participant.employeeJobTitle ? <span>Posisi: {participant.employeeJobTitle}</span> : null}
@@ -442,12 +442,12 @@ export default async function CompetencyTrainingDetailPage(props: {
                         <div className="mt-1 text-sm text-slate-600">Completed: {formatDateTimeLabel(participant.completedAt)}</div>
                       ) : null}
                       {participant.note ? (
-                        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
+                        <div className="mt-4 rounded-[18px] border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
                           {participant.note}
                         </div>
                       ) : null}
                       {participant.latestEvaluation ? (
-                        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                        <div className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
                           Evaluasi terbaru: {formatEvaluationResultLabel(participant.latestEvaluation.resultStatus)} •{' '}
                           {formatEvaluationTypeLabel(participant.latestEvaluation.evaluationType)} • Skor{' '}
                           {formatScoreLabel(participant.latestEvaluation.score)} •{' '}
@@ -458,7 +458,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                     </div>
 
                     {accessContext.canManage ? (
-                      <form action={updateCompetencyTrainingParticipantStatus} className="w-full max-w-xs rounded-xl border border-slate-200 bg-white p-4">
+                      <form action={updateCompetencyTrainingParticipantStatus} className="w-full max-w-xs rounded-[20px] border border-slate-200 bg-white p-4">
                         <input type="hidden" name="trainingId" value={training.id} />
                         <input type="hidden" name="participantId" value={participant.id} />
                         <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Update Status</div>
@@ -489,17 +489,17 @@ export default async function CompetencyTrainingDetailPage(props: {
         </div>
 
         <div className="space-y-6">
-          <section id="sesi" className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section id="sesi" className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <CalendarDays className="h-5 w-5 text-slate-700" />
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Sesi</div>
-                <h2 className="mt-1 text-xl font-semibold text-slate-900">Jadwal pelatihan per batch</h2>
+                <h2 className="mt-1 text-xl font-black text-slate-900">Jadwal pelatihan per batch</h2>
               </div>
             </div>
 
             {accessContext.canManage ? (
-              <form action={createCompetencyTrainingSession} className="mt-5 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <form action={createCompetencyTrainingSession} className="mt-5 grid gap-4 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                 <input type="hidden" name="trainingId" value={training.id} />
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="text-sm">
@@ -603,7 +603,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                     name="note"
                     rows={3}
                     placeholder="Misalnya objective sesi, materi, atau catatan operasional."
-                    className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
+                    className="mt-3 w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
                   />
                 </label>
 
@@ -617,13 +617,13 @@ export default async function CompetencyTrainingDetailPage(props: {
             ) : null}
 
             {trainingDetail.sessions.length === 0 ? (
-              <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+              <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
                 Belum ada sesi yang dijadwalkan untuk pelatihan ini.
               </div>
             ) : (
               <div className="mt-5 space-y-4">
                 {trainingDetail.sessions.map((session) => (
-                  <div key={session.id} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                  <div key={session.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="max-w-3xl">
                         <div className="flex flex-wrap items-center gap-2">
@@ -636,7 +636,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                             </span>
                           ) : null}
                         </div>
-                        <h3 className="mt-3 text-lg font-semibold text-slate-900">{session.title}</h3>
+                        <h3 className="mt-3 text-lg font-black text-slate-900">{session.title}</h3>
                         <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-600">
                           {session.sessionDate ? (
                             <span className="inline-flex items-center gap-2">
@@ -661,14 +661,14 @@ export default async function CompetencyTrainingDetailPage(props: {
                           <div className="mt-3 text-sm text-slate-600">Fasilitator: {session.facilitatorName}</div>
                         ) : null}
                         {session.note ? (
-                          <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
+                          <div className="mt-4 rounded-[18px] border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
                             {session.note}
                           </div>
                         ) : null}
                       </div>
 
                       {accessContext.canManage ? (
-                        <form action={updateCompetencyTrainingSessionStatus} className="w-full max-w-xs rounded-xl border border-slate-200 bg-white p-4">
+                        <form action={updateCompetencyTrainingSessionStatus} className="w-full max-w-xs rounded-[20px] border border-slate-200 bg-white p-4">
                           <input type="hidden" name="trainingId" value={training.id} />
                           <input type="hidden" name="sessionId" value={session.id} />
                           <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Update Status</div>
@@ -696,18 +696,18 @@ export default async function CompetencyTrainingDetailPage(props: {
             )}
           </section>
 
-          <section id="evaluasi" className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section id="evaluasi" className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <ClipboardCheck className="h-5 w-5 text-slate-700" />
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Evaluasi</div>
-                <h2 className="mt-1 text-xl font-semibold text-slate-900">Hasil observasi dan asesmen peserta</h2>
+                <h2 className="mt-1 text-xl font-black text-slate-900">Hasil observasi dan asesmen peserta</h2>
               </div>
             </div>
 
             {accessContext.canManage ? (
               trainingDetail.participants.length > 0 ? (
-                <form action={recordCompetencyTrainingEvaluation} className="mt-5 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                <form action={recordCompetencyTrainingEvaluation} className="mt-5 grid gap-4 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                   <input type="hidden" name="trainingId" value={training.id} />
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="text-sm">
@@ -803,7 +803,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                       name="note"
                       rows={3}
                       placeholder="Tuliskan observasi, poin remedial, atau hasil assessment peserta."
-                      className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
+                      className="mt-3 w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
                     />
                   </label>
 
@@ -815,20 +815,20 @@ export default async function CompetencyTrainingDetailPage(props: {
                   </button>
                 </form>
               ) : (
-                <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+                <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
                   Tambahkan peserta terlebih dulu sebelum merekam evaluasi.
                 </div>
               )
             ) : null}
 
             {trainingDetail.evaluations.length === 0 ? (
-              <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+              <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
                 Belum ada evaluasi yang terekam untuk pelatihan ini.
               </div>
             ) : (
               <div className="mt-5 space-y-4">
                 {trainingDetail.evaluations.map((evaluation) => (
-                  <div key={evaluation.id} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                  <div key={evaluation.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-700">
                         {formatEvaluationResultLabel(evaluation.resultStatus)}
@@ -840,7 +840,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                         Skor {formatScoreLabel(evaluation.score)}
                       </span>
                     </div>
-                    <h3 className="mt-3 text-lg font-semibold text-slate-900">{evaluation.participantName}</h3>
+                    <h3 className="mt-3 text-lg font-black text-slate-900">{evaluation.participantName}</h3>
                     <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-600">
                       {evaluation.participantNik ? <span>NIK: {evaluation.participantNik}</span> : null}
                       {evaluation.sessionTitle ? <span>Sesi: {evaluation.sessionTitle}</span> : null}
@@ -851,7 +851,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                       {formatDateTimeLabel(evaluation.evaluatedAt)}
                     </div>
                     {evaluation.note ? (
-                      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
+                      <div className="mt-4 rounded-[18px] border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
                         {evaluation.note}
                       </div>
                     ) : null}

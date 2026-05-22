@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { TrendingUp, TrendingDown, type LucideIcon } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, type LucideIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { ReactNode } from 'react'
 
@@ -28,57 +28,85 @@ export function MetricCard({
 }: MetricCardProps) {
   const router = useRouter()
 
-  if (isEmpty) {
-    return (
-      <div className="rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] p-5 min-h-[180px] flex flex-col justify-between">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[#9ca3af]">{label}</span>
-          <div className="w-9 h-9 rounded-lg bg-[#e5e7eb] flex items-center justify-center">
-            <Icon size={18} className="text-[#9ca3af]" />
-          </div>
-        </div>
-        <div>
-          <div className="text-2xl font-semibold text-[#d1d5db] tracking-tight">—</div>
-          <div className="text-xs text-[#9ca3af] mt-1">{hint}</div>
-        </div>
-      </div>
-    )
+  const getTrendIndicator = () => {
+    if (trend === undefined) return null
+    if (trend > 0) return { icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50' }
+    if (trend < 0) return { icon: TrendingDown, color: 'text-rose-500', bg: 'bg-rose-50' }
+    return null
   }
+
+  const trendIndicator = getTrendIndicator()
+
+  const getCardStyle = () => {
+    if (isEmpty) {
+      return {
+        bg: 'bg-slate-50',
+        border: 'border-slate-200',
+        icon: 'bg-slate-100 text-slate-400',
+        label: 'text-slate-400',
+        value: 'text-slate-300',
+      }
+    }
+    if (danger) {
+      return {
+        bg: 'bg-rose-50',
+        border: 'border-rose-200',
+        icon: 'bg-rose-100 text-rose-600',
+        label: 'text-rose-500',
+        value: 'text-rose-700',
+      }
+    }
+    return {
+      bg: 'bg-white',
+      border: 'border-slate-100',
+      icon: 'bg-slate-100 text-slate-600 group-hover:bg-blue-600 group-hover:text-white',
+      label: 'text-slate-500 group-hover:text-blue-600',
+      value: 'text-slate-900 group-hover:text-blue-700',
+    }
+  }
+
+  const styles = getCardStyle()
 
   return (
     <motion.div
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.15, ease: 'easeOut' }}
-      onClick={() => router.push(href)}
-      className="rounded-2xl border border-[#e5e7eb] bg-white p-5 min-h-[180px] flex flex-col justify-between cursor-pointer transition-shadow duration-200 hover:shadow-sm"
+      whileHover={isEmpty ? {} : { y: -4 }}
+      whileTap={isEmpty ? {} : { scale: 0.98 }}
+      onClick={() => !isEmpty && router.push(href)}
+      className={`group relative rounded-2xl p-5 border transition-all duration-300
+        ${styles.bg} ${styles.border}
+        ${isEmpty ? 'shadow-sm' : 'shadow-md hover:shadow-lg hover:border-blue-300'}
+        h-full flex flex-col justify-between min-h-[200px]`}
       title={hint}
     >
-      <div className="flex items-start justify-between">
-        <span className="text-xs text-[#6b7280] font-medium">{label}</span>
-        <div className="w-9 h-9 rounded-lg bg-[#f3f4f6] flex items-center justify-center shrink-0 ml-3">
-          <Icon size={18} className="text-[#6b7280]" />
+      <div className="flex items-start justify-between gap-3 mb-6">
+        <div className={`shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm border border-current/10 ${styles.icon}`}>
+          <Icon size={20} strokeWidth={2} />
+        </div>
+
+        <div className="flex flex-col items-end flex-1 min-w-0 gap-2">
+          <span className={`text-xs font-bold uppercase tracking-wider text-right transition-colors ${styles.label}`} title={label}>
+            {label}
+          </span>
+
+          {isEmpty ? (
+            <span className="px-2 py-1 rounded-lg bg-slate-100 text-slate-500 text-[10px] font-semibold" title="No data available">—</span>
+          ) : trendIndicator ? (
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${trendIndicator.bg}`} title={`${trend > 0 ? 'Increase' : 'Decrease'} of ${Math.abs(trend)}%`}>
+              <trendIndicator.icon size={12} className={trendIndicator.color} />
+              <span className={`text-xs font-bold ${trendIndicator.color}`}>{trend > 0 ? '+' : ''}{trend}%</span>
+            </div>
+          ) : null}
         </div>
       </div>
 
-      <div className="mt-auto">
-        <div className="text-2xl font-semibold text-[#0a0c10] tracking-tight leading-none">
-          {value}
-        </div>
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-xs text-[#9ca3af]">{hint}</span>
-          {trend !== undefined && (
-            <span className={`flex items-center gap-1 text-xs font-medium ${trend > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-              {trend > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-              {trend > 0 ? '+' : ''}{trend}%
-            </span>
-          )}
-          {danger && (
-            <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
-              Perhatian
-            </span>
-          )}
+      <div className="space-y-3 mt-auto">
+        <div className={`text-2xl font-black font-mono tracking-tight ${styles.value} ${isEmpty ? 'opacity-50' : ''}`} title={typeof value === 'string' ? value : ''}>
+          {isEmpty ? '—' : value}
         </div>
       </div>
+
+      {!isEmpty && <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-blue-500" title="Click to view details">→</div>}
+      {danger && <div className="absolute top-0 right-0 w-1 h-8 bg-rose-400 rounded-b-lg" title="Warning: requires attention" />}
     </motion.div>
   )
 }

@@ -8,6 +8,7 @@ import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/brows
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { saasModuleCoversCapability, normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
+import { PILLAR_MODULES } from '@/modules/marketplace/lib/module-registry'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import {
   LayoutDashboard,
@@ -47,7 +48,6 @@ import {
   Code2,
   Wrench,
   GraduationCap,
-  Globe,
   type LucideIcon
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
@@ -66,7 +66,6 @@ interface NavGroup {
     module_key?: string
     saas_assessor_only?: boolean
     admin_only?: boolean
-    comingSoon?: boolean
   }[]
 }
 
@@ -75,22 +74,18 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Utama',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission_key: 'dashboard' },
-      { label: 'Model Hub', href: '/marketplace', icon: Store, permission_key: 'config', admin_only: true },
+      { label: 'Modul Marketplace', href: '/marketplace', icon: Store, permission_key: 'config', admin_only: true },
       { label: 'Audit Integritas', href: '/accounting/audit', icon: ShieldCheck, permission_key: 'audit', module_key: 'Audit' },
     ]
   },
   {
     group: 'Finance',
     items: [
-      { label: 'Dashboard Keuangan', href: '/accounting', icon: BarChart3, permission_key: 'fin_dashboard', module_key: 'Finance' },
       { label: 'Akun (CoA)', href: '/settings/accounts', icon: Layers, permission_key: 'coa', module_key: 'Finance' },
       { label: 'Kas & Bank', href: '/cash', icon: Wallet, permission_key: 'bank', module_key: 'Finance' },
       { label: 'Buku Besar', href: '/accounting/journal', icon: BookOpen, permission_key: 'journal', module_key: 'Accounting' },
       { label: 'Aging (AR/AP)', href: '/accounting/aging', icon: History, permission_key: 'aging', module_key: 'Finance' },
-      { label: 'Rasio Keuangan', href: '/accounting/ratios', icon: Activity, permission_key: 'ratios', module_key: 'Finance' },
       { label: 'Manajemen Zakat', href: '/accounting/zakat', icon: Zap, permission_key: 'zakat', module_key: 'Accounting' },
-      { label: 'Multi Mata Uang', href: '/accounting/currencies', icon: Globe, permission_key: 'currencies', module_key: 'Finance' },
-      { label: 'Selisih Kurs (FX)', href: '/accounting/forex', icon: TrendingUp, permission_key: 'currencies', module_key: 'Finance' },
       { label: 'Manajemen Pajak', href: '/accounting/tax', icon: ShieldCheck, permission_key: 'tax', module_key: 'Accounting' },
       { label: 'Reimbursement', href: '/accounting/reimburse', icon: FileText, permission_key: 'reimburse', module_key: 'Finance' },
       { label: 'Penutupan Buku', href: '/accounting/closing', icon: Lock, permission_key: 'closing', module_key: 'Accounting' },
@@ -142,7 +137,7 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Insight',
     items: [
       { label: 'Laporan', href: '/reports', icon: BarChart3, permission_key: 'reports', module_key: 'Reports' },
-      { label: 'Nizametrics', href: '/reports/bsc', icon: PieChart, permission_key: 'strategy', module_key: 'Reports' },
+      { label: 'Strategi (BSC)', href: '/reports/bsc', icon: PieChart, permission_key: 'strategy', module_key: 'Reports' },
       { label: 'Proyeksi Kas', href: '/accounting/forecast', icon: LineChart, permission_key: 'forecast', module_key: 'Finance' },
     ]
   },
@@ -448,9 +443,13 @@ export function AppSidebar({
     // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
     if (isDemo) return true
 
+    // 0b. PILLAR BYPASS: Modul pillar (Finance, Marketing, HRIS) selalu muncul di sidebar
+    //     Sidebar items yang punya module_key milik pillar modules auto-visible.
+    if (item.module_key && PILLAR_MODULES.some(p => p.key.toLowerCase() === item.module_key!.toLowerCase())) {
+      return true
+    }
+
     // 1. SaaS Module Check
-    // Coming Soon items are always visible (regardless of enabled modules)
-    if (item.comingSoon) return true
     if (item.module_key && enabledModules.length > 0) {
       const matches = enabledModules.some((moduleName) => {
         const enabledLower = moduleName.trim().toLowerCase()
@@ -650,31 +649,6 @@ export function AppSidebar({
 
                       return (
                         <li key={`${group.group}:${item.label}:${item.href}`}>
-                          {item.comingSoon ? (
-                            <div
-                              className={`flex items-center rounded-2xl text-sm font-bold transition-all duration-200 group/item relative opacity-40 cursor-not-allowed
-                                ${effectiveIsCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'}
-                                text-slate-400
-                              `}
-                              title={effectiveIsCollapsed ? `${item.label} (Segera Hadir)` : ''}
-                            >
-                              <div className="flex items-center gap-3.5 relative">
-                                <Icon
-                                  size={18}
-                                  strokeWidth={2}
-                                  className="shrink-0 text-slate-300"
-                                />
-                                {!effectiveIsCollapsed && (
-                                  <span className="tracking-tight truncate flex-1">{item.label}</span>
-                                )}
-                              </div>
-                              {!effectiveIsCollapsed && (
-                                <span className="text-[9px] font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-lg whitespace-nowrap">
-                                  Segera Hadir
-                                </span>
-                              )}
-                            </div>
-                          ) : (
                           <Link
                             href={item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href}
                             onMouseEnter={() => prefetchRoute(item.href)}
@@ -732,7 +706,6 @@ export function AppSidebar({
                               </div>
                             )}
                           </Link>
-                            )}
                         </li>
                       )
                     })}

@@ -796,12 +796,9 @@ async function createOrganizationRecord(
     }
 
     const isDemo = accountIsDemo || requestedDemoPlan || parentOrgIsDemo
-    const isAbsFlow = !parentOrgId && !isDemo && planParam === 'abs'
     const shouldSkipCoaSeed = parentOrgId ? true : !isDemo
-    const shouldAutoApplyAbsVoucher = isAbsFlow
-    const ABS_TRIAL_PLAN_NAME = 'ABS Trial'
-    const SELECTABLE_PLAN_MAP: Record<string, string> = { lite: 'Lite', mini: 'Mini', enterprise: 'Enterprise' }
-    let selectedPlan = isDemo ? 'Demo' : (isAbsFlow ? ABS_TRIAL_PLAN_NAME : (SELECTABLE_PLAN_MAP[planParam] || 'Trial'))
+    const shouldAutoApplyAbsVoucher = !parentOrgId && !isDemo && planParam === 'abs'
+    let selectedPlan = isDemo ? 'Demo' : 'Trial'
     if (parentPackageState?.plan) {
       selectedPlan = parentPackageState.plan
     }
@@ -809,7 +806,7 @@ async function createOrganizationRecord(
       !hasUnlimitedAccess &&
       !isDemo &&
       !parentOrgId &&
-      !isAbsFlow &&
+      planParam !== 'abs' &&
       selectedPlan === TRIAL_PLAN_NAME
 
     if (shouldClaimTrial) {
@@ -858,11 +855,12 @@ async function createOrganizationRecord(
         currency: 'IDR',
         timezone: 'Asia/Jakarta',
         fiscal_year_start_month: 1,
-        plan: selectedPlan,
+        plan: selectedPlan, // Default plan for new orgs
         is_demo: isDemo,
         business_type: businessType,
+        // Demo root orgs should be ready-to-explore immediately, while regular orgs
+        // and child entities keep the manual/sync-first CoA activation behavior.
         skip_coa_seed: shouldSkipCoaSeed,
-        ...(isAbsFlow ? { abs_source: true, use_custom_modules: true } : {}),
       },
     }
     if (subscriptionEndToSet) {
@@ -988,63 +986,6 @@ async function createOrganizationRecord(
         await applyVoucher(orgId, 'ABS2024')
       } catch (absErr) {
         (console as any).error('ABS Activation Error:', absErr)
-      }
-    }
-
-    // IF ABS, SEED COA + CREATE DEFAULT KAS UTAMA BANK ACCOUNT + ACTIVATE CORE MODULES
-    if (isAbsFlow) {
-      try {
-        const { queryPostgres: qp } = await import('@/lib/db/postgres')
-
-        // trg_zz_seed_inventory_accounts_on_org_create fires for ALL orgs (no skip_coa_seed check),
-        // inserting accounts 1302/1303/1304 with parent_id=NULL before the CoA hierarchy exists.
-        // seed_default_coa uses plain INSERT (no ON CONFLICT), so it would fail on those duplicates.
-        // Delete them first so seed_default_coa can re-insert with proper parent hierarchy.
-        await qp(
-          `DELETE FROM public.accounts WHERE org_id = $1 AND code IN ('1302', '1303', '1304') AND parent_id IS NULL`,
-          [orgId]
-        )
-
-        // 1. Seed full PSAK CoA (SECURITY DEFINER — bypass RLS)
-        await qp('SELECT public.seed_default_coa($1::uuid)', [orgId])
-
-        // 2. Ambil akun Kas Besar (1101) yang baru di-seed
-        const kasResult = await qp<{ id: string }>(
-          `SELECT id FROM public.accounts WHERE org_id = $1 AND code = '1101' AND is_active = TRUE LIMIT 1`,
-          [orgId]
-        )
-        const kasAccountId = kasResult.rows[0]?.id ?? null
-
-        if (kasAccountId) {
-          // 3. Buat rekening Kas Utama
-          await qp(
-            `INSERT INTO public.bank_accounts (org_id, branch_id, account_id, bank_name, account_number, account_holder, currency, is_active)
-             VALUES ($1, $2, $3, 'Kas Utama', NULL, NULL, 'IDR', TRUE)
-             ON CONFLICT DO NOTHING`,
-            [orgId, defaultBranchId, kasAccountId]
-          )
-        }
-
-        // 4. Aktifkan modul inti ABS
-        const ABS_CORE_MODULES = ['Accounting', 'Finance', 'Inventory', 'Purchasing', 'Sales', 'CRM', 'HRIS', 'Reports']
-        const now = new Date().toISOString()
-
-        await qp(
-          `UPDATE public.organizations SET enabled_modules = $1::text[] WHERE id = $2`,
-          [ABS_CORE_MODULES, orgId]
-        )
-
-        if (ABS_CORE_MODULES.length > 0) {
-          const modulePlaceholders = ABS_CORE_MODULES.map((_, i) => `($1, $${i + 2}, 'READY', $${ABS_CORE_MODULES.length + 2})`).join(', ')
-          await qp(
-            `INSERT INTO public.org_module_instances (org_id, module_key, status, ready_at)
-             VALUES ${modulePlaceholders}
-             ON CONFLICT (org_id, module_key) DO UPDATE SET status = 'READY', ready_at = EXCLUDED.ready_at`,
-            [orgId, ...ABS_CORE_MODULES, now]
-          )
-        }
-      } catch (absSetupErr) {
-        ;(console as any).error('ABS Setup: gagal seed CoA/rekening/modul (non-fatal)', absSetupErr)
       }
     }
 
@@ -2268,25 +2209,6 @@ const getActiveOrgCached = cache(async () => {
     }
   }
 
-  // Fetch active branch info if branch_id is set
-  let activeBranchId: string | null = null
-  let activeBranchName: string | null = null
-  let activeBranchCode: string | null = null
-  const branchIdFromMember = String(memberData.last_active_branch_id || '').trim() || null
-  if (branchIdFromMember) {
-    const { data: branchData } = await db
-      .from('branches')
-      .select('id, name, code')
-      .eq('id', branchIdFromMember)
-      .maybeSingle()
-
-    if (branchData) {
-      activeBranchId = String(branchData.id || '').trim() || null
-      activeBranchName = String(branchData.name || '').trim() || null
-      activeBranchCode = String(branchData.code || '').trim() || null
-    }
-  }
-
   return {
     org,
     role: memberData.role as string,
@@ -2297,9 +2219,6 @@ const getActiveOrgCached = cache(async () => {
     user,
     isSubscriptionExpired,
     subscriptionEnd,
-    activeBranchId,
-    activeBranchName,
-    activeBranchCode,
   }
 })
 

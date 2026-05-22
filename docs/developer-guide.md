@@ -2,10 +2,6 @@
 
 Dokumen ini membantu developer menjalankan project, memahami kebiasaan kerja repo, dan tahu harus mulai dari mana saat mengerjakan fitur atau bugfix.
 
-> ⚠️ **Sebelum Lu Mulai:** Project ini TIDAK pakai Supabase Cloud.
-> Beberapa nama folder/file masih pakai kata "supabase" karena legacy compatibility layer.
-> Realitanya semua query ke **Railway PostgreSQL**. Detail di [`lib/supabase/README.md`](../lib/supabase/README.md).
-
 ## 1. Prasyarat
 
 - Node.js `20.19.x`

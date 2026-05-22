@@ -437,11 +437,11 @@ export default function QuotationClient({
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">No. Ref</th>
-                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Customer</th>
-                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight text-right">Total Penawaran</th>
-                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight text-center">Status</th>
-                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight text-right">Aksi</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">No. Ref</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Penawaran</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -462,7 +462,7 @@ export default function QuotationClient({
                       <td className="px-8 py-6 text-right space-x-2">
                         <button
                           onClick={() => handleConvert(quotation.id)}
-                          className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-semibold tracking-tight hover:bg-emerald-600 hover:text-white transition-all"
+                          className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all"
                         >
                           Terima & Jadi Order
                         </button>
@@ -513,7 +513,7 @@ export default function QuotationClient({
                 <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Customer</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</label>
                       <button
                         type="button"
                         onClick={openCustomerModal}
@@ -537,7 +537,7 @@ export default function QuotationClient({
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Tanggal Penawaran</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal Penawaran</label>
                     <input
                       type="date"
                       value={quoteDate}
@@ -549,7 +549,7 @@ export default function QuotationClient({
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center mb-2">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Item Penawaran</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Item Penawaran</label>
                     <button
                       type="button"
                       onClick={handleAddLine}
@@ -559,7 +559,7 @@ export default function QuotationClient({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-12 gap-2 px-1 text-[9px] font-semibold text-slate-400 uppercase tracking-tight mb-1">
+                  <div className="grid grid-cols-12 gap-2 px-1 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
                     <div className="col-span-4">Nama Produk / Jasa</div>
                     <div className="col-span-2">Kuantitas</div>
                     <div className="col-span-3">Harga Satuan</div>
@@ -625,7 +625,7 @@ export default function QuotationClient({
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <label className="text-[10px] font-semibold tracking-tight text-amber-600">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-amber-600">
                           Diskon Tambahan
                         </label>
                         <div className="inline-flex rounded-xl border border-amber-200 bg-white p-1">
@@ -694,20 +694,20 @@ export default function QuotationClient({
                         <button
                           type="button"
                           onClick={handleApplyPromo}
-                          className="px-4 h-11 bg-slate-900 text-white font-semibold text-[10px] tracking-tight uppercase rounded-xl hover:bg-slate-800 transition-colors"
+                          className="px-4 h-11 bg-slate-900 text-white font-black text-[10px] tracking-widest uppercase rounded-xl hover:bg-slate-800 transition-colors"
                         >
                           Terapkan
                         </button>
                       </div>
                     ) : (
                       <div className="flex items-center justify-between w-full bg-emerald-50 border border-emerald-100 p-3 rounded-xl text-emerald-700 text-[10px] md:text-xs">
-                        <span className="flex items-center gap-1.5 font-bold tracking-tight">
+                        <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider">
                           🎟️ Kupon: <strong>{appliedPromo.code}</strong> (-{formatRupiah(promoDiscount)})
                         </span>
                         <button
                           type="button"
                           onClick={() => setAppliedPromo(null)}
-                          className="text-emerald-900 font-bold hover:text-rose-500 tracking-tight text-[9px] px-2 py-1 bg-white rounded-lg shadow-sm"
+                          className="text-emerald-900 font-bold hover:text-rose-500 uppercase tracking-widest text-[9px] px-2 py-1 bg-white rounded-lg shadow-sm"
                         >
                           Hapus
                         </button>
@@ -744,15 +744,15 @@ export default function QuotationClient({
                       </p>
                     )}
                     <div className="border-t border-blue-200 pt-3 flex justify-between items-center">
-                      <div className="text-[10px] md:text-xs font-semibold text-blue-900 uppercase tracking-tight">
+                      <div className="text-[10px] md:text-xs font-black text-blue-900 uppercase tracking-widest">
                         Total Penawaran Estimasi
                       </div>
-                      <div className="text-xl md:text-3xl font-semibold text-blue-600 drop-shadow-sm">{formatRupiah(grandTotal)}</div>
+                      <div className="text-xl md:text-3xl font-black text-blue-600 drop-shadow-sm">{formatRupiah(grandTotal)}</div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Catatan Penawaran</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Catatan Penawaran</label>
                     <textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
@@ -829,7 +829,7 @@ export default function QuotationClient({
                       <div className="flex flex-col text-left">
                         <div className="flex items-center gap-4">
                           <img src={companyProfile.logo} alt="Logo Perusahaan" className="w-14 h-14 object-contain" />
-                          <h2 className="text-2xl font-semibold text-slate-900 uppercase tracking-tighter">{companyProfile.name}</h2>
+                          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{companyProfile.name}</h2>
                         </div>
                         <p className="text-xs font-medium text-slate-700 max-w-[420px] mt-1">{companyProfile.address}</p>
                         <div className="flex items-center gap-4 mt-2 text-[10px] font-bold text-slate-500">
@@ -858,7 +858,7 @@ export default function QuotationClient({
                     <div className="p-6 overflow-y-auto w-full print:overflow-visible print:px-0 print:py-0">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-sm">
                         <div>
-                          <p className="text-slate-400 text-[10px] font-semibold tracking-tight mb-1 print:text-slate-600">
+                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">
                             Customer / Klien
                           </p>
                           <p className="font-bold text-slate-900">{customer?.name || 'Unknown'}</p>
@@ -869,7 +869,7 @@ export default function QuotationClient({
                           )}
                         </div>
                         <div className="md:text-right">
-                          <p className="text-slate-400 text-[10px] font-semibold tracking-tight mb-1 print:text-slate-600">
+                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">
                             Tanggal Dokumen
                           </p>
                           <p className="font-bold text-slate-900">{viewQuotation.sale_date || '-'}</p>
@@ -889,19 +889,19 @@ export default function QuotationClient({
                       <table className="w-full mb-6 relative border-collapse print:border print:border-slate-200">
                         <thead className="border-y border-slate-100 bg-slate-50/50 print:bg-slate-100 print:text-slate-900">
                           <tr>
-                            <th className="py-3 px-2 text-left text-[10px] font-bold text-slate-400 tracking-tight print:text-slate-900 print:border print:border-slate-200">
+                            <th className="py-3 px-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200">
                               Deskripsi Barang/Jasa
                             </th>
-                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 tracking-tight print:text-slate-900 print:border print:border-slate-200 w-20">
+                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200 w-20">
                               Qty
                             </th>
-                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 tracking-tight print:text-slate-900 print:border print:border-slate-200">
+                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200">
                               Harga
                             </th>
-                            <th className="py-3 px-2 text-right text-[10px] font-bold text-rose-400 tracking-tight print:text-slate-900 print:border print:border-slate-200">
+                            <th className="py-3 px-2 text-right text-[10px] font-bold text-rose-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200">
                               Diskon
                             </th>
-                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 tracking-tight print:text-slate-900 print:border print:border-slate-200">
+                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200">
                               Total
                             </th>
                           </tr>
@@ -968,7 +968,7 @@ export default function QuotationClient({
 
                       {viewQuotation.notes && (
                         <div className="mt-6 border border-slate-200 bg-white rounded-2xl p-4">
-                          <h4 className="text-xs font-bold text-slate-800 tracking-tight mb-3">Catatan Penawaran</h4>
+                          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3">Catatan Penawaran</h4>
                           <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{viewQuotation.notes}</p>
                         </div>
                       )}

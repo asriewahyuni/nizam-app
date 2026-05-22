@@ -1323,9 +1323,6 @@ export async function createSaleEntry(orgId: string, payload: any) {
     grand_total: computedTotal,
     shariah_mode: shariahMode,
     notes: payload.notes,
-    currency_code: payload.currency_code || 'IDR',
-    exchange_rate: payload.exchange_rate || null,
-    base_currency_amount: payload.base_currency_amount || null,
     updated_at: new Date().toISOString(),
   }
 
@@ -1999,15 +1996,6 @@ export async function processSalesPayment(orgId: string, payload: {
   })
 
   if (error || !data?.success) return { error: 'Gagal memproses pembayaran: ' + (data?.error || error?.message) }
-
-  // Catat FX gain/loss jika sale menggunakan mata uang asing
-  try {
-    const { recordFxGainLoss } = await import('@/modules/accounting/actions/forex.actions')
-    await recordFxGainLoss('SALE', payload.sale_id)
-  } catch (fxError) {
-    // Non-bloking
-    console.error('FX gain/loss recording failed (non-blocking):', fxError)
-  }
 
   revalidatePath('/sales')
   revalidatePath('/accounting/ledgers')

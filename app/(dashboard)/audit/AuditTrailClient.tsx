@@ -74,7 +74,7 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
               key={type}
               onClick={() => setFilterType(type)}
               className={cn(
-                "px-4 py-2.5 rounded-xl text-xs font-semibold tracking-tight transition-all border shrink-0",
+                "px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border shrink-0",
                 filterType === type 
                   ? "bg-[#003366] text-white border-transparent shadow-lg shadow-blue-900/20 scale-105" 
                   : "bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600"
@@ -111,12 +111,12 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
               <div className="flex-1 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={cn(
-                    "px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-tight border",
+                    "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border",
                     getActionStyles(log.action)
                   )}>
                     {log.action}
                   </span>
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
                     <Table size={10} />
                     {log.table_name}
                   </span>
@@ -152,7 +152,7 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
       </div>
 
       <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
            Sistem Monitoring NIZAM Terenkripsi & Immutable
         </p>
       </div>

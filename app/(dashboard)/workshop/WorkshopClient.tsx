@@ -27,9 +27,7 @@ import {
   updateWorkOrderStatus,
   addWorkOrderItem,
   deleteWorkOrderItem,
-  createWorkshopCustomer,
 } from '@/modules/workshop/actions/workshop.actions'
-import { PageHeader, StatCard, StatusBadge, SafeButton, SectionCard, FormField, FormInput, FormSelect, FormTextarea } from '@/components/ui/NizamUI'
 import {
   getVehicleForSpkPrefill,
   createInvoiceFromWorkOrder,
@@ -96,10 +94,6 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
   const [showVehicleModal, setShowVehicleModal] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<WorkshopWorkOrder | null>(null)
   const [loading, setLoading] = useState(false)
-  // Contacts lokal — diupdate saat tambah pelanggan baru
-  const [localContacts, setLocalContacts] = useState<{ id: string; name: string }[]>(contacts)
-  const [spkContactId, setSpkContactId] = useState('')
-  const [vehicleFormContactId, setVehicleFormContactId] = useState('')
   // Vehicle auto-fill state
   const [vehiclePrefill, setVehiclePrefill] = useState<{
     contactId: string | null
@@ -141,7 +135,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
   }), [workOrders])
 
   async function handleVehicleChange(vehicleId: string) {
-    if (!vehicleId) { setVehiclePrefill(null); setSpkContactId(''); return }
+    if (!vehicleId) { setVehiclePrefill(null); return }
     setVehicleLoading(true)
     const data = await getVehicleForSpkPrefill(vehicleId)
     if (data) {
@@ -151,16 +145,10 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
         lastOdometer: data.lastOdometer,
         info: `${data.brand} ${data.model}${data.year ? ` (${data.year})` : ''}${data.color ? ` · ${data.color}` : ''}`,
       })
-      setSpkContactId(data.contactId || '')
     } else {
       setVehiclePrefill(null)
-      setSpkContactId('')
     }
     setVehicleLoading(false)
-  }
-
-  function handleContactCreated(contact: { id: string; name: string }) {
-    setLocalContacts(prev => [...prev, contact].sort((a, b) => a.name.localeCompare(b.name, 'id')))
   }
 
   async function handleCreateSpk(e: React.FormEvent<HTMLFormElement>) {
@@ -168,7 +156,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
     setLoading(true)
     const res = await createWorkshopWorkOrder(orgId, new FormData(e.currentTarget))
     if (res.error) alert(res.error)
-    else { setShowSpkModal(false); setVehiclePrefill(null); setSpkContactId(''); window.location.reload() }
+    else { setShowSpkModal(false); setVehiclePrefill(null); window.location.reload() }
     setLoading(false)
   }
 
@@ -177,7 +165,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
     setLoading(true)
     const res = await createWorkshopVehicle(orgId, new FormData(e.currentTarget))
     if (res.error) alert(res.error)
-    else { setShowVehicleModal(false); setVehicleFormContactId(''); window.location.reload() }
+    else { setShowVehicleModal(false); window.location.reload() }
     setLoading(false)
   }
 
@@ -191,29 +179,45 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto space-y-8">
 
       {/* Header */}
-      <PageHeader
-        title="Bengkel Motor"
-        subtitle="Manajemen Surat Perintah Kerja, kendaraan, dan servis bengkel motor."
-        icon={<Wrench size={32} />}
-        iconColor="text-blue-600"
-        actions={
-          <div className="flex gap-3">
-            <SafeButton variant="secondary" onClick={() => setShowVehicleModal(true)}>
-              <Car size={16} /> Daftarkan Kendaraan
-            </SafeButton>
-            <SafeButton onClick={() => setShowSpkModal(true)}>
-              <Plus size={16} /> Buat SPK
-            </SafeButton>
-          </div>
-        }
-      />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+            <Wrench size={32} className="text-[#003366]" />
+            Bengkel Motor
+          </h1>
+          <p className="text-sm text-slate-500 font-medium">
+            Manajemen Surat Perintah Kerja, kendaraan, dan servis bengkel motor.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowVehicleModal(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-700 text-sm font-bold rounded-2xl hover:bg-slate-200 transition-all"
+          >
+            <Car size={16} /> Daftarkan Kendaraan
+          </button>
+          <button
+            onClick={() => setShowSpkModal(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#003366] text-white text-sm font-bold rounded-2xl hover:bg-[#002d5a] shadow-xl shadow-[#003366]/10 transition-all"
+          >
+            <Plus size={16} /> Buat SPK
+          </button>
+        </div>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total SPK" value={stats.total} color="slate" />
-        <StatCard label="Antri" value={stats.antri} color="slate" />
-        <StatCard label="Dikerjakan" value={stats.dikerjakan} color="blue" />
-        <StatCard label="Selesai" value={stats.selesai} color="emerald" />
+        {[
+          { label: 'Total SPK', value: stats.total,      color: 'text-slate-700', bg: 'bg-slate-50' },
+          { label: 'Antri',     value: stats.antri,      color: 'text-slate-500', bg: 'bg-slate-50' },
+          { label: 'Dikerjakan',value: stats.dikerjakan, color: 'text-blue-600',  bg: 'bg-blue-50' },
+          { label: 'Selesai',   value: stats.selesai,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        ].map(s => (
+          <div key={s.label} className={`${s.bg} rounded-2xl p-5 border border-slate-100`}>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{s.label}</p>
+            <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
+          </div>
+        ))}
       </div>
 
       {/* Tabs + Search */}
@@ -223,14 +227,14 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
             <button
               key={t}
               onClick={() => { setTab(t); setSearch('') }}
-              className={`px-5 py-2 text-sm font-semibold rounded-xl transition-all ${
-                tab === t ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+              className={`px-5 py-2 text-sm font-black rounded-xl transition-all ${
+                tab === t ? 'bg-white text-[#003366] shadow-sm' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
               {t === 'spk' ? (
                 <span className="flex items-center gap-2"><ClipboardList size={14} /> SPK</span>
               ) : t === 'invoices' ? (
-                <span className="flex items-center gap-2">🧾 Invoice <span className="bg-[#003366] text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-full">{invoices.length}</span></span>
+                <span className="flex items-center gap-2">🧾 Invoice <span className="bg-[#003366] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">{invoices.length}</span></span>
               ) : (
                 <span className="flex items-center gap-2"><Car size={14} /> Kendaraan</span>
               )}
@@ -268,7 +272,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
       {/* Modal: Buat SPK */}
       <AnimatePresence>
         {showSpkModal && (
-          <Modal title="Buat Surat Perintah Kerja" onClose={() => { setShowSpkModal(false); setVehiclePrefill(null); setSpkContactId('') }}>
+          <Modal title="Buat Surat Perintah Kerja" onClose={() => setShowSpkModal(false)}>
             <form onSubmit={handleCreateSpk} className="space-y-4">
               <FormRow label="Kendaraan">
                 <select
@@ -296,11 +300,11 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
                 <select
                   name="contact_id"
                   className={inputCls}
-                  value={spkContactId}
-                  onChange={e => setSpkContactId(e.target.value)}
+                  value={vehiclePrefill?.contactId ?? ''}
+                  onChange={() => {}}
                 >
                   <option value="">— Pilih pelanggan —</option>
-                  {localContacts.map(c => (
+                  {contacts.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
@@ -309,13 +313,9 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
                     ✓ Otomatis diisi dari data kendaraan: {vehiclePrefill.contactName}
                   </p>
                 )}
-                <AddCustomerInline orgId={orgId} onCreated={c => { handleContactCreated(c); setSpkContactId(c.id) }} />
               </FormRow>
               <FormRow label="Nama Mekanik">
                 <input name="mechanic_name" placeholder="Contoh: Budi" className={inputCls} />
-              </FormRow>
-              <FormRow label="Biaya Jasa Mekanik (Rp)">
-                <input name="mechanic_fee" type="number" min="0" defaultValue="" placeholder="0 jika tidak ada" className={inputCls} />
               </FormRow>
               <FormRow label="Keluhan Pelanggan" required>
                 <textarea name="customer_complaint" rows={2} required className={inputCls} placeholder="Deskripsikan keluhan..." />
@@ -348,18 +348,12 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
           <Modal title="Daftarkan Kendaraan" onClose={() => setShowVehicleModal(false)}>
             <form onSubmit={handleCreateVehicle} className="space-y-4">
               <FormRow label="Pelanggan">
-                <select
-                  name="contact_id"
-                  className={inputCls}
-                  value={vehicleFormContactId}
-                  onChange={e => setVehicleFormContactId(e.target.value)}
-                >
+                <select name="contact_id" className={inputCls}>
                   <option value="">— Pilih pelanggan —</option>
-                  {localContacts.map(c => (
+                  {contacts.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
-                <AddCustomerInline orgId={orgId} onCreated={c => { handleContactCreated(c); setVehicleFormContactId(c.id) }} />
               </FormRow>
               <FormRow label="Nomor Plat" required>
                 <input name="plate_number" required placeholder="Contoh: B 1234 ABC" className={`${inputCls} uppercase`} />
@@ -441,7 +435,7 @@ function SpkList({
 }) {
   if (orders.length === 0) {
     return (
-      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold italic">
+      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-bold italic">
         Belum ada Surat Perintah Kerja.
       </div>
     )
@@ -490,15 +484,11 @@ function SpkCard({
   const [selectedProductId, setSelectedProductId] = useState('')
   const cfg = STATUS_CONFIG[order.status]
 
-  function resetItemFields() {
+  function resetItemForm() {
+    setItemType('JASA')
     setSelectedName('')
     setSelectedPrice(0)
     setSelectedProductId('')
-  }
-
-  function resetItemForm() {
-    setItemType('JASA')
-    resetItemFields()
   }
 
   function handleSelectRate(rateId: string) {
@@ -534,7 +524,7 @@ function SpkCard({
   const transitions = STATUS_TRANSITIONS[order.status]
 
   return (
-    <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden">
       {/* Card header — selalu terlihat */}
       <button
         onClick={onToggle}
@@ -542,11 +532,11 @@ function SpkCard({
       >
         <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">SPK</p>
-            <p className="text-sm font-semibold text-slate-900">{order.spkNumber}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">SPK</p>
+            <p className="text-sm font-black text-slate-900">{order.spkNumber}</p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Kendaraan</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kendaraan</p>
             <p className="text-sm font-bold text-slate-700">
               {order.vehicle
                 ? `${order.vehicle.plateNumber} · ${order.vehicle.brand} ${order.vehicle.model}`
@@ -554,16 +544,16 @@ function SpkCard({
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Pelanggan</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pelanggan</p>
             <p className="text-sm font-bold text-slate-700">{order.contactName || '—'}</p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Total</p>
-            <p className="text-sm font-semibold text-[#003366]">{formatRupiah(order.total)}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total</p>
+            <p className="text-sm font-black text-[#003366]">{formatRupiah(order.total)}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <span className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold rounded-full uppercase border ${cfg.color}`}>
+          <span className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black rounded-full uppercase border ${cfg.color}`}>
             {cfg.icon} {cfg.label}
           </span>
           {isExpanded ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
@@ -595,7 +585,7 @@ function SpkCard({
               {/* Items */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-tight">Item Pekerjaan</p>
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Item Pekerjaan</p>
                   {!['SELESAI','DISERAHKAN','CANCEL'].includes(order.status) && (
                     <button
                       onClick={() => setShowItemForm(v => !v)}
@@ -615,11 +605,11 @@ function SpkCard({
                     <table className="w-full text-sm">
                       <thead className="bg-slate-50">
                         <tr>
-                          <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Nama</th>
-                          <th className="text-center px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Tipe</th>
-                          <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Qty</th>
-                          <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Harga</th>
-                          <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Subtotal</th>
+                          <th className="text-left px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama</th>
+                          <th className="text-center px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipe</th>
+                          <th className="text-right px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Qty</th>
+                          <th className="text-right px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Harga</th>
+                          <th className="text-right px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal</th>
                           <th className="w-8"></th>
                         </tr>
                       </thead>
@@ -628,7 +618,7 @@ function SpkCard({
                           <tr key={item.id} className="hover:bg-slate-50/50">
                             <td className="px-4 py-3 font-medium text-slate-700">{item.name}</td>
                             <td className="px-4 py-3 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
                                 item.itemType === 'JASA'
                                   ? 'bg-blue-50 text-blue-600'
                                   : 'bg-orange-50 text-orange-600'
@@ -651,8 +641,8 @@ function SpkCard({
                       </tbody>
                       <tfoot className="bg-slate-50">
                         <tr>
-                          <td colSpan={4} className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-tight">Total</td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-[#003366]">{formatRupiah(order.total)}</td>
+                          <td colSpan={4} className="px-4 py-2.5 text-right text-xs font-black text-slate-500 uppercase tracking-widest">Total</td>
+                          <td className="px-4 py-2.5 text-right font-black text-[#003366]">{formatRupiah(order.total)}</td>
                           <td></td>
                         </tr>
                       </tfoot>
@@ -676,8 +666,8 @@ function SpkCard({
                           <button
                             key={t}
                             type="button"
-                            onClick={() => { setItemType(t); resetItemFields() }}
-                            className={`px-4 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
+                            onClick={() => { setItemType(t); resetItemForm() }}
+                            className={`px-4 py-1.5 text-xs font-black rounded-xl border transition-all ${
                               itemType === t
                                 ? t === 'JASA' ? 'bg-blue-600 text-white border-blue-600' : 'bg-orange-500 text-white border-orange-500'
                                 : 'bg-white text-slate-500 border-slate-200'
@@ -694,7 +684,7 @@ function SpkCard({
                         <div className="space-y-2">
                           {serviceRates.length > 0 && (
                             <div>
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Pilih dari Tarif Jasa</label>
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Pilih dari Tarif Jasa</label>
                               <select
                                 className={inputCls}
                                 onChange={e => handleSelectRate(e.target.value)}
@@ -711,7 +701,7 @@ function SpkCard({
                           )}
                           <div className="grid grid-cols-2 gap-3">
                             <div className="col-span-2">
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Nama Jasa <span className="text-rose-400">*</span></label>
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Nama Jasa <span className="text-rose-400">*</span></label>
                               <input
                                 name="name"
                                 required
@@ -722,11 +712,11 @@ function SpkCard({
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Qty</label>
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Qty</label>
                               <input name="quantity" type="number" min="0.01" step="0.01" defaultValue="1" className={inputCls} />
                             </div>
                             <div>
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Harga Satuan</label>
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Harga Satuan</label>
                               <input
                                 name="unit_price"
                                 type="number"
@@ -741,7 +731,7 @@ function SpkCard({
                       ) : (
                         <div className="space-y-2">
                           <div>
-                            <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">
                               Pilih dari Inventori
                               {partProducts.length === 0 && <span className="text-amber-500 ml-2 normal-case font-medium">— Belum ada produk tipe INVENTORY</span>}
                             </label>
@@ -764,11 +754,11 @@ function SpkCard({
                           <input type="hidden" name="name" value={selectedName || 'Spare Part'} />
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Qty</label>
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Qty</label>
                               <input name="quantity" type="number" min="0.01" step="0.01" defaultValue="1" className={inputCls} />
                             </div>
                             <div>
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Harga Jual</label>
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Harga Jual</label>
                               <input
                                 name="unit_price"
                                 type="number"
@@ -798,14 +788,14 @@ function SpkCard({
               <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-50">
                 {transitions.length > 0 && (
                   <>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-tight self-center mr-2">Ubah status:</p>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest self-center mr-2">Ubah status:</p>
                     {transitions.map(nextStatus => {
                       const nextCfg = STATUS_CONFIG[nextStatus]
                       return (
                         <button
                           key={nextStatus}
                           onClick={() => onStatusChange(order, nextStatus)}
-                          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border transition-all hover:opacity-80 ${nextCfg.color}`}
+                          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-black rounded-xl border transition-all hover:opacity-80 ${nextCfg.color}`}
                         >
                           {nextCfg.icon} {nextCfg.label}
                         </button>
@@ -814,7 +804,7 @@ function SpkCard({
                   </>
                 )}
                 {(order.status === 'SELESAI' || order.status === 'DISERAHKAN') && order.total > 0 && (
-                  <CreateInvoiceButton orderId={order.id} orgId={orgId} orderSpkNumber={order.spkNumber} invoices={invoices} />
+                  <CreateInvoiceButton orderId={order.id} orgId={orgId} />
                 )}
               </div>
             </div>
@@ -830,7 +820,7 @@ function SpkCard({
 function VehicleList({ vehicles }: { vehicles: WorkshopVehicle[] }) {
   if (vehicles.length === 0) {
     return (
-      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold italic">
+      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-bold italic">
         Belum ada kendaraan terdaftar.
       </div>
     )
@@ -842,30 +832,30 @@ function VehicleList({ vehicles }: { vehicles: WorkshopVehicle[] }) {
         <motion.div
           key={v.id}
           whileHover={{ y: -4 }}
-          className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-4 relative overflow-hidden group"
+          className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-6 space-y-4 relative overflow-hidden group"
         >
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-all">
             <Car size={80} strokeWidth={1} />
           </div>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xl font-semibold text-slate-900 tracking-tight">{v.plateNumber}</p>
+              <p className="text-xl font-black text-slate-900 tracking-tight">{v.plateNumber}</p>
               <p className="text-sm font-bold text-[#003366]">{v.brand} {v.model} {v.year ? `(${v.year})` : ''}</p>
             </div>
-            <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-semibold rounded-full uppercase">
+            <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-black rounded-full uppercase">
               {v.transmission}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div>
-              <p className="font-semibold text-slate-400 uppercase tracking-tight text-[10px]">Pemilik</p>
+              <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Pemilik</p>
               <div className="flex items-center gap-1 mt-0.5">
                 <User size={11} className="text-slate-400" />
                 <span className="font-bold text-slate-700">{v.contactName || '—'}</span>
               </div>
             </div>
             <div>
-              <p className="font-semibold text-slate-400 uppercase tracking-tight text-[10px]">Odometer</p>
+              <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Odometer</p>
               <div className="flex items-center gap-1 mt-0.5">
                 <Gauge size={11} className="text-slate-400" />
                 <span className="font-bold text-slate-700">{v.lastOdometer.toLocaleString('id-ID')} km</span>
@@ -873,12 +863,12 @@ function VehicleList({ vehicles }: { vehicles: WorkshopVehicle[] }) {
             </div>
             {v.color && (
               <div>
-                <p className="font-semibold text-slate-400 uppercase tracking-tight text-[10px]">Warna</p>
+                <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Warna</p>
                 <p className="font-bold text-slate-700 mt-0.5">{v.color}</p>
               </div>
             )}
             <div>
-              <p className="font-semibold text-slate-400 uppercase tracking-tight text-[10px]">BBM</p>
+              <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">BBM</p>
               <p className="font-bold text-slate-700 mt-0.5">{v.fuelType}</p>
             </div>
           </div>
@@ -899,7 +889,7 @@ function InvoiceList({ invoices, workOrders }: {
 }) {
   if (invoices.length === 0) {
     return (
-      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold italic">
+      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-bold italic">
         Belum ada invoice. Buat invoice dari SPK yang sudah selesai.
       </div>
     )
@@ -915,30 +905,30 @@ function InvoiceList({ invoices, workOrders }: {
   }
 
   return (
-    <div className="rounded-xl overflow-hidden border border-slate-100 shadow-sm">
+    <div className="rounded-[24px] overflow-hidden border border-slate-100 shadow-sm">
       <table className="w-full text-sm">
         <thead className="bg-slate-50">
           <tr>
-            <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">No. Invoice</th>
-            <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Pelanggan</th>
-            <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Ref. SPK</th>
-            <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Tanggal</th>
-            <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Total</th>
-            <th className="text-center px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Status</th>
+            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">No. Invoice</th>
+            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pelanggan</th>
+            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ref. SPK</th>
+            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal</th>
+            <th className="text-right px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total</th>
+            <th className="text-center px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
           {invoices.map(inv => (
             <tr key={inv.id} className="hover:bg-slate-50/50">
-              <td className="px-5 py-4 font-semibold text-[#003366]">{inv.saleNumber}</td>
+              <td className="px-5 py-4 font-black text-[#003366]">{inv.saleNumber}</td>
               <td className="px-5 py-4 font-medium text-slate-700">{inv.customerName || '—'}</td>
               <td className="px-5 py-4 text-slate-500 text-xs font-mono">
                 {inv.spkId ? (spkMap[inv.spkId] || inv.spkId.slice(0, 8) + '...') : '—'}
               </td>
               <td className="px-5 py-4 text-slate-500">{inv.saleDate ? formatDate(inv.saleDate) : '—'}</td>
-              <td className="px-5 py-4 text-right font-semibold text-slate-900">{formatRupiah(inv.grandTotal)}</td>
+              <td className="px-5 py-4 text-right font-black text-slate-900">{formatRupiah(inv.grandTotal)}</td>
               <td className="px-5 py-4 text-center">
-                <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase ${STATUS_BADGE[inv.status] || 'bg-slate-100 text-slate-500'}`}>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${STATUS_BADGE[inv.status] || 'bg-slate-100 text-slate-500'}`}>
                   {inv.status}
                 </span>
               </td>
@@ -947,8 +937,8 @@ function InvoiceList({ invoices, workOrders }: {
         </tbody>
         <tfoot className="bg-slate-50">
           <tr>
-            <td colSpan={4} className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-tight">Total</td>
-            <td className="px-5 py-3 text-right font-semibold text-[#003366]">
+            <td colSpan={4} className="px-5 py-3 text-right text-xs font-black text-slate-400 uppercase tracking-widest">Total</td>
+            <td className="px-5 py-3 text-right font-black text-[#003366]">
               {formatRupiah(invoices.reduce((s, i) => s + i.grandTotal, 0))}
             </td>
             <td />
@@ -968,7 +958,7 @@ const inputCls =
 function FormRow({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-tight mb-1.5">
+      <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5">
         {label}{required && <span className="text-rose-400 ml-1">*</span>}
       </label>
       {children}
@@ -976,58 +966,10 @@ function FormRow({ label, required, children }: { label: string; required?: bool
   )
 }
 
-function AddCustomerInline({ orgId, onCreated }: {
-  orgId: string
-  onCreated: (contact: { id: string; name: string }) => void
-}) {
-  const [show, setShow] = useState(false)
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  async function handleSave() {
-    if (!name.trim()) return
-    setLoading(true)
-    const fd = new FormData()
-    fd.set('name', name.trim())
-    if (phone.trim()) fd.set('phone', phone.trim())
-    const res = await createWorkshopCustomer(orgId, fd)
-    if (res.error) { alert(res.error); setLoading(false); return }
-    if (res.data) {
-      onCreated({ id: res.data.id, name: res.data.name })
-      setName(''); setPhone(''); setShow(false)
-    }
-    setLoading(false)
-  }
-
-  if (!show) {
-    return (
-      <button type="button" onClick={() => setShow(true)} className="mt-2 text-[11px] font-semibold text-[#003366] hover:underline flex items-center gap-1">
-        <Plus size={11} /> Tambah pelanggan baru
-      </button>
-    )
-  }
-
-  // Gunakan div, bukan form — karena komponen ini dirender di dalam form lain (nested form tidak valid di HTML)
-  return (
-    <div className="mt-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl space-y-2">
-      <p className="text-[10px] font-black uppercase tracking-tight text-emerald-700">Pelanggan Baru</p>
-      <input value={name} onChange={e => setName(e.target.value)} placeholder="Nama *" className={inputCls} />
-      <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="No. HP (opsional)" className={inputCls} />
-      <div className="flex gap-2">
-        <button type="button" onClick={handleSave} disabled={loading || !name.trim()} className="flex-1 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl disabled:opacity-50">
-          {loading ? 'Menyimpan...' : 'Simpan'}
-        </button>
-        <button type="button" onClick={() => { setShow(false); setName(''); setPhone('') }} className="px-3 py-1.5 text-xs text-slate-500 font-bold rounded-xl hover:bg-slate-100">Batal</button>
-      </div>
-    </div>
-  )
-}
-
 function InfoCell({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">{label}</p>
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
       <p className="text-sm font-medium text-slate-700 mt-0.5">{value}</p>
     </div>
   )
@@ -1047,10 +989,10 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 40, opacity: 0 }}
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+        className="bg-white rounded-[32px] w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
       >
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+          <h2 className="text-lg font-black text-slate-900">{title}</h2>
           <button onClick={onClose} className="p-2 text-slate-300 hover:text-slate-600 rounded-xl transition">
             <X size={20} />
           </button>
@@ -1063,22 +1005,8 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 // ─── Create Invoice Button ─────────────────────────────────────────────────────
 
-function CreateInvoiceButton({ orderId, orgId: _orgId, orderSpkNumber, invoices }: {
-  orderId: string
-  orgId: string
-  orderSpkNumber: string
-  invoices: WorkshopInvoice[]
-}) {
+function CreateInvoiceButton({ orderId, orgId: _orgId }: { orderId: string; orgId: string }) {
   const [loading, setLoading] = React.useState(false)
-  const existingInvoice = invoices.find(i => i.spkId === orderId)
-
-  if (existingInvoice) {
-    return (
-      <span className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border bg-emerald-50 text-emerald-700 border-emerald-200 ml-auto">
-        ✅ Invoice: {existingInvoice.saleNumber}
-      </span>
-    )
-  }
 
   async function handleCreateInvoice() {
     if (!confirm('Buat Sales Invoice dari SPK ini? Invoice akan otomatis dibuat berdasarkan item yang ada.')) return
@@ -1097,7 +1025,7 @@ function CreateInvoiceButton({ orderId, orgId: _orgId, orderSpkNumber, invoices 
     <button
       onClick={handleCreateInvoice}
       disabled={loading}
-      className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 transition-all disabled:opacity-50 ml-auto"
+      className="flex items-center gap-1.5 px-4 py-2 text-xs font-black rounded-xl border bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 transition-all disabled:opacity-50 ml-auto"
     >
       {loading ? 'Memproses...' : '🧾 Buat Invoice'}
     </button>

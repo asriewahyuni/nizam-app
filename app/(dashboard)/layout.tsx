@@ -10,9 +10,9 @@ import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonationBanner'
 import { DemoBanner } from '@/components/shared/DemoBanner'
-import { AbsTrialBanner } from '@/components/shared/AbsTrialBanner'
 import { SentryUserContext } from '@/components/shared/SentryUserContext'
 import { StartupWizard } from '@/components/shared/StartupWizard'
+import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
 import { RouteProgressBar } from '@/components/shared/RouteProgressBar'
@@ -21,8 +21,8 @@ import { GlobalApprovalNotifier } from '@/components/shared/GlobalApprovalNotifi
 import { EduModeShell } from '@/components/edu/EduModeShell'
 import { hasEnabledModuleAccess, hasPosOnlyAccess } from '@/modules/organization/lib/navigation-access'
 import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
+import { resolveRuntimeDatabaseTarget } from '@/lib/db/runtime-target'
 import { getOrgModuleInstances } from '@/modules/marketplace/actions/marketplace.actions'
-import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
 
 type RouteModuleEntry = {
   path: string
@@ -48,15 +48,12 @@ export default async function DashboardLayout({
   const requestPathname = (await headers()).get('x-pathname') || ''
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
+  const runtimeDb = resolveRuntimeDatabaseTarget()
   const orgSettings =
     orgData.org.settings && typeof orgData.org.settings === 'object' && !Array.isArray(orgData.org.settings)
       ? orgData.org.settings as Record<string, unknown>
       : {}
   const startupWizardEnabled = orgSettings.startup_wizard_enabled !== false
-  const isAbsTrialOrg = orgSettings.abs_source === true || orgSettings.plan === 'ABS Trial'
-  const absSubscriptionEnd = isAbsTrialOrg
-    ? (String((orgData.org as any).subscription_end || '')).trim() || null
-    : null
   const [adminImpersonation, activeBranch, allowAllBranchSelection, isDemo, moduleInstances] = await Promise.all([
     getAdminImpersonationState(),
     getActiveBranch(orgData.org.id),
@@ -105,9 +102,8 @@ export default async function DashboardLayout({
 
   // Map paths to their required module names (matching saas_packages.modules)
   // Each entry can have multiple aliases to support both English & Indonesian module names
-  // Note: /marketplace is intentionally excluded — it's the module management page and must always
-  // be accessible regardless of which modules are active (including /marketplace/setup/*)
   const routeModuleMap: RouteModuleEntry[] = [
+    { path: '/marketplace', requiredModule: 'Config', aliases: ['Config'], permissionKeys: ['config', 'business'] },
     { path: '/sales/pages', requiredModule: 'Sales Page', aliases: ['Sales Page'], permissionKeys: ['sales'] },
     { path: '/inventory/warehouses', requiredModule: 'Warehouse', aliases: ['Warehouse', 'WMS'], permissionKeys: ['inventory', 'warehouse'] },
     { path: '/accounting/audit', requiredModule: 'Audit', aliases: ['Audit', 'Audit Trail'], permissionKeys: ['audit', 'approval'] },
@@ -156,7 +152,7 @@ export default async function DashboardLayout({
       : orgData.enabledModules.some((m: string) => allNames.some((candidate) => moduleNameMatches(m, candidate)))
 
     if (!isModulePaid && !isSaasAssessorRouteAccess) {
-      console.warn(`[ACL] Redirecting - Module not paid: ${requiredModule} (checked aliases: ${allNames.join(', ')}) for path: ${requestPathname}`)
+      console.log(`[ACL] Redirecting - Module not paid: ${requiredModule} (checked aliases: ${allNames.join(', ')}) for path: ${requestPathname}`)
       return redirect('/dashboard')
     }
 
@@ -171,7 +167,7 @@ export default async function DashboardLayout({
         (permission) => permissionKeys.some((permissionKey) => permission.includes(permissionKey.toLowerCase()))
       )
       if (!hasPermission) {
-        console.warn(`[ACL] Redirecting - No permission for: ${requiredModule} for path: ${requestPathname}`)
+        console.log(`[ACL] Redirecting - No permission for: ${requiredModule} for path: ${requestPathname}`)
         return redirect('/dashboard')
       }
     }
@@ -211,9 +207,7 @@ export default async function DashboardLayout({
         }}
         permissions={orgData.permissions}
         enabledModules={orgData.enabledModules}
-        pendingModules={(moduleInstances as any[])
-          .filter(i => i.status !== 'READY' && ['business_type', 'addon', 'syirkah'].includes(getModuleByKey(i.module_key)?.category ?? ''))
-          .map(i => i.module_key)}
+        pendingModules={(moduleInstances as any[]).filter(i => i.status !== 'READY').map(i => i.module_key)}
         isDemo={isDemo}
         planName={effectivePlanName}
         canManageSubOrganizations={canManageSubOrganizations}
@@ -229,7 +223,6 @@ export default async function DashboardLayout({
           />
         )}
         {isDemo && <DemoBanner />}
-        {isAbsTrialOrg && !isDemo && <AbsTrialBanner subscriptionEnd={absSubscriptionEnd} />}
         <AppHeader
           key={`header:${orgData.org.id}:${activeBranch?.id || 'all'}`}
           user={{
@@ -245,22 +238,23 @@ export default async function DashboardLayout({
           activeOrgParentId={(orgData.org as { parent_org_id?: string | null }).parent_org_id ?? null}
           allowAllBranchSelection={allowAllBranchSelection}
           canManageBranches={isOwnerOrAdmin}
-          planName={effectivePlanName}
+          runtimeDatabaseMode={runtimeDb.mode}
+          runtimeDatabaseSource={runtimeDb.sourceKey}
         />
         <StartupWizard isDemo={isDemo} enabled={startupWizardEnabled} />
         <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />
         <main id="dashboard-scroll-root" className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0">
           <div className="max-w-7xl mx-auto print:max-w-none">
             {allowAllBranchSelection && !activeBranch && (
-              <div className="mb-6 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">
+              <div className="mb-6 rounded-[28px] border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">
                 <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <div className="text-[10px] font-semibold tracking-tight text-amber-600">Mode Semua Unit</div>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Mode Semua Unit</div>
+                    <p className="mt-1 text-sm font-bold text-slate-900">
                       Ringkasan lintas unit sedang aktif. Pilih satu unit dari header untuk membuat transaksi baru.
                     </p>
                   </div>
-                  <div className="text-[11px] font-semibold tracking-tight text-amber-700">
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-700">
                     Read-only agregat
                   </div>
                 </div>
@@ -274,6 +268,7 @@ export default async function DashboardLayout({
           permissions={orgData.permissions}
           enabledModules={orgData.enabledModules}
         />
+        <FloatingPlanBadge planName={effectivePlanName} />
       </div>
     </div>
   )

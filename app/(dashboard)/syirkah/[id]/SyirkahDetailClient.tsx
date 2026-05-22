@@ -15,7 +15,6 @@ import {
   syncSyirkahCapitalToCore,
   syncSyirkahProfitSharingToCore,
 } from '@/modules/syirkah/actions/syirkah.actions'
-import { SyirkahAdendumHutang } from './SyirkahAdendumHutang'
 
 const SYIRKAH_DEFAULT_CASH_CODES = ['1103', '1101', '1102', '1105']
 
@@ -290,7 +289,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 border-b-4 border-blue-600 inline-block pb-1">
+            <h1 className="text-2xl font-black text-slate-900 border-b-4 border-blue-600 inline-block pb-1">
               {contract.title}
             </h1>
           </div>
@@ -352,6 +351,21 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                   </select>
                 </div>
                 <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Limit Alokasi Hutang Keseluruhan</label>
+                  <input type="number" className="w-full border rounded-xl p-2" value={contractData.debt_allocation} onChange={e => setContractData({...contractData, debt_allocation: Number(e.target.value)})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Jumlah Hutang Terserap (Manual input/Lock)</label>
+                  <input type="number" className="w-full border rounded-xl p-2" value={contractData.current_debt} onChange={e => setContractData({...contractData, current_debt: Number(e.target.value)})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Nominal Alokasi Bagi Hasil</label>
+                  <input type="number" className="w-full border rounded-xl p-2" value={contractData.profit_sharing_allocation} onChange={e => setContractData({...contractData, profit_sharing_allocation: Number(e.target.value)})} />
+                  <p className="mt-1 text-xs text-slate-400">
+                    Isi nominal laba yang benar-benar ingin dibagikan ke para syarik. Jika 0, sistem memakai basis default saat tersedia.
+                  </p>
+                </div>
+                <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">Deskripsi Tambahan</label>
                   <textarea className="w-full border rounded-xl p-2" rows={3} value={contractData.description} onChange={e => setContractData({...contractData, description: e.target.value})}></textarea>
                 </div>
@@ -369,6 +383,25 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                 <div>
                   <span className="block text-xs font-bold text-slate-400">Dimodifikasi Tanggal</span>
                   <p className="font-medium text-slate-700">{new Date(contract.updated_at).toLocaleDateString('id-ID')}</p>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-slate-400">Limit Alokasi Hutang</span>
+                  <p className="font-bold text-slate-800 text-lg">{formatRupiah(contractData.debt_allocation)}</p>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-slate-400">Hutang Terserap</span>
+                  <p className="font-bold text-rose-600 text-lg">{formatRupiah(contractData.current_debt)}</p>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-slate-400">Nominal Alokasi Bagi Hasil</span>
+                  <p className="font-bold text-blue-700 text-lg">
+                    {contractData.profit_sharing_allocation > 0 ? formatRupiah(contractData.profit_sharing_allocation) : 'Belum ditentukan'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {contractData.profit_sharing_allocation > 0
+                      ? 'Nominal ini menjadi dasar pembagian rupiah ke masing-masing syarik.'
+                      : 'Jika belum diisi, sistem memakai basis default yang tersedia.'}
+                  </p>
                 </div>
                 {contractData.description && (
                   <div>
@@ -564,24 +597,6 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                     {canEstimateProfit ? formatRupiah(profitSharingBaseAmount) : 'Belum tersedia'}
                   </p>
                 </div>
-                {/* Peringatan: laba belum melampaui modal asal */}
-                {(() => {
-                  const isOperational = ['ACTIVE', 'COMPLETED'].includes(normalizedContractStatus)
-                  const basisForWarning = canEstimateProfit ? profitSharingBaseAmount : 0
-                  if (!isOperational || totalCapital <= 0 || basisForWarning >= totalCapital) return null
-                  return (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
-                      <p className="text-xs font-black text-amber-800 uppercase tracking-wide">⚠ Belum Dibolehkan Bagi Hasil</p>
-                      <p className="text-xs text-amber-700 leading-relaxed">
-                        {canEstimateProfit
-                          ? <>Basis bagi hasil <span className="font-bold">{formatRupiah(profitSharingBaseAmount)}</span> belum melampaui total modal asal <span className="font-bold">{formatRupiah(totalCapital)}</span>.</>
-                          : <>Basis bagi hasil belum dapat dihitung, sementara modal asal tercatat <span className="font-bold">{formatRupiah(totalCapital)}</span>.</>
-                        }
-                        {' '}Dalam prinsip syirkah, distribusi laba sebaiknya dilakukan setelah keuntungan melebihi pokok modal.
-                      </p>
-                    </div>
-                  )
-                })()}
                 <div>
                   <span className="block text-xs font-bold text-slate-400">Rekening Pembayaran</span>
                   <p className="font-medium text-slate-700">
@@ -660,7 +675,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
             <div className="space-y-6">
 	              {/* PEMODAL SECTION */}
 	              <div>
-                <h4 className="text-xs font-semibold uppercase text-slate-400 mb-3 tracking-tight">Lingkaran Pemodal (Shahibul Maal)</h4>
+                <h4 className="text-xs font-black uppercase text-slate-400 mb-3 tracking-widest">Lingkaran Pemodal (Shahibul Maal)</h4>
                 {pemodalList.length === 0 ? (
                   <p className="text-sm text-slate-400 italic mb-4">Belum ada Pemodal terdaftar.</p>
                 ) : (
@@ -673,12 +688,12 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                         </div>
                         <div className="flex flex-row md:flex-col items-center md:items-end justify-between mt-3 md:mt-0 gap-2 md:gap-0">
                           <div className="text-right">
-                            <span className="block text-[10px] uppercase font-semibold tracking-tight text-emerald-600 mb-1">Setoran Modal / Porsi</span>
+                            <span className="block text-[10px] uppercase font-black tracking-wider text-emerald-600 mb-1">Setoran Modal / Porsi</span>
                             <span className="font-bold text-slate-800">{formatRupiah(m.capital_contribution)}</span>
                             <span className="ml-2 font-black text-rose-500">[{m.profit_share_percentage}%]</span>
                           </div>
                           <div className="mt-2 text-right">
-                             <span className="block text-[10px] uppercase font-semibold tracking-tight text-blue-600 mb-1">Estimasi Bagi Hasil</span>
+                             <span className="block text-[10px] uppercase font-black tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
                              {renderEstimatedProfit(m)}
                           </div>
                           <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -694,7 +709,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
 
 	              {/* DUAL ROLE SECTION */}
 	              <div>
-	                <h4 className="text-xs font-semibold uppercase text-slate-400 mb-3 tracking-tight mt-6">Pemodal & Pengelola Sekaligus</h4>
+	                <h4 className="text-xs font-black uppercase text-slate-400 mb-3 tracking-widest mt-6">Pemodal & Pengelola Sekaligus</h4>
 	                {dualRoleList.length === 0 ? (
 	                  <p className="text-sm text-slate-400 italic mb-4">Belum ada anggota dengan peran gabungan.</p>
 	                ) : (
@@ -710,12 +725,12 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
 	                        </div>
 	                        <div className="flex flex-row md:flex-col items-center md:items-end justify-between mt-3 md:mt-0 gap-2 md:gap-0">
 	                          <div className="text-right">
-	                            <span className="block text-[10px] uppercase font-semibold tracking-tight text-emerald-600 mb-1">Setoran Modal / Porsi</span>
+	                            <span className="block text-[10px] uppercase font-black tracking-wider text-emerald-600 mb-1">Setoran Modal / Porsi</span>
 	                            <span className="font-bold text-slate-800">{formatRupiah(m.capital_contribution)}</span>
 	                            <span className="ml-2 font-black text-rose-500">[{m.profit_share_percentage}%]</span>
 	                          </div>
 	                          <div className="mt-2 text-right">
-	                             <span className="block text-[10px] uppercase font-semibold tracking-tight text-blue-600 mb-1">Estimasi Bagi Hasil</span>
+	                             <span className="block text-[10px] uppercase font-black tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
 	                             {renderEstimatedProfit(m)}
 	                          </div>
 	                          <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -731,7 +746,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
 
 	              {/* PENGELOLA SECTION */}
 	              <div>
-                <h4 className="text-xs font-semibold uppercase text-slate-400 mb-3 tracking-tight mt-6">Lingkaran Pengelola (Mudharib)</h4>
+                <h4 className="text-xs font-black uppercase text-slate-400 mb-3 tracking-widest mt-6">Lingkaran Pengelola (Mudharib)</h4>
                 {pengelolaList.length === 0 ? (
                   <p className="text-sm text-slate-400 italic mb-4">Belum ada Pengelola terdaftar.</p>
                 ) : (
@@ -744,11 +759,11 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                         </div>
                         <div className="flex flex-row md:flex-col items-center md:items-end justify-between mt-3 md:mt-0 gap-2 md:gap-0">
                           <div className="text-right">
-                            <span className="block text-[10px] uppercase font-semibold tracking-tight text-amber-600 mb-1">Porsi Bagi Hasil</span>
+                            <span className="block text-[10px] uppercase font-black tracking-wider text-amber-600 mb-1">Porsi Bagi Hasil</span>
                             <span className="font-black text-rose-500 text-lg">{m.profit_share_percentage}%</span>
                           </div>
                           <div className="mt-2 text-right">
-                             <span className="block text-[10px] uppercase font-semibold tracking-tight text-blue-600 mb-1">Estimasi Bagi Hasil</span>
+                             <span className="block text-[10px] uppercase font-black tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
                              {renderEstimatedProfit(m)}
                           </div>
                           <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -765,15 +780,6 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
           </div>
         </div>
       </div>
-
-      {/* ── Adendum: Alokasi & Eksposur Hutang ── */}
-      <SyirkahAdendumHutang
-        contractId={contract.id}
-        orgId={orgId}
-        initialDebtAllocation={contract.debt_allocation || 0}
-        initialCurrentDebt={contract.current_debt || 0}
-        contractStatus={normalizedContractStatus}
-      />
 
       {/* MEMBER FORM MODAL */}
       {isMemberFormOpen && (

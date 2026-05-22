@@ -19,11 +19,9 @@ export function ActivateCoreModuleButton({ moduleKey }: Props) {
     setError(null)
     startTransition(async () => {
       try {
-        const result = await activateModule(moduleKey)
-        if (result?.success) {
-          setDone(true)
-          router.refresh()
-        }
+        await activateModule(moduleKey)
+        setDone(true)
+        router.refresh()
       } catch (err: any) {
         setError(err.message || 'Gagal mengaktifkan modul inti')
       }
@@ -32,7 +30,7 @@ export function ActivateCoreModuleButton({ moduleKey }: Props) {
 
   if (done) {
     return (
-      <span className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold tracking-tight text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
+      <span className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
         <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
       </span>
     )

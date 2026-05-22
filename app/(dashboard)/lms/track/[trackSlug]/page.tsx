@@ -29,7 +29,7 @@ export default async function LearningTrackPage(props: { params: Promise<{ track
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
         <Link
           href="/lms"
           className="inline-flex items-center gap-2 text-sm font-black text-slate-600 hover:text-slate-900"
@@ -44,31 +44,31 @@ export default async function LearningTrackPage(props: { params: Promise<{ track
               <Icon className="h-3.5 w-3.5" />
               {track.shortLabel}
             </div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
               {track.title}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
               {track.description}
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Audience</div>
             <div className="mt-2 font-bold text-slate-900">{track.audience}</div>
             <div className="mt-4 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Course</div>
-            <div className="mt-2 text-2xl font-semibold text-slate-900">{courses.length}</div>
+            <div className="mt-2 text-2xl font-black text-slate-900">{courses.length}</div>
           </div>
         </div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
         {courses.map((course) => (
-          <div key={course.slug} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div key={course.slug} className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">
                   {course.levelCode}
                 </div>
-                <h2 className="mt-3 text-xl font-semibold text-slate-900">{course.title}</h2>
+                <h2 className="mt-3 text-xl font-black text-slate-900">{course.title}</h2>
               </div>
               <div className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${
                 course.status === 'LIVE'
@@ -89,7 +89,7 @@ export default async function LearningTrackPage(props: { params: Promise<{ track
 
             <div className="mt-5 space-y-2 text-sm text-slate-600">
               {course.outcomes.slice(0, 2).map((outcome) => (
-                <div key={outcome} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <div key={outcome} className="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
                   {outcome}
                 </div>
               ))}

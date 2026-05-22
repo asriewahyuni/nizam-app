@@ -177,26 +177,12 @@ export async function createWorkshopWorkOrder(orgId: string, formData: FormData)
 
   const spkNumber = generateSpkNumber()
 
-  // ── Auto-create contact jika new_contact_name diisi ──
-  let contactId = (formData.get('contact_id') as string) || null
-  const newContactName = (formData.get('new_contact_name') as string)?.trim()
-
-  if (!contactId && newContactName) {
-    const { data: newContact, error: contactErr } = await supabase
-      .from('contacts')
-      .insert({ org_id: orgId, name: newContactName, type: 'CUSTOMER' })
-      .select('id')
-      .single()
-    if (contactErr) return { error: 'Gagal membuat pelanggan baru: ' + contactErr.message }
-    contactId = newContact.id
-  }
-
   const payload = {
     org_id: orgId,
     branch_id: branch.branchId,
     spk_number: spkNumber,
     vehicle_id: (formData.get('vehicle_id') as string) || null,
-    contact_id: contactId, // sudah auto-create jika perlu
+    contact_id: (formData.get('contact_id') as string) || null,
     mechanic_name: (formData.get('mechanic_name') as string) || null,
     status: 'ANTRI',
     customer_complaint: (formData.get('customer_complaint') as string) || null,
@@ -215,21 +201,6 @@ export async function createWorkshopWorkOrder(orgId: string, formData: FormData)
     .single()
 
   if (error) return { error: error.message }
-
-  const mechanicFee = Number(formData.get('mechanic_fee') || 0)
-  if (mechanicFee > 0 && order?.id) {
-    const feeName = (formData.get('mechanic_fee_name') as string)?.trim() || 'Biaya Jasa Mekanik'
-    await db.from('workshop_work_order_items').insert({
-      work_order_id: order.id,
-      org_id: orgId,
-      item_type: 'JASA',
-      name: feeName,
-      quantity: 1,
-      unit_price: mechanicFee,
-      subtotal: mechanicFee,
-    })
-    await db.from('workshop_work_orders').update({ subtotal: mechanicFee, total: mechanicFee }).eq('id', order.id)
-  }
 
   revalidatePath('/workshop')
   return { success: true, id: order?.id as string }
@@ -260,16 +231,6 @@ export async function updateWorkOrderStatus(orgId: string, orderId: string, stat
     }
     // Deduct stok spare part dari inventori
     await deductWorkshopPartInventory(orgId, orderId)
-    // ── Auto-create invoice ──
-    try {
-      const { createInvoiceFromWorkOrder } = await import('@/modules/operational-bridge/actions/bridge.actions')
-      const invResult = await createInvoiceFromWorkOrder(orderId)
-      if (invResult && 'error' in invResult) {
-        console.warn('[auto-invoice] Gagal:', invResult.error)
-      }
-    } catch (invErr: any) {
-      console.warn('[auto-invoice] Error:', invErr.message)
-    }
   }
 
   revalidatePath('/workshop')
@@ -485,9 +446,8 @@ export async function deductWorkshopPartInventory(orgId: string, workOrderId: st
   const items = await queryPostgres<{
     product_id: string
     quantity: number
-    unit_price: number
   }>(`
-    SELECT product_id, quantity, unit_price
+    SELECT product_id, quantity
     FROM public.workshop_work_order_items
     WHERE work_order_id = $1
       AND item_type = 'PART'
@@ -502,48 +462,21 @@ export async function deductWorkshopPartInventory(orgId: string, workOrderId: st
     [orgId]
   )
   const warehouseId = warehouseRes.rows[0]?.id
+  if (!warehouseId) return { success: true } // Tidak ada warehouse, skip
 
-  // Ambil branch_id dari work order
-  const orderRes = await queryPostgres<{ branch_id: string | null }>(
-    `SELECT branch_id FROM public.workshop_work_orders WHERE id = $1 LIMIT 1`,
-    [workOrderId]
-  )
-  const branchId = orderRes.rows[0]?.branch_id || null
-
-  // Deduct stok dan catat movement untuk setiap part
+  // Deduct stok setiap part
   const errors: string[] = []
   for (const item of items.rows) {
     try {
-      // Update stok di warehouse default jika ada
-      if (warehouseId) {
-        await queryPostgres(`
-          UPDATE public.inventory_stocks
-          SET quantity = GREATEST(0, quantity - $1)
-          WHERE org_id = $2
-            AND product_id = $3
-            AND warehouse_id = $4
-        `, [item.quantity, orgId, item.product_id, warehouseId])
-      }
-
-      // Catat movement keluar di stock_movements (quantity negatif = keluar)
       await queryPostgres(`
-        INSERT INTO public.stock_movements
-          (org_id, product_id, quantity, unit_price, reference_type, reference_id, notes, branch_id)
-        VALUES ($1, $2, $3, $4, 'WORKSHOP', $5, 'Pemakaian spare part bengkel', $6)
-        ON CONFLICT DO NOTHING
-      `, [orgId, item.product_id, -item.quantity, item.unit_price, workOrderId, branchId])
+        UPDATE public.inventory_stocks
+        SET quantity = GREATEST(0, quantity - $1)
+        WHERE org_id = $2
+          AND product_id = $3
+          AND warehouse_id = $4
+      `, [item.quantity, orgId, item.product_id, warehouseId])
     } catch (err: any) {
-      // branch_id kolom mungkin belum ada, coba tanpa branch_id
-      try {
-        await queryPostgres(`
-          INSERT INTO public.stock_movements
-            (org_id, product_id, quantity, unit_price, reference_type, reference_id, notes)
-          VALUES ($1, $2, $3, $4, 'WORKSHOP', $5, 'Pemakaian spare part bengkel')
-          ON CONFLICT DO NOTHING
-        `, [orgId, item.product_id, -item.quantity, item.unit_price, workOrderId])
-      } catch (err2: any) {
-        errors.push(`Part ${item.product_id}: ${err2.message}`)
-      }
+      errors.push(`Part ${item.product_id}: ${err.message}`)
     }
   }
 
@@ -566,27 +499,22 @@ export interface WorkshopServiceRate {
 }
 
 export async function getWorkshopServiceRates(orgId: string): Promise<WorkshopServiceRate[]> {
-  try {
-    const { queryPostgres } = await import('@/lib/db/postgres')
-    const res = await queryPostgres<Record<string, unknown>>(
-      `SELECT id, name, description, unit_price, category, is_active
-       FROM public.workshop_service_rates
-       WHERE org_id = $1 AND is_active = true
-       ORDER BY category, name`,
-      [orgId]
-    )
-    return res.rows.map(r => ({
-      id: String(r.id),
-      name: String(r.name),
-      description: r.description ? String(r.description) : null,
-      unitPrice: Number(r.unit_price),
-      category: String(r.category || 'UMUM'),
-      isActive: Boolean(r.is_active),
-    }))
-  } catch (error) {
-    console.error('getWorkshopServiceRates:', error)
-    return []
-  }
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const res = await queryPostgres<Record<string, unknown>>(
+    `SELECT id, name, description, unit_price, category, is_active
+     FROM public.workshop_service_rates
+     WHERE org_id = $1 AND is_active = true
+     ORDER BY category, name`,
+    [orgId]
+  )
+  return res.rows.map(r => ({
+    id: String(r.id),
+    name: String(r.name),
+    description: r.description ? String(r.description) : null,
+    unitPrice: Number(r.unit_price),
+    category: String(r.category || 'UMUM'),
+    isActive: Boolean(r.is_active),
+  }))
 }
 
 export async function upsertWorkshopServiceRate(orgId: string, formData: FormData) {
@@ -631,54 +559,19 @@ export async function deleteWorkshopServiceRate(orgId: string, rateId: string) {
   return { success: true }
 }
 
-// Buat pelanggan baru langsung dari konteks workshop (bypass membership check)
-export async function createWorkshopCustomer(orgId: string, formData: FormData) {
-  const { queryPostgres } = await import('@/lib/db/postgres')
-  const name = (formData.get('name') as string)?.trim()
-  const phone = (formData.get('phone') as string)?.trim() || null
-
-  if (!name) return { error: 'Nama pelanggan wajib diisi.' }
-
-  try {
-    const res = await queryPostgres<{ id: string; name: string }>(
-      `INSERT INTO public.contacts (org_id, name, type, phone, is_active)
-       VALUES ($1, $2, 'CUSTOMER', $3, true)
-       RETURNING id::text, name`,
-      [orgId, name, phone]
-    )
-    if (!res.rows[0]) return { error: 'Gagal membuat pelanggan.' }
-    revalidatePath('/contacts')
-    revalidatePath('/workshop')
-    return { data: res.rows[0] }
-  } catch (err: any) {
-    return { error: 'Gagal membuat pelanggan: ' + (err.message || '') }
-  }
-}
-
 // Ambil produk inventori (spare part) untuk lookup di form item SPK
-export async function getWorkshopPartProducts(orgId: string, branchId?: string | null) {
-  try {
-    const { queryPostgres } = await import('@/lib/db/postgres')
-
-    // Hanya tampilkan produk dengan stok > 0 di warehouse default
-    // Filter by default warehouse agar sesuai dengan logika deduct stok
-    const res = await queryPostgres<{ id: string; name: string; sku: string; selling_price: number; quantity: number }>(
-      `SELECT p.id, p.name, p.sku, p.selling_price,
-              COALESCE(SUM(s.quantity), 0) AS quantity
-       FROM public.products p
-       LEFT JOIN public.inventory_stocks s ON s.product_id = p.id AND s.org_id = p.org_id
-         AND s.warehouse_id = (SELECT w.id FROM public.warehouses w WHERE w.org_id = $1 AND w.is_default = true LIMIT 1)
-       WHERE p.org_id = $1
-         AND p.type = 'INVENTORY'
-         AND p.is_active = true
-       GROUP BY p.id, p.name, p.sku, p.selling_price
-       HAVING COALESCE(SUM(s.quantity), 0) > 0
-       ORDER BY p.name`,
-      [orgId]
-    )
-    return res.rows
-  } catch (error) {
-    console.error('getWorkshopPartProducts:', error)
-    return []
-  }
+export async function getWorkshopPartProducts(orgId: string) {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const res = await queryPostgres<{ id: string; name: string; sku: string; selling_price: number; quantity: number }>(
+    `SELECT p.id, p.name, p.sku, p.selling_price,
+            COALESCE(SUM(s.quantity), 0) AS quantity
+     FROM public.products p
+     LEFT JOIN public.inventory_stocks s ON s.product_id = p.id AND s.org_id = p.org_id
+     WHERE p.org_id = $1
+       AND p.type IN ('INVENTORY', 'PART', 'SPAREPART')
+     GROUP BY p.id, p.name, p.sku, p.selling_price
+     ORDER BY p.name`,
+    [orgId]
+  )
+  return res.rows
 }

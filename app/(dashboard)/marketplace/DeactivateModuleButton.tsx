@@ -17,17 +17,9 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
 
   function handleConfirm() {
     startTransition(async () => {
-      try {
-        const result = await deactivateModule(moduleKey)
-        setShowConfirm(false)
-        if (result?.success && result?.redirectUrl) {
-          router.push(result.redirectUrl)
-        } else {
-          router.refresh()
-        }
-      } catch (err: any) {
-        setShowConfirm(false)
-      }
+      await deactivateModule(moduleKey)
+      setShowConfirm(false)
+      router.refresh()
     })
   }
 
@@ -58,7 +50,7 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
               </button>
             </div>
 
-            <h3 className="text-base font-semibold text-slate-900 mb-1">
+            <h3 className="text-base font-black text-slate-900 mb-1">
               Nonaktifkan {moduleName}?
             </h3>
             <p className="text-sm text-slate-500 leading-relaxed">

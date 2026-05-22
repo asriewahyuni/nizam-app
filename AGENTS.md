@@ -1,81 +1,5 @@
 # AGENTS.md
 
----
-
-# 🚨🚨🚨 STOP — READ THIS FIRST (AI/LLM AGENTS) 🚨🚨🚨
-
-## CRITICAL: THIS PROJECT DOES **NOT** USE SUPABASE
-
-**TL;DR untuk AI:** Walaupun lu lihat folder `lib/supabase/`, file `supabase/migrations/`, atau import `from '@/lib/supabase/server'` di 249+ file — **JANGAN ASUMSI PROJECT INI PAKAI SUPABASE CLOUD.**
-
-### Fakta Yang HARUS Lu Tahu:
-
-| Item | Status |
-|------|--------|
-| **Database** | ✅ Railway PostgreSQL (via `pg` native client) |
-| **Auth** | ✅ Internal Auth Nizam-native (cookie `nizam_internal_session`) |
-| **Storage** | ✅ Railway S3-compatible bucket |
-| **Supabase Cloud** | ❌ **TIDAK DIGUNAKAN** — Migrasi sudah selesai 2026-04-11 |
-| **Supabase Auth** | ❌ **TIDAK DIGUNAKAN** — `AUTH_PROVIDER=internal` permanen |
-| **Supabase Storage** | ❌ **TIDAK DIGUNAKAN** |
-
-### Kenapa Masih Ada Nama "supabase" di Code?
-
-`lib/supabase/server.ts` adalah **drop-in replacement** untuk Supabase SDK. Interface-nya kompatibel (`.from()`, `.rpc()`, `.auth.*`), tapi **semua query diarahkan ke Railway PostgreSQL native**. Nama folder tidak diubah karena 249 file mengimport dari sana — rename = high risk regression untuk benefit kosmetik.
-
-```typescript
-// Lu lihat ini di production code:
-import { createClient } from '@/lib/supabase/server'
-
-// Yang sebenarnya terjadi: createClient() return Railway PostgreSQL wrapper
-// BUKAN Supabase Cloud client!
-```
-
-### ❌ JANGAN PERNAH Lakukan Ini:
-
-- ❌ Suggest "setup Supabase project" / "create Supabase account"
-- ❌ Suggest install `@supabase/cli` untuk production
-- ❌ Add env vars `NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co` untuk runtime
-- ❌ Refactor "supabase code" tanpa konteks bahwa itu wrapper Railway
-- ❌ Asumsi tabel/auth disimpan di Supabase Cloud
-- ❌ Suggest Supabase RLS policies (kita pakai PostgreSQL row-level security native di Railway)
-
-### ✅ Yang Harus Lu Pahami:
-
-- ✅ `import { createClient } from '@/lib/supabase/server'` = import wrapper Railway PostgreSQL
-- ✅ `supabase.from('table').select()` = query ke Railway, BUKAN Supabase
-- ✅ `supabase.auth.getUser()` = panggil Internal Auth, BUKAN Supabase Auth
-- ✅ `supabase.rpc('function_name')` = call PostgreSQL function di Railway
-- ✅ SQL files di `supabase/migrations/` = applied ke Railway PostgreSQL
-
-### Cara Verify Sendiri (Jangan Percaya Tebakan):
-
-1. Baca file `lib/supabase/server.ts` baris 1-10 → ada disclaimer
-2. Baca file `lib/supabase/README.md` → detail compat layer
-3. Check `.env` → `AUTH_PROVIDER=internal`, `DATABASE_URL=postgresql://...railway.app`
-4. Check `lib/db/postgres-client.ts` → real Railway PostgreSQL client
-
-### Migration History (Untuk Konteks):
-
-- **Sebelum 2026-04-11:** Pakai Supabase Cloud (DB + Auth + Storage)
-- **2026-04-11:** Cutover ke Railway PostgreSQL + Internal Auth
-- **2026-05-21:** Documentation cleanup, archive migration scripts
-- **Sekarang:** 100% Railway, ZERO koneksi ke Supabase Cloud
-
-### Kalau Lu (AI) Masih Bingung:
-
-1. **STOP** — jangan lanjut coding/suggest sebelum paham
-2. Baca `lib/supabase/README.md` lengkap
-3. Baca `lib/supabase/server.ts` header comment
-4. Baca file ini lagi dari atas
-5. Kalau masih ragu — TANYA USER, jangan asumsi
-
----
-
-# 🚨 END OF CRITICAL SECTION 🚨
-
----
-
 ## Gambaran Umum Codebase Nizam App
 Repository `nizam-app` adalah sebuah solusi ERP (Enterprise Resource Planning) modern yang dikembangkan menggunakan TypeScript. Repository ini dirancang secara modular dan terstruktur untuk mendukung fitur seperti autentikasi pengguna, onboarding, manajemen database, dan berbagai modul bisnis (akuntansi, inventori, HR, commerce, dan lainnya).
 
@@ -263,6 +187,90 @@ npm run test           # Semua test
 npm run test:erp       # Test modul ERP utama
 npm run test:coverage  # Test dengan laporan coverage
 ```
+
+---
+
+## UI/UX Pro Max Skill — Wajib Diaktifkan untuk Semua Pekerjaan UI/UX
+
+Project ini menggunakan **UI/UX Pro Max Skill** (v2.5.0) — sebuah AI skill yang menyediakan design intelligence profesional. Skill ini **wajib diaktifkan secara otomatis** setiap kali ada permintaan terkait UI/UX, komponen, halaman, atau desain.
+
+### Lokasi Skill
+
+| AI Tool | Path Skill |
+|---|---|
+| Claude / Zed | `.claude/skills/ui-ux-pro-max/SKILL.md` |
+| Cursor | `.cursor/skills/ui-ux-pro-max/SKILL.md` |
+| Windsurf | `.windsurf/skills/ui-ux-pro-max/SKILL.md` |
+| Copilot | `.github/skills/ui-ux-pro-max/SKILL.md` |
+| Semua AI lain | Baca panduan di bawah ini |
+
+**Jika AI tool kamu mendukung skill loading native** → baca file `SKILL.md` dari path yang sesuai di atas.
+
+### Kapan Skill Ini Diaktifkan
+
+Aktifkan skill ini secara otomatis ketika user meminta:
+- Membuat halaman baru, landing page, dashboard, komponen UI
+- Memilih warna, font, style, atau tema
+- Review atau perbaikan UI/UX yang sudah ada
+- Implementasi dark mode, animasi, atau accessibility
+- Perbaikan layout, spacing, atau responsivitas
+
+### Alur Kerja Wajib (untuk semua AI)
+
+**Step 1 — Analisis Kebutuhan:**
+Identifikasi jenis produk, target pengguna, dan keyword style dari permintaan user.
+
+**Step 2 — Generate Design System (WAJIB sebelum menulis kode UI apapun):**
+```bash
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<product_type> <keywords>" --design-system -p "Nizam ERP"
+```
+Perintah ini menghasilkan: Pattern, Style, Color Palette, Typography, Key Effects, dan Anti-Patterns.
+
+**Step 3 — Domain Search (jika perlu detail tambahan):**
+```bash
+# Cari style spesifik
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --domain style
+
+# Cari UX guidelines
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --domain ux
+
+# Cari typography
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --domain typography
+
+# Cari color palette
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --domain color
+```
+
+**Step 4 — Stack Guidelines (Next.js + TailwindCSS):**
+```bash
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --stack nextjs
+```
+
+### Aturan UI Wajib untuk Nizam App
+
+Berikut aturan minimum yang SELALU diterapkan pada setiap pekerjaan UI:
+
+1. **Tidak ada emoji sebagai icon** — Gunakan Lucide React (`lucide-react`) atau Heroicons (`@heroicons/react`).
+2. **`cursor-pointer` pada semua elemen yang bisa diklik.**
+3. **Hover states** dengan transisi halus `150–300ms`.
+4. **Kontras teks minimum 4.5:1** untuk light mode, 4.5:1 untuk dark mode.
+5. **Focus states visible** untuk navigasi keyboard.
+6. **`prefers-reduced-motion`** dihormati untuk semua animasi.
+7. **Responsive**: wajib ditest pada 375px, 768px, 1024px, 1440px.
+8. **Touch targets** minimum 44×44px.
+9. **Semantic HTML** dan ARIA attributes yang benar.
+10. **Spacing system** konsisten: gunakan kelipatan 4/8px (TailwindCSS spacing).
+
+### Pre-Delivery Checklist (wajib sebelum selesai)
+
+- [ ] Design system sudah di-generate dan diikuti
+- [ ] Tidak ada emoji sebagai icon struktural
+- [ ] Semua elemen clickable punya `cursor-pointer` dan hover state
+- [ ] Kontras warna memenuhi standar WCAG AA (4.5:1)
+- [ ] Focus state visible untuk keyboard navigation
+- [ ] Responsif di semua breakpoint utama
+- [ ] Tidak ada layout shift saat interaksi
+- [ ] TailwindCSS kelas dirapikan dengan `cn()` dari `lib/utils.ts`
 
 ---
 

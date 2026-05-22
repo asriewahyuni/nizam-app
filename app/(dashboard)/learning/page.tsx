@@ -61,9 +61,9 @@ function StatCard({
   hint: string
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{label}</div>
-      <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{value}</div>
+      <div className="mt-3 text-3xl font-black tracking-tight text-slate-900">{value}</div>
       <p className="mt-2 text-sm text-slate-600">{hint}</p>
     </div>
   )
@@ -139,8 +139,8 @@ export default async function LearningPage(props: {
 
 
       {/* ══ MANAJEMEN PELATIHAN INTERNAL (HRIS) ══ */}
-      <div className="rounded-xl border-2 border-dashed border-slate-200 p-1">
-        <div className="rounded-xl bg-slate-50 px-5 py-3">
+      <div className="rounded-[32px] border-2 border-dashed border-slate-200 p-1">
+        <div className="rounded-[28px] bg-slate-50 px-5 py-3">
           <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
             Manajemen Pelatihan Internal · HRIS
           </div>
@@ -150,14 +150,14 @@ export default async function LearningPage(props: {
           </p>
         </div>
 
-      <section className="overflow-hidden rounded-xl border border-emerald-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_42%),linear-gradient(135deg,#f0fdf4_0%,#ffffff_46%,#ecfeff_100%)] p-6 shadow-sm">
+      <section className="overflow-hidden rounded-[32px] border border-emerald-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_42%),linear-gradient(135deg,#f0fdf4_0%,#ffffff_46%,#ecfeff_100%)] p-6 shadow-sm">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/85 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">
               <GraduationCap className="h-3.5 w-3.5" />
               HRIS • Pelatihan Internal
             </div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
               Program pelatihan dan peningkatan kompetensi untuk {orgData.org.name}.
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
@@ -200,25 +200,25 @@ export default async function LearningPage(props: {
       </section>
 
       {searchParams.error ? (
-        <section className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-800 shadow-sm">
+        <section className="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-800 shadow-sm">
           {searchParams.error}
         </section>
       ) : null}
 
       {searchParams.created === '1' ? (
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
+        <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
           Pelatihan baru berhasil dibuat untuk entitas aktif.
         </section>
       ) : null}
 
       {searchParams.updated === '1' ? (
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
+        <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
           Status pelatihan berhasil diperbarui.
         </section>
       ) : null}
 
       {searchParams.deleted === '1' ? (
-        <section className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-900 shadow-sm">
+        <section className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-900 shadow-sm">
           Pelatihan berhasil dihapus.
         </section>
       ) : null}
@@ -247,19 +247,19 @@ export default async function LearningPage(props: {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div id="buat-pelatihan" className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div id="buat-pelatihan" className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <PlusCircle className="h-5 w-5 text-slate-700" />
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Create Training</div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-900">Buat pelatihan internal sendiri</h2>
+              <h2 className="mt-1 text-xl font-black text-slate-900">Buat pelatihan internal sendiri</h2>
             </div>
           </div>
 
           {accessContext.canManage ? (
             <form action={createCompetencyTraining} className="mt-5 grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Judul Pelatihan</div>
                   <input
                     name="title"
@@ -269,7 +269,7 @@ export default async function LearningPage(props: {
                   />
                 </label>
 
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Skill / Kategori</div>
                   <input
                     name="skillCategory"
@@ -278,7 +278,7 @@ export default async function LearningPage(props: {
                   />
                 </label>
 
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Target Role</div>
                   <input
                     name="targetRole"
@@ -287,7 +287,7 @@ export default async function LearningPage(props: {
                   />
                 </label>
 
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Fasilitator</div>
                   <input
                     name="facilitatorName"
@@ -296,7 +296,7 @@ export default async function LearningPage(props: {
                   />
                 </label>
 
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Jenis Pelatihan</div>
                   <select
                     name="trainingType"
@@ -310,7 +310,7 @@ export default async function LearningPage(props: {
                   </select>
                 </label>
 
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Mode Delivery</div>
                   <select
                     name="deliveryMode"
@@ -324,7 +324,7 @@ export default async function LearningPage(props: {
                   </select>
                 </label>
 
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Scope Pelatihan</div>
                   <select
                     name="scopeType"
@@ -336,7 +336,7 @@ export default async function LearningPage(props: {
                   </select>
                 </label>
 
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Unit Target</div>
                   <select
                     name="branchId"
@@ -355,7 +355,7 @@ export default async function LearningPage(props: {
                   </p>
                 </label>
 
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Tanggal Mulai</div>
                   <input
                     type="date"
@@ -364,7 +364,7 @@ export default async function LearningPage(props: {
                   />
                 </label>
 
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Tanggal Selesai</div>
                   <input
                     type="date"
@@ -373,7 +373,7 @@ export default async function LearningPage(props: {
                   />
                 </label>
 
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Durasi (jam)</div>
                   <input
                     type="number"
@@ -385,7 +385,7 @@ export default async function LearningPage(props: {
                   />
                 </label>
 
-                <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                   <div className="font-black text-slate-900">Status Awal</div>
                   <select
                     name="status"
@@ -401,23 +401,23 @@ export default async function LearningPage(props: {
                 </label>
               </div>
 
-              <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+              <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                 <div className="font-black text-slate-900">Tujuan Pelatihan</div>
                 <textarea
                   name="objective"
                   rows={4}
                   placeholder="Tuliskan outcome bisnis atau kompetensi yang ingin dicapai."
-                  className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
+                  className="mt-3 w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
                 />
               </label>
 
-              <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+              <label className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm">
                 <div className="font-black text-slate-900">Catatan Tambahan</div>
                 <textarea
                   name="notes"
                   rows={4}
                   placeholder="Misalnya kebutuhan trainer, batch peserta, atau catatan SOP HR."
-                  className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
+                  className="mt-3 w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
                 />
               </label>
 
@@ -435,46 +435,46 @@ export default async function LearningPage(props: {
               </div>
             </form>
           ) : (
-            <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+            <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
               Anda sudah bisa melihat katalog pelatihan, tetapi belum punya akses untuk membuat atau mengubah data.
               Minta role dengan permission `learning:write` jika ingin mengelola program.
             </div>
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <Layers className="h-5 w-5 text-slate-700" />
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Konteks Aktif</div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-900">Entitas dan unit tempat pelatihan dibuat</h2>
+              <h2 className="mt-1 text-xl font-black text-slate-900">Entitas dan unit tempat pelatihan dibuat</h2>
             </div>
           </div>
           <div className="mt-5 space-y-4">
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-5">
+            <div className="rounded-[22px] border border-emerald-200 bg-emerald-50/70 p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
                     {formatOrgKindLabel(dashboard.currentOrg.kind)}
                   </div>
-                  <h3 className="mt-2 text-lg font-semibold text-slate-900">{dashboard.currentOrg.orgName}</h3>
+                  <h3 className="mt-2 text-lg font-black text-slate-900">{dashboard.currentOrg.orgName}</h3>
                 </div>
                 <Building2 className="h-5 w-5 text-emerald-700" />
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border border-emerald-200 bg-white p-4">
+                <div className="rounded-[18px] border border-emerald-200 bg-white p-4">
                   <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Unit</div>
-                  <div className="mt-2 text-xl font-semibold text-slate-900">{branches.length}</div>
+                  <div className="mt-2 text-xl font-black text-slate-900">{branches.length}</div>
                 </div>
-                <div className="rounded-lg border border-emerald-200 bg-white p-4">
+                <div className="rounded-[18px] border border-emerald-200 bg-white p-4">
                   <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Karyawan</div>
-                  <div className="mt-2 text-xl font-semibold text-slate-900">{dashboard.currentOrg.employeeCount}</div>
+                  <div className="mt-2 text-xl font-black text-slate-900">{dashboard.currentOrg.employeeCount}</div>
                 </div>
               </div>
             </div>
 
             {dashboard.activeUnit ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Unit Aktif</div>
@@ -488,7 +488,7 @@ export default async function LearningPage(props: {
               </div>
             ) : null}
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-5">
               <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Catatan Operasional</div>
               <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
                 <p>Parent membuat program untuk parent saat konteks aktif di parent.</p>
@@ -500,11 +500,11 @@ export default async function LearningPage(props: {
         </div>
       </section>
 
-      <section id="daftar-pelatihan" className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section id="daftar-pelatihan" className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Training Catalog</div>
-            <h2 className="mt-2 text-xl font-semibold text-slate-900">Daftar pelatihan yang sudah dibuat</h2>
+            <h2 className="mt-2 text-xl font-black text-slate-900">Daftar pelatihan yang sudah dibuat</h2>
           </div>
           <div className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-slate-600">
             {summary.total} program
@@ -512,14 +512,14 @@ export default async function LearningPage(props: {
         </div>
 
         {trainings.length === 0 ? (
-          <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-6 text-slate-600">
+          <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-6 text-slate-600">
             Belum ada pelatihan yang dibuat pada entitas aktif ini. Mulai dari form di atas untuk menyusun program skill
             business sesuai kebutuhan HR Anda sendiri.
           </div>
         ) : (
           <div className="mt-5 space-y-4">
             {trainings.map((training) => (
-              <div key={training.id} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div key={training.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="max-w-3xl">
                     <div className="flex flex-wrap items-center gap-2">
@@ -538,7 +538,7 @@ export default async function LearningPage(props: {
                         {training.deliveryMode}
                       </span>
                     </div>
-                    <h3 className="mt-3 text-lg font-semibold text-slate-900">{training.title}</h3>
+                    <h3 className="mt-3 text-lg font-black text-slate-900">{training.title}</h3>
                     <p className="mt-2 text-sm text-slate-600">{training.skillCategory}</p>
                     <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-600">
                       {training.targetRole ? <span>Target role: {training.targetRole}</span> : null}
@@ -549,7 +549,7 @@ export default async function LearningPage(props: {
                       <p className="mt-4 text-sm leading-6 text-slate-700">{training.objective}</p>
                     ) : null}
                     {training.notes ? (
-                      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
+                      <div className="mt-4 rounded-[18px] border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
                         {training.notes}
                       </div>
                     ) : null}
@@ -573,7 +573,7 @@ export default async function LearningPage(props: {
                   <div className="w-full max-w-sm space-y-3">
                     <Link
                       href={`/lms/trainings/${training.id}`}
-                      className="inline-flex w-full items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100"
+                      className="inline-flex w-full items-center justify-between rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100"
                     >
                       <span>{accessContext.canManage ? 'Kelola Peserta, Sesi, dan Evaluasi' : 'Lihat Detail Pelatihan'}</span>
                       <ArrowRight className="h-4 w-4" />
@@ -581,7 +581,7 @@ export default async function LearningPage(props: {
 
                   {accessContext.canManage ? (
                     <>
-                      <form action={updateCompetencyTrainingStatus} className="rounded-xl border border-slate-200 bg-white p-4">
+                      <form action={updateCompetencyTrainingStatus} className="rounded-[20px] border border-slate-200 bg-white p-4">
                         <input type="hidden" name="trainingId" value={training.id} />
                         <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Update Status</div>
                         <select
@@ -603,7 +603,7 @@ export default async function LearningPage(props: {
                         </button>
                       </form>
 
-                      <form action={deleteCompetencyTraining} className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                      <form action={deleteCompetencyTraining} className="rounded-[20px] border border-rose-200 bg-rose-50 p-4">
                         <input type="hidden" name="trainingId" value={training.id} />
                         <div className="text-[11px] font-black uppercase tracking-[0.16em] text-rose-700">Hapus Program</div>
                         <p className="mt-2 text-sm leading-6 text-rose-800">
@@ -618,7 +618,7 @@ export default async function LearningPage(props: {
                       </form>
                     </>
                   ) : (
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
+                    <div className="rounded-[20px] border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
                       Anda berada di mode baca. Buka detail untuk melihat assignment peserta, sesi, dan evaluasi.
                     </div>
                   )}
@@ -631,21 +631,21 @@ export default async function LearningPage(props: {
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
           <ShieldCheck className="h-5 w-5 text-emerald-700" />
           <h3 className="mt-4 text-base font-black text-slate-900">Bukan SaaS-only</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Workspace ini berfokus pada kebutuhan HR internal untuk membuat program kompetensi sendiri.
           </p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
           <Layers className="h-5 w-5 text-emerald-700" />
           <h3 className="mt-4 text-base font-black text-slate-900">Per Entitas dan Unit</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Parent, child, dan unit bisa punya katalog pelatihan berbeda sesuai konteks aktif yang dipilih.
           </p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
           <Users className="h-5 w-5 text-emerald-700" />
           <h3 className="mt-4 text-base font-black text-slate-900">Fleksibel untuk Skill Business</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">

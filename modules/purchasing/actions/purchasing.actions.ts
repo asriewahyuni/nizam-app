@@ -55,7 +55,6 @@ type InventorySyncParams = {
   orgId: string
   productId: string
   warehouseId: string
-  binId?: string
   diff: number
 }
 
@@ -358,7 +357,7 @@ async function syncInventoryStock(supabase: any, params: InventorySyncParams) {
     p_warehouse_id: params.warehouseId,
     p_diff: params.diff,
     p_batch_number: null,
-    p_bin_id: params.binId || null,
+    p_bin_id: null,
   })
 
   if (!inventorySyncError) {
@@ -678,9 +677,6 @@ export interface CreatePurchaseData {
   shariah_mode?: 'CASH' | 'SALAM' | 'ISTISHNA'
   mode?: 'DRAFT' | 'PUBLISH'
   draft_id?: string
-  currency_code?: string
-  exchange_rate?: number | null
-  base_currency_amount?: number | null
   lines: PurchaseLineData[]
 }
 
@@ -929,8 +925,6 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
         grand_total: headerGrand,
         notes: notesWithTerm,
         shariah_mode: shariahMode,
-        currency_code: payload.currency_code || 'IDR',
-        exchange_rate: payload.exchange_rate || null,
         status: 'DRAFT',
         created_by: user.id,
       },
@@ -1020,34 +1014,12 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
     }
   }
 
-  // Sync currency fields (process_purchase_atomic doesn't handle multi-currency)
-  if (payload.currency_code && payload.currency_code !== 'IDR') {
-    const { error: currencySyncError } = await updatePurchaseRecord(
-      supabase,
-      {
-        currency_code: payload.currency_code,
-        exchange_rate: payload.exchange_rate || null,
-      },
-      [
-        ['id', rpcRes.purchase_id],
-        ['org_id', orgId],
-      ]
-    )
-    if (currencySyncError) {
-      return {
-        error:
-          'PO berhasil, tetapi sinkronisasi mata uang gagal: ' +
-          String(currencySyncError.message || 'unknown error'),
-      }
-    }
-  }
-
   revalidatePath('/purchasing')
   await nudgeEduModeValidation('purchasing.create.purchase')
   return { success: true, purchaseId: rpcRes.purchase_id }
 }
 
-export async function receivePurchase(orgId: string, purchaseId: string, targetBinId?: string) {
+export async function receivePurchase(orgId: string, purchaseId: string) {
   const supabase = await createClient()
   const { queryPostgres } = await import('@/lib/db/postgres')
 
@@ -1297,7 +1269,6 @@ export async function receivePurchase(orgId: string, purchaseId: string, targetB
         orgId,
         productId: m.product_id,
         warehouseId: whId,
-        binId: targetBinId,
         diff: m.quantity,
       })
 
@@ -1591,15 +1562,6 @@ export async function createPurchasePayment(orgId: string, payload: {
 
   if (error || !data?.success) {
     return { error: data?.error || error?.message || 'Gagal memproses pembayaran.' }
-  }
-
-  // Catat FX gain/loss jika purchase menggunakan mata uang asing
-  try {
-    const { recordFxGainLoss } = await import('@/modules/accounting/actions/forex.actions')
-    await recordFxGainLoss('PURCHASE', payload.purchase_id)
-  } catch (fxError) {
-    // Non-bloking — FX gain/loss gagal dicatat, tapi payment tetap sukses
-    console.error('FX gain/loss recording failed (non-blocking):', fxError)
   }
 
   revalidatePath('/purchasing')

@@ -10,10 +10,9 @@ interface AccountRowActionsProps {
   orgId: string
   accountCode: string
   accountName: string
-  isOwner?: boolean
 }
 
-export default function AccountRowActions({ accountId, orgId, accountCode, accountName, isOwner = false }: AccountRowActionsProps) {
+export default function AccountRowActions({ accountId, orgId, accountCode, accountName }: AccountRowActionsProps) {
   const [loading, setLoading] = useState(false)
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
 
@@ -40,15 +39,13 @@ export default function AccountRowActions({ accountId, orgId, accountCode, accou
         <Edit2 size={16} />
       </a>
       
-      {isOwner && (
-        <button
-          onClick={() => setIsConfirmOpen(true)}
-          className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
-          title="Hapus Akun"
-        >
-          <Trash2 size={16} />
-        </button>
-      )}
+      <button 
+        onClick={() => setIsConfirmOpen(true)}
+        className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+        title="Hapus Akun"
+      >
+        <Trash2 size={16} />
+      </button>
 
       <AnimatePresence>
         {isConfirmOpen && (
@@ -71,11 +68,11 @@ export default function AccountRowActions({ accountId, orgId, accountCode, accou
                   <AlertTriangle size={32} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Hapus Akun?</h3>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Hapus Akun?</h3>
                   <p className="text-sm text-slate-500 font-medium mt-1">
                      Anda akan menghapus <strong className="text-slate-800">[{accountCode}] {accountName}</strong>. 
                   </p>
-                  <p className="text-[10px] text-rose-500 font-semibold tracking-tight mt-2">Tindakan ini tidak bisa dibatalkan.</p>
+                  <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest mt-2">Tindakan ini tidak bisa dibatalkan.</p>
                 </div>
 
                 <div className="flex flex-col w-full gap-2 pt-4">

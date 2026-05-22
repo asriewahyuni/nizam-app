@@ -14,7 +14,7 @@
 /coverage
 
 # next.js
-# /.next/ — commented out, we commit .next build output from CI
+/.next/
 /out/
 
 # production
@@ -61,32 +61,8 @@ trace_*.js
 find_*.js
 verify_*.ts
 fix_*.js
-# scratch scripts di ROOT (bukan di /scripts, /tests)
-/test-*.mjs
-/test-*.ts
-/test-*.js
-/test_*.mjs
-/test_*.ts
-/test_*.js
-/fix-*.mjs
-/fix-*.ts
-/reload_*.mjs
-/reload-*.mjs
-/set-*.mjs
-/update_*.mjs
-/update-*.mjs
 .claude/settings.local.json
 
 # Sentry Config File
 .env.sentry-build-plugin
 scratch/db-backups/
-
-# Python scratch files (root only)
-/*.py
-
-# Router proxy scratch files
-__pycache__/
-*.pyc
-/ROUTER_PROXY_SETUP.md
-/run_router_proxy.sh
-/setup_router_proxy.sh

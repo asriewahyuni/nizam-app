@@ -31,7 +31,7 @@ export default async function LearningLessonPage(props: {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
         <Link
           href={`/lms/course/${course.slug}`}
           className="inline-flex items-center gap-2 text-sm font-black text-slate-600 hover:text-slate-900"
@@ -45,7 +45,7 @@ export default async function LearningLessonPage(props: {
             <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-600">
               Lesson {lesson.order} dari {lessons.length}
             </div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
               {lesson.title}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
@@ -72,15 +72,15 @@ export default async function LearningLessonPage(props: {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <ImageIcon className="h-5 w-5 text-slate-700" />
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Visual Acuan</div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-900">Lihat layar yang akan dipakai peserta</h2>
+              <h2 className="mt-1 text-xl font-black text-slate-900">Lihat layar yang akan dipakai peserta</h2>
             </div>
           </div>
-          <div className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+          <div className="mt-5 overflow-hidden rounded-[28px] border border-slate-200 bg-slate-50">
             <div className="relative aspect-[4/3] w-full overflow-hidden">
               <Image
                 src={lesson.screenshot}
@@ -94,31 +94,31 @@ export default async function LearningLessonPage(props: {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-5 w-5 text-emerald-600" />
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Objective</div>
-                <h2 className="mt-1 text-xl font-semibold text-slate-900">Tujuan lesson ini</h2>
+                <h2 className="mt-1 text-xl font-black text-slate-900">Tujuan lesson ini</h2>
               </div>
             </div>
             <div className="mt-5 space-y-3 text-sm text-slate-600">
               {lesson.objectives.map((objective) => (
-                <div key={objective} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div key={objective} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
                   {objective}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Checklist</div>
-              <h2 className="mt-2 text-xl font-semibold text-slate-900">Yang harus dipahami peserta</h2>
+              <h2 className="mt-2 text-xl font-black text-slate-900">Yang harus dipahami peserta</h2>
             </div>
             <div className="mt-5 space-y-3 text-sm text-slate-600">
               {lesson.checks.map((check) => (
-                <div key={check} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div key={check} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
                   {check}
                 </div>
               ))}
@@ -128,14 +128,14 @@ export default async function LearningLessonPage(props: {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Langkah Kerja</div>
-            <h2 className="mt-2 text-xl font-semibold text-slate-900">Urutan yang dilakukan peserta</h2>
+            <h2 className="mt-2 text-xl font-black text-slate-900">Urutan yang dilakukan peserta</h2>
           </div>
           <div className="mt-5 space-y-3 text-sm text-slate-600">
             {lesson.steps.map((step, index) => (
-              <div key={step} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div key={step} className="flex items-start gap-3 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-white text-sm font-black text-slate-900 shadow-sm">
                   {index + 1}
                 </div>
@@ -145,14 +145,14 @@ export default async function LearningLessonPage(props: {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Kesalahan Umum</div>
-            <h2 className="mt-2 text-xl font-semibold text-slate-900">Hal yang perlu dihindari</h2>
+            <h2 className="mt-2 text-xl font-black text-slate-900">Hal yang perlu dihindari</h2>
           </div>
           <div className="mt-5 space-y-3 text-sm text-slate-600">
             {lesson.commonMistakes.map((mistake) => (
-              <div key={mistake} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div key={mistake} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
                 {mistake}
               </div>
             ))}
@@ -160,11 +160,11 @@ export default async function LearningLessonPage(props: {
         </div>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Navigasi Lesson</div>
-            <h2 className="mt-2 text-xl font-semibold text-slate-900">Lanjutkan belajar bertahap</h2>
+            <h2 className="mt-2 text-xl font-black text-slate-900">Lanjutkan belajar bertahap</h2>
           </div>
           <div className="flex flex-wrap gap-3">
             {previousLesson ? (

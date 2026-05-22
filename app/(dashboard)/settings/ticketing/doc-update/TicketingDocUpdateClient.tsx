@@ -31,7 +31,7 @@ export default function TicketingDocUpdateClient({ updates }: TicketingDocUpdate
               <FileStack size={14} />
               Dokumen Update Support Ticket
             </div>
-            <h1 className="mt-3 text-2xl font-semibold text-slate-900 md:text-3xl">Progress Perbaikan Support Ticket</h1>
+            <h1 className="mt-3 text-2xl font-black text-slate-900 md:text-3xl">Progress Perbaikan Support Ticket</h1>
             <p className="mt-2 text-sm font-medium text-slate-600">
               Halaman ini menampilkan update resmi dari tim terkait investigasi dan penyelesaian support ticket yang Anda laporkan.
             </p>

@@ -103,7 +103,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 20 }}
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-            className="w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden"
+            className="w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden"
           >
             {/* ── Header ── */}
             <div className="relative bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-7 pt-7 pb-8">
@@ -120,7 +120,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
                 </div>
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-400">Program Baru</p>
-                  <h2 className="text-xl font-semibold text-white">Tambah Program Pelatihan</h2>
+                  <h2 className="text-xl font-black text-white">Tambah Program Pelatihan</h2>
                 </div>
               </div>
 
@@ -136,7 +136,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
                     }`}>
                       {done || s < step ? <CheckCircle2 size={13} /> : s}
                     </div>
-                    <span className={`text-[10px] font-semibold tracking-tight transition-all ${
+                    <span className={`text-[10px] font-bold uppercase tracking-widest transition-all ${
                       s === step && !done ? 'text-white' : 'text-white/40'
                     }`}>
                       {s === 1 ? 'Info Program' : 'Konfirmasi'}
@@ -161,12 +161,12 @@ export function TambahProgramModal({ open, onClose }: Props) {
                       <CheckCircle2 size={32} className="text-emerald-500" />
                     </div>
                     <div>
-                      <p className="text-lg font-semibold text-slate-900">Program Berhasil Dibuat!</p>
+                      <p className="text-lg font-black text-slate-900">Program Berhasil Dibuat!</p>
                       <p className="text-sm text-slate-500 mt-1">
                         <span className="font-bold text-blue-600">{title}</span> sudah masuk katalog LMS.
                       </p>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 tracking-tight">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       <Loader2 size={12} className="animate-spin" /> Menutup...
                     </div>
                   </motion.div>
@@ -181,7 +181,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
                   >
                     {/* Judul */}
                     <div>
-                      <label className="flex items-center gap-2 text-[11px] font-semibold tracking-tight text-slate-500 mb-2">
+                      <label className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
                         <BookOpen size={13} /> Judul Program <span className="text-rose-400">*</span>
                       </label>
                       <input
@@ -196,7 +196,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
 
                     {/* Deskripsi */}
                     <div>
-                      <label className="flex items-center gap-2 text-[11px] font-semibold tracking-tight text-slate-500 mb-2">
+                      <label className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
                         <AlignLeft size={13} /> Deskripsi <span className="text-slate-300 font-medium normal-case">(opsional)</span>
                       </label>
                       <textarea
@@ -210,7 +210,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
 
                     {/* Level */}
                     <div>
-                      <label className="flex items-center gap-2 text-[11px] font-semibold tracking-tight text-slate-500 mb-2">
+                      <label className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
                         <Tag size={13} /> Level Peserta
                       </label>
                       <div className="grid grid-cols-2 gap-2">
@@ -285,10 +285,10 @@ export function TambahProgramModal({ open, onClose }: Props) {
                       </div>
 
                       <div className="flex gap-2 flex-wrap">
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-semibold tracking-tight text-blue-700">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-blue-700">
                           <Tag size={10} /> {selectedLevel.label}
                         </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-semibold tracking-tight text-emerald-700">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">
                           <Sparkles size={10} /> Aktif setelah disimpan
                         </span>
                       </div>

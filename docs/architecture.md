@@ -2,17 +2,6 @@
 
 Dokumen ini merangkum arsitektur teknis NIZAM dari sisi route, auth, tenancy, akses data, dan boundary antar layer.
 
-> ⚠️ **Catatan Penting tentang Nama "Supabase"**
->
-> Beberapa folder dan file masih menggunakan nama `supabase` (misalnya `lib/supabase/`, `supabase/migrations/`).
-> **Ini hanya legacy naming.** Project sudah 100% pakai Railway PostgreSQL + Internal Auth.
->
-> - `lib/supabase/*` = compatibility wrapper untuk Railway PostgreSQL (BUKAN Supabase Cloud)
-> - `supabase/migrations/*.sql` = SQL migration files yang di-apply ke Railway PostgreSQL
-> - Auth pakai Internal Auth (cookie `nizam_internal_session`), BUKAN Supabase Auth
->
-> Detail: [`lib/supabase/README.md`](../lib/supabase/README.md)
-
 ## 1. Gambaran Arsitektur
 
 Secara garis besar, aplikasi dibangun dengan pola berikut:
