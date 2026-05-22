@@ -926,10 +926,15 @@ export default function SaaSAdminPage() {
   }, [])
 
   const togglePackageStatus = async (pkgId: string, currentStatus: boolean) => {
+    // Optimistic UI update
     setPackages(packages.map(p => p.id === pkgId ? { ...p, active: !p.active } : p))
     try {
        await db.from('saas_packages').update({ is_active: !currentStatus }).eq('id', pkgId)
-    } catch (err) {}
+    } catch (err) {
+      // Revert UI kalau DB gagal — biar user gak ketipu kalau toggle-nya gak kesimpen
+      console.error('[admin] Failed to toggle package status:', err)
+      setPackages(packages.map(p => p.id === pkgId ? { ...p, active: currentStatus } : p))
+    }
   }
 
   const handleDeletePackage = (id: string) => {

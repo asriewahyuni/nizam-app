@@ -54,7 +54,10 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
               setGeoLocName(geoJson.address.city || geoJson.address.county)
             } else { setGeoLocName(`GPS ${lat.toFixed(2)},${lng.toFixed(2)}`) }
           }
-        } catch(e) {}
+        } catch(e) {
+          // Geocoding gagal (offline / Nominatim down) — fallback ke koordinat mentah
+          setGeoLocName(`GPS ${lat.toFixed(2)},${lng.toFixed(2)}`)
+        }
       }, () => {})
     }
   }, [])

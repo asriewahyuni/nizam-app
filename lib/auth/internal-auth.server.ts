@@ -974,7 +974,10 @@ export async function signInWithInternalAuth(input: {
                 [password, legacyUser.id]
               )
               isValid = fallbackPlainCheck.rows[0]?.valid || false
-            } catch (err) {}
+            } catch (err) {
+              // Fallback plaintext check gagal — biarkan isValid=false (login akan ditolak)
+              console.warn('[auth-migration] Fallback plaintext password check failed:', err)
+            }
           }
 
           if (isValid) {
