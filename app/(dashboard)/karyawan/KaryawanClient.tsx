@@ -170,58 +170,143 @@ function getTimeSlot(h: number): TimeSlot {
 }
 
 const SKY_THEMES: Record<TimeSlot, {
-  sky: string       // CSS gradient (inline style)
+  stops: Array<{ offset: string; color: string }>
   silhouette: string
-  windows: boolean  // lit windows on buildings
+  windows: boolean
   stars: boolean
-  celestial: { type: 'sun' | 'moon'; cx: number; cy: number } | null
+  glow: string | null
+  celestial: { type: 'sun' | 'moon'; x: number; y: number } | null
 }> = {
   subuh: {
-    sky: 'linear-gradient(to bottom, #05050f 0%, #150830 40%, #3d1060 65%, #8b2500 85%, #d04000 100%)',
-    silhouette: '#0a0a18', windows: true, stars: true,
-    celestial: { type: 'moon', cx: 78, cy: 22 },
+    stops: [
+      { offset: '0%',   color: '#040618' },
+      { offset: '25%',  color: '#120838' },
+      { offset: '52%',  color: '#300a5a' },
+      { offset: '70%',  color: '#7a1825' },
+      { offset: '85%',  color: '#c04018' },
+      { offset: '100%', color: '#e06525' },
+    ],
+    silhouette: '#05040c', windows: true, stars: true,
+    glow: 'rgba(185,60,12,0.22)',
+    celestial: { type: 'moon', x: 310, y: 50 },
   },
   pagi: {
-    sky: 'linear-gradient(to bottom, #5ba3d9 0%, #f5a94a 45%, #f76e2a 70%, #ffc750 100%)',
-    silhouette: '#18182e', windows: false, stars: false,
-    celestial: { type: 'sun', cx: 14, cy: 38 },
+    stops: [
+      { offset: '0%',   color: '#1e7fb4' },
+      { offset: '22%',  color: '#4aaedd' },
+      { offset: '48%',  color: '#d8a84a' },
+      { offset: '68%',  color: '#e87038' },
+      { offset: '86%',  color: '#f8b840' },
+      { offset: '100%', color: '#fce898' },
+    ],
+    silhouette: '#181530', windows: false, stars: false,
+    glow: null,
+    celestial: { type: 'sun', x: 55, y: 130 },
   },
   siang: {
-    sky: 'linear-gradient(to bottom, #1060c0 0%, #3490e0 35%, #6ab8f0 65%, #b8dff8 88%, #ddf0ff 100%)',
-    silhouette: '#1e2a38', windows: false, stars: false,
-    celestial: { type: 'sun', cx: 55, cy: 14 },
+    stops: [
+      { offset: '0%',   color: '#0c50a8' },
+      { offset: '26%',  color: '#1e82da' },
+      { offset: '56%',  color: '#42aae8' },
+      { offset: '80%',  color: '#7ccaf2' },
+      { offset: '95%',  color: '#aadff8' },
+      { offset: '100%', color: '#d2eeff' },
+    ],
+    silhouette: '#1c2838', windows: false, stars: false,
+    glow: null,
+    celestial: { type: 'sun', x: 200, y: 30 },
   },
   sore: {
-    sky: 'linear-gradient(to bottom, #0e3a82 0%, #2060b0 30%, #e07a20 65%, #d04800 85%, #a83000 100%)',
-    silhouette: '#12192e', windows: false, stars: false,
-    celestial: { type: 'sun', cx: 86, cy: 45 },
+    stops: [
+      { offset: '0%',   color: '#0e2c72' },
+      { offset: '28%',  color: '#1e50a2' },
+      { offset: '58%',  color: '#c87828' },
+      { offset: '78%',  color: '#dc5c0a' },
+      { offset: '92%',  color: '#c03a18' },
+      { offset: '100%', color: '#983010' },
+    ],
+    silhouette: '#0e0c1e', windows: false, stars: false,
+    glow: null,
+    celestial: { type: 'sun', x: 358, y: 120 },
   },
   magrib: {
-    sky: 'linear-gradient(to bottom, #10003a 0%, #5a0070 22%, #c01860 48%, #f04810 72%, #f08020 100%)',
-    silhouette: '#080814', windows: true, stars: true,
-    celestial: { type: 'sun', cx: 90, cy: 60 },
+    stops: [
+      { offset: '0%',   color: '#0c0030' },
+      { offset: '20%',  color: '#380c62' },
+      { offset: '40%',  color: '#8a1228' },
+      { offset: '60%',  color: '#d02010' },
+      { offset: '78%',  color: '#e85010' },
+      { offset: '100%', color: '#f09025' },
+    ],
+    silhouette: '#050308', windows: true, stars: true,
+    glow: 'rgba(220,88,14,0.28)',
+    celestial: { type: 'sun', x: 375, y: 148 },
   },
   malam: {
-    sky: 'linear-gradient(to bottom, #010108 0%, #040418 35%, #06082a 65%, #080c20 100%)',
-    silhouette: '#06060f', windows: true, stars: true,
-    celestial: { type: 'moon', cx: 72, cy: 20 },
+    stops: [
+      { offset: '0%',   color: '#000008' },
+      { offset: '30%',  color: '#010115' },
+      { offset: '65%',  color: '#030820' },
+      { offset: '100%', color: '#040a1c' },
+    ],
+    silhouette: '#020308', windows: true, stars: true,
+    glow: 'rgba(22,50,130,0.32)',
+    celestial: { type: 'moon', x: 290, y: 45 },
   },
 }
 
-// Hardcoded stars (cx/cy in % of viewBox 0-100)
+// Stars — coordinates in viewBox 0 0 400 260
 const STARS = [
-  [5,6],[12,3],[19,9],[27,4],[34,12],[41,5],[49,8],[57,3],[63,11],[71,6],[79,9],[87,4],[93,14],[97,7],
-  [8,18],[16,22],[24,16],[33,20],[44,17],[52,23],[60,18],[68,22],[76,16],[84,19],[91,24],
-  [3,28],[14,31],[30,26],[48,29],[65,27],[82,30],[95,28],
-].map(([cx, cy], i) => ({ cx, cy, r: i % 5 === 0 ? 1.3 : i % 3 === 0 ? 1.0 : 0.7, op: 0.55 + (i % 4) * 0.12 }))
+  { cx:  20, cy:  12, r: 1.2, op: 0.85 }, { cx:  48, cy:   6, r: 0.8, op: 0.70 },
+  { cx:  76, cy:  18, r: 1.0, op: 0.75 }, { cx: 108, cy:   8, r: 0.7, op: 0.65 },
+  { cx: 136, cy:  24, r: 1.3, op: 0.90 }, { cx: 164, cy:  12, r: 0.8, op: 0.72 },
+  { cx: 196, cy:   5, r: 1.0, op: 0.80 }, { cx: 228, cy:  18, r: 0.7, op: 0.68 },
+  { cx: 252, cy:   8, r: 1.2, op: 0.85 }, { cx: 284, cy:  22, r: 0.8, op: 0.72 },
+  { cx: 316, cy:   6, r: 1.0, op: 0.78 }, { cx: 348, cy:  16, r: 0.7, op: 0.65 },
+  { cx: 372, cy:  10, r: 1.3, op: 0.88 }, { cx: 394, cy:  26, r: 0.9, op: 0.70 },
+  { cx:  32, cy:  44, r: 0.7, op: 0.65 }, { cx:  64, cy:  36, r: 1.0, op: 0.72 },
+  { cx:  96, cy:  50, r: 0.8, op: 0.68 }, { cx: 124, cy:  40, r: 1.2, op: 0.80 },
+  { cx: 152, cy:  54, r: 0.7, op: 0.62 }, { cx: 180, cy:  36, r: 0.9, op: 0.75 },
+  { cx: 208, cy:  46, r: 1.1, op: 0.78 }, { cx: 236, cy:  32, r: 0.7, op: 0.65 },
+  { cx: 264, cy:  52, r: 0.8, op: 0.70 }, { cx: 292, cy:  38, r: 1.0, op: 0.74 },
+  { cx: 320, cy:  36, r: 0.7, op: 0.64 }, { cx: 344, cy:  46, r: 1.2, op: 0.82 },
+  { cx: 368, cy:  32, r: 0.8, op: 0.70 }, { cx: 390, cy:  52, r: 0.9, op: 0.68 },
+  { cx:  12, cy:  72, r: 0.6, op: 0.52 }, { cx:  56, cy:  76, r: 0.8, op: 0.58 },
+  { cx: 120, cy:  66, r: 0.7, op: 0.54 }, { cx: 192, cy:  80, r: 0.9, op: 0.60 },
+  { cx: 256, cy:  68, r: 0.6, op: 0.52 }, { cx: 320, cy:  78, r: 0.8, op: 0.56 },
+  { cx: 382, cy:  70, r: 0.7, op: 0.54 },
+]
 
-// Window positions on buildings (for night)
+// Window positions on buildings — night periods (viewBox 400×260)
 const WINDOWS = [
-  [38,52],[38,62],[44,52],[44,62],[44,70],[124,40],[124,50],[127,30],[127,40],[127,50],
-  [170,32],[170,42],[174,20],[174,32],[174,42],[178,32],[178,42],
-  [249,35],[249,45],[253,22],[253,35],[253,45],[257,35],[257,45],
-  [80,62],[87,50],[87,62],[288,65],[296,55],[303,65],[362,68],
-].map(([x, y]) => ({ x, y }))
+  // Landmark building (x=234–290, top=108)
+  { x: 242, y: 116 }, { x: 252, y: 116 }, { x: 262, y: 116 }, { x: 272, y: 116 },
+  { x: 242, y: 128 }, { x: 252, y: 128 },                      { x: 272, y: 128 },
+  { x: 242, y: 140 }, { x: 252, y: 140 }, { x: 262, y: 140 }, { x: 272, y: 140 },
+  { x: 242, y: 152 },                      { x: 262, y: 152 }, { x: 272, y: 152 },
+  { x: 242, y: 164 }, { x: 252, y: 164 }, { x: 262, y: 164 },
+  { x: 252, y: 176 }, { x: 262, y: 176 }, { x: 272, y: 176 },
+  { x: 242, y: 188 },                      { x: 262, y: 188 }, { x: 272, y: 188 },
+  { x: 242, y: 200 }, { x: 252, y: 200 },                      { x: 272, y: 200 },
+  // Right tall cluster (x=304–340, top=172)
+  { x: 312, y: 180 }, { x: 322, y: 180 }, { x: 332, y: 180 },
+  { x: 312, y: 192 },                      { x: 332, y: 192 },
+  { x: 312, y: 204 }, { x: 322, y: 204 }, { x: 332, y: 204 },
+                       { x: 322, y: 216 }, { x: 332, y: 216 },
+  // Left tall-medium (x=176–218, top=170)
+  { x: 184, y: 178 }, { x: 194, y: 178 }, { x: 208, y: 178 },
+  { x: 184, y: 190 },                      { x: 208, y: 190 },
+  { x: 184, y: 202 }, { x: 194, y: 202 }, { x: 208, y: 202 },
+  // Medium cluster (x=108–155, top=178)
+  { x: 116, y: 196 }, { x: 126, y: 196 }, { x: 138, y: 196 },
+  { x: 116, y: 208 },                      { x: 138, y: 208 },
+  // Small cluster left (x=34–98, top=185)
+  { x:  52, y: 200 }, { x:  64, y: 200 },
+  { x:  52, y: 212 }, { x:  76, y: 212 },
+  // Right medium (x=358–390, top=198)
+  { x: 364, y: 206 }, { x: 374, y: 206 },
+                       { x: 374, y: 216 },
+]
 
 // ─── Input style helper ───────────────────────────────────────────────────────
 const inputCls = 'w-full rounded-2xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-blue-400 dark:focus:border-blue-500'
@@ -556,75 +641,100 @@ export function KaryawanClient({
                 <motion.div key="beranda" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
 
                   {/* ── COVER — Dynamic Sky ── */}
-                  <div className="relative">
-                    <div
-                      className="relative overflow-hidden px-5 pt-4 pb-16"
-                      style={{ background: skyTheme.sky, minHeight: 220 }}
+                  <div className="relative overflow-hidden" style={{ height: 260 }}>
+
+                    {/* ── Single SVG canvas: sky + stars + celestial + buildings ── */}
+                    <svg
+                      viewBox="0 0 400 260"
+                      preserveAspectRatio="none"
+                      className="absolute inset-0 w-full h-full"
+                      style={{ display: 'block' }}
                     >
-                      {/* ── Stars (subuh / magrib / malam) ── */}
-                      {skyTheme.stars && (
-                        <svg
-                          viewBox="0 0 100 35"
-                          preserveAspectRatio="none"
-                          className="absolute inset-0 w-full h-full pointer-events-none z-0"
-                          style={{ top: 0, height: '60%' }}
-                        >
-                          {STARS.map((s, i) => (
-                            <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill="white" opacity={s.op} />
+                      <defs>
+                        <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+                          {skyTheme.stops.map((s, i) => (
+                            <stop key={i} offset={s.offset} stopColor={s.color} />
                           ))}
-                        </svg>
+                        </linearGradient>
+                        {skyTheme.glow && (
+                          <radialGradient id="glowGrad" cx="50%" cy="100%" r="65%">
+                            <stop offset="0%" stopColor={skyTheme.glow} stopOpacity="1" />
+                            <stop offset="100%" stopColor={skyTheme.glow} stopOpacity="0" />
+                          </radialGradient>
+                        )}
+                        {skyTheme.celestial?.type === 'moon' && (
+                          <mask id="moonMask">
+                            <circle cx={skyTheme.celestial.x} cy={skyTheme.celestial.y} r="14" fill="white" />
+                            <circle cx={skyTheme.celestial.x + 9} cy={skyTheme.celestial.y - 5} r="12" fill="black" />
+                          </mask>
+                        )}
+                      </defs>
+
+                      {/* Sky */}
+                      <rect width="400" height="260" fill="url(#skyGrad)" />
+
+                      {/* Stars */}
+                      {skyTheme.stars && STARS.map((s, i) => (
+                        <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill="white" opacity={s.op} />
+                      ))}
+
+                      {/* Sun */}
+                      {skyTheme.celestial?.type === 'sun' && (
+                        <>
+                          <circle cx={skyTheme.celestial.x} cy={skyTheme.celestial.y} r="38" fill="rgba(255,210,55,0.06)" />
+                          <circle cx={skyTheme.celestial.x} cy={skyTheme.celestial.y} r="27" fill="rgba(255,225,85,0.12)" />
+                          <circle cx={skyTheme.celestial.x} cy={skyTheme.celestial.y} r="18" fill="rgba(255,240,115,0.22)" />
+                          <circle cx={skyTheme.celestial.x} cy={skyTheme.celestial.y} r="11"
+                            fill={timeSlot === 'siang' ? '#fff8e0' : timeSlot === 'pagi' ? '#ffe880' : '#ffb035'} />
+                        </>
                       )}
 
-                      {/* ── Celestial body: Sun or Moon ── */}
-                      {skyTheme.celestial && (
-                        <div
-                          className="absolute pointer-events-none z-0"
-                          style={{ left: `${skyTheme.celestial.cx}%`, top: `${skyTheme.celestial.cy}%`, transform: 'translate(-50%, -50%)' }}
-                        >
-                          {skyTheme.celestial.type === 'sun' ? (
-                            /* Sun */
-                            <div className="relative flex items-center justify-center">
-                              <div className="absolute w-14 h-14 rounded-full bg-yellow-200/20 animate-pulse" />
-                              <div className="absolute w-10 h-10 rounded-full bg-yellow-100/30" />
-                              <div className="w-7 h-7 rounded-full bg-yellow-100 shadow-[0_0_24px_8px_rgba(255,220,100,0.6)]" />
-                            </div>
-                          ) : (
-                            /* Moon — crescent via clip */
-                            <div className="relative w-7 h-7">
-                              <div className="w-7 h-7 rounded-full bg-slate-100 shadow-[0_0_16px_4px_rgba(200,210,255,0.5)]" />
-                              <div className="absolute top-0 right-0 w-5 h-7 rounded-full" style={{ background: skyTheme.sky.split(',')[0].replace('linear-gradient(to bottom, ', '') }} />
-                            </div>
-                          )}
-                        </div>
+                      {/* Moon (crescent via mask) */}
+                      {skyTheme.celestial?.type === 'moon' && (
+                        <>
+                          <circle cx={skyTheme.celestial.x} cy={skyTheme.celestial.y} r="26" fill="rgba(200,215,255,0.07)" />
+                          <circle cx={skyTheme.celestial.x} cy={skyTheme.celestial.y} r="18" fill="rgba(210,222,255,0.11)" />
+                          <circle cx={skyTheme.celestial.x} cy={skyTheme.celestial.y} r="14" fill="#ced4e6" mask="url(#moonMask)" />
+                        </>
                       )}
 
-                      {/* ── City Silhouette ── */}
-                      <svg
-                        viewBox="0 0 400 100"
-                        preserveAspectRatio="none"
-                        className="absolute bottom-0 left-0 right-0 w-full pointer-events-none z-10"
-                        style={{ height: 100 }}
-                      >
-                        {/* Buildings */}
-                        <path
-                          d="M0,100 V75 H8 V65 H15 V75 H25 V50 H33 V38 H38 V28 H42 V38 H47 V50 H58 V75 H70 V58 H78 V45 H85 V58 H95 V75 H108 V60 H115 V48 H120 V35 H123 V22 H126 V35 H129 V48 H134 V60 H142 V75 H155 V52 H162 V40 H167 V24 H171 V14 H175 V24 H179 V40 H184 V52 H192 V75 H205 V60 H212 V48 H219 V60 H225 V75 H237 V55 H245 V42 H250 V30 H254 V20 H258 V30 H262 V42 H267 V55 H275 V75 H288 V62 H296 V50 H303 V62 H309 V75 H322 V65 H329 V55 H336 V65 H342 V75 H355 V70 H362 V62 H369 V70 H375 V75 H388 V80 H400 V100 Z"
-                          fill={skyTheme.silhouette}
-                        />
-                        {/* Lit windows (malam/subuh/magrib) */}
-                        {skyTheme.windows && WINDOWS.map((w, i) => (
-                          <rect key={i} x={w.x} y={w.y} width={2.5} height={3.5} fill="#ffd580" opacity={0.7 + (i % 3) * 0.1} rx={0.4} />
-                        ))}
-                        {/* Antenna on tallest building */}
-                        <line x1="175" y1="14" x2="175" y2="8" stroke={skyTheme.silhouette} strokeWidth="1.5" />
-                        <circle cx="175" cy="7.5" r="1.2" fill={timeSlot === 'malam' || timeSlot === 'subuh' ? '#ff4444' : skyTheme.silhouette} />
-                      </svg>
+                      {/* Atmospheric haze (day) */}
+                      {!skyTheme.stars && (
+                        <rect x="0" y="192" width="400" height="28" fill="rgba(255,255,255,0.04)" />
+                      )}
 
-                      {/* ── Text overlay gradient for readability ── */}
-                      <div className="absolute inset-0 pointer-events-none z-10"
-                        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 55%)' }} />
+                      {/* City ambient glow (night) */}
+                      {skyTheme.glow && (
+                        <rect width="400" height="260" fill="url(#glowGrad)" />
+                      )}
 
-                      {/* ── Row 1: Org + GPS + Weather + Settings ── */}
-                      <div className="flex items-center justify-between mb-4 relative z-20 gap-2 flex-wrap">
+                      {/* City silhouette */}
+                      <path
+                        d="M0,260 V235 H10 V225 H22 V235 H34 V215 H44 V200 H52 V185 H60 V200 H70 V210 H82 V220 H98 V228 H108 V208 H118 V192 H126 V178 H134 V192 H142 V205 H155 V218 H168 V222 H176 V202 H184 V186 H192 V170 H200 V186 H208 V200 H218 V216 H228 V220 H234 V196 H240 V178 H246 V158 H250 V140 H254 V122 H258 V108 H262 V122 H266 V140 H270 V158 H274 V178 H280 V196 H286 V218 H296 V224 H304 V204 H312 V188 H318 V172 H324 V188 H330 V204 H340 V220 H350 V224 H358 V210 H366 V198 H372 V210 H380 V218 H390 V224 H400 V260 Z"
+                        fill={skyTheme.silhouette}
+                      />
+
+                      {/* Lit windows */}
+                      {skyTheme.windows && WINDOWS.map((w, i) => (
+                        <rect key={i} x={w.x} y={w.y} width={3.5} height={5} fill="#ffd878"
+                          opacity={0.55 + (i % 5) * 0.09} rx={0.6} />
+                      ))}
+
+                      {/* Antenna on tallest building */}
+                      <line x1="260" y1="108" x2="260" y2="96" stroke={skyTheme.silhouette} strokeWidth="1.8" />
+                      <circle cx="260" cy="95" r="2"
+                        fill={skyTheme.stars ? '#ff3333' : skyTheme.silhouette} />
+                    </svg>
+
+                    {/* Text readability gradient */}
+                    <div className="absolute inset-0 pointer-events-none"
+                      style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.06) 42%, transparent 62%)' }} />
+
+                    {/* ── Content overlay ── */}
+                    <div className="absolute inset-0 flex flex-col justify-between px-5 pt-4 pb-4">
+
+                      {/* Row 1: Org + GPS + Weather + Settings */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-2">
                           {orgName && (
                             <div className="flex items-center gap-1">
@@ -651,8 +761,8 @@ export function KaryawanClient({
                         </div>
                       </div>
 
-                      {/* ── Row 2: Jam besar + Tanggal + Greeting ── */}
-                      <div className="relative z-20">
+                      {/* Row 2: Jam + Tanggal + Greeting */}
+                      <div>
                         <p suppressHydrationWarning className="text-[44px] leading-none font-black text-white tracking-tight font-mono tabular-nums drop-shadow-lg">
                           {clockStr}
                         </p>
@@ -668,7 +778,7 @@ export function KaryawanClient({
                       </div>
                     </div>
 
-                    {/* Avatar — kanan, overlapping cover */}
+                    {/* Avatar — overlapping cover bottom */}
                     <div className="absolute right-5 bottom-0 translate-y-1/2 z-30">
                       <div className="w-20 h-20 rounded-full ring-4 ring-slate-50 dark:ring-slate-900 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-xl overflow-hidden">
                         {currentAvatarUrl
