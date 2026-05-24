@@ -104,6 +104,27 @@ export async function getMyLeaveRequests(orgId: string) {
   return data
 }
 
+export async function getMyPayslips(orgId: string) {
+  const selfEmployee = await getAuthenticatedEmployee(orgId)
+  if ('error' in selfEmployee) return []
+
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data, error } = await db
+    .from('payslips')
+    .select(`
+      id, basic_salary, gross_salary, total_deductions, net_salary, payment_status, created_at,
+      run:payroll_runs(id, period_start, period_end, payment_date, status),
+      lines:payslip_lines(id, component_name, type, amount)
+    `)
+    .eq('employee_id', selfEmployee.employee.id)
+    .order('created_at', { ascending: false })
+    .limit(12)
+
+  if (error) return []
+  return data
+}
+
 export async function getMyExpenseClaims(orgId: string) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return []

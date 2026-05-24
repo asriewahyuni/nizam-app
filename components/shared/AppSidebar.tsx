@@ -48,6 +48,7 @@ import {
   Code2,
   Wrench,
   GraduationCap,
+  Fingerprint,
   type LucideIcon
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
@@ -126,6 +127,7 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'HRIS',
     items: [
       { label: 'Karyawan (HRIS)', href: '/hris', icon: Users, permission_key: 'employees', module_key: 'HRIS' },
+      { label: 'Portal Karyawan', href: '/karyawan', icon: Fingerprint, permission_key: 'employees', module_key: 'HRIS' },
       { label: 'Absensi & Cuti', href: '/hris?tab=attendance', icon: Clock, permission_key: 'attendance', module_key: 'Attendance' },
       { label: 'Payroll Components', href: '/hris?tab=payroll', icon: FileText, permission_key: 'payroll', module_key: 'Payroll' },
       { label: 'Proses Penggajian', href: '/hris?tab=runs', icon: Wallet, permission_key: 'payroll', module_key: 'Payroll' },
