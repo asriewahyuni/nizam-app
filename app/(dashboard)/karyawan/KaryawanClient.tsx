@@ -1,13 +1,14 @@
 'use client'
 
-import { startTransition, useEffect, useRef, useState } from 'react'
+import React, { startTransition, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Home, Fingerprint, CalendarDays, ReceiptText, Wallet,
-  CheckCircle2, XCircle, Clock, LogIn, LogOut,
-  AlertCircle, ChevronDown, ChevronUp, Trash2,
+  CheckCircle2, XCircle, LogIn, LogOut,
+  ChevronDown, ChevronUp, Trash2,
   Image as ImageIcon, MapPin, Moon,
+  Sun, Cloud, CloudRain, CloudDrizzle, CloudLightning, Thermometer,
 } from 'lucide-react'
 import {
   clockMyAttendance,
@@ -24,6 +25,13 @@ import { formatRupiah } from '@/lib/utils'
 type Tab = 'beranda' | 'presensi' | 'cuti' | 'reimburse' | 'gaji'
 
 type PrayerEntry = { name: string; key: string; time: string }
+
+type WeatherData = {
+  temp: number
+  feelsLike: number
+  label: string
+  Icon: React.ElementType
+}
 
 interface Props {
   orgId: string
@@ -90,6 +98,16 @@ function getNextPrayerKey(prayers: PrayerEntry[], now: Date): string | null {
   return null
 }
 
+function getWeatherInfo(code: number): { label: string; Icon: React.ElementType } {
+  if (code === 0)        return { label: 'Cerah',    Icon: Sun }
+  if (code <= 3)         return { label: 'Berawan',  Icon: Cloud }
+  if (code <= 48)        return { label: 'Berkabut', Icon: Cloud }
+  if (code <= 55)        return { label: 'Gerimis',  Icon: CloudDrizzle }
+  if (code <= 82)        return { label: 'Hujan',    Icon: CloudRain }
+  if (code >= 95)        return { label: 'Badai',    Icon: CloudLightning }
+  return { label: 'Berawan', Icon: Cloud }
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function KaryawanClient({
@@ -128,6 +146,30 @@ export function KaryawanClient({
       })
       .catch(() => {})
       .finally(() => setPrayerLoading(false))
+  }, [])
+
+  // ── Beranda: weather ──
+  const [weather, setWeather] = useState<WeatherData | null>(null)
+  useEffect(() => {
+    fetch(
+      'https://api.open-meteo.com/v1/forecast' +
+      '?latitude=-6.2088&longitude=106.8456' +
+      '&current=temperature_2m,apparent_temperature,weather_code' +
+      '&timezone=Asia%2FJakarta'
+    )
+      .then(r => r.json())
+      .then(data => {
+        const c = data?.current
+        if (!c) return
+        const { label, Icon } = getWeatherInfo(c.weather_code ?? 0)
+        setWeather({
+          temp: Math.round(c.temperature_2m),
+          feelsLike: Math.round(c.apparent_temperature),
+          label,
+          Icon,
+        })
+      })
+      .catch(() => {})
   }, [])
 
   // ── Presensi state ──
@@ -281,19 +323,53 @@ export function KaryawanClient({
 
                 {/* ── Cover + Avatar ── */}
                 <div className="relative">
-                  {/* Cover gradient */}
-                  <div className="h-32 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 relative overflow-hidden">
+                  {/* Cover gradient — tinggi diperbesar, muat jam + cuaca */}
+                  <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 relative overflow-hidden px-5 pt-4 pb-14">
                     {/* Decorative circles */}
-                    <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/10 rounded-full" />
-                    <div className="absolute -bottom-12 -left-6 w-32 h-32 bg-white/5 rounded-full" />
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 w-24 h-24 bg-white/5 rounded-full" />
-                    {/* Org name badge */}
-                    {orgName && (
-                      <div className="absolute top-3 right-4 flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full">
-                        <MapPin size={10} className="text-white/80" />
-                        <span className="text-[10px] font-black text-white/90 uppercase tracking-wider">{orgName}</span>
-                      </div>
-                    )}
+                    <div className="absolute -top-10 -right-10 w-52 h-52 bg-white/5 rounded-full pointer-events-none" />
+                    <div className="absolute -bottom-16 -left-8 w-44 h-44 bg-white/5 rounded-full pointer-events-none" />
+
+                    {/* ── Row 1: Org + Weather ── */}
+                    <div className="flex items-center justify-between mb-5 relative z-10">
+                      {orgName ? (
+                        <div className="flex items-center gap-1.5">
+                          <MapPin size={11} className="text-white/70" />
+                          <span className="text-[11px] font-black text-white/80 uppercase tracking-wider">{orgName}</span>
+                        </div>
+                      ) : <div />}
+
+                      {/* Weather badge */}
+                      {weather ? (
+                        <div className="flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-2xl">
+                          <weather.Icon size={14} className="text-white" />
+                          <span className="text-[13px] font-black text-white tabular-nums">
+                            {weather.temp}°C
+                          </span>
+                          <span className="text-[10px] font-bold text-white/70">{weather.label}</span>
+                        </div>
+                      ) : (
+                        <div className="w-24 h-7 bg-white/10 rounded-2xl animate-pulse" />
+                      )}
+                    </div>
+
+                    {/* ── Row 2: Big Clock ── */}
+                    <div className="relative z-10">
+                      <p className="text-[42px] leading-none font-black text-white tracking-tight font-mono tabular-nums">
+                        {clockStr}
+                      </p>
+                      <p className="text-[11px] text-white/60 font-bold mt-1 tracking-wider capitalize">
+                        {dateStr}
+                      </p>
+                      {/* Greeting */}
+                      <p className="text-[13px] font-black text-white/90 mt-2.5">
+                        {greeting.text}, {firstName} 👋
+                      </p>
+                      {weather && (
+                        <p className="text-[11px] text-white/60 font-medium mt-0.5">
+                          Terasa seperti {weather.feelsLike}°C di luar
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Avatar — overlapping cover */}
@@ -305,7 +381,7 @@ export function KaryawanClient({
                     </div>
                   </div>
 
-                  {/* Attendance badge — top right of profile row */}
+                  {/* Attendance badge — kanan bawah cover */}
                   <div className="absolute right-5 bottom-0 translate-y-1/2">
                     <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full shadow-sm ${todayAtt ? statusBadge(todayAtt.status) : 'bg-white text-slate-500 border border-slate-200'}`}>
                       {todayAtt?.status || 'Belum Absen'}
@@ -328,30 +404,6 @@ export function KaryawanClient({
                 </div>
 
                 <div className="px-4 pt-4 space-y-4">
-
-                  {/* ── Clock & Greeting card ── */}
-                  <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-5 shadow-lg relative overflow-hidden">
-                    {/* Background decoration */}
-                    <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-500/10 rounded-full translate-y-1/2 -translate-x-1/2" />
-
-                    <div className="relative z-10">
-                      {/* Big clock */}
-                      <p className="text-4xl font-black text-white tracking-tight font-mono leading-none tabular-nums">
-                        {clockStr}
-                      </p>
-                      <p className="text-[11px] text-slate-400 font-bold mt-1 uppercase tracking-wider">{dateStr}</p>
-
-                      {/* Divider */}
-                      <div className="h-px bg-white/10 my-4" />
-
-                      {/* Greeting */}
-                      <p className="text-base font-black text-white">
-                        {greeting.text}, {firstName}
-                      </p>
-                      <p className="text-[12px] text-slate-400 mt-0.5">{greeting.sub}</p>
-                    </div>
-                  </div>
 
                   {/* ── Jadwal Sholat card ── */}
                   <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
