@@ -265,6 +265,7 @@ interface AppSidebarProps {
   planName?: string
   canManageSubOrganizations?: boolean
   isSaasAssessor?: boolean
+  isStaffEmployee?: boolean
 }
 
 export function AppSidebar({ 
@@ -285,6 +286,7 @@ export function AppSidebar({
   planName = 'Trial',
   canManageSubOrganizations = true,
   isSaasAssessor = false,
+  isStaffEmployee = false,
 }: AppSidebarProps) {
   const router = useRouter()
   const [isSigningOut, startSignOutTransition] = useTransition()
@@ -493,14 +495,24 @@ export function AppSidebar({
     userRole,
   ])
 
+  const STAFF_NAV_GROUPS: NavGroup[] = useMemo(() => [
+    {
+      group: 'Portal Saya',
+      items: [
+        { label: 'Portal Karyawan', href: '/karyawan', icon: Fingerprint },
+      ],
+    },
+  ], [])
+
   const visibleNavGroups = useMemo(() => {
+    if (isStaffEmployee) return STAFF_NAV_GROUPS
     return navGroups
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => isItemVisible(group, item)),
       }))
       .filter((group) => group.items.length > 0)
-  }, [isItemVisible, navGroups])
+  }, [isItemVisible, isStaffEmployee, navGroups, STAFF_NAV_GROUPS])
 
   const toggleCollapse = () => {
     const next = !isCollapsed

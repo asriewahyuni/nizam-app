@@ -1144,7 +1144,7 @@ export async function signInWithNik(formData: FormData) {
     }
 
     revalidatePath('/', 'layout')
-    return redirect(redirectTo || '/dashboard')
+    return redirect(redirectTo || '/karyawan')
   }
 
   const adminClient = await createAdminClient()
@@ -1236,7 +1236,7 @@ export async function signInWithNik(formData: FormData) {
 
         setActiveOrganizationCookie(cookieStore, preferredOrgId)
         revalidatePath('/', 'layout')
-        return redirect(redirectTo || '/dashboard')
+        return redirect(redirectTo || '/karyawan')
       }
     }
   }

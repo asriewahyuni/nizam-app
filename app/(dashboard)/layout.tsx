@@ -20,6 +20,7 @@ import { UserActivityTracker } from '@/components/shared/UserActivityTracker'
 import { GlobalApprovalNotifier } from '@/components/shared/GlobalApprovalNotifier'
 import { EduModeShell } from '@/components/edu/EduModeShell'
 import { hasEnabledModuleAccess, hasPosOnlyAccess } from '@/modules/organization/lib/navigation-access'
+import { createClient } from '@/lib/supabase/server'
 import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
 import { resolveRuntimeDatabaseTarget } from '@/lib/db/runtime-target'
 import { getOrgModuleInstances } from '@/modules/marketplace/actions/marketplace.actions'
@@ -88,6 +89,22 @@ export default async function DashboardLayout({
   const isOwnerOrAdmin = orgData.role === 'owner' || orgData.role === 'admin'
   const canManageSubOrganizations = isOwnerOrAdmin
   const isPosOnlyUser = hasPosOnlyAccess(orgData.role, orgData.permissions)
+
+  // Deteksi staff employee: bukan owner/admin DAN punya employee record yang terhubung
+  let isStaffEmployee = false
+  if (!isOwnerOrAdmin) {
+    const userId = String(orgData.user?.id || '').trim()
+    if (userId) {
+      const supabaseForEmpCheck = await createClient()
+      const { data: empRecord } = await (supabaseForEmpCheck as any)
+        .from('employees')
+        .select('id')
+        .eq('org_id', orgData.org.id)
+        .eq('user_id', userId)
+        .maybeSingle()
+      isStaffEmployee = !!empRecord?.id
+    }
+  }
   const isSaasAssessorRouteAccess =
     requestPathname.startsWith('/lms') &&
     saasAssessorContext.hasAccess
@@ -212,6 +229,7 @@ export default async function DashboardLayout({
         planName={effectivePlanName}
         canManageSubOrganizations={canManageSubOrganizations}
         isSaasAssessor={saasAssessorContext.hasAccess}
+        isStaffEmployee={isStaffEmployee}
       />
 
       {/* Main content */}

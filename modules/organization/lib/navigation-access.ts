@@ -26,6 +26,7 @@ const DEFAULT_LANDING_CANDIDATES: LandingCandidate[] = [
   { href: '/learning', permissionKey: 'learning', moduleKey: 'HRIS' },
   { href: '/construction', permissionKey: 'construction,project,services', moduleKey: 'Project & Construction' },
   { href: '/syirkah', permissionKey: 'syirkah', moduleKey: 'Syirkah' },
+  { href: '/karyawan' },
   { href: '/profil-saya' },
 ]
 
