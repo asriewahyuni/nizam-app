@@ -241,19 +241,23 @@ export async function clockMyAttendance(
       ? `${payload.latitude.toFixed(6)},${payload.longitude.toFixed(6)}`
       : null
 
-  const { data: existingRecord, error: existingRecordError } = await db
+  // Ambil record TERBARU hari ini (bisa ada lebih dari 1 sesi per hari)
+  const { data: todayRows, error: existingRecordError } = await db
     .from('attendance')
-    .select('id, status, check_out, notes')
+    .select('id, status, check_in, check_out, notes')
     .eq('org_id', orgId)
     .eq('employee_id', selfEmployee.employee.id)
     .eq('record_date', today)
-    .maybeSingle()
+    .order('created_at', { ascending: false })
+    .limit(1)
 
   if (existingRecordError) return { error: existingRecordError.message }
+  const latestRecord = todayRows?.[0] ?? null
 
   if (payload.type === 'IN') {
-    if (existingRecord?.id) {
-      return { error: 'Anda sudah clock-in hari ini.' }
+    // Boleh clock-in jika: belum ada record hari ini ATAU sesi terakhir sudah clock-out
+    if (latestRecord && !latestRecord.check_out) {
+      return { error: 'Sesi aktif sedang berjalan. Lakukan clock-out dulu.' }
     }
 
     const { error } = await db
@@ -271,17 +275,17 @@ export async function clockMyAttendance(
 
     if (error) return { error: error.message }
   } else {
-    if (!existingRecord?.id) {
+    if (!latestRecord?.id) {
       return { error: 'Anda belum clock-in hari ini.' }
     }
 
-    if (existingRecord.check_out) {
-      return { error: 'Anda sudah clock-out hari ini.' }
+    if (latestRecord.check_out) {
+      return { error: 'Sesi ini sudah selesai. Lakukan clock-in kembali jika perlu.' }
     }
 
     const mergedNotes = notes
-      ? (existingRecord.notes ? `${existingRecord.notes} | ${notes}` : notes)
-      : existingRecord.notes
+      ? (latestRecord.notes ? `${latestRecord.notes} | ${notes}` : notes)
+      : latestRecord.notes
 
     const { error } = await db
       .from('attendance')
@@ -291,7 +295,7 @@ export async function clockMyAttendance(
         location_gps: locationGps,
         updated_at: now,
       })
-      .eq('id', existingRecord.id)
+      .eq('id', latestRecord.id)
       .eq('org_id', orgId)
       .eq('employee_id', selfEmployee.employee.id)
 

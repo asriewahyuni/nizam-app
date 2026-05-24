@@ -470,14 +470,15 @@ export function KaryawanClient({
     } catch {}
     return String(val ?? '').substring(0, 10)
   }
+  // Record terbaru hari ini (attendance diurutkan created_at desc dari server)
   const todayAtt = attendance.find((r: any) => toJakartaDate(r.record_date) === today) ?? null
 
-  // Presensi gate — menu selain Beranda & Presensi hanya bisa diakses setelah clock-in
-  const hasPresent = !!todayAtt?.check_in
+  // Sesi aktif = sudah clock-in DAN belum clock-out (mendukung multi-sesi per hari)
+  const hasActiveSession = !!todayAtt?.check_in && !todayAtt?.check_out
 
   const handleTabChange = (id: Tab) => {
-    if (!hasPresent && id !== 'beranda' && id !== 'presensi') {
-      showToast('Lakukan presensi terlebih dahulu untuk mengakses menu ini.', false)
+    if (!hasActiveSession && id !== 'beranda' && id !== 'presensi') {
+      showToast('Aktifkan sesi kerja (clock-in) untuk mengakses menu ini.', false)
       setTab('presensi')
       return
     }
@@ -756,13 +757,12 @@ export function KaryawanClient({
                     {/* ── Content overlay ── */}
                     <div className="absolute inset-0 flex flex-col justify-between px-5 pt-4 pb-4">
 
-                      {/* Row 1: Org + GPS + Weather + Settings */}
+                      {/* Row 1: Jabatan + GPS + Weather + Settings */}
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-2">
-                          {orgName && (
-                            <div className="flex items-center gap-1">
-                              <MapPin size={10} className="text-white/60" />
-                              <span className="text-[11px] font-black text-white/70 uppercase tracking-wider">{orgName}</span>
+                          {employee?.job_title && (
+                            <div className="bg-white/10 backdrop-blur-sm border border-white/20 px-2.5 py-1 rounded-xl">
+                              <span className="text-[10px] font-black text-white/85 uppercase tracking-widest">{employee.job_title}</span>
                             </div>
                           )}
                           <GpsBadge />
@@ -952,11 +952,11 @@ export function KaryawanClient({
                       ].map(({ label, tab: t, Icon, color }) => (
                         <button key={t} type="button" onClick={() => handleTabChange(t)}
                           className="relative bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all">
-                          <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center ${!hasPresent ? 'opacity-35' : ''}`}>
+                          <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center ${!hasActiveSession ? 'opacity-35' : ''}`}>
                             <Icon size={18} />
                           </div>
-                          <span className={`text-[10px] font-black text-center leading-tight ${!hasPresent ? 'text-slate-300 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300'}`}>{label}</span>
-                          {!hasPresent && (
+                          <span className={`text-[10px] font-black text-center leading-tight ${!hasActiveSession ? 'text-slate-300 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300'}`}>{label}</span>
+                          {!hasActiveSession && (
                             <div className="absolute top-1.5 right-1.5">
                               <Lock size={10} className="text-slate-300 dark:text-slate-600" />
                             </div>
@@ -1012,7 +1012,7 @@ export function KaryawanClient({
                     />
                     <div className="grid grid-cols-2 gap-3">
                       <button type="button"
-                        disabled={clockLoading || !!todayAtt?.check_in || gps.status !== 'ok'}
+                        disabled={clockLoading || (!!todayAtt?.check_in && !todayAtt?.check_out) || gps.status !== 'ok'}
                         onClick={() => handleClock('IN')}
                         className="flex flex-col items-center justify-center gap-1.5 py-5 rounded-2xl bg-emerald-500 text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-emerald-600 shadow-lg shadow-emerald-200 dark:shadow-none"
                       >
@@ -1297,7 +1297,7 @@ export function KaryawanClient({
                 <div className="flex h-16">
                   {SIDE_TABS.slice(0, 2).map(({ id, label, icon: Icon }) => {
                     const active = tab === id
-                    const locked = !hasPresent && id !== 'beranda'
+                    const locked = !hasActiveSession && id !== 'beranda'
                     return (
                       <button key={id} type="button" onClick={() => handleTabChange(id)}
                         className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${active ? 'text-blue-600' : locked ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}>
@@ -1323,7 +1323,7 @@ export function KaryawanClient({
 
                   {SIDE_TABS.slice(2).map(({ id, label, icon: Icon }) => {
                     const active = tab === id
-                    const locked = !hasPresent
+                    const locked = !hasActiveSession
                     return (
                       <button key={id} type="button" onClick={() => handleTabChange(id)}
                         className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${active ? 'text-blue-600' : locked ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}>

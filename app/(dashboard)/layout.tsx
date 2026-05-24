@@ -115,18 +115,22 @@ export default async function DashboardLayout({
       // Portal-only: karyawan tanpa permission ERP
       isStaffEmployee = hasEmployeeRecord && !hasAssignedPermissions
 
-      // Attendance gate: SEMUA employee (termasuk manajer/direktur) wajib clock-in
+      // Attendance gate: SEMUA employee wajib punya sesi aktif (clock-in tanpa clock-out)
+      // Mendukung multi-sesi per hari: ambil record TERBARU hari ini
       if (hasEmployeeRecord) {
         requiresAttendanceGate = true
         const todayJkt = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
-        const { data: todayAtt } = await (supabaseForEmpCheck as any)
+        const { data: todayRows } = await (supabaseForEmpCheck as any)
           .from('attendance')
-          .select('check_in')
+          .select('check_in, check_out')
           .eq('org_id', orgData.org.id)
           .eq('employee_id', empRecord.id)
           .eq('record_date', todayJkt)
-          .maybeSingle()
-        hasClockedInToday = !!todayAtt?.check_in
+          .order('created_at', { ascending: false })
+          .limit(1)
+        const latestToday = todayRows?.[0] ?? null
+        // Menu aktif HANYA jika ada sesi aktif: sudah clock-in DAN belum clock-out
+        hasClockedInToday = !!latestToday?.check_in && !latestToday?.check_out
       }
     }
   }
