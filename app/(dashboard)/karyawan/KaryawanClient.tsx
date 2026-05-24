@@ -424,11 +424,11 @@ export function KaryawanClient({
 
                     {/* Row 2: Jam besar + Tanggal + Greeting */}
                     <div className="relative z-10">
-                      <p className="text-[44px] leading-none font-black text-white tracking-tight font-mono tabular-nums">
+                      <p suppressHydrationWarning className="text-[44px] leading-none font-black text-white tracking-tight font-mono tabular-nums">
                         {clockStr}
                       </p>
-                      <p className="text-[11px] text-white/60 font-bold mt-1 tracking-wider capitalize">{dateStr}</p>
-                      <p className="text-[14px] font-black text-white/90 mt-3">
+                      <p suppressHydrationWarning className="text-[11px] text-white/60 font-bold mt-1 tracking-wider capitalize">{dateStr}</p>
+                      <p suppressHydrationWarning className="text-[14px] font-black text-white/90 mt-3">
                         {greeting}, {firstName} 👋
                       </p>
                       {weather && (
