@@ -161,6 +161,11 @@ const NAV_GROUPS: NavGroup[] = [
   }
 ]
 
+// Module keys yang termasuk Core ERP — dipakai untuk badge CORE di sidebar
+const CORE_MODULE_KEYS = new Set([
+  'Accounting', 'Finance', 'Inventory', 'Purchasing', 'Sales', 'POS', 'CRM', 'HRIS', 'Payroll', 'Attendance',
+])
+
 const SAAS_OPERATOR_GROUP: NavGroup = {
   group: 'SaaS Operator',
   items: [
@@ -638,6 +643,7 @@ export function AppSidebar({
                     {filteredItems.map((item) => {
                       const Icon = item.icon
                       const isActive = isNavItemActive(item.href)
+                      const isCore = item.module_key ? CORE_MODULE_KEYS.has(item.module_key) : false
 
                       // Define Notification Badges Mapping
                       let badgeCount = 0
@@ -697,6 +703,11 @@ export function AppSidebar({
                                 {item.module_key && pendingModules.includes(item.module_key) && badgeCount === 0 && (
                                   <div className="px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest leading-none bg-amber-400 text-white animate-in fade-in zoom-in">
                                     SETUP
+                                  </div>
+                                )}
+                                {isCore && !isActive && badgeCount === 0 && !(item.module_key && pendingModules.includes(item.module_key)) && (
+                                  <div className="px-1.5 py-0.5 rounded-md text-[8px] font-black tracking-widest leading-none bg-teal-50 text-teal-600 border border-teal-200/80 opacity-0 group-hover/item:opacity-100 transition-opacity duration-150">
+                                    CORE
                                   </div>
                                 )}
                                 <ChevronRight
