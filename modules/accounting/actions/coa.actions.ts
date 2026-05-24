@@ -1077,6 +1077,36 @@ export async function setShariahAccountsActive(orgId: string, active: boolean) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// resetCoA — Hapus semua akun org lalu re-seed CoA standar PSAK
+// ─────────────────────────────────────────────────────────────
+export async function resetCoA(orgId: string): Promise<{ success: boolean; error?: string }> {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) return { success: false, error: 'Organisasi tidak valid.' }
+
+  const supabase = await createClient()
+
+  // Hapus semua akun milik org ini
+  const { error: deleteError } = await (supabase as any)
+    .from('accounts')
+    .delete()
+    .eq('org_id', trimmedOrgId)
+
+  if (deleteError) {
+    ;(console as any).error('resetCoA delete error:', deleteError)
+    return { success: false, error: 'Gagal menghapus akun lama: ' + (deleteError.message || 'unknown error') }
+  }
+
+  // Re-seed dengan template PSAK standar
+  const seedResult = await backfillStandardPsaKCoA(trimmedOrgId)
+  if (!seedResult.success) {
+    return { success: false, error: seedResult.error || 'Gagal mengisi ulang CoA standar PSAK.' }
+  }
+
+  revalidatePath('/settings/accounts')
+  return { success: true }
+}
+
+// ─────────────────────────────────────────────────────────────
 // uploadCoAFromExcel — Import CoA dari file .xlsx
 // Format: Sheet pertama, baris 1 = header, baris 2+ = data akun
 // Kolom wajib: code, name, type, normal_balance
