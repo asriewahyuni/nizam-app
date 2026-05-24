@@ -163,7 +163,7 @@ const NAV_GROUPS: NavGroup[] = [
 
 // Module keys yang termasuk Core ERP — dipakai untuk badge CORE di sidebar
 const CORE_MODULE_KEYS = new Set([
-  'Accounting', 'Finance', 'Inventory', 'Purchasing', 'Sales', 'POS', 'CRM', 'HRIS', 'Payroll', 'Attendance',
+  'Accounting', 'Finance', 'Inventory', 'Purchasing', 'Sales', 'POS', 'CRM', 'HRIS', 'Payroll', 'Attendance', 'Syirkah',
 ])
 
 const SAAS_OPERATOR_GROUP: NavGroup = {
