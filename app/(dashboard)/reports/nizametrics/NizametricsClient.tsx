@@ -158,10 +158,28 @@ const DOMAIN_CONFIG: Record<BSCPerspective, DomainConfig> = {
   },
 }
 
-// ─── Todo Types ──────────────────────────────────────────────────────────────
+// ─── Todo & Plan Types ───────────────────────────────────────────────────────
 
 type TodoPriority = 'high' | 'medium' | 'low'
 type TodoItem = { priority: TodoPriority; text: string }
+
+type PlanItem = {
+  id: string
+  text: string
+  perspective: BSCPerspective
+  priority: TodoPriority
+  done: boolean
+}
+
+function genId() {
+  return `plan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+const PRIORITY_COLORS: Record<TodoPriority, { dot: string; label: string; ring: string }> = {
+  high:   { dot: 'bg-rose-500',   label: 'Tinggi', ring: 'ring-rose-200' },
+  medium: { dot: 'bg-amber-400',  label: 'Sedang', ring: 'ring-amber-200' },
+  low:    { dot: 'bg-slate-300',  label: 'Rendah', ring: 'ring-slate-200' },
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -345,6 +363,16 @@ export function NizametricsClient({
   }>({ id: null, perspective: 'FINANCIAL', name: '', unit: '', direction: 'HIGHER_BETTER', weightPercent: '25', targetValue: '1' })
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
+  // ── Plan state ──
+  const [planTitle, setPlanTitle] = useState('Rencana Bulan Ini')
+  const [planTitleEditing, setPlanTitleEditing] = useState(false)
+  const [planTitleDraft, setPlanTitleDraft] = useState('')
+  const [planItems, setPlanItems] = useState<PlanItem[]>([])
+  const [planForm, setPlanForm] = useState<{ text: string; perspective: BSCPerspective; priority: TodoPriority }>({
+    text: '', perspective: 'FINANCIAL', priority: 'medium',
+  })
+  const [planExpanded, setPlanExpanded] = useState(true)
+
   const canManageSetup = Boolean(activeBranchId) || allowAllBranchSelection
   const scopeLabel = activeBranchName || (allowAllBranchSelection ? 'Semua Unit' : '—')
 
@@ -519,6 +547,32 @@ export function NizametricsClient({
       setKpiEditForm({ id: null, perspective: 'FINANCIAL', name: '', unit: '', direction: 'HIGHER_BETTER', weightPercent: '25', targetValue: '1' })
       router.refresh()
     })
+  }
+
+  // ── Plan handlers ──
+  const handleAddPlanItem = () => {
+    if (!planForm.text.trim()) return
+    const newItem: PlanItem = {
+      id: genId(),
+      text: planForm.text.trim(),
+      perspective: planForm.perspective,
+      priority: planForm.priority,
+      done: false,
+    }
+    setPlanItems((prev) => [...prev, newItem])
+    setPlanForm((prev) => ({ ...prev, text: '' }))
+  }
+
+  const handleTogglePlanItem = (id: string) => {
+    setPlanItems((prev) => prev.map((i) => i.id === id ? { ...i, done: !i.done } : i))
+  }
+
+  const handleDeletePlanItem = (id: string) => {
+    setPlanItems((prev) => prev.filter((i) => i.id !== id))
+  }
+
+  const handleMovePlanItem = (id: string, perspective: BSCPerspective) => {
+    setPlanItems((prev) => prev.map((i) => i.id === id ? { ...i, perspective } : i))
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -1077,6 +1131,270 @@ export function NizametricsClient({
           )
         })}
       </motion.div>
+
+      {/* ── Plan & Todolist Section ── */}
+      <div className="rounded-[32px] border border-slate-200 bg-white overflow-hidden shadow-sm">
+
+        {/* Plan header */}
+        <div className="px-8 py-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-2xl bg-slate-900 flex items-center justify-center shrink-0">
+              <ListTodo size={17} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              {planTitleEditing ? (
+                <input
+                  type="text"
+                  value={planTitleDraft}
+                  onChange={(e) => setPlanTitleDraft(e.target.value)}
+                  onBlur={() => { if (planTitleDraft.trim()) setPlanTitle(planTitleDraft.trim()); setPlanTitleEditing(false) }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { if (planTitleDraft.trim()) setPlanTitle(planTitleDraft.trim()); setPlanTitleEditing(false) }
+                    if (e.key === 'Escape') setPlanTitleEditing(false)
+                  }}
+                  autoFocus
+                  className="text-lg font-black text-slate-900 border-b-2 border-blue-400 bg-transparent outline-none w-full"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setPlanTitleDraft(planTitle); setPlanTitleEditing(true) }}
+                  className="flex items-center gap-2 group cursor-pointer"
+                >
+                  <h3 className="text-lg font-black text-slate-900 group-hover:text-slate-700 transition-colors">{planTitle}</h3>
+                  <Pencil size={12} className="text-slate-300 group-hover:text-slate-500 transition-colors" />
+                </button>
+              )}
+              <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                {planItems.length} tugas · {planItems.filter((i) => i.done).length} selesai
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Progress bar mini */}
+            {planItems.length > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="w-24 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-slate-900 transition-all duration-500"
+                    style={{ width: `${Math.round((planItems.filter((i) => i.done).length / planItems.length) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-black text-slate-500">
+                  {Math.round((planItems.filter((i) => i.done).length / planItems.length) * 100)}%
+                </span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setPlanExpanded((prev) => !prev)}
+              className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              {planExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+          </div>
+        </div>
+
+        {planExpanded && (
+          <div className="px-8 py-6 space-y-6">
+
+            {/* Quick-add form */}
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
+              <div className="flex gap-2.5 flex-wrap sm:flex-nowrap">
+                <input
+                  type="text"
+                  placeholder="Tulis rencana atau tugas..."
+                  value={planForm.text}
+                  onChange={(e) => setPlanForm((prev) => ({ ...prev, text: e.target.value }))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddPlanItem() }}
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 placeholder:font-normal placeholder:text-slate-400 min-w-0"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddPlanItem}
+                  disabled={!planForm.text.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider hover:bg-slate-700 transition-all disabled:opacity-40 cursor-pointer shrink-0"
+                >
+                  <Plus size={13} />
+                  Tambah
+                </button>
+              </div>
+
+              {/* Domain + priority selector */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-1">Domain:</span>
+                {PERSPECTIVES.map((p) => {
+                  const d = DOMAIN_CONFIG[p]
+                  const isSelected = planForm.perspective === p
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPlanForm((prev) => ({ ...prev, perspective: p }))}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        isSelected
+                          ? `${d.color.bg} ${d.color.text} ${d.color.border} border ring-2 ${
+                              p === 'FINANCIAL' ? 'ring-emerald-200'
+                              : p === 'CUSTOMER' ? 'ring-blue-200'
+                              : p === 'INTERNAL_PROCESS' ? 'ring-indigo-200'
+                              : 'ring-rose-200'
+                            }`
+                          : 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <d.icon size={11} />
+                      {d.domainLabel}
+                    </button>
+                  )
+                })}
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-3 mr-1">Prioritas:</span>
+                {(['high', 'medium', 'low'] as TodoPriority[]).map((p) => {
+                  const pc = PRIORITY_COLORS[p]
+                  const isSelected = planForm.priority === p
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPlanForm((prev) => ({ ...prev, priority: p }))}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        isSelected
+                          ? `ring-2 ${pc.ring} border-slate-200 bg-white text-slate-700`
+                          : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${pc.dot}`} />
+                      {pc.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Distribution grid — 2×2 matching domain colors */}
+            {planItems.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/40 px-6 py-10 text-center">
+                <ListTodo size={28} className="text-slate-300 mx-auto mb-3" />
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Belum ada rencana</p>
+                <p className="text-xs text-slate-400 font-medium mt-1">Tulis tugas di atas lalu pilih domain tujuannya.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {PERSPECTIVES.map((perspective) => {
+                  const domain = DOMAIN_CONFIG[perspective]
+                  const DIcon = domain.icon
+                  const items = planItems.filter((i) => i.perspective === perspective)
+                  const doneCount = items.filter((i) => i.done).length
+
+                  return (
+                    <div
+                      key={perspective}
+                      className={`rounded-2xl border p-4 space-y-3 min-h-[120px] transition-all ${domain.color.bg} ${domain.color.border}`}
+                    >
+                      {/* Column header */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <DIcon size={14} className={domain.color.text} />
+                          <p className={`text-[11px] font-black uppercase tracking-widest ${domain.color.text}`}>
+                            {domain.domainLabel}
+                          </p>
+                        </div>
+                        <span className="text-[10px] font-black text-slate-400">
+                          {doneCount}/{items.length}
+                        </span>
+                      </div>
+
+                      {/* Items */}
+                      {items.length === 0 ? (
+                        <p className="text-[11px] text-slate-400 font-medium italic">Belum ada tugas di domain ini.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {items.map((item) => (
+                            <div
+                              key={item.id}
+                              className="group flex items-start gap-2 rounded-xl border border-white/70 bg-white/70 px-3 py-2.5 shadow-sm transition-all hover:bg-white hover:shadow"
+                            >
+                              {/* Checkbox */}
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePlanItem(item.id)}
+                                className="mt-0.5 shrink-0 cursor-pointer transition-transform active:scale-90"
+                                aria-label={item.done ? 'Tandai belum selesai' : 'Tandai selesai'}
+                              >
+                                {item.done ? (
+                                  <CheckCircle2 size={15} className="text-emerald-500" />
+                                ) : (
+                                  <div className={`w-3.5 h-3.5 rounded-full border-2 ${domain.color.border} transition-colors`} />
+                                )}
+                              </button>
+
+                              {/* Text + priority dot */}
+                              <div className="flex-1 min-w-0 flex items-start gap-1.5">
+                                <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_COLORS[item.priority].dot}`} />
+                                <p className={`text-xs font-semibold leading-relaxed flex-1 ${item.done ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                                  {item.text}
+                                </p>
+                              </div>
+
+                              {/* Actions (visible on hover) */}
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                {/* Move domain dropdown */}
+                                <select
+                                  value={item.perspective}
+                                  onChange={(e) => handleMovePlanItem(item.id, e.target.value as BSCPerspective)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[10px] font-black text-slate-400 bg-transparent border-0 outline-none cursor-pointer py-0 px-0.5 max-w-[60px]"
+                                  title="Pindah domain"
+                                >
+                                  {PERSPECTIVES.map((p) => (
+                                    <option key={p} value={p}>{DOMAIN_CONFIG[p].domainLabel}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePlanItem(item.id)}
+                                  className="p-0.5 rounded text-slate-300 hover:text-rose-500 transition-colors cursor-pointer"
+                                  aria-label="Hapus tugas"
+                                >
+                                  <X size={11} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Summary strip */}
+            {planItems.length > 0 && (
+              <div className="flex flex-wrap items-center gap-4 px-1">
+                {(['high', 'medium', 'low'] as TodoPriority[]).map((p) => {
+                  const count = planItems.filter((i) => i.priority === p && !i.done).length
+                  if (count === 0) return null
+                  return (
+                    <div key={p} className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[p].dot}`} />
+                      <span className="text-[11px] font-semibold text-slate-500">{count} {PRIORITY_COLORS[p].label.toLowerCase()} pending</span>
+                    </div>
+                  )
+                })}
+                {planItems.filter((i) => i.done).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setPlanItems((prev) => prev.filter((i) => !i.done))}
+                    className="ml-auto text-[11px] font-black text-slate-400 hover:text-rose-500 transition-colors cursor-pointer uppercase tracking-wider"
+                  >
+                    Hapus yang selesai ({planItems.filter((i) => i.done).length})
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── Advanced BSC Section ── */}
       <div className="rounded-[32px] border border-slate-200 bg-slate-50/80 overflow-hidden">
