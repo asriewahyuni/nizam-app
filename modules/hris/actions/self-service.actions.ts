@@ -505,3 +505,31 @@ export async function deleteMyExpenseClaim(orgId: string, claimId: string) {
   revalidatePath('/hris')
   return { success: true }
 }
+
+export async function updateMyEmployeeProfile(
+  orgId: string,
+  payload: { firstName?: string; lastName?: string; avatarUrl?: string | null }
+) {
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Sesi tidak ditemukan.' }
+
+  const updates: Record<string, unknown> = {}
+  if (payload.firstName !== undefined) updates.first_name = payload.firstName.trim()
+  if (payload.lastName  !== undefined) updates.last_name  = payload.lastName.trim()
+  if (payload.avatarUrl !== undefined) updates.avatar_url = payload.avatarUrl
+
+  if (Object.keys(updates).length === 0) return { error: 'Tidak ada perubahan.' }
+
+  const { error } = await db
+    .from('employees')
+    .update(updates)
+    .eq('org_id', orgId)
+    .eq('user_id', user.id)
+
+  if (error) return { error: error.message || 'Gagal memperbarui profil.' }
+
+  revalidatePath('/karyawan')
+  return { success: true }
+}
