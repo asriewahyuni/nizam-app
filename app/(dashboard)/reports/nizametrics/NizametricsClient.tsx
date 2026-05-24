@@ -329,6 +329,11 @@ export function NizametricsClient({
   })
   const [ikhtiyyarTargetEditing, setIkhtiyyarTargetEditing] = useState<BSCPerspective | null>(null)
   const [ikhtiyyarTargetDraft, setIkhtiyyarTargetDraft] = useState<string>('')
+  const [ikhtiyyarOverrides, setIkhtiyyarOverrides] = useState<Record<BSCPerspective, number | null>>({
+    FINANCIAL: null, CUSTOMER: null, INTERNAL_PROCESS: null, LEARNING_GROWTH: null,
+  })
+  const [ikhtiyyarValueEditing, setIkhtiyyarValueEditing] = useState<BSCPerspective | null>(null)
+  const [ikhtiyyarValueDraft, setIkhtiyyarValueDraft] = useState<string>('')
   const [cycleIsLocked, setCycleIsLocked] = useState(setupData.cycle?.status === 'LOCKED')
   const [paramPickerOpen, setParamPickerOpen] = useState<BSCPerspective | null>(null)
   const [measurementDrafts, setMeasurementDrafts] = useState<Record<string, { actual: string; note: string }>>({})
@@ -644,10 +649,13 @@ export function NizametricsClient({
           const perspectiveKpis = sortedKpis.filter((k) => k.perspective === perspective)
           const perspectiveSummary = setupData.summary.perspective_scores[perspective]
 
-          // Ikhtiyyar live value
-          const ikhtiyyarValue = domain.ikhtiyyar.getValue(initialData)
+          // Ikhtiyyar live value (override manual jika ada)
+          const ikhtiyyarComputed = domain.ikhtiyyar.getValue(initialData)
+          const ikhtiyyarIsOverridden = ikhtiyyarOverrides[perspective] !== null
+          const ikhtiyyarValue = ikhtiyyarIsOverridden ? ikhtiyyarOverrides[perspective]! : ikhtiyyarComputed
           const ikhtiyyarTarget = ikhtiyyarTargets[perspective]
           const ikhtiyyarDir = domain.ikhtiyyar.direction
+          const isEditingValue = ikhtiyyarValueEditing === perspective
 
           // Progress bar for Ikhtiyyar
           const ikhtiyyarProgress = ikhtiyyarDir === 'HIGHER_BETTER'
@@ -715,10 +723,65 @@ export function NizametricsClient({
                   </div>
                   <div className="flex items-end justify-between gap-2">
                     <div>
-                      <p className="text-xs font-black text-slate-500">{domain.ikhtiyyar.label}</p>
-                      <p className={`text-2xl font-black ${domain.color.text} mt-0.5`}>
-                        {formatValue(domain.ikhtiyyar.unit, ikhtiyyarValue)}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-black text-slate-500">{domain.ikhtiyyar.label}</p>
+                        {ikhtiyyarIsOverridden && (
+                          <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-white/80 border border-slate-300 text-slate-500">
+                            Manual
+                          </span>
+                        )}
+                      </div>
+                      {isEditingValue ? (
+                        <input
+                          type="number"
+                          value={ikhtiyyarValueDraft}
+                          onChange={(e) => setIkhtiyyarValueDraft(e.target.value)}
+                          onBlur={() => {
+                            const parsed = Number(ikhtiyyarValueDraft)
+                            if (!Number.isNaN(parsed)) {
+                              setIkhtiyyarOverrides((prev) => ({ ...prev, [perspective]: parsed }))
+                            }
+                            setIkhtiyyarValueEditing(null)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const parsed = Number(ikhtiyyarValueDraft)
+                              if (!Number.isNaN(parsed)) {
+                                setIkhtiyyarOverrides((prev) => ({ ...prev, [perspective]: parsed }))
+                              }
+                              setIkhtiyyarValueEditing(null)
+                            }
+                            if (e.key === 'Escape') setIkhtiyyarValueEditing(null)
+                          }}
+                          autoFocus
+                          placeholder={String(ikhtiyyarComputed)}
+                          className="mt-0.5 w-32 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xl font-black text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIkhtiyyarValueDraft(String(ikhtiyyarValue))
+                            setIkhtiyyarValueEditing(perspective)
+                          }}
+                          className="flex items-center gap-1.5 group cursor-pointer mt-0.5"
+                          title="Klik untuk override nilai aktual"
+                        >
+                          <span className={`text-2xl font-black ${domain.color.text} group-hover:opacity-80 transition-opacity`}>
+                            {formatValue(domain.ikhtiyyar.unit, ikhtiyyarValue)}
+                          </span>
+                          <Pencil size={11} className="text-slate-300 group-hover:text-slate-500 transition-colors shrink-0 mb-1" />
+                        </button>
+                      )}
+                      {ikhtiyyarIsOverridden && (
+                        <button
+                          type="button"
+                          onClick={() => setIkhtiyyarOverrides((prev) => ({ ...prev, [perspective]: null }))}
+                          className="text-[10px] font-black text-slate-400 hover:text-rose-500 transition-colors mt-0.5 cursor-pointer underline underline-offset-2"
+                        >
+                          Reset ke data sistem ({formatValue(domain.ikhtiyyar.unit, ikhtiyyarComputed)})
+                        </button>
+                      )}
                     </div>
                     {/* Editable Ikhtiyyar Target */}
                     <div className="flex flex-col items-end gap-1">
