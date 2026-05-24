@@ -1242,22 +1242,18 @@ export function AppHeader({
               onFocus={prewarmNavigationContext}
               onTouchStart={prewarmNavigationContext}
               onPointerDown={prewarmNavigationContext}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm hover:bg-slate-100/70 transition-all disabled:cursor-wait disabled:opacity-70"
+              className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm hover:bg-slate-100/70 transition-all disabled:cursor-wait disabled:opacity-70"
             >
-              <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#003366] shrink-0 shadow-sm">
-                {pendingContextSwitch?.kind === 'org' ? <LoaderCircle size={14} className="animate-spin" /> : <Building2 size={14} />}
+              <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#003366] shrink-0 shadow-sm">
+                {pendingContextSwitch?.kind === 'org' ? <LoaderCircle size={12} className="animate-spin" /> : <Building2 size={12} />}
               </div>
-              <div className="flex flex-col overflow-hidden">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter leading-none mb-0.5">Organisasi Aktif</span>
-                <span className="text-xs font-black text-slate-900 leading-none truncate max-w-[140px]">{org.name}</span>
-                <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 mt-1 leading-none">
-                  {effectiveActiveOrgRole}
-                </span>
-                <span className="text-[9px] font-semibold text-slate-500 mt-1 leading-none truncate max-w-[170px]">
-                  {activeOrgIsParent ? 'PARENT' : 'CHILD'} • {activeOrgHierarchyLabel}
+              <div className="flex flex-col overflow-hidden min-w-0">
+                <span className="text-[11px] font-black text-slate-900 leading-tight truncate max-w-[130px]">{org.name}</span>
+                <span className="text-[9px] font-semibold text-slate-400 leading-tight truncate max-w-[130px]">
+                  {effectiveActiveOrgRole} · {activeOrgIsParent ? 'ROOT' : activeOrgHierarchyLabel}
                 </span>
               </div>
-              <ChevronDown size={12} className={`text-slate-400 ml-1 transition-transform ${isOrgMenuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={11} className={`text-slate-400 ml-0.5 shrink-0 transition-transform ${isOrgMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isOrgMenuOpen && (
@@ -1539,21 +1535,16 @@ export function AppHeader({
               onFocus={prewarmNavigationContext}
               onTouchStart={prewarmNavigationContext}
               onPointerDown={prewarmNavigationContext}
-              className="flex items-center gap-2 px-3 py-1.5 bg-[#003366]/5/50 border border-[#003366]/10 rounded-xl hover:bg-[#003366]/5 transition-all shadow-sm disabled:cursor-wait disabled:opacity-70"
+              className="flex items-center gap-2 px-2.5 py-1.5 bg-[#003366]/5 border border-[#003366]/10 rounded-xl hover:bg-[#003366]/10 transition-all shadow-sm disabled:cursor-wait disabled:opacity-70"
             >
               {pendingContextSwitch?.kind === 'branch'
-                ? <LoaderCircle size={14} className="text-[#003366] shrink-0 animate-spin" />
-                : <MapPin size={14} className="text-[#003366] shrink-0" />}
-              <div className="flex flex-col overflow-hidden">
-                <span className="text-[9px] text-[#003366]/60 font-bold uppercase tracking-tighter leading-none mb-0.5">Unit Terpilih</span>
-                <span className="text-xs font-black text-blue-900 leading-none truncate max-w-[150px]">
-                  {branchHeadline}
-                </span>
-                <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#003366]/45 mt-1 leading-none">
-                  {branchCaption}
-                </span>
+                ? <LoaderCircle size={12} className="text-[#003366] shrink-0 animate-spin" />
+                : <MapPin size={12} className="text-[#003366] shrink-0" />}
+              <div className="flex flex-col overflow-hidden min-w-0">
+                <span className="text-[11px] font-black text-blue-900 leading-tight truncate max-w-[130px]">{branchHeadline}</span>
+                <span className="text-[9px] font-semibold text-[#003366]/50 leading-tight truncate max-w-[130px]">{branchCaption}</span>
               </div>
-              <ChevronDown size={12} className={`text-[#003366]/60 ml-1 transition-transform ${isBranchMenuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={11} className={`text-[#003366]/60 ml-0.5 shrink-0 transition-transform ${isBranchMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isBranchMenuOpen && (
