@@ -219,7 +219,10 @@ export async function clockByQRScan(orgId: string, branchId: string): Promise<QR
   }
 }
 
-export async function clockMyAttendance(orgId: string, payload: { type: 'IN' | 'OUT'; notes?: string }) {
+export async function clockMyAttendance(
+  orgId: string,
+  payload: { type: 'IN' | 'OUT'; notes?: string; latitude?: number | null; longitude?: number | null }
+) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return { error: selfEmployee.error }
 
@@ -228,6 +231,10 @@ export async function clockMyAttendance(orgId: string, payload: { type: 'IN' | '
   const today = new Date().toISOString().split('T')[0]
   const now = new Date().toISOString()
   const notes = String(payload.notes || '').trim()
+  const locationGps =
+    payload.latitude != null && payload.longitude != null
+      ? `${payload.latitude.toFixed(6)},${payload.longitude.toFixed(6)}`
+      : null
 
   const { data: existingRecord, error: existingRecordError } = await db
     .from('attendance')
@@ -254,6 +261,7 @@ export async function clockMyAttendance(orgId: string, payload: { type: 'IN' | '
         check_in: now,
         status: 'PRESENT',
         notes: notes || null,
+        location_gps: locationGps,
       })
 
     if (error) return { error: error.message }
@@ -275,6 +283,7 @@ export async function clockMyAttendance(orgId: string, payload: { type: 'IN' | '
       .update({
         check_out: now,
         notes: mergedNotes || null,
+        location_gps: locationGps,
         updated_at: now,
       })
       .eq('id', existingRecord.id)
