@@ -5,6 +5,8 @@ import { getChartOfAccounts, seedInitialCoA, checkCanManageCoA, syncParentCoAToC
 import { getShariahSetupSummary } from '@/modules/accounting/actions/shariah.actions'
 import AccountRowActions from './components/AccountRowActions'
 import ShariahSettingsCard from './components/ShariahSettingsCard'
+import UploadCoAButton from './components/UploadCoAButton'
+import ResetCoAButton from './components/ResetCoAButton'
 
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -91,13 +93,17 @@ export default async function ChartOfAccountsPage() {
             </button>
           </form>
         ) : canCreateDirectAccount ? (
-          <Link
-            href="/settings/accounts/new"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
-            style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
-          >
-            + Tambah Akun
-          </Link>
+          <div className="flex items-center gap-2">
+            <UploadCoAButton />
+            <ResetCoAButton />
+            <Link
+              href="/settings/accounts/new"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
+              style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
+            >
+              + Tambah Akun
+            </Link>
+          </div>
         ) : isInheritedChildOrganization ? (
           <div className="flex items-center gap-2">
             <a
