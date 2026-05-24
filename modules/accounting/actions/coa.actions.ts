@@ -1078,25 +1078,107 @@ export async function setShariahAccountsActive(orgId: string, active: boolean) {
 
 // ─────────────────────────────────────────────────────────────
 // resetCoA — Hapus semua akun org lalu re-seed CoA standar PSAK
+// Alur:
+//   1. Cek blocking data (journal_lines, cash_transactions) → tolak jika ada
+//   2. Null-kan FK nullable di products, payroll, dll
+//   3. Hapus tabel non-transaksional dengan FK NOT NULL (budgets, bank_accounts)
+//   4. Null parent_id (self-reference) → DELETE accounts
+//   5. Re-seed via backfillStandardPsaKCoA
 // ─────────────────────────────────────────────────────────────
 export async function resetCoA(orgId: string): Promise<{ success: boolean; error?: string }> {
   const trimmedOrgId = String(orgId || '').trim()
   if (!trimmedOrgId) return { success: false, error: 'Organisasi tidak valid.' }
 
-  const supabase = await createClient()
+  const { queryPostgres: qp } = await import('@/lib/db/postgres')
 
-  // Hapus semua akun milik org ini
-  const { error: deleteError } = await (supabase as any)
-    .from('accounts')
-    .delete()
-    .eq('org_id', trimmedOrgId)
-
-  if (deleteError) {
-    ;(console as any).error('resetCoA delete error:', deleteError)
-    return { success: false, error: 'Gagal menghapus akun lama: ' + (deleteError.message || 'unknown error') }
+  // ── Step 1: Cek journal_lines (blocking) ──────────────────────
+  try {
+    const jlCheck = await qp<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt
+       FROM journal_lines jl
+       JOIN accounts a ON a.id = jl.account_id
+       WHERE a.org_id = $1`,
+      [trimmedOrgId]
+    )
+    const jlCount = parseInt(jlCheck.rows[0]?.cnt ?? '0', 10)
+    if (jlCount > 0) {
+      return {
+        success: false,
+        error: `Tidak dapat mereset CoA: ditemukan ${jlCount} baris jurnal yang terhubung ke akun-akun ini. Reset hanya bisa dilakukan sebelum ada transaksi.`,
+      }
+    }
+  } catch (e) {
+    ;(console as any).warn('resetCoA: skip journal_lines check –', e)
   }
 
-  // Re-seed dengan template PSAK standar
+  // ── Step 2: Cek cash_transactions (blocking) ──────────────────
+  try {
+    const ctCheck = await qp<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt
+       FROM cash_transactions ct
+       JOIN bank_accounts ba ON ba.id = ct.bank_account_id
+       JOIN accounts a ON a.id = ba.account_id
+       WHERE a.org_id = $1`,
+      [trimmedOrgId]
+    )
+    const ctCount = parseInt(ctCheck.rows[0]?.cnt ?? '0', 10)
+    if (ctCount > 0) {
+      return {
+        success: false,
+        error: 'Tidak dapat mereset CoA: ditemukan transaksi kas/bank yang terhubung ke akun-akun ini.',
+      }
+    }
+  } catch (e) {
+    ;(console as any).warn('resetCoA: skip cash_transactions check –', e)
+  }
+
+  // ── Step 3: Null-kan FK nullable di tabel konfigurasi ─────────
+  const nullUpdates = [
+    `UPDATE products
+        SET asset_account_id = NULL, income_account_id = NULL, expense_account_id = NULL
+      WHERE org_id = $1`,
+    `UPDATE payroll_components SET account_id = NULL WHERE org_id = $1`,
+    `UPDATE payslip_lines SET account_id = NULL
+      WHERE payslip_id IN (SELECT id FROM payslips WHERE org_id = $1)`,
+    `UPDATE hr_payroll_components SET account_id = NULL WHERE org_id = $1`,
+    `UPDATE organization_payroll_settings SET account_id = NULL WHERE org_id = $1`,
+  ]
+  for (const sql of nullUpdates) {
+    await qp(sql, [trimmedOrgId]).catch(() => {
+      /* kolom/tabel mungkin belum ada — abaikan */
+    })
+  }
+
+  // ── Step 4: Hapus tabel non-transaksional dengan NOT NULL FK ──
+  const deleteDependent = [
+    // budgets: account_id NOT NULL
+    `DELETE FROM budgets WHERE org_id = $1`,
+    // bank_accounts: account_id NOT NULL (sudah dicek tidak ada cash_tx)
+    `DELETE FROM bank_accounts
+      WHERE account_id IN (SELECT id FROM accounts WHERE org_id = $1)`,
+    // disbursement_account_id di organizations (nullable, null saja)
+    `UPDATE organizations SET disbursement_account_id = NULL WHERE id = $1`,
+  ]
+  for (const sql of deleteDependent) {
+    await qp(sql, [trimmedOrgId]).catch(() => {
+      /* tabel/kolom mungkin belum ada — abaikan */
+    })
+  }
+
+  // ── Step 5: Hapus self-reference parent_id, lalu delete accounts ─
+  try {
+    await qp(`UPDATE accounts SET parent_id = NULL WHERE org_id = $1`, [trimmedOrgId])
+    await qp(`DELETE FROM accounts WHERE org_id = $1`, [trimmedOrgId])
+  } catch (deleteErr: unknown) {
+    const msg = deleteErr instanceof Error ? deleteErr.message : String(deleteErr)
+    ;(console as any).error('resetCoA delete accounts error:', msg)
+    return {
+      success: false,
+      error: `Gagal menghapus akun lama: ${msg}. Pastikan tidak ada data transaksi yang terhubung.`,
+    }
+  }
+
+  // ── Step 6: Re-seed dengan PSAK standar ───────────────────────
   const seedResult = await backfillStandardPsaKCoA(trimmedOrgId)
   if (!seedResult.success) {
     return { success: false, error: seedResult.error || 'Gagal mengisi ulang CoA standar PSAK.' }
