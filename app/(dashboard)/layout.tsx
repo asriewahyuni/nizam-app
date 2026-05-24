@@ -241,6 +241,7 @@ export default async function DashboardLayout({
           />
         )}
         {isDemo && <DemoBanner />}
+        <div className={isStaffEmployee ? 'hidden md:block' : ''}>
         <AppHeader
           key={`header:${orgData.org.id}:${activeBranch?.id || 'all'}`}
           user={{
@@ -259,6 +260,7 @@ export default async function DashboardLayout({
           runtimeDatabaseMode={runtimeDb.mode}
           runtimeDatabaseSource={runtimeDb.sourceKey}
         />
+        </div>
         {!isStaffEmployee && <StartupWizard isDemo={isDemo} enabled={startupWizardEnabled} />}
         {!isStaffEmployee && <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />}
         <main
