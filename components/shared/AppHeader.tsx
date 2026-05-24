@@ -1692,15 +1692,6 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-6">
-        <div
-          title={runtimeDatabaseBadge.description}
-          className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all ${runtimeDatabaseBadge.className}`}
-        >
-          <Database size={14} />
-          <span className="hidden sm:inline">{runtimeDatabaseBadge.label}</span>
-          <CircleDot size={12} className={runtimeDatabaseBadge.dotClassName} />
-        </div>
-
         {isPlatformAdmin && (
           <Link
             href="/admin"
