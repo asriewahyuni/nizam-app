@@ -434,7 +434,7 @@ export function AssetClient({
                </div>
                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Aset</span>
             </div>
-            <p className="text-2xl font-black text-slate-900">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (a.purchase_price || 0), 0))}</p>
+            <p className="text-2xl font-black text-slate-900">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (Number(a.purchase_price) || 0), 0))}</p>
          </div>
 
          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
@@ -444,7 +444,7 @@ export function AssetClient({
                </div>
                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Akumulasi Penyusutan</span>
             </div>
-            <p className="text-2xl font-black text-rose-600">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (a.accumulated_depreciation || 0), 0))}</p>
+            <p className="text-2xl font-black text-rose-600">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (Number(a.accumulated_depreciation) || 0), 0))}</p>
          </div>
 
          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
@@ -454,7 +454,7 @@ export function AssetClient({
                </div>
                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nilai Buku (Net)</span>
             </div>
-            <p className="text-2xl font-black text-emerald-600">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (a.current_book_value || 0), 0))}</p>
+            <p className="text-2xl font-black text-emerald-600">{formatCurrency(assets.reduce((acc: number, a: any) => acc + (Number(a.current_book_value) || 0), 0))}</p>
          </div>
 
          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md bg-gradient-to-br from-indigo-50/50 to-white overflow-hidden relative group">
@@ -529,11 +529,21 @@ export function AssetClient({
                              </div>
                           </td>
                           <td className="px-6 py-6 font-bold text-slate-600"> {asset.useful_life_months} Bulan </td>
-                          <td className="px-6 py-6 text-right font-black text-slate-900"> {formatCurrency(asset.purchase_price)} </td>
+                          <td className="px-6 py-6 text-right font-black text-slate-900"> {formatCurrency(Number(asset.purchase_price))} </td>
                           <td className="px-6 py-6 text-right">
-                             <p className="font-black text-emerald-600">{formatCurrency(asset.current_book_value)}</p>
+                             <p className="font-black text-emerald-600">{formatCurrency(Number(asset.current_book_value))}</p>
                              <div className="w-full bg-slate-100 h-2 rounded-full mt-2 overflow-hidden max-w-[120px] ml-auto">
-                                <div className={`h-full rounded-full ${ (asset.current_book_value / asset.purchase_price) < 0.2 ? 'bg-rose-500' : 'bg-emerald-500' }`} style={{ width: `${(asset.current_book_value / asset.purchase_price) * 100}%` }} />
+                                {(() => {
+                                  const bookVal = Number(asset.current_book_value) || 0
+                                  const purchasePrice = Number(asset.purchase_price) || 1
+                                  const ratio = bookVal / purchasePrice
+                                  return (
+                                    <div
+                                      className={`h-full rounded-full ${ratio < 0.2 ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                                      style={{ width: `${Math.min(ratio * 100, 100)}%` }}
+                                    />
+                                  )
+                                })()}
                              </div>
                           </td>
                            <td className="px-8 py-6 text-center">
@@ -845,15 +855,15 @@ export function AssetClient({
                   <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Harga Perolehan</p>
-                      <p className="text-sm font-black text-slate-900">{formatCurrency(selectedAssetForDisposal.purchase_price)}</p>
+                      <p className="text-sm font-black text-slate-900">{formatCurrency(Number(selectedAssetForDisposal.purchase_price))}</p>
                     </div>
                     <div>
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Akumulasi Penyusutan</p>
-                      <p className="text-sm font-black text-rose-500">-{formatCurrency(selectedAssetForDisposal.accumulated_depreciation || 0)}</p>
+                      <p className="text-sm font-black text-rose-500">-{formatCurrency(Number(selectedAssetForDisposal.accumulated_depreciation) || 0)}</p>
                     </div>
                     <div className="col-span-2 border-t border-slate-200 pt-4">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nilai Buku Saat Ini (NBV)</p>
-                      <p className="text-xl font-black text-emerald-600">{formatCurrency(selectedAssetForDisposal.current_book_value || 0)}</p>
+                      <p className="text-xl font-black text-emerald-600">{formatCurrency(Number(selectedAssetForDisposal.current_book_value) || 0)}</p>
                     </div>
                   </div>
 
@@ -871,7 +881,7 @@ export function AssetClient({
                       </div>
                       {(() => {
                         const sp = parseFloat(disposalForm.salePrice.replace(/\./g, '')) || 0
-                        const bv = selectedAssetForDisposal.current_book_value || 0
+                        const bv = Number(selectedAssetForDisposal.current_book_value) || 0
                         const gl = sp - bv
                         if (sp === 0) return null
                         return (
