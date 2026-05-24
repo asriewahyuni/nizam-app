@@ -90,15 +90,17 @@ export default async function DashboardLayout({
   const canManageSubOrganizations = isOwnerOrAdmin
   const isPosOnlyUser = hasPosOnlyAccess(orgData.role, orgData.permissions)
 
-  // Deteksi staff employee: bukan owner/admin DAN punya employee record DAN
-  // tidak ada permission yang di-assign (portal-only karyawan biasa).
-  // Jika user memiliki permission yang di-assign, mereka mengakses ERP sebagai
-  // manajer/supervisor dan harus mendapatkan sidebar penuh sesuai permission mereka.
+  // ── EMPLOYEE DETECTION + ATTENDANCE GATE ────────────────────────────────
+  // isStaffEmployee: bukan owner/admin, punya employee record, tanpa permission → portal-only
+  // requiresAttendanceGate: semua employee (termasuk manajer) wajib clock-in dulu
+  // hasClockedInToday: sudah clock-in hari ini (Asia/Jakarta) atau belum
   let isStaffEmployee = false
+  let requiresAttendanceGate = false
+  let hasClockedInToday = false
+
   if (!isOwnerOrAdmin) {
     const userId = String(orgData.user?.id || '').trim()
-    const hasAssignedPermissions = Array.isArray(orgData.permissions) && orgData.permissions.length > 0
-    if (userId && !hasAssignedPermissions) {
+    if (userId) {
       const supabaseForEmpCheck = await createClient()
       const { data: empRecord } = await (supabaseForEmpCheck as any)
         .from('employees')
@@ -106,7 +108,26 @@ export default async function DashboardLayout({
         .eq('org_id', orgData.org.id)
         .eq('user_id', userId)
         .maybeSingle()
-      isStaffEmployee = !!empRecord?.id
+
+      const hasEmployeeRecord = !!empRecord?.id
+      const hasAssignedPermissions = Array.isArray(orgData.permissions) && orgData.permissions.length > 0
+
+      // Portal-only: karyawan tanpa permission ERP
+      isStaffEmployee = hasEmployeeRecord && !hasAssignedPermissions
+
+      // Attendance gate: SEMUA employee (termasuk manajer/direktur) wajib clock-in
+      if (hasEmployeeRecord) {
+        requiresAttendanceGate = true
+        const todayJkt = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
+        const { data: todayAtt } = await (supabaseForEmpCheck as any)
+          .from('attendance')
+          .select('check_in')
+          .eq('org_id', orgData.org.id)
+          .eq('employee_id', empRecord.id)
+          .eq('record_date', todayJkt)
+          .maybeSingle()
+        hasClockedInToday = !!todayAtt?.check_in
+      }
     }
   }
   const isSaasAssessorRouteAccess =
@@ -234,6 +255,8 @@ export default async function DashboardLayout({
         canManageSubOrganizations={canManageSubOrganizations}
         isSaasAssessor={saasAssessorContext.hasAccess}
         isStaffEmployee={isStaffEmployee}
+        requiresAttendanceGate={requiresAttendanceGate}
+        hasClockedInToday={hasClockedInToday}
       />
 
       {/* Main content */}
@@ -300,6 +323,8 @@ export default async function DashboardLayout({
             userRole={orgData.role}
             permissions={orgData.permissions}
             enabledModules={orgData.enabledModules}
+            requiresAttendanceGate={requiresAttendanceGate}
+            hasClockedInToday={hasClockedInToday}
           />
         )}
         {!isStaffEmployee && <FloatingPlanBadge planName={effectivePlanName} />}

@@ -266,19 +266,21 @@ interface AppSidebarProps {
   canManageSubOrganizations?: boolean
   isSaasAssessor?: boolean
   isStaffEmployee?: boolean
+  requiresAttendanceGate?: boolean
+  hasClockedInToday?: boolean
 }
 
-export function AppSidebar({ 
+export function AppSidebar({
   orgId,
   activeBranchId = null,
-  userRole, 
+  userRole,
   jobTitle,
   user,
   permissions = [],
   enabledModules = [],
   pendingModules = [],
-  pendingApprovals = 0, 
-  unpostedJournals = 0, 
+  pendingApprovals = 0,
+  unpostedJournals = 0,
   pendingPurchaseRequests = 0,
   hrisNotifications = 0,
   pendingCoaRequests = 0,
@@ -287,6 +289,8 @@ export function AppSidebar({
   canManageSubOrganizations = true,
   isSaasAssessor = false,
   isStaffEmployee = false,
+  requiresAttendanceGate = false,
+  hasClockedInToday = false,
 }: AppSidebarProps) {
   const router = useRouter()
   const [isSigningOut, startSignOutTransition] = useTransition()
@@ -297,6 +301,7 @@ export function AppSidebar({
   const prefetchedRoutesRef = useRef<Set<string>>(new Set())
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [attendanceToast, setAttendanceToast] = useState(false)
   const [badgeMetrics, setBadgeMetrics] = useState(() => ({
     pendingApprovals,
     unpostedJournals,
@@ -304,6 +309,22 @@ export function AppSidebar({
     hrisNotifications,
     pendingCoaRequests,
   }))
+
+  // Route yang bebas diakses meskipun belum clock-in
+  const ATTENDANCE_FREE_ROUTES = ['/karyawan', '/profil-saya', '/billing']
+  const isAttendanceFree = (href: string) =>
+    ATTENDANCE_FREE_ROUTES.some((r) => href === r || href.startsWith(r + '/') || href.startsWith(r + '?'))
+
+  // Gate check: apakah item ini terkunci karena belum presensi?
+  const isLockedByAttendance = (href: string) =>
+    requiresAttendanceGate && !hasClockedInToday && !isAttendanceFree(href)
+
+  // Handler klik saat gate aktif
+  const handleLockedClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setAttendanceToast(true)
+    setTimeout(() => setAttendanceToast(false), 3000)
+  }
 
   useEffect(() => {
     const handleMobileToggle = () => setIsMobileOpen((prev) => !prev)
@@ -575,10 +596,20 @@ export function AppSidebar({
     <>
       {/* Mobile Overlay */}
       {isMobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
           onClick={() => setIsMobileOpen(false)}
         />
+      )}
+
+      {/* Attendance Gate Toast */}
+      {attendanceToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-top-2 fade-in duration-200">
+          <div className="flex items-center gap-2.5 bg-slate-900 text-white text-sm font-semibold px-4 py-3 rounded-2xl shadow-xl">
+            <Lock size={15} className="text-amber-400 shrink-0" />
+            <span>Lakukan clock-in terlebih dahulu</span>
+          </div>
+        </div>
       )}
       
       <aside className={`
@@ -667,25 +698,29 @@ export function AppSidebar({
                       if (item.href === '/hris') badgeCount = badgeMetrics.hrisNotifications
                       if (item.href === '/cash') badgeCount = badgeMetrics.pendingCoaRequests
 
+                      const locked = isLockedByAttendance(item.href)
                       return (
                         <li key={`${group.group}:${item.label}:${item.href}`}>
                           <Link
-                            href={item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href}
-                            onMouseEnter={() => prefetchRoute(item.href)}
-                            onFocus={() => prefetchRoute(item.href)}
-                            onTouchStart={() => prefetchRoute(item.href)}
-                            onPointerDown={() => prefetchRoute(item.href)}
-                            onClick={() => {
+                            href={locked ? '/karyawan' : (item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href)}
+                            onMouseEnter={() => !locked && prefetchRoute(item.href)}
+                            onFocus={() => !locked && prefetchRoute(item.href)}
+                            onTouchStart={() => !locked && prefetchRoute(item.href)}
+                            onPointerDown={() => !locked && prefetchRoute(item.href)}
+                            onClick={(e) => {
+                              if (locked) { handleLockedClick(e); return }
                               prefetchRoute(item.href)
                               notifyRouteLoadingStart()
                               setIsMobileOpen(false)
                             }}
-                            title={effectiveIsCollapsed ? item.label : ''}
+                            title={effectiveIsCollapsed ? item.label : (locked ? 'Clock-in dulu untuk akses menu ini' : '')}
                             className={`flex items-center rounded-2xl text-sm font-bold transition-all duration-200 group/item relative
                               ${effectiveIsCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'}
-                              ${isActive
-                                ? 'bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
-                                : 'text-slate-500 hover:text-[#003366] hover:bg-[#003366]/5'
+                              ${locked
+                                ? 'opacity-40 cursor-not-allowed'
+                                : isActive
+                                  ? 'bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
+                                  : 'text-slate-500 hover:text-[#003366] hover:bg-[#003366]/5'
                               }`}
                           >
                             <div className="flex items-center gap-3.5 relative">
@@ -695,7 +730,12 @@ export function AppSidebar({
                                   strokeWidth={isActive ? 2.5 : 2}
                                   className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover/item:text-emerald-500'}`}
                                 />
-                                {effectiveIsCollapsed && badgeCount > 0 && (
+                                {locked && (
+                                  <div className="absolute -top-1 -right-1.5 w-3 h-3 rounded-full bg-amber-400 border border-white flex items-center justify-center">
+                                    <Lock size={6} className="text-white" />
+                                  </div>
+                                )}
+                                {!locked && effectiveIsCollapsed && badgeCount > 0 && (
                                   <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#003366] border border-white flex items-center justify-center text-[7px] font-black text-white shrink-0">
                                     {badgeCount > 9 ? '9+' : badgeCount}
                                   </div>
@@ -709,17 +749,17 @@ export function AppSidebar({
 
                             {!effectiveIsCollapsed && (
                               <div className="flex items-center gap-2">
-                                {badgeCount > 0 && (
+                                {!locked && badgeCount > 0 && (
                                   <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest leading-none flex items-center justify-center animate-in fade-in zoom-in ${isActive ? 'bg-white text-[#003366] shadow-sm' : 'bg-[#003366] text-white shadow-sm shadow-[#003366]/10'}`}>
                                     {badgeCount}
                                   </div>
                                 )}
-                                {item.module_key && pendingModules.includes(item.module_key) && badgeCount === 0 && (
+                                {!locked && item.module_key && pendingModules.includes(item.module_key) && badgeCount === 0 && (
                                   <div className="px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest leading-none bg-amber-400 text-white animate-in fade-in zoom-in">
                                     SETUP
                                   </div>
                                 )}
-                                {isCore && !isActive && badgeCount === 0 && !(item.module_key && pendingModules.includes(item.module_key)) && (
+                                {!locked && isCore && !isActive && badgeCount === 0 && !(item.module_key && pendingModules.includes(item.module_key)) && (
                                   <div className="px-1.5 py-0.5 rounded-md text-[8px] font-black tracking-widest leading-none bg-teal-50 text-teal-600 border border-teal-200/80 opacity-0 group-hover/item:opacity-100 transition-opacity duration-150">
                                     CORE
                                   </div>
@@ -750,24 +790,28 @@ export function AppSidebar({
                     if (item.href === '/hris') badgeCount = badgeMetrics.hrisNotifications
                     if (item.href === '/cash') badgeCount = badgeMetrics.pendingCoaRequests
 
+                    const locked = isLockedByAttendance(item.href)
                     return (
                       <li key={`${group.group}:${item.label}:${item.href}`}>
                         <Link
-                          href={item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href}
-                          onMouseEnter={() => prefetchRoute(item.href)}
-                          onFocus={() => prefetchRoute(item.href)}
-                          onTouchStart={() => prefetchRoute(item.href)}
-                          onPointerDown={() => prefetchRoute(item.href)}
-                          onClick={() => {
+                          href={locked ? '/karyawan' : (item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href)}
+                          onMouseEnter={() => !locked && prefetchRoute(item.href)}
+                          onFocus={() => !locked && prefetchRoute(item.href)}
+                          onTouchStart={() => !locked && prefetchRoute(item.href)}
+                          onPointerDown={() => !locked && prefetchRoute(item.href)}
+                          onClick={(e) => {
+                            if (locked) { handleLockedClick(e); return }
                             prefetchRoute(item.href)
                             notifyRouteLoadingStart()
                             setIsMobileOpen(false)
                           }}
-                          title={item.label}
+                          title={locked ? 'Clock-in dulu' : item.label}
                           className={`flex items-center justify-center rounded-2xl p-3 text-sm font-bold transition-all duration-200 group/item relative
-                            ${isActive
-                              ? 'bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
-                              : 'text-slate-500 hover:text-[#003366] hover:bg-[#003366]/5'
+                            ${locked
+                              ? 'opacity-40 cursor-not-allowed'
+                              : isActive
+                                ? 'bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
+                                : 'text-slate-500 hover:text-[#003366] hover:bg-[#003366]/5'
                             }`}
                         >
                           <div className="relative">
@@ -776,7 +820,12 @@ export function AppSidebar({
                               strokeWidth={isActive ? 2.5 : 2}
                               className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover/item:text-emerald-500'}`}
                             />
-                            {badgeCount > 0 && (
+                            {locked && (
+                              <div className="absolute -top-1 -right-1.5 w-3 h-3 rounded-full bg-amber-400 border border-white flex items-center justify-center">
+                                <Lock size={6} className="text-white" />
+                              </div>
+                            )}
+                            {!locked && badgeCount > 0 && (
                               <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#003366] border border-white flex items-center justify-center text-[7px] font-black text-white shrink-0">
                                 {badgeCount > 9 ? '9+' : badgeCount}
                               </div>
