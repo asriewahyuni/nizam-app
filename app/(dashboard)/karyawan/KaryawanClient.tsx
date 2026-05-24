@@ -906,55 +906,61 @@ export function KaryawanClient({
 
         {/* ── Bottom Tab Navigation ── */}
         <div className="fixed bottom-0 left-0 right-0 z-50 safe-area-pb">
-          {/* Background bar */}
-          <div className="bg-white border-t border-slate-200">
-            <div className="max-w-md mx-auto flex items-end h-16">
+          <div className="relative bg-white border-t border-slate-200">
+            <div className="max-w-md mx-auto relative">
 
-              {/* Kiri: Beranda + Cuti */}
-              {SIDE_TABS.slice(0, 2).map(({ id, label, icon: Icon }) => {
-                const active = tab === id
-                return (
-                  <button key={id} type="button" onClick={() => setTab(id)}
-                    className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-3 h-full transition-all cursor-pointer ${active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                    <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
-                    <span className={`text-[9px] font-black uppercase tracking-wide ${active ? 'text-blue-600' : ''}`}>{label}</span>
-                    {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />}
-                  </button>
-                )
-              })}
-
-              {/* Tengah: Presensi FAB placeholder */}
-              <div className="relative flex-1 flex flex-col items-center justify-end pb-2">
-                {/* FAB menonjol ke atas */}
+              {/* ── FAB Presensi — absolute ke tengah bar ── */}
+              <div className="absolute left-1/2 -translate-x-1/2 -top-8 flex flex-col items-center gap-0.5">
                 <button
                   type="button"
                   onClick={() => setTab('presensi')}
-                  className={`absolute -top-7 w-[60px] h-[60px] rounded-full flex flex-col items-center justify-center gap-0.5 shadow-xl transition-all cursor-pointer active:scale-95 ${
+                  className={`w-[58px] h-[58px] rounded-full flex items-center justify-center shadow-xl transition-all cursor-pointer active:scale-95 ${
                     tab === 'presensi'
-                      ? 'bg-blue-600 shadow-blue-300/60 scale-105'
+                      ? 'bg-blue-600 shadow-blue-400/50 scale-[1.07]'
                       : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-indigo-300/50 hover:scale-105'
                   }`}
                 >
                   <Fingerprint size={26} className="text-white" strokeWidth={tab === 'presensi' ? 2.5 : 2} />
                 </button>
-                <span className={`text-[9px] font-black uppercase tracking-wide mt-0.5 ${tab === 'presensi' ? 'text-blue-600' : 'text-slate-400'}`}>
-                  Presensi
-                </span>
               </div>
 
-              {/* Kanan: Reimburse + Gaji */}
-              {SIDE_TABS.slice(2).map(({ id, label, icon: Icon }) => {
-                const active = tab === id
-                return (
-                  <button key={id} type="button" onClick={() => setTab(id)}
-                    className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-3 h-full transition-all cursor-pointer ${active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
-                    <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
-                    <span className={`text-[9px] font-black uppercase tracking-wide ${active ? 'text-blue-600' : ''}`}>{label}</span>
-                    {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />}
-                  </button>
-                )
-              })}
+              {/* ── Tab row: 4 tab + 1 spacer di tengah ── */}
+              <div className="flex h-16">
 
+                {/* Kiri: Beranda + Cuti */}
+                {SIDE_TABS.slice(0, 2).map(({ id, label, icon: Icon }) => {
+                  const active = tab === id
+                  return (
+                    <button key={id} type="button" onClick={() => setTab(id)}
+                      className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                      <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+                      <span className="text-[9px] font-black uppercase tracking-wide">{label}</span>
+                      {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />}
+                    </button>
+                  )
+                })}
+
+                {/* Tengah: spacer + label Presensi */}
+                <div className="flex-1 flex flex-col items-center justify-end pb-1.5">
+                  <span className={`text-[9px] font-black uppercase tracking-wide ${tab === 'presensi' ? 'text-blue-600' : 'text-slate-400'}`}>
+                    Presensi
+                  </span>
+                </div>
+
+                {/* Kanan: Reimburse + Gaji */}
+                {SIDE_TABS.slice(2).map(({ id, label, icon: Icon }) => {
+                  const active = tab === id
+                  return (
+                    <button key={id} type="button" onClick={() => setTab(id)}
+                      className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                      <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+                      <span className="text-[9px] font-black uppercase tracking-wide">{label}</span>
+                      {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />}
+                    </button>
+                  )
+                })}
+
+              </div>
             </div>
           </div>
         </div>
