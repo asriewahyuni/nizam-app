@@ -90,11 +90,15 @@ export default async function DashboardLayout({
   const canManageSubOrganizations = isOwnerOrAdmin
   const isPosOnlyUser = hasPosOnlyAccess(orgData.role, orgData.permissions)
 
-  // Deteksi staff employee: bukan owner/admin DAN punya employee record yang terhubung
+  // Deteksi staff employee: bukan owner/admin DAN punya employee record DAN
+  // tidak ada permission yang di-assign (portal-only karyawan biasa).
+  // Jika user memiliki permission yang di-assign, mereka mengakses ERP sebagai
+  // manajer/supervisor dan harus mendapatkan sidebar penuh sesuai permission mereka.
   let isStaffEmployee = false
   if (!isOwnerOrAdmin) {
     const userId = String(orgData.user?.id || '').trim()
-    if (userId) {
+    const hasAssignedPermissions = Array.isArray(orgData.permissions) && orgData.permissions.length > 0
+    if (userId && !hasAssignedPermissions) {
       const supabaseForEmpCheck = await createClient()
       const { data: empRecord } = await (supabaseForEmpCheck as any)
         .from('employees')
