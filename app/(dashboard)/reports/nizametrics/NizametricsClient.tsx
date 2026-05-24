@@ -8,7 +8,8 @@ import {
   Save, Plus, Trash2, RefreshCcw, Zap,
   Lock, LockOpen, Star, Lightbulb,
   ChevronDown, ChevronUp, ShoppingCart,
-  CheckCircle2, AlertCircle, BookOpen, X,
+  CheckCircle2, AlertCircle, BookOpen, X, Pencil,
+  ListTodo,
 } from 'lucide-react'
 import { formatRupiah, getDateInTimeZone } from '@/lib/utils'
 import {
@@ -157,6 +158,11 @@ const DOMAIN_CONFIG: Record<BSCPerspective, DomainConfig> = {
   },
 }
 
+// ─── Todo Types ──────────────────────────────────────────────────────────────
+
+type TodoPriority = 'high' | 'medium' | 'low'
+type TodoItem = { priority: TodoPriority; text: string }
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatValue(unit: string | null | undefined, value: number): string {
@@ -182,6 +188,88 @@ function inferTargetForMetric(metricKey: BSCOperationalMetricKey, currentValue: 
   const isLower = LOWER_BETTER_FORMULA_KEYS.has(metricKey)
   if (currentValue <= 0) return isLower ? 10 : 1
   return isLower ? Math.max(1, Math.round(currentValue * 0.9)) : Math.max(1, Math.round(currentValue * 1.1))
+}
+
+function buildTodoList(
+  perspective: BSCPerspective,
+  ikhtiyyarValue: number,
+  ikhtiyyarTarget: number,
+  direction: BSCDirection,
+  ikhtiyyarLabel: string,
+  ikhtiyyarUnit: string,
+  kpis: BSCKPIItem[],
+  data: NizametricsClientProps['initialData']
+): TodoItem[] {
+  const todos: TodoItem[] = []
+  const gap = direction === 'HIGHER_BETTER'
+    ? ikhtiyyarTarget - ikhtiyyarValue
+    : ikhtiyyarValue - ikhtiyyarTarget
+  const isOnTarget = gap <= 0
+  const gapPct = ikhtiyyarTarget !== 0 ? (Math.abs(gap) / Math.abs(ikhtiyyarTarget)) * 100 : 0
+
+  if (perspective === 'FINANCIAL') {
+    if (!isOnTarget) {
+      const priority: TodoPriority = gapPct > 20 ? 'high' : gapPct > 10 ? 'medium' : 'low'
+      todos.push({ priority, text: `Tingkatkan Net Profit Margin dari ${ikhtiyyarValue.toFixed(1)}% → ${ikhtiyyarTarget}%: review beban operasional & harga jual.` })
+    } else {
+      todos.push({ priority: 'low', text: 'Margin sudah on-target — pertahankan dengan monitoring jurnal mingguan.' })
+    }
+    if (data.financial.currentExpenses > data.financial.currentRevenue * 0.5) {
+      todos.push({ priority: 'high', text: 'Pengeluaran > 50% pendapatan — identifikasi beban terbesar dan cari efisiensi.' })
+    }
+    if (data.financial.revenueGrowth < 5) {
+      todos.push({ priority: 'medium', text: 'Pertumbuhan pendapatan rendah — pertimbangkan ekspansi produk atau segmen baru.' })
+    }
+  } else if (perspective === 'CUSTOMER') {
+    const aov = data.customer.totalOrders > 0 ? data.customer.mtdSales / data.customer.totalOrders : 0
+    if (!isOnTarget) {
+      const priority: TodoPriority = gapPct > 30 ? 'high' : gapPct > 15 ? 'medium' : 'low'
+      todos.push({ priority, text: `Naikkan AOV dari ${formatValue('IDR', aov)} → ${formatValue('IDR', ikhtiyyarTarget)}: coba bundling atau program upsell.` })
+    } else {
+      todos.push({ priority: 'low', text: 'AOV on-target — pertahankan dengan program loyalitas pelanggan.' })
+    }
+    if (data.customer.totalOrders < 10) {
+      todos.push({ priority: 'high', text: 'Volume pesanan rendah — jalankan kampanye akuisisi pelanggan baru bulan ini.' })
+    } else {
+      todos.push({ priority: 'medium', text: 'Fokus retensi pelanggan aktif — follow-up pasca pembelian & repeat order.' })
+    }
+  } else if (perspective === 'INTERNAL_PROCESS') {
+    const backlog = data.internal.pendingPurchases + data.internal.pendingSales
+    if (!isOnTarget) {
+      const priority: TodoPriority = gapPct > 50 ? 'high' : gapPct > 20 ? 'medium' : 'low'
+      todos.push({ priority, text: `Kurangi Draft Backlog ${backlog} → ≤${ikhtiyyarTarget} docs: tuntaskan PO & SO yang tertunda.` })
+    } else {
+      todos.push({ priority: 'low', text: 'Draft Backlog on-target — pertahankan kedisiplinan penyelesaian dokumen.' })
+    }
+    if (data.internal.pendingPurchases > 5) {
+      todos.push({ priority: 'medium', text: `${data.internal.pendingPurchases} PO/draft pembelian belum selesai — tetapkan PIC per dokumen.` })
+    }
+    if (data.internal.overdueDepreciation > 0) {
+      todos.push({ priority: 'high', text: `${data.internal.overdueDepreciation} aset terlambat penyusutan — jalankan rekonsiliasi aset segera.` })
+    }
+  } else if (perspective === 'LEARNING_GROWTH') {
+    if (!isOnTarget) {
+      const priority: TodoPriority = gapPct > 20 ? 'high' : gapPct > 10 ? 'medium' : 'low'
+      todos.push({ priority, text: `HR Completion Rate ${ikhtiyyarValue.toFixed(0)}% → target ${ikhtiyyarTarget}%: pastikan semua payroll run selesai tepat waktu.` })
+    } else {
+      todos.push({ priority: 'low', text: 'HR Completion Rate on-target — pertahankan siklus penggajian rutin.' })
+    }
+    if (data.learning.activeEmployees === 0) {
+      todos.push({ priority: 'high', text: 'Belum ada karyawan aktif — setup data karyawan di modul HR.' })
+    } else if (data.learning.payrollRunsCompleted === 0) {
+      todos.push({ priority: 'high', text: 'Belum ada payroll run selesai bulan ini — jalankan siklus penggajian.' })
+    } else {
+      todos.push({ priority: 'low', text: `${data.learning.activeEmployees} karyawan aktif — lengkapi data kehadiran & evaluasi periode ini.` })
+    }
+  }
+
+  // Shared: unmeasured KPIs
+  const unmeasured = kpis.filter((k) => !k.latest_measurement)
+  if (unmeasured.length > 0) {
+    todos.push({ priority: 'medium', text: `${unmeasured.length} parameter KPI belum ada pengukuran — isi sebelum akhir bulan.` })
+  }
+
+  return todos.slice(0, 4)
 }
 
 function buildRecommendations(
@@ -233,6 +321,14 @@ export function NizametricsClient({
   const todayDate = getDateInTimeZone('Asia/Jakarta')
 
   // ── State ──
+  const [ikhtiyyarTargets, setIkhtiyyarTargets] = useState<Record<BSCPerspective, number>>({
+    FINANCIAL: DOMAIN_CONFIG.FINANCIAL.ikhtiyyar.targetDefault,
+    CUSTOMER: DOMAIN_CONFIG.CUSTOMER.ikhtiyyar.targetDefault,
+    INTERNAL_PROCESS: DOMAIN_CONFIG.INTERNAL_PROCESS.ikhtiyyar.targetDefault,
+    LEARNING_GROWTH: DOMAIN_CONFIG.LEARNING_GROWTH.ikhtiyyar.targetDefault,
+  })
+  const [ikhtiyyarTargetEditing, setIkhtiyyarTargetEditing] = useState<BSCPerspective | null>(null)
+  const [ikhtiyyarTargetDraft, setIkhtiyyarTargetDraft] = useState<string>('')
   const [cycleIsLocked, setCycleIsLocked] = useState(setupData.cycle?.status === 'LOCKED')
   const [paramPickerOpen, setParamPickerOpen] = useState<BSCPerspective | null>(null)
   const [measurementDrafts, setMeasurementDrafts] = useState<Record<string, { actual: string; note: string }>>({})
@@ -550,7 +646,7 @@ export function NizametricsClient({
 
           // Ikhtiyyar live value
           const ikhtiyyarValue = domain.ikhtiyyar.getValue(initialData)
-          const ikhtiyyarTarget = domain.ikhtiyyar.targetDefault
+          const ikhtiyyarTarget = ikhtiyyarTargets[perspective]
           const ikhtiyyarDir = domain.ikhtiyyar.direction
 
           // Progress bar for Ikhtiyyar
@@ -573,6 +669,14 @@ export function NizametricsClient({
             perspectiveKpis, ikhtiyyarValue, ikhtiyyarTarget,
             ikhtiyyarDir, domain.ikhtiyyar.label, cycleIsLocked, uncoveredMetrics
           )
+
+          // Todolist
+          const todoList = buildTodoList(
+            perspective, ikhtiyyarValue, ikhtiyyarTarget,
+            ikhtiyyarDir, domain.ikhtiyyar.label, domain.ikhtiyyar.unit,
+            perspectiveKpis, initialData
+          )
+          const isEditingTarget = ikhtiyyarTargetEditing === perspective
 
           return (
             <motion.div
@@ -616,9 +720,53 @@ export function NizametricsClient({
                         {formatValue(domain.ikhtiyyar.unit, ikhtiyyarValue)}
                       </p>
                     </div>
-                    <p className="text-xs text-slate-400 font-semibold">
-                      Target {formatValue(domain.ikhtiyyar.unit, ikhtiyyarTarget)}
-                    </p>
+                    {/* Editable Ikhtiyyar Target */}
+                    <div className="flex flex-col items-end gap-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target</p>
+                      {isEditingTarget ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={ikhtiyyarTargetDraft}
+                            onChange={(e) => setIkhtiyyarTargetDraft(e.target.value)}
+                            onBlur={() => {
+                              const parsed = Number(ikhtiyyarTargetDraft)
+                              if (!Number.isNaN(parsed) && parsed > 0) {
+                                setIkhtiyyarTargets((prev) => ({ ...prev, [perspective]: parsed }))
+                              }
+                              setIkhtiyyarTargetEditing(null)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                const parsed = Number(ikhtiyyarTargetDraft)
+                                if (!Number.isNaN(parsed) && parsed > 0) {
+                                  setIkhtiyyarTargets((prev) => ({ ...prev, [perspective]: parsed }))
+                                }
+                                setIkhtiyyarTargetEditing(null)
+                              }
+                              if (e.key === 'Escape') setIkhtiyyarTargetEditing(null)
+                            }}
+                            autoFocus
+                            className="w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-black text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 text-right"
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIkhtiyyarTargetDraft(String(ikhtiyyarTarget))
+                            setIkhtiyyarTargetEditing(perspective)
+                          }}
+                          className="flex items-center gap-1 group cursor-pointer"
+                          title="Klik untuk ubah target"
+                        >
+                          <span className="text-sm font-black text-slate-600 group-hover:text-slate-900 transition-colors">
+                            {formatValue(domain.ikhtiyyar.unit, ikhtiyyarTarget)}
+                          </span>
+                          <Pencil size={10} className="text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="h-1.5 rounded-full bg-white/70 border border-white/50 overflow-hidden">
                     <div
@@ -828,6 +976,37 @@ export function NizametricsClient({
                         {rec}
                       </p>
                     ))}
+                  </div>
+                )}
+
+                {/* Todolist dari Gap Ikhtiyyar */}
+                {todoList.length > 0 && (
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <ListTodo size={12} className="text-slate-500 shrink-0" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Todolist Domain</p>
+                    </div>
+                    <div className="space-y-1.5 pl-1">
+                      {todoList.map((todo, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span
+                            className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
+                              todo.priority === 'high'
+                                ? 'bg-rose-500'
+                                : todo.priority === 'medium'
+                                  ? 'bg-amber-400'
+                                  : 'bg-slate-300'
+                            }`}
+                          />
+                          <p className="text-xs text-slate-700 font-medium leading-relaxed">{todo.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-3 pt-0.5 pl-1">
+                      <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /><span className="text-[10px] text-slate-400 font-semibold">Prioritas Tinggi</span></div>
+                      <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /><span className="text-[10px] text-slate-400 font-semibold">Sedang</span></div>
+                      <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 inline-block" /><span className="text-[10px] text-slate-400 font-semibold">Rendah</span></div>
+                    </div>
                   </div>
                 )}
               </div>
