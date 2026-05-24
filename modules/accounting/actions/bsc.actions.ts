@@ -1172,7 +1172,7 @@ export async function saveBSCPerspectiveWeights(orgId: string, weights: BSCWeigh
 
   if (error) return { error: error.message || 'Gagal menyimpan bobot perspektif Nizametrics.' }
 
-  revalidatePath('/reports/bsc')
+  revalidatePath('/reports/nizametrics')
   return { success: true }
 }
 
@@ -1257,7 +1257,7 @@ export async function upsertBSCKPI(orgId: string, input: UpsertBSCKPIInput, bran
 
     if (error) return { error: error.message || 'Gagal memperbarui KPI.' }
 
-    revalidatePath('/reports/bsc')
+    revalidatePath('/reports/nizametrics')
     return { success: true, kpiId: existingKpi.id }
   }
 
@@ -1279,7 +1279,7 @@ export async function upsertBSCKPI(orgId: string, input: UpsertBSCKPIInput, bran
     return { error: error?.message || 'Gagal menambahkan KPI baru.' }
   }
 
-  revalidatePath('/reports/bsc')
+  revalidatePath('/reports/nizametrics')
   return { success: true, kpiId: String(inserted.id) }
 }
 
@@ -1298,7 +1298,7 @@ export async function archiveBSCKPI(orgId: string, kpiId: string, branchId?: str
 
   if (error) return { error: error.message || 'Gagal menonaktifkan KPI.' }
 
-  revalidatePath('/reports/bsc')
+  revalidatePath('/reports/nizametrics')
   return { success: true }
 }
 
@@ -1348,7 +1348,7 @@ export async function recordBSCKPIMeasurement(orgId: string, input: RecordMeasur
 
   if (error) return { error: error.message || 'Gagal menyimpan pengukuran KPI.' }
 
-  revalidatePath('/reports/bsc')
+  revalidatePath('/reports/nizametrics')
   return { success: true }
 }
 
@@ -1379,7 +1379,7 @@ export async function seedDefaultBSCKpis(orgId: string, branchId?: string | null
 
   if (error) return { error: error.message || 'Gagal membuat template KPI default.' }
 
-  revalidatePath('/reports/bsc')
+  revalidatePath('/reports/nizametrics')
   return { success: true, inserted: rows.length }
 }
 
@@ -1459,7 +1459,7 @@ export async function generateBSCKpisFromExistingData(orgId: string, branchId?: 
     }
   }
 
-  revalidatePath('/reports/bsc')
+  revalidatePath('/reports/nizametrics')
 
   return {
     success: true,
@@ -1517,7 +1517,7 @@ export async function applyBscKpiSuggestedIndicator(
 
   if (error) return { error: error.message || 'Gagal menerapkan indikator ke KPI.' }
 
-  revalidatePath('/reports/bsc')
+  revalidatePath('/reports/nizametrics')
   return { success: true }
 }
 
@@ -1617,7 +1617,7 @@ export async function syncBSCKpisFromExistingData(orgId: string, branchId?: stri
     return { error: syncError.message || 'Gagal menyimpan sinkronisasi KPI otomatis.' }
   }
 
-  revalidatePath('/reports/bsc')
+  revalidatePath('/reports/nizametrics')
 
   return {
     success: true,
@@ -1665,7 +1665,7 @@ export async function lockBSCCycle(orgId: string, branchId?: string | null) {
 
   if (error) return { error: error.message || 'Gagal mengunci siklus Nizametrics.' }
 
-  revalidatePath('/reports/bsc')
+  revalidatePath('/reports/nizametrics')
   return { success: true }
 }
 
@@ -1685,6 +1685,6 @@ export async function unlockBSCCycle(orgId: string, branchId?: string | null) {
 
   if (error) return { error: error.message || 'Gagal membuka kunci siklus Nizametrics.' }
 
-  revalidatePath('/reports/bsc')
+  revalidatePath('/reports/nizametrics')
   return { success: true }
 }

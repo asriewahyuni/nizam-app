@@ -40,7 +40,7 @@ import {
 
 type BSCSetupData = BSCSetupPayload
 
-export interface BSCClientProps {
+export interface NizametricsClientProps {
   orgId: string
   activeBranchId: string | null
   activeBranchName: string | null
@@ -95,7 +95,7 @@ type DomainConfig = {
   ikhtiyyar: {
     label: string
     ikhtiyyarFormulaKey: string
-    getValue: (data: BSCClientProps['initialData']) => number
+    getValue: (data: NizametricsClientProps['initialData']) => number
     unit: string
     targetDefault: number
     direction: BSCDirection
@@ -220,14 +220,14 @@ function buildRecommendations(
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export function BSCClient({
+export function NizametricsClient({
   orgId,
   activeBranchId = null,
   activeBranchName = null,
   allowAllBranchSelection = false,
   initialData,
   setupData,
-}: BSCClientProps) {
+}: NizametricsClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const todayDate = getDateInTimeZone('Asia/Jakarta')
