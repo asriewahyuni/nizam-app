@@ -156,6 +156,73 @@ async function fetchWeatherData(lat: number, lng: number): Promise<WeatherData |
   }
 }
 
+// ─── Time-based Sky Theme ────────────────────────────────────────────────────
+
+type TimeSlot = 'subuh' | 'pagi' | 'siang' | 'sore' | 'magrib' | 'malam'
+
+function getTimeSlot(h: number): TimeSlot {
+  if (h >= 4  && h < 6)  return 'subuh'
+  if (h >= 6  && h < 10) return 'pagi'
+  if (h >= 10 && h < 15) return 'siang'
+  if (h >= 15 && h < 18) return 'sore'
+  if (h >= 18 && h < 20) return 'magrib'
+  return 'malam'
+}
+
+const SKY_THEMES: Record<TimeSlot, {
+  sky: string       // CSS gradient (inline style)
+  silhouette: string
+  windows: boolean  // lit windows on buildings
+  stars: boolean
+  celestial: { type: 'sun' | 'moon'; cx: number; cy: number } | null
+}> = {
+  subuh: {
+    sky: 'linear-gradient(to bottom, #05050f 0%, #150830 40%, #3d1060 65%, #8b2500 85%, #d04000 100%)',
+    silhouette: '#0a0a18', windows: true, stars: true,
+    celestial: { type: 'moon', cx: 78, cy: 22 },
+  },
+  pagi: {
+    sky: 'linear-gradient(to bottom, #5ba3d9 0%, #f5a94a 45%, #f76e2a 70%, #ffc750 100%)',
+    silhouette: '#18182e', windows: false, stars: false,
+    celestial: { type: 'sun', cx: 14, cy: 38 },
+  },
+  siang: {
+    sky: 'linear-gradient(to bottom, #1060c0 0%, #3490e0 35%, #6ab8f0 65%, #b8dff8 88%, #ddf0ff 100%)',
+    silhouette: '#1e2a38', windows: false, stars: false,
+    celestial: { type: 'sun', cx: 55, cy: 14 },
+  },
+  sore: {
+    sky: 'linear-gradient(to bottom, #0e3a82 0%, #2060b0 30%, #e07a20 65%, #d04800 85%, #a83000 100%)',
+    silhouette: '#12192e', windows: false, stars: false,
+    celestial: { type: 'sun', cx: 86, cy: 45 },
+  },
+  magrib: {
+    sky: 'linear-gradient(to bottom, #10003a 0%, #5a0070 22%, #c01860 48%, #f04810 72%, #f08020 100%)',
+    silhouette: '#080814', windows: true, stars: true,
+    celestial: { type: 'sun', cx: 90, cy: 60 },
+  },
+  malam: {
+    sky: 'linear-gradient(to bottom, #010108 0%, #040418 35%, #06082a 65%, #080c20 100%)',
+    silhouette: '#06060f', windows: true, stars: true,
+    celestial: { type: 'moon', cx: 72, cy: 20 },
+  },
+}
+
+// Hardcoded stars (cx/cy in % of viewBox 0-100)
+const STARS = [
+  [5,6],[12,3],[19,9],[27,4],[34,12],[41,5],[49,8],[57,3],[63,11],[71,6],[79,9],[87,4],[93,14],[97,7],
+  [8,18],[16,22],[24,16],[33,20],[44,17],[52,23],[60,18],[68,22],[76,16],[84,19],[91,24],
+  [3,28],[14,31],[30,26],[48,29],[65,27],[82,30],[95,28],
+].map(([cx, cy], i) => ({ cx, cy, r: i % 5 === 0 ? 1.3 : i % 3 === 0 ? 1.0 : 0.7, op: 0.55 + (i % 4) * 0.12 }))
+
+// Window positions on buildings (for night)
+const WINDOWS = [
+  [38,52],[38,62],[44,52],[44,62],[44,70],[124,40],[124,50],[127,30],[127,40],[127,50],
+  [170,32],[170,42],[174,20],[174,32],[174,42],[178,32],[178,42],
+  [249,35],[249,45],[253,22],[253,35],[253,45],[257,35],[257,45],
+  [80,62],[87,50],[87,62],[288,65],[296,55],[303,65],[362,68],
+].map(([x, y]) => ({ x, y }))
+
 // ─── Input style helper ───────────────────────────────────────────────────────
 const inputCls = 'w-full rounded-2xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-blue-400 dark:focus:border-blue-500'
 
@@ -170,16 +237,22 @@ export function KaryawanClient({
   const [tab, setTab] = useState<Tab>('beranda')
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
 
-  // ── Dark mode ──
+  // ── Dark mode (apply to html element — Tailwind class strategy) ──
   const [darkMode, setDarkMode] = useState(false)
   useEffect(() => {
     const saved = localStorage.getItem('karyawan-dark-mode')
-    if (saved === 'true') setDarkMode(true)
+    const isDark = saved === 'true'
+    setDarkMode(isDark)
+    if (isDark) document.documentElement.classList.add('dark')
+    else        document.documentElement.classList.remove('dark')
+    return () => document.documentElement.classList.remove('dark')
   }, [])
   const toggleDarkMode = () => {
     const next = !darkMode
     setDarkMode(next)
     localStorage.setItem('karyawan-dark-mode', String(next))
+    if (next) document.documentElement.classList.add('dark')
+    else      document.documentElement.classList.remove('dark')
   }
 
   // ── Sheet state ──
@@ -432,6 +505,10 @@ export function KaryawanClient({
     timeZone: 'Asia/Jakarta',
   })
 
+  // Time-based sky
+  const timeSlot  = getTimeSlot(now.getHours())
+  const skyTheme  = SKY_THEMES[timeSlot]
+
   // Current avatar for display (might be updated during edit)
   const currentAvatarUrl = employee?.avatar_url
 
@@ -466,9 +543,8 @@ export function KaryawanClient({
   ]
 
   return (
-    <div className={darkMode ? 'dark' : ''}>
-      <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
-        <div className="max-w-md mx-auto relative min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
+      <div className="max-w-md mx-auto relative min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
 
           <div className="flex-1 overflow-y-auto pb-24">
             <AnimatePresence mode="wait">
@@ -479,14 +555,76 @@ export function KaryawanClient({
               {tab === 'beranda' && (
                 <motion.div key="beranda" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
 
-                  {/* ── COVER ── */}
+                  {/* ── COVER — Dynamic Sky ── */}
                   <div className="relative">
-                    <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 relative overflow-hidden px-5 pt-4 pb-14">
-                      <div className="absolute -top-10 -right-10 w-52 h-52 bg-white/5 rounded-full pointer-events-none" />
-                      <div className="absolute -bottom-16 -left-8 w-44 h-44 bg-white/5 rounded-full pointer-events-none" />
+                    <div
+                      className="relative overflow-hidden px-5 pt-4 pb-16"
+                      style={{ background: skyTheme.sky, minHeight: 220 }}
+                    >
+                      {/* ── Stars (subuh / magrib / malam) ── */}
+                      {skyTheme.stars && (
+                        <svg
+                          viewBox="0 0 100 35"
+                          preserveAspectRatio="none"
+                          className="absolute inset-0 w-full h-full pointer-events-none z-0"
+                          style={{ top: 0, height: '60%' }}
+                        >
+                          {STARS.map((s, i) => (
+                            <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill="white" opacity={s.op} />
+                          ))}
+                        </svg>
+                      )}
 
-                      {/* Row 1: Org + GPS + Weather + Settings */}
-                      <div className="flex items-center justify-between mb-4 relative z-10 gap-2 flex-wrap">
+                      {/* ── Celestial body: Sun or Moon ── */}
+                      {skyTheme.celestial && (
+                        <div
+                          className="absolute pointer-events-none z-0"
+                          style={{ left: `${skyTheme.celestial.cx}%`, top: `${skyTheme.celestial.cy}%`, transform: 'translate(-50%, -50%)' }}
+                        >
+                          {skyTheme.celestial.type === 'sun' ? (
+                            /* Sun */
+                            <div className="relative flex items-center justify-center">
+                              <div className="absolute w-14 h-14 rounded-full bg-yellow-200/20 animate-pulse" />
+                              <div className="absolute w-10 h-10 rounded-full bg-yellow-100/30" />
+                              <div className="w-7 h-7 rounded-full bg-yellow-100 shadow-[0_0_24px_8px_rgba(255,220,100,0.6)]" />
+                            </div>
+                          ) : (
+                            /* Moon — crescent via clip */
+                            <div className="relative w-7 h-7">
+                              <div className="w-7 h-7 rounded-full bg-slate-100 shadow-[0_0_16px_4px_rgba(200,210,255,0.5)]" />
+                              <div className="absolute top-0 right-0 w-5 h-7 rounded-full" style={{ background: skyTheme.sky.split(',')[0].replace('linear-gradient(to bottom, ', '') }} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ── City Silhouette ── */}
+                      <svg
+                        viewBox="0 0 400 100"
+                        preserveAspectRatio="none"
+                        className="absolute bottom-0 left-0 right-0 w-full pointer-events-none z-10"
+                        style={{ height: 100 }}
+                      >
+                        {/* Buildings */}
+                        <path
+                          d="M0,100 V75 H8 V65 H15 V75 H25 V50 H33 V38 H38 V28 H42 V38 H47 V50 H58 V75 H70 V58 H78 V45 H85 V58 H95 V75 H108 V60 H115 V48 H120 V35 H123 V22 H126 V35 H129 V48 H134 V60 H142 V75 H155 V52 H162 V40 H167 V24 H171 V14 H175 V24 H179 V40 H184 V52 H192 V75 H205 V60 H212 V48 H219 V60 H225 V75 H237 V55 H245 V42 H250 V30 H254 V20 H258 V30 H262 V42 H267 V55 H275 V75 H288 V62 H296 V50 H303 V62 H309 V75 H322 V65 H329 V55 H336 V65 H342 V75 H355 V70 H362 V62 H369 V70 H375 V75 H388 V80 H400 V100 Z"
+                          fill={skyTheme.silhouette}
+                        />
+                        {/* Lit windows (malam/subuh/magrib) */}
+                        {skyTheme.windows && WINDOWS.map((w, i) => (
+                          <rect key={i} x={w.x} y={w.y} width={2.5} height={3.5} fill="#ffd580" opacity={0.7 + (i % 3) * 0.1} rx={0.4} />
+                        ))}
+                        {/* Antenna on tallest building */}
+                        <line x1="175" y1="14" x2="175" y2="8" stroke={skyTheme.silhouette} strokeWidth="1.5" />
+                        <circle cx="175" cy="7.5" r="1.2" fill={timeSlot === 'malam' || timeSlot === 'subuh' ? '#ff4444' : skyTheme.silhouette} />
+                      </svg>
+
+                      {/* ── Text overlay gradient for readability ── */}
+                      <div className="absolute inset-0 pointer-events-none z-10"
+                        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 55%)' }} />
+
+                      {/* ── Row 1: Org + GPS + Weather + Settings ── */}
+                      <div className="flex items-center justify-between mb-4 relative z-20 gap-2 flex-wrap">
                         <div className="flex items-center gap-2">
                           {orgName && (
                             <div className="flex items-center gap-1">
@@ -496,11 +634,9 @@ export function KaryawanClient({
                           )}
                           <GpsBadge />
                         </div>
-
                         <div className="flex items-center gap-2">
-                          {/* Weather */}
                           {weather ? (
-                            <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-2xl">
+                            <div className="flex items-center gap-1.5 bg-black/25 backdrop-blur-sm border border-white/15 px-3 py-1.5 rounded-2xl">
                               <weather.Icon size={13} className="text-white" />
                               <span className="text-[13px] font-black text-white tabular-nums">{weather.temp}°C</span>
                               <span className="text-[10px] font-bold text-white/70">{weather.label}</span>
@@ -508,24 +644,20 @@ export function KaryawanClient({
                           ) : (
                             <div className="w-24 h-7 bg-white/10 rounded-2xl animate-pulse" />
                           )}
-                          {/* Settings button */}
-                          <button
-                            type="button"
-                            onClick={() => setSheet('settings')}
-                            className="w-8 h-8 rounded-full bg-white/15 border border-white/20 flex items-center justify-center cursor-pointer hover:bg-white/25 active:scale-95 transition-all"
-                          >
+                          <button type="button" onClick={() => setSheet('settings')}
+                            className="w-8 h-8 rounded-full bg-black/25 border border-white/15 flex items-center justify-center cursor-pointer hover:bg-black/40 active:scale-95 transition-all">
                             <Settings size={14} className="text-white" />
                           </button>
                         </div>
                       </div>
 
-                      {/* Row 2: Jam besar + Tanggal + Greeting */}
-                      <div className="relative z-10">
-                        <p suppressHydrationWarning className="text-[44px] leading-none font-black text-white tracking-tight font-mono tabular-nums">
+                      {/* ── Row 2: Jam besar + Tanggal + Greeting ── */}
+                      <div className="relative z-20">
+                        <p suppressHydrationWarning className="text-[44px] leading-none font-black text-white tracking-tight font-mono tabular-nums drop-shadow-lg">
                           {clockStr}
                         </p>
-                        <p suppressHydrationWarning className="text-[11px] text-white/60 font-bold mt-1 tracking-wider capitalize">{dateStr}</p>
-                        <p suppressHydrationWarning className="text-[14px] font-black text-white/90 mt-3">
+                        <p suppressHydrationWarning className="text-[11px] text-white/65 font-bold mt-1 tracking-wider capitalize">{dateStr}</p>
+                        <p suppressHydrationWarning className="text-[14px] font-black text-white mt-3 drop-shadow">
                           {greeting}, {firstName} 👋
                         </p>
                         {weather && (
@@ -537,7 +669,7 @@ export function KaryawanClient({
                     </div>
 
                     {/* Avatar — kanan, overlapping cover */}
-                    <div className="absolute right-5 bottom-0 translate-y-1/2">
+                    <div className="absolute right-5 bottom-0 translate-y-1/2 z-30">
                       <div className="w-20 h-20 rounded-full ring-4 ring-slate-50 dark:ring-slate-900 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-xl overflow-hidden">
                         {currentAvatarUrl
                           ? <img src={currentAvatarUrl} alt={name} className="w-full h-full object-cover" />
@@ -1282,7 +1414,6 @@ export function KaryawanClient({
             )}
           </AnimatePresence>
 
-        </div>
       </div>
     </div>
   )
