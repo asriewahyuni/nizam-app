@@ -44,6 +44,7 @@ import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 import { createEmployee, deleteEmployee, resignEmployee, transferEmployeeToChildOrg, updateEmployee } from '@/modules/hris/actions/employee.actions'
 import { createPayrollComponent, deletePayrollComponent, generatePayrollRun, payPayrollRun, fixEmptyPayrollJournals, getPayrollRunDetails, deletePayrollRun, voidPayrollRun } from '@/modules/hris/actions/payroll.actions'
 import { upsertAttendanceRecord } from '@/modules/hris/actions/attendance.actions'
+import { AttendanceQRButton } from '@/components/hris/AttendanceQRButton'
 import { approveLeaveRequest, createLeaveRequest, rejectLeaveRequest } from '@/modules/hris/actions/leave.actions'
 import {
   deleteOrganizationRole,
@@ -1155,15 +1156,24 @@ export default function HrisClient({
                 subtitle="Kelola absensi manual per hari berdasarkan karyawan yang termasuk ke unit yang bisa Anda akses."
                 icon={Clock}
                 actions={
-                  <SafeButton
-                    onClick={() => setIsAttendanceModalOpen(true)}
-                    variant="primary"
-                    size="sm"
-                    icon={<Plus size={16} />}
-                    disabled={employees.length === 0}
-                  >
-                    CATAT ABSENSI
-                  </SafeButton>
+                  <div className="flex items-center gap-2">
+                    {activeBranchId && (
+                      <AttendanceQRButton
+                        orgId={orgId}
+                        branchId={activeBranchId}
+                        branchName={activeBranchName || 'Unit Aktif'}
+                      />
+                    )}
+                    <SafeButton
+                      onClick={() => setIsAttendanceModalOpen(true)}
+                      variant="primary"
+                      size="sm"
+                      icon={<Plus size={16} />}
+                      disabled={employees.length === 0}
+                    >
+                      CATAT ABSENSI
+                    </SafeButton>
+                  </div>
                 }
               />
 

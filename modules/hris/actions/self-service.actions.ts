@@ -122,6 +122,82 @@ export async function getMyExpenseClaims(orgId: string) {
   return data
 }
 
+// ─── QR Scan Attendance ──────────────────────────────────────────────────────
+
+export type QRScanResult =
+  | { action: 'IN'; time: string; employeeName: string }
+  | { action: 'OUT'; time: string; employeeName: string; durationMinutes: number }
+  | { action: 'ALREADY_COMPLETE'; checkIn: string; checkOut: string; employeeName: string }
+  | { error: string }
+
+export async function clockByQRScan(orgId: string, branchId: string): Promise<QRScanResult> {
+  const selfEmployee = await getAuthenticatedEmployee(orgId)
+  if ('error' in selfEmployee) return { error: selfEmployee.error }
+
+  const supabase = await createClient()
+  const db = supabase as any
+  const now = new Date()
+  const today = now.toISOString().split('T')[0]
+  const nowISO = now.toISOString()
+  const qrPayload = `qr:branch=${branchId}:date=${today}`
+  const employeeName = `${selfEmployee.employee.first_name} ${selfEmployee.employee.last_name || ''}`.trim()
+
+  const { data: existing, error: fetchErr } = await db
+    .from('attendance')
+    .select('id, check_in, check_out')
+    .eq('org_id', orgId)
+    .eq('employee_id', selfEmployee.employee.id)
+    .eq('record_date', today)
+    .maybeSingle()
+
+  if (fetchErr) return { error: fetchErr.message }
+
+  if (!existing) {
+    // ── Clock IN ──
+    const { error } = await db.from('attendance').insert({
+      org_id: orgId,
+      branch_id: branchId,
+      employee_id: selfEmployee.employee.id,
+      record_date: today,
+      check_in: nowISO,
+      status: 'PRESENT',
+      qr_scanned_payload: qrPayload,
+      created_at: nowISO,
+    })
+    if (error) return { error: error.message }
+    revalidatePath('/hris')
+    revalidatePath('/profil-saya')
+    return { action: 'IN', time: nowISO, employeeName }
+  }
+
+  if (!existing.check_out) {
+    // ── Clock OUT ──
+    const checkInTime = new Date(existing.check_in)
+    const durationMinutes = Math.floor((now.getTime() - checkInTime.getTime()) / 60_000)
+    const { error } = await db
+      .from('attendance')
+      .update({
+        check_out: nowISO,
+        qr_scanned_payload: `${qrPayload}|out=${nowISO}`,
+        updated_at: nowISO,
+      })
+      .eq('id', existing.id)
+      .eq('org_id', orgId)
+    if (error) return { error: error.message }
+    revalidatePath('/hris')
+    revalidatePath('/profil-saya')
+    return { action: 'OUT', time: nowISO, employeeName, durationMinutes }
+  }
+
+  // ── Already complete ──
+  return {
+    action: 'ALREADY_COMPLETE',
+    checkIn: existing.check_in,
+    checkOut: existing.check_out,
+    employeeName,
+  }
+}
+
 export async function clockMyAttendance(orgId: string, payload: { type: 'IN' | 'OUT'; notes?: string }) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return { error: selfEmployee.error }
