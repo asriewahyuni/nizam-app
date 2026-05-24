@@ -190,6 +190,29 @@ export default async function DashboardLayout({
     }
   }
 
+  // ── STAFF EMPLOYEE: tampilkan halaman langsung tanpa chrome ERP ──
+  if (isStaffEmployee) {
+    return (
+      <>
+        <SentryUserContext
+          userId={orgData.user?.id || null}
+          email={orgData.user?.email || null}
+          fullName={String(orgData.user?.user_metadata?.full_name || orgData.user?.email || '')}
+          orgId={orgData.org.id}
+          orgName={orgData.org.name}
+          branchId={activeBranch?.id || null}
+          branchName={activeBranch?.name || null}
+          role={orgData.role}
+          route={requestPathname}
+          feature="karyawan"
+        />
+        <RouteProgressBar />
+        <UserActivityTracker />
+        {children}
+      </>
+    )
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 print:block print:h-auto print:overflow-visible print:bg-white">
       <SentryUserContext
