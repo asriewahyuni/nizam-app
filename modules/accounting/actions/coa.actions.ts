@@ -12,6 +12,7 @@
  */
 
 import { revalidatePath } from 'next/cache'
+import ExcelJS from 'exceljs'
 import type {
   Account,
   AccountType,
@@ -102,73 +103,148 @@ async function getCoAManagementContextFromDb(db: any, orgId: string): Promise<Co
   }
 }
 
+/**
+ * Hierarki CoA Standar PSAK (Indonesia PSAK 1)
+ * Urutan: parent selalu sebelum child agar backfill/insert berjalan benar.
+ *
+ * 1xxx - ASET
+ *   1100 - Aset Lancar
+ *     1101-1105  Kas & Bank          → parent 1100
+ *     1200       Piutang (grup)      → parent 1100
+ *       1201-1203 Piutang detail     → parent 1200
+ *     1300       Persediaan (grup)   → parent 1100
+ *       1301-1304 Persediaan detail  → parent 1300
+ *     1400       Aset Lancar Lainnya → parent 1100
+ *       1401-1403 detail             → parent 1400
+ *   1500 - Aset Tetap                → parent 1000
+ *     1501-1507  detail              → parent 1500
+ *   1600 - Investasi Jangka Panjang  → parent 1000
+ *     1601       detail              → parent 1600
+ *
+ * 2xxx - LIABILITAS
+ *   2100 - Hutang Lancar             → parent 2000
+ *     2101-2102  detail              → parent 2100
+ *   2200 - Hutang Pajak              → parent 2000
+ *     2201-2204  detail              → parent 2200
+ *   2300 - Pendapatan Diterima di Muka → parent 2000
+ *     2301-2302  detail              → parent 2300
+ *   2400 - Hutang Jangka Pendek Lainnya → parent 2000
+ *     2401       detail              → parent 2400
+ *   2500 - Hutang Jangka Panjang     → parent 2000
+ *     2501       detail              → parent 2500
+ *
+ * 3xxx - EKUITAS
+ *   3001-3004    langsung bawah 3000
+ *
+ * 4xxx - PENDAPATAN
+ *   4001-4003    Pendapatan Usaha    → parent 4000
+ *   4100 - Pendapatan Non-Usaha      → parent 4000
+ *     4101-4102  detail              → parent 4100
+ *
+ * 5xxx - BEBAN POKOK PENJUALAN
+ *   5001-5003    langsung bawah 5000
+ *
+ * 6xxx - BEBAN OPERASIONAL
+ *   6001-6099    Beban Operasional   → parent 6000
+ *   6100 - Beban Non-Operasional     → parent 6000
+ *     6101       detail              → parent 6100
+ */
 const STANDARD_PSAK_COA_TEMPLATE: StandardCoATemplate[] = [
-  { code: '1000', name: 'Aset', type: 'ASSET', normal_balance: 'DEBIT' },
-  { code: '1100', name: 'Aset Lancar', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1101', name: 'Kas Besar', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1102', name: 'Kas Kecil (Petty Cash)', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1103', name: 'Bank - Rekening Operasional', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1104', name: 'Bank - Rekening Payroll', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1105', name: 'Bank - Rekening Lainnya', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1201', name: 'Piutang Usaha', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1202', name: 'Piutang Karyawan', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1203', name: 'Cadangan Kerugian Piutang', type: 'ASSET', normal_balance: 'CREDIT', parent_code: '1000' },
-  { code: '1301', name: 'Persediaan Barang Dagangan', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1302', name: 'Persediaan Barang Dalam Proses', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1303', name: 'Persediaan Bahan Baku', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1304', name: 'Persediaan Barang Jadi', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1401', name: 'PPN Masukan (Pajak Dibayar)', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1402', name: 'Biaya Dibayar Dimuka', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1403', name: 'Uang Muka Pembelian', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1500', name: 'Aset Tetap', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1501', name: 'Tanah', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1502', name: 'Bangunan', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1503', name: 'Akumulasi Penyusutan Bangunan', type: 'ASSET', normal_balance: 'CREDIT', parent_code: '1000' },
-  { code: '1504', name: 'Kendaraan', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1505', name: 'Akumulasi Penyusutan Kendaraan', type: 'ASSET', normal_balance: 'CREDIT', parent_code: '1000' },
-  { code: '1506', name: 'Peralatan & Mesin', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1507', name: 'Akumulasi Penyusutan Peralatan', type: 'ASSET', normal_balance: 'CREDIT', parent_code: '1000' },
-  { code: '1600', name: 'Investasi Jangka Panjang', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
-  { code: '1601', name: 'Investasi pada Entitas Anak / Unit', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1600' },
-  { code: '2000', name: 'Liabilitas', type: 'LIABILITY', normal_balance: 'CREDIT' },
-  { code: '2101', name: 'Hutang Usaha', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
-  { code: '2102', name: 'Hutang Bank Jangka Pendek', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
-  { code: '2201', name: 'PPN Keluaran (Pajak Dipungut)', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
-  { code: '2202', name: 'Hutang PPh 21', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
-  { code: '2203', name: 'Hutang PPh 23', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
-  { code: '2204', name: 'Hutang PPh Badan', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
-  { code: '2301', name: 'Pendapatan Diterima di Muka', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
-  { code: '2302', name: 'Uang Muka Penjualan', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
-  { code: '2401', name: 'Hutang Gaji', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
-  { code: '2501', name: 'Hutang Bank Jangka Panjang', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
-  { code: '3000', name: 'Ekuitas', type: 'EQUITY', normal_balance: 'CREDIT' },
-  { code: '3001', name: 'Modal Disetor', type: 'EQUITY', normal_balance: 'CREDIT', parent_code: '3000' },
-  { code: '3002', name: 'Laba Ditahan', type: 'EQUITY', normal_balance: 'CREDIT', parent_code: '3000' },
-  { code: '3003', name: 'Laba Periode Berjalan', type: 'EQUITY', normal_balance: 'CREDIT', parent_code: '3000' },
-  { code: '3004', name: 'Prive / Dividen', type: 'EQUITY', normal_balance: 'DEBIT', parent_code: '3000' },
-  { code: '4000', name: 'Pendapatan', type: 'REVENUE', normal_balance: 'CREDIT' },
-  { code: '4001', name: 'Pendapatan Usaha', type: 'REVENUE', normal_balance: 'CREDIT', parent_code: '4000' },
-  { code: '4002', name: 'Diskon Penjualan (Contra)', type: 'REVENUE', normal_balance: 'DEBIT', parent_code: '4000' },
-  { code: '4003', name: 'Retur Penjualan', type: 'REVENUE', normal_balance: 'DEBIT', parent_code: '4000' },
-  { code: '4101', name: 'Pendapatan Bunga', type: 'REVENUE', normal_balance: 'CREDIT', parent_code: '4000' },
-  { code: '4102', name: 'Pendapatan Lain-lain', type: 'REVENUE', normal_balance: 'CREDIT', parent_code: '4000' },
-  { code: '5000', name: 'Beban Pokok Penjualan', type: 'EXPENSE', normal_balance: 'DEBIT' },
-  { code: '5001', name: 'HPP / Cost of Goods Sold', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '5000' },
-  { code: '5002', name: 'Biaya Pengiriman Masuk (Freight In)', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '5000' },
-  { code: '5003', name: 'Retur Pembelian (Contra)', type: 'EXPENSE', normal_balance: 'CREDIT', parent_code: '5000' },
-  { code: '6000', name: 'Beban Operasional', type: 'EXPENSE', normal_balance: 'DEBIT' },
-  { code: '6001', name: 'Gaji & Tunjangan', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
-  { code: '6002', name: 'Sewa Tempat', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
-  { code: '6003', name: 'Utilitas (Listrik, Air, Internet)', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
-  { code: '6004', name: 'Perlengkapan Kantor', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
-  { code: '6005', name: 'Biaya Pemasaran & Iklan', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
-  { code: '6006', name: 'Biaya Transportasi', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
-  { code: '6007', name: 'Biaya Perbaikan & Pemeliharaan', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
-  { code: '6008', name: 'Biaya Asuransi', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
-  { code: '6009', name: 'Biaya Penyusutan', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
-  { code: '6010', name: 'Biaya Profesional & Konsultan', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
-  { code: '6099', name: 'Beban Lain-lain', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
-  { code: '6101', name: 'Biaya Bunga Pinjaman', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  // ── ASET ─────────────────────────────────────────────────────────────────
+  { code: '1000', name: 'Aset',                               type: 'ASSET',     normal_balance: 'DEBIT'  },
+  { code: '1100', name: 'Aset Lancar',                        type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1000' },
+  // Kas & Bank (parent: 1100)
+  { code: '1101', name: 'Kas Besar',                          type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1100' },
+  { code: '1102', name: 'Kas Kecil (Petty Cash)',             type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1100' },
+  { code: '1103', name: 'Bank - Rekening Operasional',        type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1100' },
+  { code: '1104', name: 'Bank - Rekening Payroll',            type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1100' },
+  { code: '1105', name: 'Bank - Rekening Lainnya',            type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1100' },
+  // Piutang (parent: 1100, detail parent: 1200)
+  { code: '1200', name: 'Piutang',                            type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1100' },
+  { code: '1201', name: 'Piutang Usaha',                      type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1200' },
+  { code: '1202', name: 'Piutang Karyawan',                   type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1200' },
+  { code: '1203', name: 'Cadangan Kerugian Piutang',          type: 'ASSET',     normal_balance: 'CREDIT', parent_code: '1200' },
+  // Persediaan (parent: 1100, detail parent: 1300)
+  { code: '1300', name: 'Persediaan',                         type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1100' },
+  { code: '1301', name: 'Persediaan Barang Dagangan',         type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1300' },
+  { code: '1302', name: 'Persediaan Barang Dalam Proses',     type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1300' },
+  { code: '1303', name: 'Persediaan Bahan Baku',              type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1300' },
+  { code: '1304', name: 'Persediaan Barang Jadi',             type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1300' },
+  // Aset Lancar Lainnya (parent: 1100, detail parent: 1400)
+  { code: '1400', name: 'Aset Lancar Lainnya',                type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1100' },
+  { code: '1401', name: 'PPN Masukan (Pajak Dibayar)',        type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1400' },
+  { code: '1402', name: 'Biaya Dibayar Dimuka',               type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1400' },
+  { code: '1403', name: 'Uang Muka Pembelian',                type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1400' },
+  // Aset Tetap (parent: 1000, detail parent: 1500)
+  { code: '1500', name: 'Aset Tetap',                         type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1000' },
+  { code: '1501', name: 'Tanah',                              type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1500' },
+  { code: '1502', name: 'Bangunan',                           type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1500' },
+  { code: '1503', name: 'Akumulasi Penyusutan Bangunan',      type: 'ASSET',     normal_balance: 'CREDIT', parent_code: '1500' },
+  { code: '1504', name: 'Kendaraan',                          type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1500' },
+  { code: '1505', name: 'Akumulasi Penyusutan Kendaraan',     type: 'ASSET',     normal_balance: 'CREDIT', parent_code: '1500' },
+  { code: '1506', name: 'Peralatan & Mesin',                  type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1500' },
+  { code: '1507', name: 'Akumulasi Penyusutan Peralatan',     type: 'ASSET',     normal_balance: 'CREDIT', parent_code: '1500' },
+  // Investasi Jangka Panjang (parent: 1000, detail parent: 1600)
+  { code: '1600', name: 'Investasi Jangka Panjang',           type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1000' },
+  { code: '1601', name: 'Investasi pada Entitas Anak / Unit', type: 'ASSET',     normal_balance: 'DEBIT',  parent_code: '1600' },
+  // ── LIABILITAS ────────────────────────────────────────────────────────────
+  { code: '2000', name: 'Liabilitas',                         type: 'LIABILITY', normal_balance: 'CREDIT' },
+  // Hutang Lancar (parent: 2000, detail parent: 2100)
+  { code: '2100', name: 'Hutang Lancar',                      type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2101', name: 'Hutang Usaha',                       type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2100' },
+  { code: '2102', name: 'Hutang Bank Jangka Pendek',          type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2100' },
+  // Hutang Pajak (parent: 2000, detail parent: 2200)
+  { code: '2200', name: 'Hutang Pajak',                       type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2201', name: 'PPN Keluaran (Pajak Dipungut)',       type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2200' },
+  { code: '2202', name: 'Hutang PPh 21',                      type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2200' },
+  { code: '2203', name: 'Hutang PPh 23',                      type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2200' },
+  { code: '2204', name: 'Hutang PPh Badan',                   type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2200' },
+  // Pendapatan Diterima di Muka (parent: 2000, detail parent: 2300)
+  { code: '2300', name: 'Pendapatan Diterima di Muka',        type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2301', name: 'Pendapatan Diterima di Muka',        type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2300' },
+  { code: '2302', name: 'Uang Muka Penjualan',                type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2300' },
+  // Hutang Jangka Pendek Lainnya (parent: 2000, detail parent: 2400)
+  { code: '2400', name: 'Hutang Jangka Pendek Lainnya',       type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2401', name: 'Hutang Gaji',                        type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2400' },
+  // Hutang Jangka Panjang (parent: 2000, detail parent: 2500)
+  { code: '2500', name: 'Hutang Jangka Panjang',              type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2501', name: 'Hutang Bank Jangka Panjang',         type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2500' },
+  // ── EKUITAS ───────────────────────────────────────────────────────────────
+  { code: '3000', name: 'Ekuitas',                            type: 'EQUITY',    normal_balance: 'CREDIT' },
+  { code: '3001', name: 'Modal Disetor',                      type: 'EQUITY',    normal_balance: 'CREDIT', parent_code: '3000' },
+  { code: '3002', name: 'Laba Ditahan',                       type: 'EQUITY',    normal_balance: 'CREDIT', parent_code: '3000' },
+  { code: '3003', name: 'Laba Periode Berjalan',              type: 'EQUITY',    normal_balance: 'CREDIT', parent_code: '3000' },
+  { code: '3004', name: 'Prive / Dividen',                    type: 'EQUITY',    normal_balance: 'DEBIT',  parent_code: '3000' },
+  // ── PENDAPATAN ────────────────────────────────────────────────────────────
+  { code: '4000', name: 'Pendapatan',                         type: 'REVENUE',   normal_balance: 'CREDIT' },
+  { code: '4001', name: 'Pendapatan Usaha',                   type: 'REVENUE',   normal_balance: 'CREDIT', parent_code: '4000' },
+  { code: '4002', name: 'Diskon Penjualan (Contra)',          type: 'REVENUE',   normal_balance: 'DEBIT',  parent_code: '4000' },
+  { code: '4003', name: 'Retur Penjualan',                    type: 'REVENUE',   normal_balance: 'DEBIT',  parent_code: '4000' },
+  // Pendapatan Non-Usaha (parent: 4000, detail parent: 4100)
+  { code: '4100', name: 'Pendapatan Non-Usaha',               type: 'REVENUE',   normal_balance: 'CREDIT', parent_code: '4000' },
+  { code: '4101', name: 'Pendapatan Bunga',                   type: 'REVENUE',   normal_balance: 'CREDIT', parent_code: '4100' },
+  { code: '4102', name: 'Pendapatan Lain-lain',               type: 'REVENUE',   normal_balance: 'CREDIT', parent_code: '4100' },
+  // ── BEBAN POKOK PENJUALAN ─────────────────────────────────────────────────
+  { code: '5000', name: 'Beban Pokok Penjualan',              type: 'EXPENSE',   normal_balance: 'DEBIT'  },
+  { code: '5001', name: 'HPP / Cost of Goods Sold',           type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '5000' },
+  { code: '5002', name: 'Biaya Pengiriman Masuk (Freight In)',type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '5000' },
+  { code: '5003', name: 'Retur Pembelian (Contra)',           type: 'EXPENSE',   normal_balance: 'CREDIT', parent_code: '5000' },
+  // ── BEBAN OPERASIONAL ─────────────────────────────────────────────────────
+  { code: '6000', name: 'Beban Operasional',                  type: 'EXPENSE',   normal_balance: 'DEBIT'  },
+  { code: '6001', name: 'Gaji & Tunjangan',                   type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  { code: '6002', name: 'Sewa Tempat',                        type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  { code: '6003', name: 'Utilitas (Listrik, Air, Internet)',  type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  { code: '6004', name: 'Perlengkapan Kantor',                type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  { code: '6005', name: 'Biaya Pemasaran & Iklan',            type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  { code: '6006', name: 'Biaya Transportasi',                 type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  { code: '6007', name: 'Biaya Perbaikan & Pemeliharaan',     type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  { code: '6008', name: 'Biaya Asuransi',                     type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  { code: '6009', name: 'Biaya Penyusutan',                   type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  { code: '6010', name: 'Biaya Profesional & Konsultan',      type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  { code: '6099', name: 'Beban Lain-lain',                    type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  // Beban Non-Operasional (parent: 6000, detail parent: 6100)
+  { code: '6100', name: 'Beban Non-Operasional',              type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6000' },
+  { code: '6101', name: 'Biaya Bunga Pinjaman',               type: 'EXPENSE',   normal_balance: 'DEBIT',  parent_code: '6100' },
 ]
 
 function buildMirrorPayload(
@@ -998,4 +1074,188 @@ export async function seedInitialCoA(orgId: string, options?: SeedInitialCoAOpti
 // ─────────────────────────────────────────────────────────────
 export async function setShariahAccountsActive(orgId: string, active: boolean) {
   return syncShariahAccountsActive(orgId, active)
+}
+
+// ─────────────────────────────────────────────────────────────
+// uploadCoAFromExcel — Import CoA dari file .xlsx
+// Format: Sheet pertama, baris 1 = header, baris 2+ = data akun
+// Kolom wajib: code, name, type, normal_balance
+// Kolom opsional: parent_code, description
+// Baris dengan code/name kosong diabaikan (termasuk group-label dekorasi)
+// ─────────────────────────────────────────────────────────────
+export async function uploadCoAFromExcel(
+  orgId: string,
+  buffer: ArrayBuffer | Buffer | Uint8Array,
+  _filename: string
+): Promise<{ success: boolean; message?: string; error?: string; inserted?: number; updated?: number }> {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) return { success: false, error: 'Organisasi tidak valid.' }
+
+  // ── 1. Parse Excel ──────────────────────────────────────────
+  let workbook: ExcelJS.Workbook
+  try {
+    workbook = new ExcelJS.Workbook()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await workbook.xlsx.load(buffer as any)
+  } catch {
+    return { success: false, error: 'File tidak dapat dibaca. Pastikan format file adalah .xlsx yang valid.' }
+  }
+
+  const ws = workbook.getWorksheet(1)
+  if (!ws) {
+    return { success: false, error: 'Sheet CoA tidak ditemukan. Pastikan sheet pertama berisi data akun.' }
+  }
+
+  // ── 2. Baca header ──────────────────────────────────────────
+  const headerRow = ws.getRow(1)
+  const colIndex: Record<string, number> = {}
+  headerRow.eachCell((cell, col) => {
+    const h = String(cell.value ?? '').toLowerCase().trim()
+    if (h) colIndex[h] = col
+  })
+
+  const REQUIRED = ['code', 'name', 'type', 'normal_balance'] as const
+  for (const h of REQUIRED) {
+    if (!colIndex[h]) {
+      return { success: false, error: `Header wajib "${h}" tidak ditemukan di baris pertama.` }
+    }
+  }
+
+  // ── 3. Baca baris data ──────────────────────────────────────
+  type RawRow = {
+    rowNum: number
+    code: string
+    name: string
+    type: string
+    normal_balance: string
+    parent_code: string
+    description: string
+  }
+  const rawRows: RawRow[] = []
+
+  ws.eachRow((row, rowNum) => {
+    if (rowNum === 1) return // skip header
+    const code = String(row.getCell(colIndex['code'])?.value ?? '').trim()
+    const name = String(row.getCell(colIndex['name'])?.value ?? '').trim()
+    if (!code || !name) return // baris kosong / group-label dekorasi
+
+    rawRows.push({
+      rowNum,
+      code,
+      name,
+      type: String(row.getCell(colIndex['type'])?.value ?? '').trim().toUpperCase(),
+      normal_balance: String(row.getCell(colIndex['normal_balance'])?.value ?? '').trim().toUpperCase(),
+      parent_code: colIndex['parent_code']
+        ? String(row.getCell(colIndex['parent_code'])?.value ?? '').trim()
+        : '',
+      description: colIndex['description']
+        ? String(row.getCell(colIndex['description'])?.value ?? '').trim()
+        : '',
+    })
+  })
+
+  if (rawRows.length === 0) {
+    return { success: false, error: 'Tidak ada data akun ditemukan. Pastikan baris data dimulai dari baris ke-2.' }
+  }
+
+  // ── 4. Validasi nilai ───────────────────────────────────────
+  const VALID_TYPES = new Set(['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'])
+  const VALID_BALANCES = new Set(['DEBIT', 'CREDIT'])
+  const validationErrors: string[] = []
+
+  for (const r of rawRows) {
+    if (!VALID_TYPES.has(r.type)) {
+      validationErrors.push(`Baris ${r.rowNum}: tipe "${r.type}" tidak valid (harus ASSET/LIABILITY/EQUITY/REVENUE/EXPENSE).`)
+    }
+    if (!VALID_BALANCES.has(r.normal_balance)) {
+      validationErrors.push(`Baris ${r.rowNum}: normal_balance "${r.normal_balance}" tidak valid (harus DEBIT/CREDIT).`)
+    }
+  }
+
+  if (validationErrors.length > 0) {
+    return { success: false, error: validationErrors.join('\n') }
+  }
+
+  // ── 5. Cek otorisasi CoA ─────────────────────────────────────
+  const canManageResult = await checkCanManageCoA(trimmedOrgId)
+  if (!canManageResult.canManageDirect) {
+    return { success: false, error: 'Tidak memiliki akses untuk mengelola CoA organisasi ini. Mode CoA mungkin INHERITED — ajukan perubahan ke organisasi induk.' }
+  }
+
+  // ── 6. Upsert ke database (urut top-down agar parent ada lebih dulu) ──
+  const admin = await createAdminClient()
+  const { data: existingRows, error: fetchError } = await (admin as any)
+    .from('accounts')
+    .select('id, code, parent_id')
+    .eq('org_id', trimmedOrgId)
+
+  if (fetchError) {
+    return { success: false, error: 'Gagal membaca akun yang sudah ada: ' + (fetchError.message || '') }
+  }
+
+  const rowByCode = new Map<string, { id: string; code: string }>()
+  for (const row of (existingRows || []) as any[]) {
+    const c = String(row?.code || '').trim()
+    const id = String(row?.id || '').trim()
+    if (c && id) rowByCode.set(c, { id, code: c })
+  }
+
+  let insertedCount = 0
+  let updatedCount = 0
+
+  for (const r of rawRows) {
+    const parentId = r.parent_code ? (rowByCode.get(r.parent_code)?.id ?? null) : null
+    const payload = {
+      code: r.code,
+      name: r.name,
+      type: r.type as AccountType,
+      normal_balance: r.normal_balance as NormalBalance,
+      parent_id: parentId,
+      description: r.description || null,
+      is_active: true,
+    }
+
+    const existing = rowByCode.get(r.code)
+    if (existing?.id) {
+      // UPDATE — pertahankan is_system jika sudah ada
+      const { error: updateError } = await (admin as any)
+        .from('accounts')
+        .update(payload)
+        .eq('org_id', trimmedOrgId)
+        .eq('id', existing.id)
+
+      if (updateError) {
+        return {
+          success: false,
+          error: `Gagal update akun ${r.code} (${r.name}): ${updateError.message || ''}`,
+        }
+      }
+      updatedCount += 1
+    } else {
+      // INSERT baru
+      const { data: inserted, error: insertError } = await (admin as any)
+        .from('accounts')
+        .insert({ org_id: trimmedOrgId, ...payload, is_system: false })
+        .select('id, code')
+        .single()
+
+      if (insertError || !inserted?.id) {
+        return {
+          success: false,
+          error: `Gagal membuat akun ${r.code} (${r.name}): ${insertError?.message || ''}`,
+        }
+      }
+      // Tambah ke map agar parent_code dari baris berikutnya bisa resolve
+      rowByCode.set(String(inserted.code), { id: String(inserted.id), code: String(inserted.code) })
+      insertedCount += 1
+    }
+  }
+
+  revalidatePath('/settings/accounts')
+  return {
+    success: true,
+    message: `Import CoA selesai: ${insertedCount} akun baru, ${updatedCount} akun diperbarui.`,
+    inserted: insertedCount,
+    updated: updatedCount,
+  }
 }
