@@ -34,6 +34,7 @@ export default async function KaryawanPage() {
   return (
     <KaryawanClient
       orgId={orgData.org.id}
+      orgName={orgData.org.name}
       employee={employee}
       userName={orgData.user?.user_metadata?.full_name || orgData.user?.email || ''}
       initialAttendance={attendance}
