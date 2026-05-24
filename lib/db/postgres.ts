@@ -1,4 +1,10 @@
-import { Pool, type PoolClient, type QueryResultRow } from 'pg'
+import { Pool, types, type PoolClient, type QueryResultRow } from 'pg'
+
+// Kembalikan DATE (OID 1082) sebagai string plain "YYYY-MM-DD",
+// bukan JavaScript Date object. Hal ini menghindari konversi timezone
+// yang tidak konsisten antar server (UTC vs UTC+7) dan mempermudah
+// perbandingan tanggal di seluruh aplikasi.
+types.setTypeParser(1082, (val: string) => val)
 
 type GlobalWithPostgresPool = typeof globalThis & {
   __nizamPostgresPool?: Pool
