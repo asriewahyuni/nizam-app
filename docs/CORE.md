@@ -1,6 +1,6 @@
 # Nizam ERP — Core Modules
 
-> Dokumen teknis mendalam tentang 6 modul inti Nizam ERP.
+> Dokumen teknis mendalam tentang 7 modul inti Nizam ERP.
 > Mencakup definisi, tanggung jawab, tabel database, siklus transaksi, dan integrasi antar modul.
 
 ---
@@ -12,7 +12,7 @@ Sebuah modul disebut **Core** jika memenuhi dua kriteria sekaligus:
 1. **Modul lain bergantung padanya** — ada foreign key, trigger otomatis, atau join dari modul lain ke tabel-tabelnya.
 2. **Sistem tidak bisa beroperasi tanpanya** — bukan fitur opsional, tapi prasyarat fungsional.
 
-> Modul Vertical (Fleet, Factory, Syirkah, dll) *menulis ke* Core. Core tidak bergantung pada Vertical.
+> Modul Vertical (Fleet, Factory, Koperasi, dll) *menulis ke* Core. Core tidak bergantung pada Vertical.
 
 ---
 
@@ -41,11 +41,13 @@ Sebuah modul disebut **Core** jika memenuhi dua kriteria sekaligus:
                     │  inv_movements  │
                     └─────────────────┘
 
-   ┌─────────────────┐
-   │      HRIS       │  → posting gaji ke Accounting
-   │  employees      │  → disbursement ke Finance
-   │  payslips       │
-   └─────────────────┘
+   ┌─────────────────┐         ┌─────────────────┐
+   │      HRIS       │         │    SYIRKAH      │
+   │  employees      │         │  syirkah_       │
+   │  payslips       │         │  contracts      │
+   └────────┬────────┘         └────────┬────────┘
+            │ posting gaji              │ posting modal & bagi hasil
+            └──────────────────────────▶ ACCOUNTING
 ```
 
 ---
@@ -532,18 +534,100 @@ Reimburse → journal:
 
 ---
 
+## 7. Syirkah (Kemitraan Bisnis Syariah)
+
+### Tanggung Jawab
+Mengelola kemitraan bisnis berbasis syariah — mulai dari penyusunan akad, penandatanganan digital oleh mitra dan saksi, hingga posting modal dan bagi hasil ke General Ledger. Syirkah adalah satu-satunya modul yang menangani aspek legal-syariah dan membawa implikasi langsung ke Ekuitas di Accounting.
+
+### Tabel Utama
+
+| Tabel | Fungsi |
+|---|---|
+| `syirkah_contracts` | Header akad — nama kontrak, org, status, tanggal |
+| `syirkah_members` | Mitra dalam akad + persentase bagi hasil + token tanda tangan |
+| `syirkah_witnesses` | Saksi akad + token tanda tangan |
+
+### Status Akad
+
+```
+DRAFT → ACTIVE → CLOSED
+           ↑
+    (semua pihak sudah tanda tangan — Ijab-Qobul digital selesai)
+```
+
+### Siklus Akad Syirkah
+
+```
+1. upsertSyirkahContract()       → buat akad (DRAFT)
+        ↓
+2. upsertSyirkahMember()         → tambah mitra + % bagi hasil
+   upsertSyirkahWitness()        → tambah saksi
+        ↓
+3. Kirim link penandatanganan ke masing-masing pihak
+        ↓
+4. signSyirkahMember()           → mitra tanda tangan via token
+   signSyirkahWitness()          → saksi tanda tangan via token
+        ↓
+5. Akad → status: ACTIVE (Ijab-Qobul digital selesai)
+```
+
+### Posting Modal ke Core Accounting
+
+```
+syncSyirkahCapitalToCore()
+    ↓
+Untuk setiap mitra yang setor modal:
+  Dr. Kas / Bank           (akun 1100-an)
+  Cr. Modal Syirkah [nama] (akun Ekuitas — khusus per mitra)
+    ↓
+journal_entry dibuat otomatis dengan reference_type: 'SYIRKAH'
+```
+
+### Posting Bagi Hasil ke Core Accounting
+
+```
+syncSyirkahProfitSharingToCore()
+    ↓
+Hitung laba bersih × % bagi hasil per mitra
+    ↓
+  Dr. Laba Ditahan / Distribusi
+  Cr. Hutang Bagi Hasil [mitra]    (atau langsung Kas jika tunai)
+    ↓
+journal_entry dengan reference_type: 'SYIRKAH_PROFIT'
+```
+
+### Mengapa Syirkah Termasuk Core
+
+Tidak seperti modul Vertical lain (Fleet, Konstruksi, dll) yang hanya *menggunakan* infrastruktur bisnis, Syirkah menyentuh **struktur kepemilikan** perusahaan itu sendiri:
+
+- Posting ke **akun Ekuitas** — bukan sekadar pendapatan/beban
+- **Ijab-Qobul digital** adalah legalitas kemitraan — fondasi bisnis syariah
+- Akad Syirkah menentukan **siapa pemilik** dan **berapa bagiannya** — ini adalah data konstitutif, bukan operasional
+- Di banyak bisnis syariah Indonesia, akad Syirkah *mendahului* semua transaksi operasional lainnya
+
+### Fitur Khusus
+
+- **Tanda Tangan Digital** — mitra & saksi sign via link unik (token-based), tanpa perlu akun Nizam
+- **Ijab-Qobul Digital** — akad sah secara syariah saat semua pihak telah menandatangani
+- **Duplikasi Guard** — tidak bisa ada dua mitra dengan identitas yang sama dalam satu akad
+- **Posting Otomatis** — modal dan bagi hasil langsung generate jurnal GL tanpa input manual
+- **Dashboard Syirkah** — ringkasan kontrak aktif, total modal, dan distribusi bagi hasil
+
+---
+
 ## Integrasi Antar Core Module
 
 ### Matriks Integrasi
 
-| Module | Accounting | Finance | Inventory | Purchasing | Sales | HRIS |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Accounting** | — | ✅ baca saldo | ✅ terima posting | ✅ terima posting | ✅ terima posting | ✅ terima posting |
-| **Finance** | ✅ posting payment | — | — | ✅ bayar PO | ✅ terima bayar | ✅ disbursement |
-| **Inventory** | ✅ posting COGS | — | — | ✅ terima barang | ✅ kurangi stok | — |
-| **Purchasing** | ✅ buat jurnal hutang | ✅ bayar hutang | ✅ tambah stok | — | ✅ retur ke supplier | — |
-| **Sales** | ✅ buat jurnal piutang | ✅ terima bayar | ✅ kurangi stok | — | — | — |
-| **HRIS** | ✅ posting gaji | ✅ disbursement | — | — | — | — |
+| Module | Accounting | Finance | Inventory | Purchasing | Sales | HRIS | Syirkah |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Accounting** | — | ✅ baca saldo | ✅ terima posting | ✅ terima posting | ✅ terima posting | ✅ terima posting | ✅ terima posting |
+| **Finance** | ✅ posting payment | — | — | ✅ bayar PO | ✅ terima bayar | ✅ disbursement | — |
+| **Inventory** | ✅ posting COGS | — | — | ✅ terima barang | ✅ kurangi stok | — | — |
+| **Purchasing** | ✅ buat jurnal hutang | ✅ bayar hutang | ✅ tambah stok | — | ✅ retur ke supplier | — | — |
+| **Sales** | ✅ buat jurnal piutang | ✅ terima bayar | ✅ kurangi stok | — | — | — | — |
+| **HRIS** | ✅ posting gaji | ✅ disbursement | — | — | — | — | — |
+| **Syirkah** | ✅ posting modal & bagi hasil ke Ekuitas | — | — | — | — | — | — |
 
 ### Contoh: Satu Siklus Bisnis Lengkap
 
@@ -608,6 +692,7 @@ Hasil akhir di Accounting:
 | **Purchasing** | `purchases`, `purchase_items` | Supplier, Inventory | AP, stock in |
 | **Sales** | `sales`, `sales_items` | Pelanggan, Inventory | AR, revenue, stock out |
 | **HRIS** | `employees`, `payslips` | Attendance, Components | Payroll journal, disbursement |
+| **Syirkah** | `syirkah_contracts`, `syirkah_members` | Mitra, Akad | Jurnal Ekuitas (modal & bagi hasil) |
 
 ---
 

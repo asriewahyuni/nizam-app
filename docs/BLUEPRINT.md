@@ -27,10 +27,10 @@ Migration pertama (`001_organizations.sql`) sudah menetapkan ini — `organizati
 ├─────────────────────────────────────────────────────────────┤
 │  CORE ERP LAYER          ← "otak" sistem                    │
 │  Accounting · Finance · Inventory                           │
-│  Purchasing · Sales · HRIS                                  │
+│  Purchasing · Sales · HRIS · Syirkah                        │
 ├─────────────────────────────────────────────────────────────┤
 │  VERTICAL MODULE LAYER                                      │
-│  Fleet · Factory · Construction · Workshop · Syirkah        │
+│  Fleet · Factory · Construction · Workshop                  │
 │  Koperasi · LMS · Services · E-Commerce · Marketplace       │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -51,7 +51,7 @@ Kriteria sebuah modul disebut **Core**:
 1. **Modul lain bergantung padanya** — ada FK, trigger, atau join dari modul lain ke sini.
 2. **Sistem tidak bisa beroperasi tanpanya** — bukan fitur opsional, tapi prasyarat.
 
-Berdasarkan dua kriteria ini, ada **6 modul Core**:
+Berdasarkan dua kriteria ini, ada **7 modul Core**:
 
 ---
 
@@ -155,6 +155,22 @@ Di hampir semua bisnis Indonesia, payroll adalah pengeluaran terbesar dan paling
 
 ---
 
+### 7. 🤝 Syirkah (Kemitraan Bisnis Syariah)
+
+**Mengapa Core:**
+Syirkah bukan sekadar modul transaksi — ia menyentuh **struktur kepemilikan** bisnis itu sendiri. Akad Syirkah menentukan siapa pemilik dan berapa persentase bagi hasilnya, lalu mem-posting langsung ke akun **Ekuitas** di General Ledger. Di bisnis syariah Indonesia, akad ini mendahului semua transaksi operasional lainnya. Tidak ada modul Vertical lain yang menyentuh Ekuitas secara langsung.
+
+**Isi modul:**
+- Akad Syirkah (kontrak kemitraan)
+- Manajemen Mitra (% bagi hasil, porsi modal)
+- Saksi Akad
+- Ijab-Qobul Digital (tanda tangan via link token)
+- Posting Modal ke Ekuitas (otomatis)
+- Posting Bagi Hasil ke GL (otomatis)
+- Dashboard Syirkah
+
+---
+
 ## Governance Layer
 
 Bukan modul bisnis, tapi **wajib ada** — sistem tidak bisa berjalan tanpa layer ini.
@@ -192,7 +208,6 @@ Modul yang menjawab kebutuhan industri spesifik. Semuanya **bergantung pada Core
 | **Construction** | Kontraktor, RAB, progress billing | Budget → Accounting; Progress Invoice → Sales |
 | **Workshop / Bengkel** | Bengkel motor, service center | Service Order → Sales; Sparepart → Inventory |
 | **Services / Job Order** | Jasa umum, proyek, billing per-jam | Job Billing → Sales; Resource Cost → Accounting |
-| **Syirkah** | Kemitraan bisnis syariah | Bagi hasil → Accounting (Equity); Ijab-Qobul digital |
 | **Koperasi Syariah** | Simpan pinjam, murabahah, mudharabah | Simpanan → Accounting; Pembiayaan → Finance |
 | **LMS** | Lembaga pelatihan, kursus berbayar | Enrollment Fee → Sales; Instructor Cost → HRIS |
 | **E-Commerce** | Toko online dengan theme builder | Orders → Sales; Stock → Inventory |
@@ -237,7 +252,7 @@ Hampir semua modul keuangan punya mode syariah. Ini bukan afterthought — built
 - **`shariah_settings`** per-org: toggle aktif/nonaktif akun syariah
 - **CoA Syariah:** dedicated akun murabahah, mudharabah, musyarakah, zakat
 - **Sales Mode Syariah:** invoice dengan akad murabahah
-- **Syirkah Module:** kemitraan dengan bagi hasil, ijab-qobul digital, signing lifecycle
+- **Syirkah (Core):** kemitraan dengan bagi hasil, ijab-qobul digital, signing lifecycle — posting langsung ke Ekuitas
 - **Koperasi Syariah:** simpanan pokok/wajib, pembiayaan IMBT, sertifikasi DPS
 - **Zakat Engine:** kalkulasi zakat maal, zakat perusahaan
 
@@ -266,7 +281,7 @@ Ada dedicated migrations untuk injeksi akun-akun syariah ke dalam CoA standar PS
 ## Ringkasan
 
 ```
-Core Nizam = Accounting + Finance + Inventory + Purchasing + Sales + HRIS
+Core Nizam = Accounting + Finance + Inventory + Purchasing + Sales + HRIS + Syirkah
 ```
 
 Dengan **Governance Layer** (Org, RBAC, Approval, Audit) sebagai fondasi wajib di bawahnya, dan **Vertical Modules** sebagai ekstensi yang *menulis ke Core* — bukan sistem terpisah.
