@@ -463,6 +463,18 @@ export function KaryawanClient({
   const today   = new Date().toISOString().split('T')[0]
   const todayAtt = attendance.find((r: any) => r.record_date === today) ?? null
 
+  // Presensi gate — menu selain Beranda & Presensi hanya bisa diakses setelah clock-in
+  const hasPresent = !!todayAtt?.check_in
+
+  const handleTabChange = (id: Tab) => {
+    if (!hasPresent && id !== 'beranda' && id !== 'presensi') {
+      showToast('Lakukan presensi terlebih dahulu untuk mengakses menu ini.', false)
+      setTab('presensi')
+      return
+    }
+    setTab(id)
+  }
+
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleClock = async (type: 'IN' | 'OUT') => {
@@ -641,7 +653,9 @@ export function KaryawanClient({
                 <motion.div key="beranda" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
 
                   {/* ── COVER — Dynamic Sky ── */}
-                  <div className="relative overflow-hidden" style={{ height: 260 }}>
+                  <div className="relative" style={{ height: 260 }}>
+                    {/* Inner clip — hanya sky+overlay, bukan avatar */}
+                    <div className="absolute inset-0 overflow-hidden">
 
                     {/* ── Single SVG canvas: sky + stars + celestial + buildings ── */}
                     <svg
@@ -778,8 +792,10 @@ export function KaryawanClient({
                       </div>
                     </div>
 
-                    {/* Avatar — overlapping cover bottom */}
-                    <div className="absolute right-5 bottom-0 translate-y-1/2 z-30">
+                    </div>{/* end inner sky clip */}
+
+                    {/* Avatar — di luar inner clip, tidak terpotong */}
+                    <div className="absolute right-5 bottom-0 translate-y-1/2 z-40">
                       <div className="w-20 h-20 rounded-full ring-4 ring-slate-50 dark:ring-slate-900 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-xl overflow-hidden">
                         {currentAvatarUrl
                           ? <img src={currentAvatarUrl} alt={name} className="w-full h-full object-cover" />
@@ -925,12 +941,17 @@ export function KaryawanClient({
                         { label: 'Reimburse',      tab: 'reimburse' as Tab, Icon: ReceiptText,  color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/40' },
                         { label: 'Slip Gaji',      tab: 'gaji'      as Tab, Icon: Wallet,       color: 'text-violet-600 bg-violet-50 dark:bg-violet-900/40' },
                       ].map(({ label, tab: t, Icon, color }) => (
-                        <button key={t} type="button" onClick={() => setTab(t)}
-                          className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all">
-                          <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center`}>
+                        <button key={t} type="button" onClick={() => handleTabChange(t)}
+                          className="relative bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all">
+                          <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center ${!hasPresent ? 'opacity-35' : ''}`}>
                             <Icon size={18} />
                           </div>
-                          <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 text-center leading-tight">{label}</span>
+                          <span className={`text-[10px] font-black text-center leading-tight ${!hasPresent ? 'text-slate-300 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300'}`}>{label}</span>
+                          {!hasPresent && (
+                            <div className="absolute top-1.5 right-1.5">
+                              <Lock size={10} className="text-slate-300 dark:text-slate-600" />
+                            </div>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -1246,10 +1267,18 @@ export function KaryawanClient({
                 <div className="flex h-16">
                   {SIDE_TABS.slice(0, 2).map(({ id, label, icon: Icon }) => {
                     const active = tab === id
+                    const locked = !hasPresent && id !== 'beranda'
                     return (
-                      <button key={id} type="button" onClick={() => setTab(id)}
-                        className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${active ? 'text-blue-600' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}>
-                        <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+                      <button key={id} type="button" onClick={() => handleTabChange(id)}
+                        className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${active ? 'text-blue-600' : locked ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}>
+                        <div className="relative">
+                          <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+                          {locked && (
+                            <div className="absolute -top-1 -right-1.5 w-3 h-3 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                              <Lock size={6} className="text-slate-400 dark:text-slate-500" />
+                            </div>
+                          )}
+                        </div>
                         <span className="text-[9px] font-black uppercase tracking-wide">{label}</span>
                         {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />}
                       </button>
@@ -1264,10 +1293,18 @@ export function KaryawanClient({
 
                   {SIDE_TABS.slice(2).map(({ id, label, icon: Icon }) => {
                     const active = tab === id
+                    const locked = !hasPresent
                     return (
-                      <button key={id} type="button" onClick={() => setTab(id)}
-                        className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${active ? 'text-blue-600' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}>
-                        <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+                      <button key={id} type="button" onClick={() => handleTabChange(id)}
+                        className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${active ? 'text-blue-600' : locked ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}>
+                        <div className="relative">
+                          <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+                          {locked && (
+                            <div className="absolute -top-1 -right-1.5 w-3 h-3 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                              <Lock size={6} className="text-slate-400 dark:text-slate-500" />
+                            </div>
+                          )}
+                        </div>
                         <span className="text-[9px] font-black uppercase tracking-wide">{label}</span>
                         {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />}
                       </button>
