@@ -228,7 +228,8 @@ export async function clockMyAttendance(
 
   const supabase = await createClient()
   const db = supabase as any
-  const today = new Date().toISOString().split('T')[0]
+  // Gunakan Jakarta timezone (WIB) agar record_date sesuai hari kalender user
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
   const now = new Date().toISOString()
   const notes = String(payload.notes || '').trim()
   const locationGps =

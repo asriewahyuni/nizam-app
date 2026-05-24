@@ -460,8 +460,12 @@ export function KaryawanClient({
 
   const refresh = () => startTransition(() => router.refresh())
 
-  const today   = new Date().toISOString().split('T')[0]
-  const todayAtt = attendance.find((r: any) => r.record_date === today) ?? null
+  // Gunakan Jakarta timezone — pg driver mengembalikan DATE sebagai Date object
+  // yang di-serialize JSON jadi "YYYY-MM-DDTHH:mm:ss.sssZ", bukan "YYYY-MM-DD"
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
+  const todayAtt = attendance.find((r: any) =>
+    String(r.record_date ?? '').substring(0, 10) === today
+  ) ?? null
 
   // Presensi gate — menu selain Beranda & Presensi hanya bisa diakses setelah clock-in
   const hasPresent = !!todayAtt?.check_in
