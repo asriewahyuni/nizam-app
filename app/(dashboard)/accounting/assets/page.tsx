@@ -15,23 +15,36 @@ export default async function AssetsPage() {
     redirect('/dashboard')
   }
 
-  const supabase = await createClient()
-  const activeBranch = await getActiveBranch(orgData.org.id)
+  let assets: any[] = []
+  let coa: any[] = []
+  let activeBranch: Awaited<ReturnType<typeof getActiveBranch>> = null
 
-  const [assets, coaRes] = await Promise.all([
-    getFixedAssets(orgData.org.id, activeBranch?.id),
-    supabase.from('accounts').select('*').eq('org_id', orgData.org.id).eq('is_active', true).order('code')
-  ])
+  try {
+    const supabase = await createClient()
+    activeBranch = await getActiveBranch(orgData.org.id)
+
+    const [assetsResult, coaRes] = await Promise.all([
+      getFixedAssets(orgData.org.id, activeBranch?.id),
+      supabase.from('accounts').select('*').eq('org_id', orgData.org.id).eq('is_active', true).order('code')
+    ])
+
+    assets = Array.isArray(assetsResult) ? assetsResult : []
+    coa = Array.isArray(coaRes?.data) ? coaRes.data : []
+  } catch (err) {
+    // Log error ke server untuk debug — halaman tetap render dengan data kosong
+    console.error('[AssetsPage] Gagal memuat data aset:', err)
+    // Biarkan assets & coa sebagai [] agar halaman tetap bisa dimuat
+  }
 
   return (
     <div className="p-10 min-h-screen bg-slate-50/20">
-      <AssetClient 
-        orgId={orgData.org.id} 
+      <AssetClient
+        orgId={orgData.org.id}
         orgName={orgData.org.name}
         activeBranchId={activeBranch?.id ?? null}
         activeBranchName={activeBranch?.name ?? null}
-        initialAssets={assets} 
-        coa={coaRes.data || []} 
+        initialAssets={assets}
+        coa={coa}
       />
     </div>
   )

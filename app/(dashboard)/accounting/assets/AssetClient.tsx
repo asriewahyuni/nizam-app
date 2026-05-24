@@ -82,7 +82,8 @@ export function AssetClient({
   coa,
 }: AssetClientProps) {
   const router = useRouter()
-  const [assets, setAssets] = useState(initialAssets)
+  // Defensive: pastikan initialAssets selalu array meski server return null/undefined
+  const [assets, setAssets] = useState<any[]>(Array.isArray(initialAssets) ? initialAssets : [])
   const [showModal, setShowModal] = useState(false)
   const [showLabelModal, setShowLabelModal] = useState(false)
   const [selectedAsset, setSelectedAsset] = useState<any>(null)
