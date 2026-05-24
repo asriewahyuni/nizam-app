@@ -4,7 +4,7 @@
 /**
  * bsc.actions.ts
  * ------------------------------------------------------------------
- * Balanced Scorecard actions:
+ * Nizametrics actions:
  * - Real-time operational snapshot (existing dashboard block)
  * - Configurable KPI setup per cycle (monthly scope)
  * - Hybrid score model: internal 0..100 and display 0..4
@@ -37,7 +37,7 @@ export type BSCCycle = {
   period_type: 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'CUSTOM'
   start_date: string
   end_date: string
-  status: 'ACTIVE' | 'CLOSED'
+  status: 'ACTIVE' | 'LOCKED' | 'CLOSED'
 }
 
 export type BSCLatestMeasurement = {
@@ -241,7 +241,7 @@ function getCurrentCycleRange() {
   const jsMonthIndex = month - 1
   const monthEndDate = new Date(Date.UTC(year, jsMonthIndex + 1, 0))
   const endDate = `${yearRaw}-${String(monthEndDate.getUTCMonth() + 1).padStart(2, '0')}-${String(monthEndDate.getUTCDate()).padStart(2, '0')}`
-  const cycleName = `BSC ${cycleKey}`
+  const cycleName = `Nizametrics ${cycleKey}`
 
   return {
     today,
@@ -280,7 +280,7 @@ function buildDefaultTemplateRows(cycleId: string, userId: string | null) {
       perspective: template.perspective,
       code: `${PERSPECTIVE_CODE_MAP[template.perspective]}_${slug.slice(0, 18)}_${suffix}`,
       name: template.name,
-      description: 'Template KPI default BSC 4x4.',
+      description: 'Template KPI default Nizametrics 4x4.',
       unit: template.unit,
       direction: template.direction,
       weight_percent: 25,
@@ -506,7 +506,7 @@ async function findCycleByScope(db: any, orgId: string, cycleKey: string, branch
     .select('*')
     .eq('org_id', orgId)
     .eq('cycle_key', cycleKey)
-    .eq('status', 'ACTIVE')
+    .in('status', ['ACTIVE', 'LOCKED'])
 
   if (branchId) query = query.eq('branch_id', branchId)
   else query = query.is('branch_id', null)
@@ -521,13 +521,13 @@ async function ensureActiveCycle(orgId: string, branchId?: string | null): Promi
   const db = supabase as any
   const branchSelection = await resolveBSCBranchId(orgId, branchId)
   if ('error' in branchSelection) {
-    return { error: String(branchSelection.error || 'Gagal menentukan cakupan BSC.') }
+    return { error: String(branchSelection.error || 'Gagal menentukan cakupan Nizametrics.') }
   }
 
   const { cycleKey, cycleName, startDate, endDate } = getCurrentCycleRange()
   const cycleLookup = await findCycleByScope(db, orgId, cycleKey, branchSelection.branchId)
   if ('error' in cycleLookup) {
-    return { error: String(cycleLookup.error || 'Gagal memuat siklus BSC.') }
+    return { error: String(cycleLookup.error || 'Gagal memuat siklus Nizametrics.') }
   }
 
   let cycle = cycleLookup.cycle
@@ -551,14 +551,14 @@ async function ensureActiveCycle(orgId: string, branchId?: string | null): Promi
       .single()
 
     if (insertError || !createdCycle?.id) {
-      return { error: insertError?.message || 'Gagal membuat siklus BSC aktif.' }
+      return { error: insertError?.message || 'Gagal membuat siklus Nizametrics aktif.' }
     }
 
     cycle = createdCycle as BSCCycle
   }
 
   if (!cycle) {
-    return { error: 'Gagal memastikan siklus BSC aktif.' }
+    return { error: 'Gagal memastikan siklus Nizametrics aktif.' }
   }
 
   const defaultWeightRows = PERSPECTIVES.map((perspective) => ({
@@ -621,7 +621,7 @@ export async function getBSCDeckSummaries(orgIds: string[]): Promise<Record<stri
             LEARNING_GROWTH: { score_100: 0, score_4: 0, kpi_count: 0 },
           },
           status: 'error' as const,
-          error: cycleError.message || 'Gagal memuat ringkasan BSC.',
+          error: cycleError.message || 'Gagal memuat ringkasan Nizametrics.',
         },
       ])
     )
@@ -692,7 +692,7 @@ export async function getBSCDeckSummaries(orgIds: string[]): Promise<Record<stri
   ])
 
   if (weightError || kpiError) {
-    const message = weightError?.message || kpiError?.message || 'Gagal memuat detail BSC.'
+    const message = weightError?.message || kpiError?.message || 'Gagal memuat detail Nizametrics.'
     return Object.fromEntries(
       normalizedOrgIds.map((orgId) => [
         orgId,
@@ -740,7 +740,7 @@ export async function getBSCDeckSummaries(orgIds: string[]): Promise<Record<stri
               LEARNING_GROWTH: { score_100: 0, score_4: 0, kpi_count: 0 },
             },
             status: preferredCycleByOrg.has(orgId) ? 'error' as const : 'empty' as const,
-            ...(preferredCycleByOrg.has(orgId) ? { error: latestError.message || 'Gagal memuat score BSC.' } : {}),
+            ...(preferredCycleByOrg.has(orgId) ? { error: latestError.message || 'Gagal memuat score Nizametrics.' } : {}),
           },
         ])
       )
@@ -839,7 +839,7 @@ export async function getBSCDeckSummaries(orgIds: string[]): Promise<Record<stri
 }
 
 // ---------------------------------------------------------------------
-// Existing BSC dashboard metrics (read-only operational snapshot)
+// Nizametrics dashboard metrics (read-only operational snapshot)
 // ---------------------------------------------------------------------
 export async function getBSCMetrics(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
@@ -1038,7 +1038,7 @@ export async function getBSCMetrics(orgId: string, branchId?: string | null) {
 }
 
 // ---------------------------------------------------------------------
-// Configurable BSC setup + measurement
+// Configurable Nizametrics setup + measurement
 // ---------------------------------------------------------------------
 export async function getBSCSetup(orgId: string, branchId?: string | null): Promise<BSCSetupPayload> {
   const supabase = await createClient()
@@ -1081,7 +1081,7 @@ export async function getBSCSetup(orgId: string, branchId?: string | null): Prom
         start_date: range.startDate,
         end_date: range.endDate,
       },
-      weightError?.message || kpiError?.message || 'Gagal memuat setup BSC.'
+      weightError?.message || kpiError?.message || 'Gagal memuat setup Nizametrics.'
     )
   }
 
@@ -1170,7 +1170,7 @@ export async function saveBSCPerspectiveWeights(orgId: string, weights: BSCWeigh
     .from('bsc_perspective_weights')
     .upsert(rows, { onConflict: 'cycle_id,perspective' })
 
-  if (error) return { error: error.message || 'Gagal menyimpan bobot perspektif BSC.' }
+  if (error) return { error: error.message || 'Gagal menyimpan bobot perspektif Nizametrics.' }
 
   revalidatePath('/reports/bsc')
   return { success: true }
@@ -1366,7 +1366,7 @@ export async function seedDefaultBSCKpis(orgId: string, branchId?: string | null
     .eq('is_active', true)
 
   if ((count || 0) > 0) {
-    return { error: 'Siklus BSC aktif sudah memiliki KPI. Template default hanya untuk setup awal kosong.' }
+    return { error: 'Siklus Nizametrics aktif sudah memiliki KPI. Template default hanya untuk setup awal kosong.' }
   }
 
   const userId = (await supabase.auth.getUser())?.data?.user?.id || null
@@ -1604,7 +1604,7 @@ export async function syncBSCKpisFromExistingData(orgId: string, branchId?: stri
     kpi_id: item.kpi_id,
     measurement_date: measurementDate,
     actual_value: round2(item.metric.value),
-    note: `Auto-sync dari data operasional: ${item.metric.label} (${item.metric.key})`,
+    note: `Nizametrics auto-sync dari data operasional: ${item.metric.label} (${item.metric.key})`,
     measured_by: userId,
     updated_at: new Date().toISOString(),
   }))
@@ -1644,4 +1644,47 @@ export async function syncBSCKpisFromExistingData(orgId: string, branchId?: stri
       })),
     })),
   }
+}
+
+// ---------------------------------------------------------------------
+// Lock / Unlock siklus Nizametrics
+// ---------------------------------------------------------------------
+export async function lockBSCCycle(orgId: string, branchId?: string | null) {
+  const ensured = await ensureActiveCycle(orgId, branchId)
+  if ('error' in ensured) return { error: ensured.error }
+
+  if (ensured.cycle.status !== 'ACTIVE') {
+    return { error: 'Siklus tidak dalam mode setup — tidak bisa dikunci.' }
+  }
+
+  const supabase = await createClient()
+  const { error } = await (supabase as any)
+    .from('bsc_cycles')
+    .update({ status: 'LOCKED' })
+    .eq('id', ensured.cycle.id)
+
+  if (error) return { error: error.message || 'Gagal mengunci siklus Nizametrics.' }
+
+  revalidatePath('/reports/bsc')
+  return { success: true }
+}
+
+export async function unlockBSCCycle(orgId: string, branchId?: string | null) {
+  const ensured = await ensureActiveCycle(orgId, branchId)
+  if ('error' in ensured) return { error: ensured.error }
+
+  if (ensured.cycle.status !== 'LOCKED') {
+    return { error: 'Siklus tidak dalam mode terkunci — tidak bisa dibuka.' }
+  }
+
+  const supabase = await createClient()
+  const { error } = await (supabase as any)
+    .from('bsc_cycles')
+    .update({ status: 'ACTIVE' })
+    .eq('id', ensured.cycle.id)
+
+  if (error) return { error: error.message || 'Gagal membuka kunci siklus Nizametrics.' }
+
+  revalidatePath('/reports/bsc')
+  return { success: true }
 }
