@@ -16,6 +16,10 @@ import {
    Target,
    Trophy,
    GraduationCap,
+   Users,
+   Clock,
+   CheckCircle2,
+   XCircle,
    type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -69,16 +73,31 @@ interface DashboardClientProps {
          totalCustomers: number
          top20Count: number
          top20Revenue: number
-         top20Profit: number // Added top20Profit to customerPareto
+         top20Profit: number
          totalRevenue: number
-         totalProfit: number // Added totalProfit to customerPareto
+         totalProfit: number
          paretoCustomers: Array<{
-            id: string // Added id to paretoCustomers
+            id: string
             name: string
             revenue: number
-            profit: number // Added profit to paretoCustomers
+            profit: number
          }>
       }
+      attendanceSummary?: {
+         date: string
+         totalEmployees: number
+         presentCount: number
+         lateCount: number
+         absentCount: number
+         list: Array<{
+            employeeId: string
+            employeeName: string
+            jobTitle: string
+            checkIn: string | null
+            checkOut: string | null
+            status: string
+         }>
+      } | null
    }
 }
 
@@ -229,6 +248,113 @@ function renderMetricValue(value: string) {
    })
 }
 
+// ── Widget Kehadiran Hari Ini ─────────────────────────────────────────────────
+type AttendanceSummary = NonNullable<DashboardClientProps['data']['attendanceSummary']>
+
+function AttendanceTodayWidget({ summary }: { summary: AttendanceSummary }) {
+   const pct = summary.totalEmployees > 0
+      ? Math.round((summary.presentCount / summary.totalEmployees) * 100)
+      : 0
+   const fmtTime = (iso: string | null) => {
+      if (!iso) return '--:--'
+      try {
+         return new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })
+      } catch { return '--:--' }
+   }
+
+   return (
+      <div className="bg-white rounded-[28px] border border-slate-100 shadow-sm overflow-hidden">
+         {/* Header */}
+         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-50">
+            <div className="flex items-center gap-3">
+               <div className="w-9 h-9 rounded-2xl bg-indigo-50 flex items-center justify-center">
+                  <Users size={18} className="text-indigo-600" />
+               </div>
+               <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Kehadiran Hari Ini</p>
+                  <p className="text-xs font-bold text-slate-500">{summary.date}</p>
+               </div>
+            </div>
+            <Link href="/hris?tab=attendance" className="text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-700 flex items-center gap-1 transition-colors">
+               Lihat Semua <ChevronRight size={12} />
+            </Link>
+         </div>
+
+         <div className="px-6 py-4">
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-4 mb-4">
+               <div className="text-center">
+                  <p className="text-2xl font-black text-emerald-600">{summary.presentCount}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">Hadir</p>
+               </div>
+               <div className="text-center">
+                  <p className="text-2xl font-black text-amber-500">{summary.lateCount}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">Terlambat</p>
+               </div>
+               <div className="text-center">
+                  <p className="text-2xl font-black text-rose-500">{summary.absentCount}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">Belum Absen</p>
+               </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="mb-4">
+               <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-bold text-slate-400">{summary.presentCount} / {summary.totalEmployees} karyawan</span>
+                  <span className="text-[10px] font-black text-indigo-600">{pct}%</span>
+               </div>
+               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                     className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-indigo-400 transition-all duration-700"
+                     style={{ width: `${pct}%` }}
+                  />
+               </div>
+            </div>
+
+            {/* Employee list (max 6, sorted: hadir first) */}
+            {summary.list.length === 0 ? (
+               <p className="text-sm text-slate-400 text-center py-2">Belum ada karyawan terdaftar.</p>
+            ) : (
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {summary.list.slice(0, 9).map((emp) => {
+                     const hadir = !!emp.checkIn
+                     return (
+                        <div
+                           key={emp.employeeId}
+                           className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-slate-50 border border-slate-100"
+                        >
+                           <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${hadir ? 'bg-emerald-100' : 'bg-slate-200'}`}>
+                              {hadir
+                                 ? <CheckCircle2 size={14} className="text-emerald-600" />
+                                 : <XCircle size={14} className="text-slate-400" />
+                              }
+                           </div>
+                           <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-slate-800 truncate leading-tight">{emp.employeeName || '—'}</p>
+                              {hadir ? (
+                                 <p className="text-[10px] text-emerald-600 font-bold leading-tight flex items-center gap-1">
+                                    <Clock size={9} />
+                                    {fmtTime(emp.checkIn)} {emp.checkOut ? `→ ${fmtTime(emp.checkOut)}` : ''}
+                                 </p>
+                              ) : (
+                                 <p className="text-[10px] text-slate-400 font-bold leading-tight">Belum absen</p>
+                              )}
+                           </div>
+                        </div>
+                     )
+                  })}
+               </div>
+            )}
+            {summary.list.length > 9 && (
+               <Link href="/hris?tab=attendance" className="mt-3 block text-center text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-600 transition-colors">
+                  +{summary.list.length - 9} karyawan lainnya →
+               </Link>
+            )}
+         </div>
+      </div>
+   )
+}
+
 export function DashboardClient({ data }: DashboardClientProps) {
    const router = useRouter()
    // Safety fallback for new fields
@@ -291,6 +417,13 @@ export function DashboardClient({ data }: DashboardClientProps) {
                )
             })}
          </div>
+
+         {/* ── Kehadiran Hari Ini ────────────────────────────────── */}
+         {data.attendanceSummary && (
+            <motion.div variants={item}>
+               <AttendanceTodayWidget summary={data.attendanceSummary} />
+            </motion.div>
+         )}
 
          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Revenue Trend Chart - Clean & Pro */}

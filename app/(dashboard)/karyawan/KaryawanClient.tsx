@@ -1031,7 +1031,28 @@ export function KaryawanClient({
                   </div>
 
                   <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Riwayat 14 Hari</p>
+                    {/* Ringkasan bulan berjalan */}
+                    {(() => {
+                      const nowM = new Date().getMonth()
+                      const thisMonthRecords = attendance.filter((r: any) => {
+                        const d = new Date(String(r.record_date))
+                        return d.getMonth() === nowM && r.check_in
+                      })
+                      const bulanLabel = new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+                      return (
+                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-50 dark:border-slate-700">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Riwayat Presensi</p>
+                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">{bulanLabel}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">{thisMonthRecords.length}</p>
+                            <p className="text-[10px] font-bold text-slate-400">hari hadir</p>
+                          </div>
+                        </div>
+                      )
+                    })()}
+
                     {attendance.length === 0
                       ? <p className="text-sm text-slate-400 text-center py-4">Belum ada riwayat.</p>
                       : <div className="space-y-2">

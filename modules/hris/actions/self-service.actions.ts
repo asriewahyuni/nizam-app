@@ -69,9 +69,13 @@ export async function getMyAttendanceRecords(orgId: string, startDate?: string |
   const supabase = await createClient()
   const db = supabase as any
   const normalizedStartDate = normalizeDateOnly(String(startDate || '').trim())
-  const defaultStartDate = new Date()
-  defaultStartDate.setUTCDate(defaultStartDate.getUTCDate() - 14)
-  const fallbackStartDate = defaultStartDate.toISOString().split('T')[0]
+  // Default: awal bulan berjalan (Asia/Jakarta), atau maksimum 30 hari ke belakang
+  const nowJkt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
+  const startOfMonth = new Date(nowJkt.getFullYear(), nowJkt.getMonth(), 1)
+  const thirtyDaysAgo = new Date(nowJkt)
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  const fallbackStart = startOfMonth < thirtyDaysAgo ? startOfMonth : thirtyDaysAgo
+  const fallbackStartDate = fallbackStart.toLocaleDateString('en-CA')
 
   const { data, error } = await db
     .from('attendance')

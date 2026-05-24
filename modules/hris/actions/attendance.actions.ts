@@ -60,6 +60,65 @@ function normalizeDateTime(value: string) {
   return parsed.toISOString()
 }
 
+// ── Ringkasan presensi hari ini (untuk dashboard ERP admin/owner) ────────────
+export async function getTodayAttendanceSummary(orgId: string, branchId?: string | null) {
+  const supabase = await createClient()
+  const db = supabase as any
+  const todayJkt = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
+
+  // Semua karyawan aktif di org ini (filter branch jika dipilih)
+  let empQuery = db
+    .from('employees')
+    .select('id, first_name, last_name, job_title, branch_id')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+  if (branchId) empQuery = empQuery.eq('branch_id', branchId)
+  const { data: employees } = await empQuery
+
+  // Record presensi hari ini
+  let attQuery = db
+    .from('attendance')
+    .select('employee_id, check_in, check_out, status')
+    .eq('org_id', orgId)
+    .eq('record_date', todayJkt)
+  if (branchId) attQuery = attQuery.eq('branch_id', branchId)
+  const { data: records } = await attQuery
+
+  const attMap = new Map<string, { check_in: string | null; check_out: string | null; status: string }>(
+    (records ?? []).map((r: any) => [r.employee_id, r])
+  )
+
+  const totalEmployees = (employees ?? []).length
+  const presentCount = (records ?? []).filter((r: any) => r.check_in).length
+  const lateCount = (records ?? []).filter((r: any) => r.status === 'LATE').length
+
+  const list = (employees ?? []).map((emp: any) => {
+    const att = attMap.get(emp.id)
+    return {
+      employeeId: emp.id as string,
+      employeeName: [emp.first_name, emp.last_name].filter(Boolean).join(' '),
+      jobTitle: (emp.job_title as string) || '',
+      checkIn: (att?.check_in ?? null) as string | null,
+      checkOut: (att?.check_out ?? null) as string | null,
+      status: (att?.status ?? 'ABSENT') as string,
+    }
+  }).sort((a, b) => {
+    // Hadir duluan, lalu belum hadir
+    if (a.checkIn && !b.checkIn) return -1
+    if (!a.checkIn && b.checkIn) return 1
+    return a.employeeName.localeCompare(b.employeeName)
+  })
+
+  return {
+    date: todayJkt,
+    totalEmployees,
+    presentCount,
+    lateCount,
+    absentCount: totalEmployees - presentCount,
+    list,
+  }
+}
+
 export async function getAttendanceRecords(orgId: string, branchId?: string | null, startDate?: string | null) {
   const supabase = await createClient()
   const db = supabase as any

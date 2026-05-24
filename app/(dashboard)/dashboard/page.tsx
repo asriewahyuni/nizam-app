@@ -12,6 +12,7 @@ import { hasRolePermission, resolveDefaultAuthorizedRoute } from '@/modules/orga
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
 import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.actions'
+import { getTodayAttendanceSummary } from '@/modules/hris/actions/attendance.actions'
 
 type DashboardBalanceRow = {
   code?: string | null
@@ -33,13 +34,17 @@ export default async function DashboardPage() {
   // Allow admins to filter dashboard by their selected branch
   const reportBranchId = activeBranch?.id ?? null
 
-  const [cashBalance, balanceSheet, profitLoss, cashFlow, analytics, agingSummary] = await Promise.all([
+  const isOwnerOrAdmin = orgData.role === 'owner' || orgData.role === 'admin'
+  const canSeeAttendance = isOwnerOrAdmin || hasRolePermission(orgData.role, orgData.permissions, 'attendance')
+
+  const [cashBalance, balanceSheet, profitLoss, cashFlow, analytics, agingSummary, attendanceSummary] = await Promise.all([
     getBankLiquidityTotal(orgData.org.id, reportBranchId),
     getBalanceSheet(orgData.org.id, undefined, reportBranchId, false),
     getProfitLoss(orgData.org.id, undefined, undefined, reportBranchId, false),
     getCashFlow(orgData.org.id, reportBranchId, false),
     getDashboardAnalytics(orgData.org.id, reportBranchId ?? undefined),
     getAgingSummary(orgData.org.id, reportBranchId),
+    canSeeAttendance ? getTodayAttendanceSummary(orgData.org.id, reportBranchId) : Promise.resolve(null),
   ])
 
   const assetRows: DashboardBalanceRow[] = Array.isArray(balanceSheet?.assets) ? balanceSheet.assets : []
@@ -115,7 +120,8 @@ export default async function DashboardPage() {
     topExpenses: analytics.topExpenses,
     topProducts: analytics.topProducts,
     paretoAnalysis: analytics.paretoAnalysis,
-    customerPareto: analytics.customerPareto
+    customerPareto: analytics.customerPareto,
+    attendanceSummary: attendanceSummary ?? null,
   }
 
   const serializableData = JSON.parse(JSON.stringify(data))
