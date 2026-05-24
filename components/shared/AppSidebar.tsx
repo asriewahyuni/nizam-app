@@ -137,7 +137,7 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Insight',
     items: [
       { label: 'Laporan', href: '/reports', icon: BarChart3, permission_key: 'reports', module_key: 'Reports' },
-      { label: 'Strategi (BSC)', href: '/reports/bsc', icon: PieChart, permission_key: 'strategy', module_key: 'Reports' },
+      { label: 'Nizametrics', href: '/reports/bsc', icon: PieChart, permission_key: 'strategy', module_key: 'Reports' },
       { label: 'Proyeksi Kas', href: '/accounting/forecast', icon: LineChart, permission_key: 'forecast', module_key: 'Finance' },
     ]
   },

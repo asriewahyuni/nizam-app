@@ -548,7 +548,7 @@ export function BSCClient({
            <BarChart3 size={14} />
            Performance Navigation · Live Data
         </div>
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Balanced Scorecard (BSC)</h1>
+        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Nizametrics</h1>
         <p className="text-slate-500 font-medium text-lg italic opacity-80">4 Perspektif strategis — semua dari data operasional real-time.</p>
       </div>
 
