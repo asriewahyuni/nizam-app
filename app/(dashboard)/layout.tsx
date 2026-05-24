@@ -190,29 +190,6 @@ export default async function DashboardLayout({
     }
   }
 
-  // ── STAFF EMPLOYEE: tampilkan halaman langsung tanpa chrome ERP ──
-  if (isStaffEmployee) {
-    return (
-      <>
-        <SentryUserContext
-          userId={orgData.user?.id || null}
-          email={orgData.user?.email || null}
-          fullName={String(orgData.user?.user_metadata?.full_name || orgData.user?.email || '')}
-          orgId={orgData.org.id}
-          orgName={orgData.org.name}
-          branchId={activeBranch?.id || null}
-          branchName={activeBranch?.name || null}
-          role={orgData.role}
-          route={requestPathname}
-          feature="karyawan"
-        />
-        <RouteProgressBar />
-        <UserActivityTracker />
-        {children}
-      </>
-    )
-  }
-
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 print:block print:h-auto print:overflow-visible print:bg-white">
       <SentryUserContext
@@ -282,34 +259,44 @@ export default async function DashboardLayout({
           runtimeDatabaseMode={runtimeDb.mode}
           runtimeDatabaseSource={runtimeDb.sourceKey}
         />
-        <StartupWizard isDemo={isDemo} enabled={startupWizardEnabled} />
-        <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />
-        <main id="dashboard-scroll-root" className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0">
-          <div className="max-w-7xl mx-auto print:max-w-none">
-            {allowAllBranchSelection && !activeBranch && (
-              <div className="mb-6 rounded-[28px] border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">
-                <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Mode Semua Unit</div>
-                    <p className="mt-1 text-sm font-bold text-slate-900">
-                      Ringkasan lintas unit sedang aktif. Pilih satu unit dari header untuk membuat transaksi baru.
-                    </p>
-                  </div>
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-700">
-                    Read-only agregat
+        {!isStaffEmployee && <StartupWizard isDemo={isDemo} enabled={startupWizardEnabled} />}
+        {!isStaffEmployee && <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />}
+        <main
+          id="dashboard-scroll-root"
+          className={isStaffEmployee
+            ? 'flex-1 overflow-y-auto print:overflow-visible'
+            : 'flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0'
+          }
+        >
+          {isStaffEmployee ? children : (
+            <div className="max-w-7xl mx-auto print:max-w-none">
+              {allowAllBranchSelection && !activeBranch && (
+                <div className="mb-6 rounded-[28px] border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">
+                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Mode Semua Unit</div>
+                      <p className="mt-1 text-sm font-bold text-slate-900">
+                        Ringkasan lintas unit sedang aktif. Pilih satu unit dari header untuk membuat transaksi baru.
+                      </p>
+                    </div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-700">
+                      Read-only agregat
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            {children}
-          </div>
+              )}
+              {children}
+            </div>
+          )}
         </main>
-        <MobileBottomNav
-          userRole={orgData.role}
-          permissions={orgData.permissions}
-          enabledModules={orgData.enabledModules}
-        />
-        <FloatingPlanBadge planName={effectivePlanName} />
+        {!isStaffEmployee && (
+          <MobileBottomNav
+            userRole={orgData.role}
+            permissions={orgData.permissions}
+            enabledModules={orgData.enabledModules}
+          />
+        )}
+        {!isStaffEmployee && <FloatingPlanBadge planName={effectivePlanName} />}
       </div>
     </div>
   )
