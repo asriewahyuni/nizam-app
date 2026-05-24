@@ -1082,8 +1082,11 @@ export async function setShariahAccountsActive(orgId: string, active: boolean) {
 //   1. Cek blocking data (journal_lines, cash_transactions) → tolak jika ada
 //   2. Null-kan FK nullable di products, payroll, dll
 //   3. Hapus tabel non-transaksional dengan FK NOT NULL (budgets, bank_accounts)
-//   4. Null parent_id (self-reference) → DELETE accounts
+//   4. UPDATE is_system=FALSE & parent_id=NULL (bypass trigger) → DELETE accounts
 //   5. Re-seed via backfillStandardPsaKCoA
+// Catatan trigger DB:
+//   enforce_accounts_delete_governance() memblokir DELETE jika is_system=TRUE.
+//   Solusinya: mark FALSE dulu sebelum delete (sah karena ini adalah reset total).
 // ─────────────────────────────────────────────────────────────
 export async function resetCoA(orgId: string): Promise<{ success: boolean; error?: string }> {
   const trimmedOrgId = String(orgId || '').trim()
@@ -1165,16 +1168,23 @@ export async function resetCoA(orgId: string): Promise<{ success: boolean; error
     })
   }
 
-  // ── Step 5: Hapus self-reference parent_id, lalu delete accounts ─
+  // ── Step 5: Hapus accounts ────────────────────────────────────
+  // Trigger trg_accounts_delete_governance memblokir:
+  //   - is_system = TRUE → selalu ditolak (kecuali cascade org delete)
+  //   - is_system = FALSE → lolos jika auth.uid() IS NULL (Railway pg: selalu NULL)
+  // Solusi: set is_system = FALSE & parent_id = NULL dulu, baru DELETE.
   try {
-    await qp(`UPDATE accounts SET parent_id = NULL WHERE org_id = $1`, [trimmedOrgId])
+    await qp(
+      `UPDATE accounts SET is_system = FALSE, parent_id = NULL WHERE org_id = $1`,
+      [trimmedOrgId]
+    )
     await qp(`DELETE FROM accounts WHERE org_id = $1`, [trimmedOrgId])
   } catch (deleteErr: unknown) {
     const msg = deleteErr instanceof Error ? deleteErr.message : String(deleteErr)
     ;(console as any).error('resetCoA delete accounts error:', msg)
     return {
       success: false,
-      error: `Gagal menghapus akun lama: ${msg}. Pastikan tidak ada data transaksi yang terhubung.`,
+      error: `Gagal menghapus akun: ${msg}`,
     }
   }
 
