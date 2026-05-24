@@ -74,8 +74,20 @@ function isServiceBusinessHint(value: unknown): boolean {
 
 function getAccountCodeStem(value: unknown): string {
   const normalized = String(value || '').trim().toUpperCase()
-  const match = normalized.match(/^(\d{4})/)
-  return match?.[1] || normalized
+  // 1. Kode standar PSAK: 4 digit berturut-turut di awal (e.g. "1100", "1100.1")
+  const directMatch = normalized.match(/^(\d{4})/)
+  if (directMatch) return directMatch[1]
+  // 2. Kode dot-notation (e.g. "1.1.01", "1.2.1", "2.1.01"):
+  //    Gabungkan semua digit, lalu ambil 4 digit pertama
+  const digitsOnly = normalized.replace(/[^0-9]/g, '')
+  if (digitsOnly.length >= 4) {
+    return digitsOnly.slice(0, 4)
+  }
+  // 3. 3 digit (e.g. "1.1.1" → "111"): tambah trailing 0 agar masuk range
+  if (digitsOnly.length === 3) {
+    return digitsOnly + '0'
+  }
+  return normalized
 }
 
 function isCashAccountForZakat(code: unknown): boolean {
