@@ -290,10 +290,10 @@ export function AssetClient({
     return val.replace(/\./g, '')
   }
 
-  const getAssetIcon = (category: string) => {
-    if (category.includes('Kendaraan')) return <CarFront size={24} className="text-blue-500" />
-    if (category.includes('Bangunan')) return <Building2 size={24} className="text-amber-600" />
-    if (category.includes('Peralatan')) return <Monitor size={24} className="text-emerald-500" />
+  const getAssetIcon = (category: string | null | undefined) => {
+    if (category?.includes('Kendaraan')) return <CarFront size={24} className="text-blue-500" />
+    if (category?.includes('Bangunan')) return <Building2 size={24} className="text-amber-600" />
+    if (category?.includes('Peralatan')) return <Monitor size={24} className="text-emerald-500" />
     return <Landmark size={24} className="text-slate-500" />
   }
 
