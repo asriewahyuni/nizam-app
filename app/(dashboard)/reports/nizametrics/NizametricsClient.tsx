@@ -372,6 +372,8 @@ export function NizametricsClient({
     text: '', perspective: 'FINANCIAL', priority: 'medium',
   })
   const [planExpanded, setPlanExpanded] = useState(true)
+  const [kpiTargetEditing, setKpiTargetEditing] = useState<string | null>(null)
+  const [kpiTargetDraft, setKpiTargetDraft] = useState('')
 
   const canManageSetup = Boolean(activeBranchId) || allowAllBranchSelection
   const scopeLabel = activeBranchName || (allowAllBranchSelection ? 'Semua Unit' : '—')
@@ -573,6 +575,30 @@ export function NizametricsClient({
 
   const handleMovePlanItem = (id: string, perspective: BSCPerspective) => {
     setPlanItems((prev) => prev.map((i) => i.id === id ? { ...i, perspective } : i))
+  }
+
+  // ── KPI target inline edit ──
+  const handleSaveKpiTarget = (kpi: BSCKPIItem) => {
+    const parsed = Number(kpiTargetDraft)
+    if (Number.isNaN(parsed) || kpiTargetDraft.trim() === '') {
+      setKpiTargetEditing(null)
+      return
+    }
+    setKpiTargetEditing(null)
+    if (parsed === kpi.target_value) return
+    startTransition(async () => {
+      const result = await upsertBSCKPI(orgId, {
+        id: kpi.id,
+        perspective: kpi.perspective,
+        name: kpi.name,
+        unit: kpi.unit || null,
+        direction: kpi.direction,
+        weightPercent: kpi.weight_percent,
+        targetValue: parsed,
+      }, activeBranchId) as { error?: string }
+      if (result.error) { window.alert(result.error); return }
+      router.refresh()
+    })
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -937,12 +963,44 @@ export function NizametricsClient({
                               )}
                               <div className="min-w-0">
                                 <p className="text-xs font-black text-slate-900 leading-tight">{kpi.name}</p>
-                                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                  Target {formatValue(kpi.unit, kpi.target_value)}
-                                  {kpi.baseline_value !== null && (
-                                    <span className="ml-2 text-slate-400">· Dasar {formatValue(kpi.unit, kpi.baseline_value)}</span>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  {kpiTargetEditing === kpi.id ? (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[11px] text-slate-500 font-medium">Target</span>
+                                      <input
+                                        type="number"
+                                        value={kpiTargetDraft}
+                                        onChange={(e) => setKpiTargetDraft(e.target.value)}
+                                        onBlur={() => handleSaveKpiTarget(kpi)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') handleSaveKpiTarget(kpi)
+                                          if (e.key === 'Escape') setKpiTargetEditing(null)
+                                        }}
+                                        autoFocus
+                                        className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-black text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+                                      />
+                                      {kpi.unit && <span className="text-[11px] text-slate-400 font-medium">{kpi.unit}</span>}
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setKpiTargetDraft(String(kpi.target_value))
+                                        setKpiTargetEditing(kpi.id)
+                                      }}
+                                      className="flex items-center gap-1 group cursor-pointer"
+                                      title="Klik untuk ubah target"
+                                    >
+                                      <span className="text-[11px] text-slate-500 font-medium group-hover:text-slate-700 transition-colors">
+                                        Target {formatValue(kpi.unit, kpi.target_value)}
+                                      </span>
+                                      <Pencil size={9} className="text-slate-300 group-hover:text-slate-500 transition-colors" />
+                                    </button>
                                   )}
-                                </p>
+                                  {kpi.baseline_value !== null && (
+                                    <span className="text-[11px] text-slate-400 font-medium">· Dasar {formatValue(kpi.unit, kpi.baseline_value)}</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
