@@ -297,7 +297,7 @@ export default async function DashboardLayout({
         <main
           id="dashboard-scroll-root"
           className={isStaffEmployee
-            ? 'flex-1 overflow-y-auto print:overflow-visible'
+            ? 'flex-1 overflow-hidden print:overflow-visible'
             : 'flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0'
           }
         >

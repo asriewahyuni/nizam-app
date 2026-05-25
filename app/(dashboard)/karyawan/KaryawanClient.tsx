@@ -620,8 +620,8 @@ export function KaryawanClient({
   ]
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
-      <div className="max-w-md mx-auto relative min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+    <div className="h-full bg-slate-100 dark:bg-slate-950">
+      <div className="max-w-md mx-auto relative h-full flex flex-col bg-slate-50 dark:bg-slate-900">
 
           <div className="flex-1 overflow-y-auto pb-24">
             <AnimatePresence mode="wait">
