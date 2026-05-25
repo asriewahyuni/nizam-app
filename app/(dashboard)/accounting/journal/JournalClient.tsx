@@ -12,12 +12,15 @@ import { format } from 'date-fns'
 interface JournalClientProps {
   orgId: string
   initialEntries: any[]
+  initialFilterStatus?: JournalStatusFilter
   accounts: any[]
   fiscalPeriods: any[]
   userRole: string
   activeBranchId: string | null
   activeBranchName: string | null
 }
+
+type JournalStatusFilter = 'POSTED' | 'VOIDED' | 'DRAFT'
 
 type PurchaseTransparencySummary = {
   subtotal?: number
@@ -34,6 +37,7 @@ type PurchaseTransparencySummary = {
 export default function JournalClient({
   orgId,
   initialEntries,
+  initialFilterStatus = 'POSTED',
   accounts,
   fiscalPeriods,
   userRole,
@@ -48,7 +52,7 @@ export default function JournalClient({
   const [entries] = useState<any[]>(initialEntries)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [filterStatus, setFilterStatus] = useState<'POSTED' | 'VOIDED' | 'DRAFT'>('POSTED')
+  const [filterStatus, setFilterStatus] = useState<JournalStatusFilter>(initialFilterStatus)
   
   const isOwner = userRole === 'owner'
 
