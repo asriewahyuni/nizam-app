@@ -390,7 +390,7 @@ export function KaryawanClient({
     finally { setPrayerLoading(false) }
   }, [])
 
-  useEffect(() => {
+  const requestGps = useCallback(() => {
     if (!navigator?.geolocation) {
       setGps({ status: 'error', msg: 'GPS tidak didukung perangkat ini.' })
       loadLocationData(JAKARTA.lat, JAKARTA.lng)
@@ -407,9 +407,11 @@ export function KaryawanClient({
         setGps({ status: 'error', msg: 'Izin GPS ditolak. Wajib untuk absensi.' })
         loadLocationData(JAKARTA.lat, JAKARTA.lng)
       },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 }
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
     )
   }, [loadLocationData])
+
+  useEffect(() => { requestGps() }, [requestGps])
 
   // ── Presensi ──
   const [attendance, setAttendance] = useState(initialAttendance)
@@ -989,9 +991,17 @@ export function KaryawanClient({
                     </div>
 
                     {gps.status === 'error' && (
-                      <div className="flex items-center gap-2 bg-rose-50 dark:bg-rose-900/30 border border-rose-100 dark:border-rose-800 rounded-2xl px-4 py-2.5 mb-3">
-                        <AlertTriangle size={14} className="text-rose-500 shrink-0" />
-                        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400">{gps.msg}</p>
+                      <div className="flex items-center justify-between gap-2 bg-rose-50 dark:bg-rose-900/30 border border-rose-100 dark:border-rose-800 rounded-2xl px-4 py-2.5 mb-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <AlertTriangle size={14} className="text-rose-500 shrink-0" />
+                          <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 truncate">{gps.msg}</p>
+                        </div>
+                        <button
+                          onClick={requestGps}
+                          className="shrink-0 text-[10px] font-black text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-800 hover:bg-rose-200 dark:hover:bg-rose-700 px-2.5 py-1 rounded-lg transition-colors"
+                        >
+                          Coba Lagi
+                        </button>
                       </div>
                     )}
                     {gps.status === 'ok' && (
