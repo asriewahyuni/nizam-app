@@ -1076,8 +1076,28 @@ function summarizeCashFlowFromLines(
     }
   }
 
+  // Filter: Skip opening balance entries (ADJUSTMENT reference_type)
+  // Opening balance entries are not real cash flow transactions
+  const realLines = lines.filter((line) => {
+    if (!line?.entry_id) return false
+    const entry = line.entry
+    return entry?.reference_type !== 'ADJUSTMENT'
+  })
+
+  if (realLines.length === 0) {
+    return {
+      ocf: 0,
+      icf: 0,
+      fcf: 0,
+      netChange: 0,
+      ocfItems: [] as CashFlowItem[],
+      icfItems: [] as CashFlowItem[],
+      fcfItems: [] as CashFlowItem[],
+    }
+  }
+
   const linesByEntryId = new Map<string, CashFlowLine[]>()
-  lines.forEach((line) => {
+  realLines.forEach((line) => {
     const entryId = String(line?.entry_id || '').trim()
     if (!entryId) return
     const existing = linesByEntryId.get(entryId) || []
