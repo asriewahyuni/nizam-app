@@ -65,12 +65,10 @@ export async function startDemoSessionFromForm(formData: FormData) {
 function isDemoOrganizationRecord(orgRow: { is_demo?: boolean | null; settings?: Record<string, unknown> | null } | null | undefined) {
   if (!orgRow) return false
   const settings = orgRow.settings ?? null
-  const planName =
-    settings && typeof settings.plan === 'string'
-      ? settings.plan.trim().toLowerCase()
-      : ''
-
-  return Boolean(orgRow.is_demo) || settings?.is_demo === true || planName === 'demo'
+  // Sumber kebenaran utama = organizations.is_demo (kolom DB).
+  // settings.is_demo hanya fallback legacy. planName === 'demo' DIHAPUS —
+  // nama plan bukan penentu apakah org adalah demo.
+  return Boolean(orgRow.is_demo) || settings?.is_demo === true
 }
 
 async function getValidatedDemoSession() {
@@ -436,10 +434,11 @@ export async function ensureBlankDemoBudgetingSetup(orgId: string, preferredBran
 
   const settings = (orgRow?.settings ?? {}) as Record<string, unknown>
   const businessType = String(settings.business_type || '').trim().toUpperCase()
+  // Sumber kebenaran utama = organizations.is_demo (kolom DB).
+  // planName === 'demo' DIHAPUS — nama plan bukan penentu apakah org adalah demo.
   const isDemoOrg =
     Boolean(orgRow?.is_demo) ||
-    settings.is_demo === true ||
-    String(settings.plan || '').trim().toLowerCase() === 'demo'
+    settings.is_demo === true
 
   if (!isDemoOrg || businessType !== 'BLANK') {
     return { branchId: null, didSeed: false }
