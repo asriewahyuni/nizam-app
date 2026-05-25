@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getAuditOverview } from '@/modules/accounting/actions/audit.actions'
+import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { AuditClient } from './AuditClient'
 
 export const dynamic = 'force-dynamic'
@@ -9,8 +10,7 @@ export default async function AuditPage() {
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 
-  // Only owners/admins can see Audit Dashboard
-  if (!['owner', 'admin'].includes(orgData.role)) {
+  if (!hasRolePermission(orgData.role, orgData.permissions, 'accounting:read')) {
     redirect('/dashboard?error=akses-ditolak')
   }
 

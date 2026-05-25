@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getPendingApprovals } from '@/modules/organization/actions/approval.actions'
+import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { ApprovalClient } from './ApprovalClient'
 
 export const dynamic = 'force-dynamic'
@@ -9,8 +10,7 @@ export default async function ApprovalsPage() {
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 
-  // Hanya owner, admin, manager yang bisa akses
-  if (!['owner', 'admin', 'manager'].includes(orgData.role)) {
+  if (!hasRolePermission(orgData.role, orgData.permissions, 'accounting:read')) {
     redirect('/dashboard?error=akses-ditolak')
   }
 
