@@ -1076,12 +1076,14 @@ function summarizeCashFlowFromLines(
     }
   }
 
-  // Filter: Skip opening balance entries (ADJUSTMENT reference_type)
-  // Opening balance entries are not real cash flow transactions
+  // Filter: Skip opening balance entries (ADJUSTMENT) and capital injection entries (SYIRKAH_CAPITAL)
+  // These are non-cash or structural entries that don't represent real cash flow transactions
+  const SKIP_REFERENCE_TYPES = new Set(['ADJUSTMENT', 'SYIRKAH_CAPITAL'])
   const realLines = lines.filter((line) => {
     if (!line?.entry_id) return false
     const entry = line.entry
-    return entry?.reference_type !== 'ADJUSTMENT'
+    const refType = String(entry?.reference_type || '').trim().toUpperCase()
+    return !SKIP_REFERENCE_TYPES.has(refType)
   })
 
   if (realLines.length === 0) {
