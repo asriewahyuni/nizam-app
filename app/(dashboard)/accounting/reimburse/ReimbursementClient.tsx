@@ -464,7 +464,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                                       // Upload ke Supabase Storage
                                                       const fd = new FormData()
                                                       fd.append('file', file)
-                                                      const uploadResult = await uploadReceipt(fd)
+                                                      const uploadResult = await uploadReceipt(orgId, fd)
 
                                                       // Set receipt_url + isUploading=false via functional update
                                                       setItems(prev => {

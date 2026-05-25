@@ -496,7 +496,7 @@ export function KaryawanClient({
     setClaimReceiptPreview(URL.createObjectURL(file))
     setReceiptUploading(true)
     const fd = new FormData(); fd.set('file', file)
-    const res = await uploadReceipt(fd)
+    const res = await uploadReceipt(orgId, fd)
     setReceiptUploading(false)
     if (!res.success || !res.url) { showToast(res.error || 'Gagal upload nota.', false); return }
     setClaimReceiptUrl(res.url); showToast('Nota terupload.', true)
@@ -527,7 +527,7 @@ export function KaryawanClient({
     setEditAvatarPreview(URL.createObjectURL(file))
     setAvatarUploading(true)
     const fd = new FormData(); fd.set('file', file)
-    const res = await uploadMyAvatar(fd)
+    const res = await uploadMyAvatar(orgId, fd)
     setAvatarUploading(false)
     if (!res.success || !res.url) { showToast(res.error || 'Gagal upload foto.', false); return }
     setEditAvatarUrl(res.url)

@@ -175,7 +175,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
 
     const formData = new FormData()
     formData.set('file', file)
-    const result = await uploadReceipt(formData)
+    const result = await uploadReceipt(orgId, formData)
 
     setReceiptUploading(false)
     if (!result.success || !result.url) {

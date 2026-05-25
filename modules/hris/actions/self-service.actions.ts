@@ -3,7 +3,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
   buildAvatarStorageKey,
   buildPublicStorageObjectPath,
@@ -552,12 +551,9 @@ export async function updateMyEmployeeProfile(
   return { success: true }
 }
 
-export async function uploadMyAvatar(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
+export async function uploadMyAvatar(orgId: string, formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
   const session = await getInternalAuthSession()
   if (!session) return { success: false, error: 'Tidak terautentikasi.' }
-
-  const orgData = await getActiveOrg()
-  if (!orgData) return { success: false, error: 'Organisasi tidak ditemukan.' }
 
   if (!isObjectStorageConfigured()) return { success: false, error: 'Storage belum dikonfigurasi.' }
 
@@ -566,7 +562,7 @@ export async function uploadMyAvatar(formData: FormData): Promise<{ success: boo
 
   try {
     const fileBuffer = Buffer.from(await file.arrayBuffer())
-    const storageKey = buildAvatarStorageKey(orgData.org.id, session.user.id, file.name)
+    const storageKey = buildAvatarStorageKey(orgId, session.user.id, file.name)
 
     await uploadObjectToStorage({
       key: storageKey,

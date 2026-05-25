@@ -104,8 +104,8 @@ async function runPostgresWithRetry<T>(
   operationName: 'query' | 'connect',
   runner: (pool: Pool) => Promise<T>
 ): Promise<T> {
-  const maxAttempts = Math.max(1, Number(process.env.PG_RETRY_ATTEMPTS || 2))
-  const retryDelayMs = Math.max(50, Number(process.env.PG_RETRY_DELAY_MS || 250))
+  const maxAttempts = Math.max(1, Number(process.env.PG_RETRY_ATTEMPTS || 3))
+  const retryDelayMs = Math.max(50, Number(process.env.PG_RETRY_DELAY_MS || 400))
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {

@@ -6,7 +6,6 @@ import { revalidatePath } from 'next/cache'
 import { createJournalEntry } from './journal.actions'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
   buildPublicStorageObjectPath,
   buildReceiptStorageKey,
@@ -66,12 +65,9 @@ async function syncReimbursementApprovalRequest(params: {
   }
 }
 
-export async function uploadReceipt(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
+export async function uploadReceipt(orgId: string, formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
   const session = await getInternalAuthSession()
   if (!session) return { success: false, error: 'Tidak terautentikasi.' }
-
-  const orgData = await getActiveOrg()
-  if (!orgData) return { success: false, error: 'Organisasi tidak ditemukan.' }
 
   if (!isObjectStorageConfigured()) return { success: false, error: 'Storage belum dikonfigurasi.' }
 
@@ -80,7 +76,7 @@ export async function uploadReceipt(formData: FormData): Promise<{ success: bool
 
   try {
     const fileBuffer = Buffer.from(await file.arrayBuffer())
-    const storageKey = buildReceiptStorageKey(orgData.org.id, session.user.id, file.name)
+    const storageKey = buildReceiptStorageKey(orgId, session.user.id, file.name)
 
     await uploadObjectToStorage({
       key: storageKey,
