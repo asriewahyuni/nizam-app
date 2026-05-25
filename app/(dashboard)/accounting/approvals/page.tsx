@@ -10,7 +10,7 @@ export default async function ApprovalsPage() {
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 
-  if (!hasRolePermission(orgData.role, orgData.permissions, 'accounting:read')) {
+  if (!hasRolePermission(orgData.role, orgData.permissions, 'accounting:read,approval')) {
     redirect('/dashboard?error=akses-ditolak')
   }
 

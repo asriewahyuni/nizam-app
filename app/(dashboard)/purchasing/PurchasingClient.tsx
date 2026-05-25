@@ -45,6 +45,8 @@ import { QRCodeSVG } from 'qrcode.react'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
 import { updatePurchaseRequestStatus } from '@/modules/purchasing/actions/purchasing.actions'
 
+type PurchasingTab = 'PURCHASES' | 'REQUESTS'
+
 export default function PurchasingClient({
   orgId,
   orgName,
@@ -58,7 +60,14 @@ export default function PurchasingClient({
   purchaseRequests = [],
 }: any) {
    const router = useRouter()
-   const [activeTab, setActiveTab] = useState<'PURCHASES' | 'REQUESTS'>('PURCHASES')
+   const searchParams = useSearchParams()
+   const payId = searchParams.get('pay')
+   const requestedTab = String(searchParams.get('tab') || '').trim().toUpperCase()
+   const [activeTab, setActiveTab] = useState<PurchasingTab>(() => {
+     if (requestedTab === 'REQUESTS') return 'REQUESTS'
+     if (requestedTab === 'PURCHASES' || payId) return 'PURCHASES'
+     return purchaseRequests.some((request: { status?: unknown }) => request?.status === 'PENDING') ? 'REQUESTS' : 'PURCHASES'
+   })
    const [purchaseRows, setPurchaseRows] = useState<any[]>(() => purchases || [])
    const orgSettings = org?.settings || {}
    const companyProfile = {
@@ -72,9 +81,6 @@ export default function PurchasingClient({
   const [showModal, setShowModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
    const [loading, setLoading] = useState(false)
-   const searchParams = useSearchParams()
-   const payId = searchParams.get('pay')
-
    useEffect(() => {
      if (payId && purchaseRows.length > 0) {
        const purchase = purchaseRows.find((p: any) => p.id === payId)
