@@ -1471,9 +1471,11 @@ export async function getJournalEntries(
     status?: string
     branch_id?: string
     entry?: string
+    search?: string
     fromDate?: string
     toDate?: string
     limit?: number
+    offset?: number
   }
 ) {
   const { queryPostgres } = await import('@/lib/db/postgres')
@@ -1501,6 +1503,19 @@ export async function getJournalEntries(
       whereClauses.push(`(je.id::text = $${params.push(entry)} OR upper(je.entry_number) = upper($${params.length}))`)
     }
   }
+  if (filters?.search) {
+    const search = String(filters.search).trim()
+    if (search) {
+      const searchParam = params.push(`%${search}%`)
+      whereClauses.push(`(
+        je.entry_number ILIKE $${searchParam}
+        OR je.description ILIKE $${searchParam}
+        OR COALESCE(je.notes, '') ILIKE $${searchParam}
+        OR COALESCE(je.reference_type::text, '') ILIKE $${searchParam}
+        OR COALESCE(je.reference_id::text, '') ILIKE $${searchParam}
+      )`)
+    }
+  }
   if (filters?.fromDate) {
     whereClauses.push(`je.entry_date >= $${params.push(filters.fromDate)}`)
   }
@@ -1508,8 +1523,16 @@ export async function getJournalEntries(
     whereClauses.push(`je.entry_date <= $${params.push(filters.toDate)}`)
   }
 
-  const limit = filters?.limit || 50
-  params.push(limit)
+  const requestedLimit = Number(filters?.limit ?? 50)
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 200)
+    : 50
+  const requestedOffset = Number(filters?.offset ?? 0)
+  const offset = Number.isFinite(requestedOffset)
+    ? Math.max(Math.trunc(requestedOffset), 0)
+    : 0
+  const limitParam = params.push(limit)
+  const offsetParam = params.push(offset)
 
   let entryRows: any[] = []
   try {
@@ -1518,7 +1541,8 @@ export async function getJournalEntries(
       FROM   public.journal_entries je
       WHERE  ${whereClauses.join(' AND ')}
       ORDER  BY je.entry_date DESC, je.created_at DESC
-      LIMIT  $${params.length}
+      LIMIT  $${limitParam}
+      OFFSET $${offsetParam}
     `, params)
     entryRows = result.rows
   } catch (err) {

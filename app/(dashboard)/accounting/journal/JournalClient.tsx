@@ -1,18 +1,25 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, X, Trash2, Download, FileText, Filter, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus } from 'lucide-react'
+import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2 } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
-import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal } from '@/modules/accounting/actions/journal.actions'
+import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries } from '@/modules/accounting/actions/journal.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatRupiah } from '@/lib/utils'
 import { format } from 'date-fns'
 
+type JournalEntryItem = {
+  id?: string | null
+  status?: string | null
+  [key: string]: any
+}
+
 interface JournalClientProps {
   orgId: string
-  initialEntries: any[]
+  initialEntries: JournalEntryItem[]
   initialFilterStatus?: JournalStatusFilter
+  initialLoadedCounts: Record<JournalStatusFilter, number>
   accounts: any[]
   fiscalPeriods: any[]
   userRole: string
@@ -21,6 +28,7 @@ interface JournalClientProps {
 }
 
 type JournalStatusFilter = 'POSTED' | 'VOIDED' | 'DRAFT'
+const JOURNAL_PAGE_SIZE = 100
 
 type PurchaseTransparencySummary = {
   subtotal?: number
@@ -34,10 +42,23 @@ type PurchaseTransparencySummary = {
   note?: string | null
 }
 
+function uniqueJournalEntries(entries: JournalEntryItem[]) {
+  const entriesById = new Map<string, JournalEntryItem>()
+
+  for (const entry of entries) {
+    const id = String(entry?.id || '').trim()
+    if (!id || entriesById.has(id)) continue
+    entriesById.set(id, entry)
+  }
+
+  return Array.from(entriesById.values())
+}
+
 export default function JournalClient({
   orgId,
   initialEntries,
   initialFilterStatus = 'POSTED',
+  initialLoadedCounts,
   accounts,
   fiscalPeriods,
   userRole,
@@ -49,10 +70,21 @@ export default function JournalClient({
     return Number.isFinite(parsed) ? parsed : 0
   }
 
-  const [entries] = useState<any[]>(initialEntries)
+  const [entries, setEntries] = useState<JournalEntryItem[]>(initialEntries)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [filterStatus, setFilterStatus] = useState<JournalStatusFilter>(initialFilterStatus)
+  const [searchText, setSearchText] = useState('')
+  const [activeSearch, setActiveSearch] = useState('')
+  const [searchResults, setSearchResults] = useState<JournalEntryItem[] | null>(null)
+  const [searchHasMore, setSearchHasMore] = useState(false)
+  const [isLoadingEntries, setIsLoadingEntries] = useState(false)
+  const [loadedCountByStatus, setLoadedCountByStatus] = useState<Record<JournalStatusFilter, number>>(initialLoadedCounts)
+  const [hasMoreByStatus, setHasMoreByStatus] = useState<Record<JournalStatusFilter, boolean>>(() => ({
+    POSTED: initialLoadedCounts.POSTED >= JOURNAL_PAGE_SIZE,
+    VOIDED: initialLoadedCounts.VOIDED >= JOURNAL_PAGE_SIZE,
+    DRAFT: initialLoadedCounts.DRAFT >= JOURNAL_PAGE_SIZE,
+  }))
   
   const isOwner = userRole === 'owner'
 
@@ -94,6 +126,86 @@ export default function JournalClient({
   }
 
   const selectedClosedPeriod = getClosedPeriodForDate(entryDate)
+  const statusEntries = entries.filter((entry) => entry.status === filterStatus)
+  const visibleEntries = searchResults || statusEntries
+  const canLoadMoreEntries = activeSearch ? searchHasMore : hasMoreByStatus[filterStatus]
+
+  const setStatusFilter = (status: JournalStatusFilter) => {
+    setFilterStatus(status)
+    setSearchText('')
+    setActiveSearch('')
+    setSearchResults(null)
+    setSearchHasMore(false)
+  }
+
+  const loadJournalEntriesPage = async (options?: { reset?: boolean; search?: string }) => {
+    const reset = Boolean(options?.reset)
+    const search = String(options?.search ?? activeSearch).trim()
+    const offset = reset
+      ? 0
+      : search
+        ? (searchResults?.length || 0)
+        : loadedCountByStatus[filterStatus]
+
+    setIsLoadingEntries(true)
+    try {
+      const nextEntries = await getJournalEntries(orgId, {
+        branch_id: activeBranchId || undefined,
+        status: filterStatus,
+        search: search || undefined,
+        limit: JOURNAL_PAGE_SIZE,
+        offset,
+      })
+
+      setActiveSearch(search)
+
+      if (search) {
+        setSearchResults((currentResults) => (
+          reset
+            ? nextEntries
+            : uniqueJournalEntries([...(currentResults || []), ...nextEntries])
+        ))
+        setSearchHasMore(nextEntries.length >= JOURNAL_PAGE_SIZE)
+        return
+      }
+
+      setSearchResults(null)
+      setSearchHasMore(false)
+      setEntries((currentEntries) => {
+        const nextStatusEntries = reset
+          ? nextEntries
+          : uniqueJournalEntries([...statusEntries, ...nextEntries])
+        const otherStatusEntries = currentEntries.filter((entry) => entry.status !== filterStatus)
+
+        return uniqueJournalEntries([...otherStatusEntries, ...nextStatusEntries])
+      })
+      setLoadedCountByStatus((current) => ({
+        ...current,
+        [filterStatus]: reset
+          ? nextEntries.length
+          : current[filterStatus] + nextEntries.length,
+      }))
+      setHasMoreByStatus((current) => ({
+        ...current,
+        [filterStatus]: nextEntries.length >= JOURNAL_PAGE_SIZE,
+      }))
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : ''
+      alert(message || 'Gagal memuat data jurnal.')
+    } finally {
+      setIsLoadingEntries(false)
+    }
+  }
+
+  const handleSearchEntries = async (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault()
+    await loadJournalEntriesPage({ reset: true, search: searchText })
+  }
+
+  const handleResetSearch = async () => {
+    setSearchText('')
+    await loadJournalEntriesPage({ reset: true, search: '' })
+  }
 
   const stats = {
     postedCount: entries.filter((e: any) => e.status === 'POSTED').length,
@@ -244,8 +356,8 @@ export default function JournalClient({
               {(['POSTED', 'VOIDED', 'DRAFT'] as const).map((s) => (
                 <button
                   key={s}
-                  onClick={() => setFilterStatus(s)}
-                  className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${filterStatus === s ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                  onClick={() => setStatusFilter(s)}
+                  className={`cursor-pointer px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${filterStatus === s ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   {s}
                 </button>
@@ -288,50 +400,78 @@ export default function JournalClient({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          label="Total Jurnal Posted" 
+          label="Posted Dimuat"
           value={`${stats.postedCount} Entri`} 
           icon={CheckCircle2}
           color="emerald"
-          sub="Tersimpan di Buku Besar"
-          onClick={() => setFilterStatus('POSTED')}
+          sub="Bisa ditambah lewat Muat Lagi"
+          onClick={() => setStatusFilter('POSTED')}
         />
         <StatCard 
-          label="Draft Belum Posting" 
+          label="Draft Dimuat"
           value={`${stats.draftCount} Draft`} 
           icon={History}
           color="amber"
           alert={stats.draftCount > 0}
-          sub="Wajib diperiksa berkala"
-          onClick={() => setFilterStatus('DRAFT')}
+          sub="Belum diposting"
+          onClick={() => setStatusFilter('DRAFT')}
         />
         <StatCard 
-          label="Volume Transaksi" 
+          label="Volume Dimuat"
           value={formatRupiah(stats.totalVolume)} 
           icon={Wallet}
           color="indigo"
-          sub="Total Mutasi (Debit)"
-          onClick={() => setFilterStatus('POSTED')}
+          sub="Mutasi debit yang sudah dimuat"
+          onClick={() => setStatusFilter('POSTED')}
         />
         <StatCard 
-          label="Voided Hari Ini" 
+          label="Voided Dimuat Hari Ini"
           value={`${stats.voidedToday} Batal`} 
           icon={AlertCircle}
           color="rose"
-          sub="Jurnal yang dibatalkan"
-          onClick={() => setFilterStatus('VOIDED')}
+          sub="Dari data yang sudah dimuat"
+          onClick={() => setStatusFilter('VOIDED')}
         />
       </div>
 
       <SectionCard>
         <SectionHeader 
           title="Buku Besar Umum"
-          subtitle={`Menampilkan daftar jurnal entri dengan status ${filterStatus}.`}
+          subtitle={
+            activeSearch
+              ? `Hasil pencarian "${activeSearch}" pada status ${filterStatus}.`
+              : `Menampilkan daftar jurnal entri dengan status ${filterStatus}.`
+          }
           actions={
-             <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-                  <Filter size={10} className="inline mr-1" /> Auto-Refresh Active
-                </span>
-             </div>
+            <form onSubmit={handleSearchEntries} className="flex items-center gap-2">
+              <div className="relative">
+                <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  placeholder="Cari nomor/deskripsi"
+                  className="h-10 w-56 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-bold text-slate-700 outline-none transition-all placeholder:text-slate-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoadingEntries}
+                className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 text-[10px] font-black uppercase tracking-widest text-blue-600 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoadingEntries ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+                Cari
+              </button>
+              {activeSearch && (
+                <button
+                  type="button"
+                  onClick={handleResetSearch}
+                  disabled={isLoadingEntries}
+                  className="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Reset
+                </button>
+              )}
+            </form>
           }
         />
         
@@ -347,10 +487,10 @@ export default function JournalClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {entries.filter((e: any) => e.status === filterStatus).length === 0 ? (
+              {visibleEntries.length === 0 ? (
                 <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Tidak ada data jurnal {filterStatus.toLowerCase()}.</td></tr>
               ) : (
-	                entries.filter((e: any) => e.status === filterStatus).map((entry: any) => {
+	                visibleEntries.map((entry: any) => {
                       const lockedPeriod = getClosedPeriodForDate(entry.entry_date)
                       const lockMessage = lockedPeriod
                         ? `Periode fiskal ${lockedPeriod.name} sudah ditutup.`
@@ -504,6 +644,22 @@ export default function JournalClient({
 	              )}
 	            </tbody>
           </table>
+        </div>
+        <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/40 px-10 py-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            {visibleEntries.length} jurnal {filterStatus.toLowerCase()} sudah dimuat{activeSearch ? ' dari hasil pencarian' : ''}.
+          </div>
+          {canLoadMoreEntries && (
+            <button
+              type="button"
+              onClick={() => loadJournalEntriesPage()}
+              disabled={isLoadingEntries}
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-[10px] font-black uppercase tracking-widest text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLoadingEntries ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />}
+              Muat Lagi
+            </button>
+          )}
         </div>
       </SectionCard>
 

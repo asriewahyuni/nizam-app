@@ -9,6 +9,7 @@ type JournalStatusFilter = 'POSTED' | 'VOIDED' | 'DRAFT'
 type JournalEntryListItem = Awaited<ReturnType<typeof getJournalEntries>>[number]
 
 const JOURNAL_STATUS_FILTERS: JournalStatusFilter[] = ['POSTED', 'VOIDED', 'DRAFT']
+const JOURNAL_INITIAL_PAGE_SIZE = 100
 
 function normalizeStatusFilter(value?: string | string[]): JournalStatusFilter | null {
   const rawValue = Array.isArray(value) ? value[0] : value
@@ -49,9 +50,9 @@ export default async function JournalPage({
 
   // Parallel data fetching for performance
   const [postedEntries, voidedEntries, draftEntries, targetedEntries, accounts, fiscalPeriods] = await Promise.all([
-    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'POSTED', limit: 200 }),
-    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'VOIDED', limit: 100 }),
-    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'DRAFT', limit: 200 }),
+    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'POSTED', limit: JOURNAL_INITIAL_PAGE_SIZE }),
+    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'VOIDED', limit: JOURNAL_INITIAL_PAGE_SIZE }),
+    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'DRAFT', limit: JOURNAL_INITIAL_PAGE_SIZE }),
     requestedEntry
       ? getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, entry: requestedEntry, limit: 1 })
       : Promise.resolve([]),
@@ -67,6 +68,11 @@ export default async function JournalPage({
       orgId={orgData.org.id}
       initialEntries={entries}
       initialFilterStatus={initialFilterStatus}
+      initialLoadedCounts={{
+        POSTED: postedEntries.length,
+        VOIDED: voidedEntries.length,
+        DRAFT: draftEntries.length,
+      }}
       accounts={accounts}
       fiscalPeriods={fiscalPeriods}
       userRole={orgData.role}
