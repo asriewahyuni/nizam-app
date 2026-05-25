@@ -488,8 +488,8 @@ export function KaryawanClient({
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleClock = async (type: 'IN' | 'OUT') => {
-    if (gps.status === 'loading') { showToast('GPS sedang diproses, harap tunggu…', false); return }
-    if (gps.status !== 'ok')     { showToast('GPS diperlukan untuk absensi. Izinkan akses lokasi.', false); return }
+    if (gps.status === 'idle' || gps.status === 'loading') { showToast('GPS sedang mendeteksi lokasi, harap tunggu sebentar…', false); return }
+    if (gps.status === 'error')  { showToast('Izin lokasi (GPS) ditolak. Buka pengaturan browser → Izin Lokasi → Izinkan, lalu muat ulang halaman.', false); return }
     setClockLoading(true)
     const res = await clockMyAttendance(orgId, {
       type, notes: attNotes,
