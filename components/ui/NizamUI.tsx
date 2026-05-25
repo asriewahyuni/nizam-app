@@ -79,8 +79,8 @@ export function SafeButton({
   }
 
   const sizes = {
-    sm: 'px-3 py-1.5 text-[10px] gap-1.5 rounded-xl',
-    md: 'px-5 py-2.5 text-xs gap-2 rounded-2xl',
+    sm: 'px-3 py-2 text-xs gap-1.5 rounded-xl',
+    md: 'px-5 py-2.5 text-sm gap-2 rounded-2xl',
     lg: 'px-7 py-3.5 text-sm gap-2.5 rounded-[22px]',
     xl: 'px-10 py-5 text-base gap-3 rounded-[28px]'
   }
@@ -101,12 +101,12 @@ export function SafeButton({
         {loading ? (
           <motion.div key="loading" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="flex items-center gap-2">
             <Loader2 size={16} className="animate-spin shrink-0" />
-            <span className="text-[10px]">{loadingText || 'Working...'}</span>
+            <span>{loadingText || 'Memproses...'}</span>
           </motion.div>
         ) : done ? (
           <motion.div key="done" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex items-center gap-2 text-emerald-300">
             <CheckCircle2 size={16} className="shrink-0" />
-            <span className="text-[10px]">SUCCESS</span>
+            <span>Berhasil</span>
           </motion.div>
         ) : (
           <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
@@ -149,11 +149,11 @@ export function PageHeader({ tag, title, subtitle, actions, icon, iconColor = 't
           )}
           <div className="space-y-0.5">
             {tag && (
-              <div className="flex items-center gap-2 text-indigo-500 font-black tracking-[0.2em] text-[8px] uppercase bg-indigo-50 w-fit px-3 py-1 rounded-full border border-indigo-100 mb-1 italic">
+              <div className="flex items-center gap-2 text-indigo-600 font-bold tracking-wider text-xs uppercase bg-indigo-50 w-fit px-3 py-1 rounded-full border border-indigo-100 mb-1">
                 {tag}
               </div>
             )}
-            <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{title}</h1>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight leading-tight">{title}</h1>
           </div>
         </div>
         {subtitle && <p className="text-sm text-slate-400 font-medium tracking-tight pl-1">{subtitle}</p>}
@@ -204,34 +204,34 @@ export function StatCard({ label, value, sub, color = 'slate', icon: Icon, alert
   const card = (
     <div 
       onClick={onClick}
-      className={`p-8 rounded-[40px] border shadow-[0_15px_30px_-5px_rgba(0,0,0,0.02)] transition-all duration-500 relative overflow-hidden flex flex-col justify-between h-full min-h-[180px] ${styles[color]} ${isInteractive ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl group/card' : 'group'}`}
+      className={`p-5 rounded-2xl border shadow-sm transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-full min-h-[120px] ${styles[color]} ${isInteractive ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md group/card' : 'group'}`}
     >
-      <div className="flex items-start justify-between mb-4 relative z-10">
-        <div className="space-y-1">
-          <p className={`text-[10px] font-black uppercase tracking-[0.2em] opacity-60 ${isOrange ? 'text-white' : 'text-slate-400'}`}>
+      <div className="flex items-start justify-between mb-3 relative z-10">
+        <div className="space-y-1 flex-1 min-w-0 pr-2">
+          <p className={`text-xs font-semibold uppercase tracking-wide ${isOrange ? 'text-white/80' : 'text-slate-500'}`}>
             {label}
           </p>
-          <div className={`text-2xl font-black font-mono tracking-tighter truncate ${isOrange ? 'text-white' : 'text-slate-900'}`}>{value}</div>
+          <div className={`text-xl font-bold font-mono tracking-tight truncate ${isOrange ? 'text-white' : 'text-slate-900'}`}>{value}</div>
         </div>
         {Icon && (
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 ${iconColors[color]}`}>
-            <Icon size={24} strokeWidth={2.5} />
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 group-hover/card:scale-105 ${iconColors[color]}`}>
+            <Icon size={20} strokeWidth={2} />
           </div>
         )}
       </div>
 
-      <div className="relative z-10 space-y-3">
-        {sub && <p className={`text-[10px] font-bold italic opacity-60 ${isOrange ? 'text-white' : 'text-slate-400'}`}>{sub}</p>}
+      <div className="relative z-10 space-y-2">
+        {sub && <p className={`text-xs font-medium ${isOrange ? 'text-white/70' : 'text-slate-400'}`}>{sub}</p>}
         {trend && (
-           <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black font-mono border
-             ${trend.positive ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}
+           <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold border
+             ${trend.positive ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'}
            `}>
              {trend.value}
            </div>
         )}
       </div>
       
-      {alert && <div className="absolute top-4 right-4"><AlertTriangle size={16} className="text-amber-500 animate-pulse" /></div>}
+      {alert && <div className="absolute top-3 right-3"><AlertTriangle size={14} className="text-amber-500" /></div>}
     </div>
   )
 
@@ -258,17 +258,17 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 gap-6 text-center bg-white rounded-[48px] border-2 border-dashed border-slate-100 shadow-inner">
+    <div className="flex flex-col items-center justify-center py-16 gap-5 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
       {Icon && (
-        <div className="w-20 h-20 rounded-[32px] bg-slate-50 flex items-center justify-center text-slate-300 shadow-inner">
-          <Icon size={40} strokeWidth={1.5} />
+        <div className="w-14 h-14 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-300 shadow-sm">
+          <Icon size={28} strokeWidth={1.5} />
         </div>
       )}
       <div className="space-y-1">
-        <p className="font-black text-slate-900 text-xl tracking-tight">{title}</p>
-        {description && <p className="text-sm text-slate-400 font-medium mt-1 max-w-sm mx-auto leading-relaxed">{description}</p>}
+        <p className="font-semibold text-slate-700 text-base">{title}</p>
+        {description && <p className="text-sm text-slate-400 font-normal mt-1 max-w-sm mx-auto leading-relaxed">{description}</p>}
       </div>
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div className="mt-2">{action}</div>}
     </div>
   )
 }
@@ -279,7 +279,7 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
 export function SectionCard({ children, className = '', glass = false }: { children: React.ReactNode; className?: string; glass?: boolean }) {
   return (
     <div className={`
-      rounded-[40px] border shadow-[0_20px_40px_-10px_rgba(0,0,0,0.03)] overflow-hidden transition-all
+      rounded-2xl border shadow-sm overflow-hidden transition-all
       ${glass ? 'bg-white/70 backdrop-blur-xl border-white/50' : 'bg-white border-slate-100'}
       ${className}
     `}>
@@ -290,21 +290,21 @@ export function SectionCard({ children, className = '', glass = false }: { child
 
 export function SectionHeader({ title, subtitle, actions, icon }: { title: React.ReactNode; subtitle?: string; actions?: React.ReactNode; icon?: any }) {
   return (
-    <div className="px-10 py-7 border-b border-slate-100/80 bg-slate-50/40 flex items-center justify-between gap-4">
-      <div className="flex items-center gap-4">
+    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3">
         {icon && (
-          <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400">
+          <div className="w-8 h-8 rounded-lg bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-500">
             {typeof icon === 'function' ? 
-              React.createElement(icon as React.ComponentType<any>, { size: 20 }) :
+              React.createElement(icon as React.ComponentType<any>, { size: 16 }) :
               React.isValidElement(icon) ? 
-              React.cloneElement(icon as React.ReactElement<any>, { size: 20 }) :
+              React.cloneElement(icon as React.ReactElement<any>, { size: 16 }) :
               null
             }
           </div>
         )}
         <div>
-          <div className="font-black text-slate-900 text-sm uppercase tracking-widest">{title}</div>
-          {subtitle && <div className="text-[10px] text-slate-400 font-bold italic mt-0.5 tracking-tight">{subtitle}</div>}
+          <div className="font-semibold text-slate-800 text-sm">{title}</div>
+          {subtitle && <div className="text-xs text-slate-400 font-normal mt-0.5">{subtitle}</div>}
         </div>
       </div>
       {actions && <div className="flex items-center gap-3">{actions}</div>}
@@ -328,7 +328,7 @@ export function StatusBadge({ label, variant = 'neutral' }: { label: string; var
   }
 
   return (
-    <span className={`inline-block px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border shadow-sm ${styles[variant]}`}>
+    <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-semibold border ${styles[variant]}`}>
       {label}
     </span>
   )
@@ -352,23 +352,22 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
-      <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="relative bg-white rounded-[48px] shadow-2xl p-10 w-full max-w-sm space-y-8 text-center overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-rose-500 to-amber-500" />
+      <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="relative bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm space-y-6 text-center overflow-hidden">
         <div className="space-y-4">
-          <div className="w-20 h-20 rounded-[32px] bg-rose-50 flex items-center justify-center mx-auto shadow-inner">
-            <AlertTriangle size={40} className="text-rose-600" />
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mx-auto">
+            <AlertTriangle size={28} className="text-rose-600" />
           </div>
           <div>
-            <h3 className="font-black text-slate-900 text-2xl tracking-tighter">{title}</h3>
-            <p className="text-sm text-slate-400 font-medium mt-2 leading-relaxed px-2">{message}</p>
+            <h3 className="font-semibold text-slate-900 text-lg">{title}</h3>
+            <p className="text-sm text-slate-500 font-normal mt-1.5 leading-relaxed">{message}</p>
           </div>
         </div>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
           <SafeButton onClick={onConfirm} variant={variant === 'danger' ? 'danger' : 'primary'} size="lg" className="w-full">
             {confirmLabel}
           </SafeButton>
-          <button onClick={onClose} className="py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">
-            Batalkan Aksi
+          <button onClick={onClose} className="py-2.5 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors cursor-pointer">
+            Batal
           </button>
         </div>
       </motion.div>
