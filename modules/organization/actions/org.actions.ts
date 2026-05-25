@@ -369,8 +369,12 @@ function readPlanNameFromSettings(settings: unknown): string | null {
 }
 
 function readDemoFlagFromSettings(settings: unknown): boolean {
+  // Hanya baca settings.is_demo sebagai fallback legacy (migrasi lama).
+  // Jangan pernah derive isDemo dari nama plan di settings — itu rawan false-positive
+  // (org non-demo dengan plan bernama "Demo" akan ke-flag salah).
+  // Sumber kebenaran utama = kolom organizations.is_demo di DB.
   if (!isPlainObject(settings)) return false
-  return Boolean(settings.is_demo) || isDemoPlanName(settings.plan)
+  return Boolean(settings.is_demo)
 }
 
 function parseOptionalDate(value: unknown): Date | null {
@@ -434,7 +438,10 @@ async function getOrganizationPackageState(
   }
 
   const plan = readPlanNameFromSettings(orgRow.settings)
-  const isDemo = Boolean(orgRow.is_demo) || readDemoFlagFromSettings(orgRow.settings) || isDemoPlanName(plan)
+  // Sumber kebenaran utama = organizations.is_demo (kolom DB).
+  // settings.is_demo hanya sebagai fallback legacy (org lama sebelum kolom is_demo ada).
+  // isDemoPlanName(plan) DIHAPUS — nama plan "Demo" bukan indikator org adalah demo.
+  const isDemo = Boolean(orgRow.is_demo) || readDemoFlagFromSettings(orgRow.settings)
 
   return { plan, isDemo }
 }
@@ -2103,7 +2110,14 @@ const getActiveOrgCached = cache(async () => {
     'org_id, role, role_id, joined_at, last_active_at, last_active_branch_id, organizations(*), roles(permissions)'
   )
 
-  if (!memberData) return null
+  if (!memberData) {
+    // User tidak punya org_members aktif → diarahkan ke onboarding.
+    // Penyebab umum: akun dibuat manual (seeding) tapi lupa isi tabel org_members.
+    ;(console as any).warn('GetActiveOrg: user tidak punya keanggotaan org aktif. Pastikan tabel org_members sudah diisi.', {
+      userId: user.id,
+    })
+    return null
+  }
 
   const activeOrgId = memberData.org_id
   const org = memberData.organizations as any
@@ -2132,19 +2146,25 @@ const getActiveOrgCached = cache(async () => {
 
   // DYNAMIC MODULE RESOLUTION + SUBSCRIPTION EXPIRY CHECK FROM SaaS PACKAGE
   if (planName) {
-    const { data: pkgData } = await db
+    const { data: pkgData, error: pkgError } = await db
       .from('saas_packages')
       .select('modules, duration_days')
       .eq('name', planName)
       .eq('is_active', true)
       .maybeSingle()
+
+    // Bug #3 guard: paket di settings.plan tidak ketemu di tabel saas_packages.
+    // Bisa terjadi kalau nama paket di-rename atau dihapus. Jangan crash — log warning saja.
+    if (!pkgData && !pkgError) {
+      ;(console as any).warn(`GetActiveOrg: paket "${planName}" tidak ditemukan di saas_packages. Modul akan kosong. Org: ${activeOrgId}`)
+    }
     
     if (!useCustomModules && pkgData?.modules) {
       try {
         const pkgModules = Array.isArray(pkgData.modules) ? pkgData.modules : JSON.parse(pkgData.modules || '[]')
         enabledModules = [...enabledModules, ...pkgModules]
-      } catch (pkgError) {
-        (console as any).error('GetActiveOrg: failed to parse package modules', pkgError)
+      } catch (pkgParseError) {
+        (console as any).error('GetActiveOrg: failed to parse package modules', pkgParseError)
       }
     }
 
