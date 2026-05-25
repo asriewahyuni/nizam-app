@@ -1,9 +1,10 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2 } from 'lucide-react'
+import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2, Calculator, ArrowRightLeft } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
-import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries } from '@/modules/accounting/actions/journal.actions'
+import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries, getAccountLedger } from '@/modules/accounting/actions/journal.actions'
+import type { AccountLedgerResult } from '@/modules/accounting/actions/journal.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatRupiah } from '@/lib/utils'
@@ -29,6 +30,18 @@ interface JournalClientProps {
 
 type JournalStatusFilter = 'POSTED' | 'VOIDED' | 'DRAFT'
 const JOURNAL_PAGE_SIZE = 100
+const EMPTY_ACCOUNT_LEDGER: AccountLedgerResult = {
+  account: null,
+  summary: {
+    openingBalance: 0,
+    totalDebit: 0,
+    totalCredit: 0,
+    endingBalance: 0,
+    rowCount: 0,
+  },
+  rows: [],
+  hasMore: false,
+}
 
 type PurchaseTransparencySummary = {
   subtotal?: number
@@ -78,6 +91,10 @@ export default function JournalClient({
   const [activeSearch, setActiveSearch] = useState('')
   const [searchResults, setSearchResults] = useState<JournalEntryItem[] | null>(null)
   const [searchHasMore, setSearchHasMore] = useState(false)
+  const [accountSearch, setAccountSearch] = useState('')
+  const [selectedAccountId, setSelectedAccountId] = useState('')
+  const [accountLedger, setAccountLedger] = useState<AccountLedgerResult>(EMPTY_ACCOUNT_LEDGER)
+  const [isLoadingAccountLedger, setIsLoadingAccountLedger] = useState(false)
   const [isLoadingEntries, setIsLoadingEntries] = useState(false)
   const [loadedCountByStatus, setLoadedCountByStatus] = useState<Record<JournalStatusFilter, number>>(initialLoadedCounts)
   const [hasMoreByStatus, setHasMoreByStatus] = useState<Record<JournalStatusFilter, boolean>>(() => ({
@@ -129,6 +146,18 @@ export default function JournalClient({
   const statusEntries = entries.filter((entry) => entry.status === filterStatus)
   const visibleEntries = searchResults || statusEntries
   const canLoadMoreEntries = activeSearch ? searchHasMore : hasMoreByStatus[filterStatus]
+  const selectedAccount = accounts.find((account: any) => String(account?.id || '') === selectedAccountId) || null
+  const normalizedAccountSearch = accountSearch.trim().toLowerCase()
+  const accountOptions = normalizedAccountSearch
+    ? accounts
+      .filter((account: any) => {
+        if (account?.is_active === false) return false
+        const label = `${account?.code || ''} ${account?.name || ''}`.toLowerCase()
+        return label.includes(normalizedAccountSearch)
+      })
+      .slice(0, 8)
+    : []
+  const isAccountLedgerMode = Boolean(selectedAccountId)
 
   const setStatusFilter = (status: JournalStatusFilter) => {
     setFilterStatus(status)
@@ -136,6 +165,62 @@ export default function JournalClient({
     setActiveSearch('')
     setSearchResults(null)
     setSearchHasMore(false)
+    resetAccountLedger()
+  }
+
+  function resetAccountLedger() {
+    setSelectedAccountId('')
+    setAccountSearch('')
+    setAccountLedger(EMPTY_ACCOUNT_LEDGER)
+  }
+
+  const loadAccountLedgerPage = async (accountId = selectedAccountId, options?: { reset?: boolean }) => {
+    const normalizedAccountId = String(accountId || '').trim()
+    if (!normalizedAccountId) return
+
+    const reset = Boolean(options?.reset)
+    const offset = reset ? 0 : accountLedger.rows.length
+
+    setIsLoadingAccountLedger(true)
+    try {
+      const nextLedger = await getAccountLedger(orgId, {
+        account_id: normalizedAccountId,
+        branch_id: activeBranchId || undefined,
+        status: 'POSTED',
+        limit: JOURNAL_PAGE_SIZE,
+        offset,
+      })
+
+      setAccountLedger((currentLedger) => {
+        if (reset) return nextLedger
+
+        return {
+          ...nextLedger,
+          rows: [
+            ...currentLedger.rows,
+            ...nextLedger.rows.filter((row) => !currentLedger.rows.some((currentRow) => currentRow.line_id === row.line_id)),
+          ],
+        }
+      })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : ''
+      alert(message || 'Gagal memuat mutasi akun.')
+    } finally {
+      setIsLoadingAccountLedger(false)
+    }
+  }
+
+  const handleSelectAccount = async (account: any) => {
+    const accountId = String(account?.id || '').trim()
+    if (!accountId) return
+
+    setSelectedAccountId(accountId)
+    setAccountSearch(`${account?.code || ''} - ${account?.name || ''}`.trim())
+    setSearchText('')
+    setActiveSearch('')
+    setSearchResults(null)
+    setSearchHasMore(false)
+    await loadAccountLedgerPage(accountId, { reset: true })
   }
 
   const loadJournalEntriesPage = async (options?: { reset?: boolean; search?: string }) => {
@@ -474,7 +559,144 @@ export default function JournalClient({
             </form>
           }
         />
-        
+
+        <div className="border-b border-slate-100 bg-white px-10 py-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="relative flex-1">
+              <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Mutasi Per Akun
+              </label>
+              <div className="relative">
+                <Calculator size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={accountSearch}
+                  onChange={(event) => {
+                    setAccountSearch(event.target.value)
+                    setSelectedAccountId('')
+                    setAccountLedger(EMPTY_ACCOUNT_LEDGER)
+                  }}
+                  placeholder="Cari akun, contoh: 1502 Kendaraan"
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-bold text-slate-800 outline-none transition-all placeholder:text-slate-300 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                />
+              </div>
+              {accountOptions.length > 0 && !selectedAccountId && (
+                <div className="absolute left-0 right-0 top-[74px] z-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/70">
+                  {accountOptions.map((account: any) => (
+                    <button
+                      key={account.id}
+                      type="button"
+                      onClick={() => handleSelectAccount(account)}
+                      className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-4 border-b border-slate-50 px-4 py-3 text-left transition-colors last:border-0 hover:bg-blue-50"
+                    >
+                      <span>
+                        <span className="block text-sm font-black text-slate-800">{account.code} - {account.name}</span>
+                        <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                          {account.type || 'ACCOUNT'} / Normal {account.normal_balance || '-'}
+                        </span>
+                      </span>
+                      <ArrowRightLeft size={15} className="shrink-0 text-blue-500" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {selectedAccount && (
+              <div className="flex items-center gap-3">
+                <span className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-blue-700">
+                  {selectedAccount.code} - {selectedAccount.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={resetAccountLedger}
+                  className="inline-flex h-11 cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-slate-50"
+                >
+                  Kembali Umum
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {isAccountLedgerMode ? (
+          <>
+            <div className="grid grid-cols-1 border-b border-slate-100 bg-slate-50/40 md:grid-cols-4">
+              {[
+                ['Saldo Awal', accountLedger.summary.openingBalance],
+                ['Total Debit', accountLedger.summary.totalDebit],
+                ['Total Kredit', accountLedger.summary.totalCredit],
+                ['Saldo Akhir', accountLedger.summary.endingBalance],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="border-b border-slate-100 px-10 py-6 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</div>
+                  <div className="mt-2 font-mono text-xl font-black tracking-tight text-slate-900">{formatRupiah(Number(value))}</div>
+                </div>
+              ))}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tanggal & No</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Keterangan</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Lawan Akun</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Debit</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Kredit</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {isLoadingAccountLedger && accountLedger.rows.length === 0 ? (
+                    <tr><td colSpan={6} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Memuat mutasi akun...</td></tr>
+                  ) : accountLedger.rows.length === 0 ? (
+                    <tr><td colSpan={6} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Belum ada mutasi posted untuk akun ini.</td></tr>
+                  ) : (
+                    accountLedger.rows.map((row) => (
+                      <tr key={row.line_id} className="group hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-6 align-top">
+                          <div className="text-sm font-black text-slate-900 tracking-tight">{row.entry_date ? format(new Date(row.entry_date), 'yyyy-MM-dd') : ''}</div>
+                          <div className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase tracking-tighter">{row.entry_number}</div>
+                        </td>
+                        <td className="px-6 py-6 align-top">
+                          <div className="text-sm font-black text-slate-800 leading-tight">{row.description || '-'}</div>
+                          <div className="mt-2 text-[10px] font-medium italic text-slate-400">{row.memo || row.notes || row.reference_type || '-'}</div>
+                        </td>
+                        <td className="px-6 py-6 align-top text-xs font-bold text-slate-500">
+                          {row.counterparty_accounts || '-'}
+                        </td>
+                        <td className="px-6 py-6 align-top text-right font-mono text-xs font-black text-emerald-600">
+                          {row.debit > 0 ? formatRupiah(row.debit) : '-'}
+                        </td>
+                        <td className="px-6 py-6 align-top text-right font-mono text-xs font-black text-rose-600">
+                          {row.credit > 0 ? formatRupiah(row.credit) : '-'}
+                        </td>
+                        <td className={`px-8 py-6 align-top text-right font-mono text-xs font-black ${row.running_balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                          {formatRupiah(row.running_balance)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/40 px-10 py-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                {accountLedger.rows.length} dari {accountLedger.summary.rowCount} mutasi posted sudah dimuat.
+              </div>
+              {accountLedger.hasMore && (
+                <button
+                  type="button"
+                  onClick={() => loadAccountLedgerPage()}
+                  disabled={isLoadingAccountLedger}
+                  className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-[10px] font-black uppercase tracking-widest text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLoadingAccountLedger ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />}
+                  Muat Lagi
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -661,6 +883,8 @@ export default function JournalClient({
             </button>
           )}
         </div>
+          </>
+        )}
       </SectionCard>
 
       <AnimatePresence>
