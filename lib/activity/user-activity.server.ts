@@ -5,6 +5,7 @@
  */
 
 import { queryPostgres } from '@/lib/db/postgres'
+import { PLATFORM_ADMIN_EMAILS } from '@/lib/saas/platform-admin'
 import type {
   UserActivityHeatmapCell,
   UserActivityItem,
@@ -341,6 +342,7 @@ export async function getUserActivitySnapshot(): Promise<UserActivitySnapshot> {
             filter (
               where occurred_at >= now() - interval '10 minutes'
                 and event_type in ('route_view', 'heartbeat')
+                and (email is null or email != all(array[${PLATFORM_ADMIN_EMAILS.map(e => `'${e}'`).join(',')}]))
             )::int as active_users_10m,
           count(*)
             filter (
@@ -583,6 +585,7 @@ export async function getWeeklyUserActivityReport(): Promise<UserActivityWeeklyR
             filter (
               where occurred_at >= now() - interval '10 minutes'
                 and event_type in ('route_view', 'heartbeat')
+                and (email is null or email != all(array[${PLATFORM_ADMIN_EMAILS.map(e => `'${e}'`).join(',')}]))
             )::int as active_users_10m,
           count(*)
             filter (

@@ -16,6 +16,7 @@ import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
 import { RouteProgressBar } from '@/components/shared/RouteProgressBar'
+import { RouteErrorToast } from '@/components/shared/RouteErrorToast'
 import { UserActivityTracker } from '@/components/shared/UserActivityTracker'
 import { GlobalApprovalNotifier } from '@/components/shared/GlobalApprovalNotifier'
 import { EduModeShell } from '@/components/edu/EduModeShell'
@@ -234,6 +235,7 @@ export default async function DashboardLayout({
         feature="dashboard"
       />
       <RouteProgressBar />
+      <RouteErrorToast />
       <UserActivityTracker />
       <GlobalApprovalNotifier
         orgId={orgData.org.id}

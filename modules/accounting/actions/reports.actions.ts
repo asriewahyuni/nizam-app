@@ -1076,8 +1076,40 @@ function summarizeCashFlowFromLines(
     }
   }
 
+  // Filter: Skip non-cash / structural entries that should not appear in cash flow
+  // 1. ADJUSTMENT          — opening balance entries
+  // 2. SYIRKAH_CAPITAL     — capital injection (non-operating)
+  // 3. AUTO_MIGRATION_*    — opening cash/bank balances migrated from legacy system
+  const SKIP_REFERENCE_TYPES = new Set(['ADJUSTMENT', 'SYIRKAH_CAPITAL'])
+  const SKIP_DESCRIPTION_PREFIXES = ['[AUTO_MIGRATION_OPENING_CASH_BANK]']
+  // Skip penyesuaian saldo awal (koreksi saldo bank, bukan transaksi kas riil)
+  const SKIP_DESCRIPTION_KEYWORDS = ['penyesuaian saldo']
+
+  const realLines = lines.filter((line) => {
+    if (!line?.entry_id) return false
+    const entry = line.entry
+    const refType = String(entry?.reference_type || '').trim().toUpperCase()
+    if (SKIP_REFERENCE_TYPES.has(refType)) return false
+    const desc = String(entry?.description || '').trim().toLowerCase()
+    if (SKIP_DESCRIPTION_PREFIXES.some((prefix) => desc.startsWith(prefix.toLowerCase()))) return false
+    if (SKIP_DESCRIPTION_KEYWORDS.some((kw) => desc.includes(kw.toLowerCase()))) return false
+    return true
+  })
+
+  if (realLines.length === 0) {
+    return {
+      ocf: 0,
+      icf: 0,
+      fcf: 0,
+      netChange: 0,
+      ocfItems: [] as CashFlowItem[],
+      icfItems: [] as CashFlowItem[],
+      fcfItems: [] as CashFlowItem[],
+    }
+  }
+
   const linesByEntryId = new Map<string, CashFlowLine[]>()
-  lines.forEach((line) => {
+  realLines.forEach((line) => {
     const entryId = String(line?.entry_id || '').trim()
     if (!entryId) return
     const existing = linesByEntryId.get(entryId) || []

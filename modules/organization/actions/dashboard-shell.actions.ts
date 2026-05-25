@@ -56,7 +56,7 @@ export async function getSidebarChromeMetrics(
     resolveWithFallback('pending approvals', 0, () => getPendingApprovalsCount(orgId, branchId)),
     resolveWithFallback('unposted journals', 0, () => getUnpostedJournalsCount(orgId, branchId)),
     resolveWithFallback('pending purchase requests', 0, () => getPendingPurchaseRequestsCount(orgId, branchId)),
-    resolveWithFallback('hris reset requests', 0, () => getResetRequestsCount(orgId)),
+    resolveWithFallback('hris reset requests', 0, () => getResetRequestsCount(orgId, branchId)),
     resolveWithFallback('pending coa requests', 0, () => getPendingCoaRequestCount(orgId)),
   ])
 

@@ -368,18 +368,21 @@ export function KaryawanClient({
       return
     }
     setGps({ status: 'loading' })
-    navigator.geolocation.getCurrentPosition(
+    const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords
         setGps({ status: 'ok', lat, lng })
         loadLocationData(lat, lng)
+        navigator.geolocation.clearWatch(watchId)
       },
       () => {
         setGps({ status: 'error', msg: 'Izin GPS ditolak. Wajib untuk absensi.' })
         loadLocationData(JAKARTA.lat, JAKARTA.lng)
+        navigator.geolocation.clearWatch(watchId)
       },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 }
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
     )
+    return () => { navigator.geolocation.clearWatch(watchId) }
   }, [loadLocationData])
 
   // ── Presensi ──
@@ -459,8 +462,8 @@ export function KaryawanClient({
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleClock = async (type: 'IN' | 'OUT') => {
-    if (gps.status === 'loading') { showToast('GPS sedang diproses, harap tunggu…', false); return }
-    if (gps.status !== 'ok')     { showToast('GPS diperlukan untuk absensi. Izinkan akses lokasi.', false); return }
+    if (gps.status === 'idle' || gps.status === 'loading') { showToast('GPS sedang mendeteksi lokasi, harap tunggu sebentar…', false); return }
+    if (gps.status === 'error')  { showToast('Izin lokasi (GPS) ditolak. Buka pengaturan browser → Izin Lokasi → Izinkan, lalu muat ulang halaman.', false); return }
     setClockLoading(true)
     const res = await clockMyAttendance(orgId, {
       type, notes: attNotes,

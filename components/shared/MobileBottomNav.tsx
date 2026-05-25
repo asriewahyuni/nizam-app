@@ -64,7 +64,7 @@ export function MobileBottomNav({
   }
 
   const items = useMemo(() => ([
-    { label: 'Dash', href: '/dashboard', icon: LayoutDashboard, permission_key: 'dashboard' },
+    { label: 'Beranda', href: '/dashboard', icon: LayoutDashboard, permission_key: 'dashboard' },
     { label: 'POS', href: '/pos', icon: Store, permission_key: 'pos', module_key: 'POS' },
     { label: 'Laporan', href: '/reports', icon: FileText, permission_key: 'reports', module_key: 'Reports' },
     { label: 'Audit', href: '/accounting/audit', icon: History, permission_key: 'audit', module_key: 'Audit' },

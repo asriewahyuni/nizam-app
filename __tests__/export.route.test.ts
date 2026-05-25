@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   exportBalanceSheetXLSX: vi.fn(),
   exportGeneralLedgerXLSX: vi.fn(),
   exportZakatReportXLSX: vi.fn(),
+  exportFixedAssetsXLSX: vi.fn(),
   isObjectStorageFeatureEnabled: vi.fn(),
 }))
 
@@ -26,6 +27,7 @@ vi.mock('@/modules/accounting/actions/export.actions', () => ({
   exportBalanceSheetXLSX: mocks.exportBalanceSheetXLSX,
   exportGeneralLedgerXLSX: mocks.exportGeneralLedgerXLSX,
   exportZakatReportXLSX: mocks.exportZakatReportXLSX,
+  exportFixedAssetsXLSX: mocks.exportFixedAssetsXLSX,
 }))
 
 vi.mock('@/lib/storage/object-storage.server', () => ({
@@ -128,5 +130,31 @@ describe('Export Route Boundary', () => {
 
     const body = Buffer.from(await response.arrayBuffer())
     expect(body.equals(Buffer.from('gl-xlsx'))).toBe(true)
+  })
+
+  it('returns aset tetap export as xlsx when assets are requested', async () => {
+    mocks.createClient.mockResolvedValue(buildSupabaseClient())
+    mocks.getBranchAccessScope.mockResolvedValue({
+      membershipId: 'member-1',
+      role: 'staff',
+      accessibleBranches: [{ id: 'branch-1', name: 'Cabang A' }],
+      accessibleBranchIds: ['branch-1'],
+      canAccessAllBranches: false,
+    })
+    mocks.exportFixedAssetsXLSX.mockResolvedValue(Buffer.from('assets-xlsx'))
+
+    const response = await GET(
+      new NextRequest('http://localhost:3000/api/export?type=assets&orgId=org-1&branchId=branch-1')
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Type')).toBe(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    expect(response.headers.get('Content-Disposition')).toContain('Aset-Tetap_Org Demo')
+    expect(mocks.exportFixedAssetsXLSX).toHaveBeenCalledWith('org-1', 'Org Demo', 'branch-1')
+
+    const body = Buffer.from(await response.arrayBuffer())
+    expect(body.equals(Buffer.from('assets-xlsx'))).toBe(true)
   })
 })

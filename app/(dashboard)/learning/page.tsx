@@ -116,7 +116,7 @@ export default async function LearningPage(props: {
   })
 
   if (!accessContext.canRead && !accessContext.canManage) {
-    return redirect('/dashboard')
+    return redirect('/dashboard?error=akses-ditolak')
   }
 
   const searchParams = await props.searchParams

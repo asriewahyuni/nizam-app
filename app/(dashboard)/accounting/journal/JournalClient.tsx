@@ -1,22 +1,46 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, X, Trash2, Download, FileText, Filter, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus } from 'lucide-react'
+import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2, Calculator, ArrowRightLeft } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
-import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal } from '@/modules/accounting/actions/journal.actions'
+import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries, getAccountLedger } from '@/modules/accounting/actions/journal.actions'
+import type { AccountLedgerResult } from '@/modules/accounting/actions/journal.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatRupiah } from '@/lib/utils'
 import { format } from 'date-fns'
 
+type JournalEntryItem = {
+  id?: string | null
+  status?: string | null
+  [key: string]: any
+}
+
 interface JournalClientProps {
   orgId: string
-  initialEntries: any[]
+  initialEntries: JournalEntryItem[]
+  initialFilterStatus?: JournalStatusFilter
+  initialLoadedCounts: Record<JournalStatusFilter, number>
   accounts: any[]
   fiscalPeriods: any[]
   userRole: string
   activeBranchId: string | null
   activeBranchName: string | null
+}
+
+type JournalStatusFilter = 'POSTED' | 'VOIDED' | 'DRAFT'
+const JOURNAL_PAGE_SIZE = 100
+const EMPTY_ACCOUNT_LEDGER: AccountLedgerResult = {
+  account: null,
+  summary: {
+    openingBalance: 0,
+    totalDebit: 0,
+    totalCredit: 0,
+    endingBalance: 0,
+    rowCount: 0,
+  },
+  rows: [],
+  hasMore: false,
 }
 
 type PurchaseTransparencySummary = {
@@ -31,9 +55,23 @@ type PurchaseTransparencySummary = {
   note?: string | null
 }
 
+function uniqueJournalEntries(entries: JournalEntryItem[]) {
+  const entriesById = new Map<string, JournalEntryItem>()
+
+  for (const entry of entries) {
+    const id = String(entry?.id || '').trim()
+    if (!id || entriesById.has(id)) continue
+    entriesById.set(id, entry)
+  }
+
+  return Array.from(entriesById.values())
+}
+
 export default function JournalClient({
   orgId,
   initialEntries,
+  initialFilterStatus = 'POSTED',
+  initialLoadedCounts,
   accounts,
   fiscalPeriods,
   userRole,
@@ -45,10 +83,25 @@ export default function JournalClient({
     return Number.isFinite(parsed) ? parsed : 0
   }
 
-  const [entries] = useState<any[]>(initialEntries)
+  const [entries, setEntries] = useState<JournalEntryItem[]>(initialEntries)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [filterStatus, setFilterStatus] = useState<'POSTED' | 'VOIDED' | 'DRAFT'>('POSTED')
+  const [filterStatus, setFilterStatus] = useState<JournalStatusFilter>(initialFilterStatus)
+  const [searchText, setSearchText] = useState('')
+  const [activeSearch, setActiveSearch] = useState('')
+  const [searchResults, setSearchResults] = useState<JournalEntryItem[] | null>(null)
+  const [searchHasMore, setSearchHasMore] = useState(false)
+  const [accountSearch, setAccountSearch] = useState('')
+  const [selectedAccountId, setSelectedAccountId] = useState('')
+  const [accountLedger, setAccountLedger] = useState<AccountLedgerResult>(EMPTY_ACCOUNT_LEDGER)
+  const [isLoadingAccountLedger, setIsLoadingAccountLedger] = useState(false)
+  const [isLoadingEntries, setIsLoadingEntries] = useState(false)
+  const [loadedCountByStatus, setLoadedCountByStatus] = useState<Record<JournalStatusFilter, number>>(initialLoadedCounts)
+  const [hasMoreByStatus, setHasMoreByStatus] = useState<Record<JournalStatusFilter, boolean>>(() => ({
+    POSTED: initialLoadedCounts.POSTED >= JOURNAL_PAGE_SIZE,
+    VOIDED: initialLoadedCounts.VOIDED >= JOURNAL_PAGE_SIZE,
+    DRAFT: initialLoadedCounts.DRAFT >= JOURNAL_PAGE_SIZE,
+  }))
   
   const isOwner = userRole === 'owner'
 
@@ -90,6 +143,154 @@ export default function JournalClient({
   }
 
   const selectedClosedPeriod = getClosedPeriodForDate(entryDate)
+  const statusEntries = entries.filter((entry) => entry.status === filterStatus)
+  const visibleEntries = searchResults || statusEntries
+  const canLoadMoreEntries = activeSearch ? searchHasMore : hasMoreByStatus[filterStatus]
+  const selectedAccount = accounts.find((account: any) => String(account?.id || '') === selectedAccountId) || null
+  const normalizedAccountSearch = accountSearch.trim().toLowerCase()
+  const accountOptions = normalizedAccountSearch
+    ? accounts
+      .filter((account: any) => {
+        if (account?.is_active === false) return false
+        const label = `${account?.code || ''} ${account?.name || ''}`.toLowerCase()
+        return label.includes(normalizedAccountSearch)
+      })
+      .slice(0, 8)
+    : []
+  const isAccountLedgerMode = Boolean(selectedAccountId)
+
+  const setStatusFilter = (status: JournalStatusFilter) => {
+    setFilterStatus(status)
+    setSearchText('')
+    setActiveSearch('')
+    setSearchResults(null)
+    setSearchHasMore(false)
+    resetAccountLedger()
+  }
+
+  function resetAccountLedger() {
+    setSelectedAccountId('')
+    setAccountSearch('')
+    setAccountLedger(EMPTY_ACCOUNT_LEDGER)
+  }
+
+  const loadAccountLedgerPage = async (accountId = selectedAccountId, options?: { reset?: boolean }) => {
+    const normalizedAccountId = String(accountId || '').trim()
+    if (!normalizedAccountId) return
+
+    const reset = Boolean(options?.reset)
+    const offset = reset ? 0 : accountLedger.rows.length
+
+    setIsLoadingAccountLedger(true)
+    try {
+      const nextLedger = await getAccountLedger(orgId, {
+        account_id: normalizedAccountId,
+        branch_id: activeBranchId || undefined,
+        status: 'POSTED',
+        limit: JOURNAL_PAGE_SIZE,
+        offset,
+      })
+
+      setAccountLedger((currentLedger) => {
+        if (reset) return nextLedger
+
+        return {
+          ...nextLedger,
+          rows: [
+            ...currentLedger.rows,
+            ...nextLedger.rows.filter((row) => !currentLedger.rows.some((currentRow) => currentRow.line_id === row.line_id)),
+          ],
+        }
+      })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : ''
+      alert(message || 'Gagal memuat mutasi akun.')
+    } finally {
+      setIsLoadingAccountLedger(false)
+    }
+  }
+
+  const handleSelectAccount = async (account: any) => {
+    const accountId = String(account?.id || '').trim()
+    if (!accountId) return
+
+    setSelectedAccountId(accountId)
+    setAccountSearch(`${account?.code || ''} - ${account?.name || ''}`.trim())
+    setSearchText('')
+    setActiveSearch('')
+    setSearchResults(null)
+    setSearchHasMore(false)
+    await loadAccountLedgerPage(accountId, { reset: true })
+  }
+
+  const loadJournalEntriesPage = async (options?: { reset?: boolean; search?: string }) => {
+    const reset = Boolean(options?.reset)
+    const search = String(options?.search ?? activeSearch).trim()
+    const offset = reset
+      ? 0
+      : search
+        ? (searchResults?.length || 0)
+        : loadedCountByStatus[filterStatus]
+
+    setIsLoadingEntries(true)
+    try {
+      const nextEntries = await getJournalEntries(orgId, {
+        branch_id: activeBranchId || undefined,
+        status: filterStatus,
+        search: search || undefined,
+        limit: JOURNAL_PAGE_SIZE,
+        offset,
+      })
+
+      setActiveSearch(search)
+
+      if (search) {
+        setSearchResults((currentResults) => (
+          reset
+            ? nextEntries
+            : uniqueJournalEntries([...(currentResults || []), ...nextEntries])
+        ))
+        setSearchHasMore(nextEntries.length >= JOURNAL_PAGE_SIZE)
+        return
+      }
+
+      setSearchResults(null)
+      setSearchHasMore(false)
+      setEntries((currentEntries) => {
+        const nextStatusEntries = reset
+          ? nextEntries
+          : uniqueJournalEntries([...statusEntries, ...nextEntries])
+        const otherStatusEntries = currentEntries.filter((entry) => entry.status !== filterStatus)
+
+        return uniqueJournalEntries([...otherStatusEntries, ...nextStatusEntries])
+      })
+      setLoadedCountByStatus((current) => ({
+        ...current,
+        [filterStatus]: reset
+          ? nextEntries.length
+          : current[filterStatus] + nextEntries.length,
+      }))
+      setHasMoreByStatus((current) => ({
+        ...current,
+        [filterStatus]: nextEntries.length >= JOURNAL_PAGE_SIZE,
+      }))
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : ''
+      alert(message || 'Gagal memuat data jurnal.')
+    } finally {
+      setIsLoadingEntries(false)
+    }
+  }
+
+  const handleSearchEntries = async (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault()
+    await loadJournalEntriesPage({ reset: true, search: searchText })
+  }
+
+  const handleResetSearch = async () => {
+    setSearchText('')
+    await loadJournalEntriesPage({ reset: true, search: '' })
+  }
 
   const stats = {
     postedCount: entries.filter((e: any) => e.status === 'POSTED').length,
@@ -240,8 +441,8 @@ export default function JournalClient({
               {(['POSTED', 'VOIDED', 'DRAFT'] as const).map((s) => (
                 <button
                   key={s}
-                  onClick={() => setFilterStatus(s)}
-                  className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${filterStatus === s ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                  onClick={() => setStatusFilter(s)}
+                  className={`cursor-pointer px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${filterStatus === s ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   {s}
                 </button>
@@ -284,53 +485,218 @@ export default function JournalClient({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          label="Total Jurnal Posted" 
+          label="Posted Dimuat"
           value={`${stats.postedCount} Entri`} 
           icon={CheckCircle2}
           color="emerald"
-          sub="Tersimpan di Buku Besar"
-          onClick={() => setFilterStatus('POSTED')}
+          sub="Bisa ditambah lewat Muat Lagi"
+          onClick={() => setStatusFilter('POSTED')}
         />
         <StatCard 
-          label="Draft Belum Posting" 
+          label="Draft Dimuat"
           value={`${stats.draftCount} Draft`} 
           icon={History}
           color="amber"
           alert={stats.draftCount > 0}
-          sub="Wajib diperiksa berkala"
-          onClick={() => setFilterStatus('DRAFT')}
+          sub="Belum diposting"
+          onClick={() => setStatusFilter('DRAFT')}
         />
         <StatCard 
-          label="Volume Transaksi" 
+          label="Volume Dimuat"
           value={formatRupiah(stats.totalVolume)} 
           icon={Wallet}
           color="indigo"
-          sub="Total Mutasi (Debit)"
-          onClick={() => setFilterStatus('POSTED')}
+          sub="Mutasi debit yang sudah dimuat"
+          onClick={() => setStatusFilter('POSTED')}
         />
         <StatCard 
-          label="Voided Hari Ini" 
+          label="Voided Dimuat Hari Ini"
           value={`${stats.voidedToday} Batal`} 
           icon={AlertCircle}
           color="rose"
-          sub="Jurnal yang dibatalkan"
-          onClick={() => setFilterStatus('VOIDED')}
+          sub="Dari data yang sudah dimuat"
+          onClick={() => setStatusFilter('VOIDED')}
         />
       </div>
 
       <SectionCard>
         <SectionHeader 
           title="Buku Besar Umum"
-          subtitle={`Menampilkan daftar jurnal entri dengan status ${filterStatus}.`}
+          subtitle={
+            activeSearch
+              ? `Hasil pencarian "${activeSearch}" pada status ${filterStatus}.`
+              : `Menampilkan daftar jurnal entri dengan status ${filterStatus}.`
+          }
           actions={
-             <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-                  <Filter size={10} className="inline mr-1" /> Auto-Refresh Active
-                </span>
-             </div>
+            <form onSubmit={handleSearchEntries} className="flex items-center gap-2">
+              <div className="relative">
+                <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  placeholder="Cari nomor/deskripsi"
+                  className="h-10 w-56 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-bold text-slate-700 outline-none transition-all placeholder:text-slate-300 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoadingEntries}
+                className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 text-[10px] font-black uppercase tracking-widest text-blue-600 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoadingEntries ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+                Cari
+              </button>
+              {activeSearch && (
+                <button
+                  type="button"
+                  onClick={handleResetSearch}
+                  disabled={isLoadingEntries}
+                  className="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Reset
+                </button>
+              )}
+            </form>
           }
         />
-        
+
+        <div className="border-b border-slate-100 bg-white px-10 py-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="relative flex-1">
+              <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Mutasi Per Akun
+              </label>
+              <div className="relative">
+                <Calculator size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={accountSearch}
+                  onChange={(event) => {
+                    setAccountSearch(event.target.value)
+                    setSelectedAccountId('')
+                    setAccountLedger(EMPTY_ACCOUNT_LEDGER)
+                  }}
+                  placeholder="Cari akun, contoh: 1502 Kendaraan"
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-bold text-slate-800 outline-none transition-all placeholder:text-slate-300 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                />
+              </div>
+              {accountOptions.length > 0 && !selectedAccountId && (
+                <div className="absolute left-0 right-0 top-[74px] z-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/70">
+                  {accountOptions.map((account: any) => (
+                    <button
+                      key={account.id}
+                      type="button"
+                      onClick={() => handleSelectAccount(account)}
+                      className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-4 border-b border-slate-50 px-4 py-3 text-left transition-colors last:border-0 hover:bg-blue-50"
+                    >
+                      <span>
+                        <span className="block text-sm font-black text-slate-800">{account.code} - {account.name}</span>
+                        <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                          {account.type || 'ACCOUNT'} / Normal {account.normal_balance || '-'}
+                        </span>
+                      </span>
+                      <ArrowRightLeft size={15} className="shrink-0 text-blue-500" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {selectedAccount && (
+              <div className="flex items-center gap-3">
+                <span className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-blue-700">
+                  {selectedAccount.code} - {selectedAccount.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={resetAccountLedger}
+                  className="inline-flex h-11 cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-slate-50"
+                >
+                  Kembali Umum
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {isAccountLedgerMode ? (
+          <>
+            <div className="grid grid-cols-1 border-b border-slate-100 bg-slate-50/40 md:grid-cols-4">
+              {[
+                ['Saldo Awal', accountLedger.summary.openingBalance],
+                ['Total Debit', accountLedger.summary.totalDebit],
+                ['Total Kredit', accountLedger.summary.totalCredit],
+                ['Saldo Akhir', accountLedger.summary.endingBalance],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="border-b border-slate-100 px-10 py-6 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</div>
+                  <div className="mt-2 font-mono text-xl font-black tracking-tight text-slate-900">{formatRupiah(Number(value))}</div>
+                </div>
+              ))}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tanggal & No</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Keterangan</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Lawan Akun</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Debit</th>
+                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Kredit</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {isLoadingAccountLedger && accountLedger.rows.length === 0 ? (
+                    <tr><td colSpan={6} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Memuat mutasi akun...</td></tr>
+                  ) : accountLedger.rows.length === 0 ? (
+                    <tr><td colSpan={6} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Belum ada mutasi posted untuk akun ini.</td></tr>
+                  ) : (
+                    accountLedger.rows.map((row) => (
+                      <tr key={row.line_id} className="group hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-6 align-top">
+                          <div className="text-sm font-black text-slate-900 tracking-tight">{row.entry_date ? format(new Date(row.entry_date), 'yyyy-MM-dd') : ''}</div>
+                          <div className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase tracking-tighter">{row.entry_number}</div>
+                        </td>
+                        <td className="px-6 py-6 align-top">
+                          <div className="text-sm font-black text-slate-800 leading-tight">{row.description || '-'}</div>
+                          <div className="mt-2 text-[10px] font-medium italic text-slate-400">{row.memo || row.notes || row.reference_type || '-'}</div>
+                        </td>
+                        <td className="px-6 py-6 align-top text-xs font-bold text-slate-500">
+                          {row.counterparty_accounts || '-'}
+                        </td>
+                        <td className="px-6 py-6 align-top text-right font-mono text-xs font-black text-emerald-600">
+                          {row.debit > 0 ? formatRupiah(row.debit) : '-'}
+                        </td>
+                        <td className="px-6 py-6 align-top text-right font-mono text-xs font-black text-rose-600">
+                          {row.credit > 0 ? formatRupiah(row.credit) : '-'}
+                        </td>
+                        <td className={`px-8 py-6 align-top text-right font-mono text-xs font-black ${row.running_balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                          {formatRupiah(row.running_balance)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/40 px-10 py-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                {accountLedger.rows.length} dari {accountLedger.summary.rowCount} mutasi posted sudah dimuat.
+              </div>
+              {accountLedger.hasMore && (
+                <button
+                  type="button"
+                  onClick={() => loadAccountLedgerPage()}
+                  disabled={isLoadingAccountLedger}
+                  className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-[10px] font-black uppercase tracking-widest text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLoadingAccountLedger ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />}
+                  Muat Lagi
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -343,10 +709,10 @@ export default function JournalClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {entries.filter((e: any) => e.status === filterStatus).length === 0 ? (
+              {visibleEntries.length === 0 ? (
                 <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Tidak ada data jurnal {filterStatus.toLowerCase()}.</td></tr>
               ) : (
-	                entries.filter((e: any) => e.status === filterStatus).map((entry: any) => {
+	                visibleEntries.map((entry: any) => {
                       const lockedPeriod = getClosedPeriodForDate(entry.entry_date)
                       const lockMessage = lockedPeriod
                         ? `Periode fiskal ${lockedPeriod.name} sudah ditutup.`
@@ -501,6 +867,24 @@ export default function JournalClient({
 	            </tbody>
           </table>
         </div>
+        <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/40 px-10 py-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            {visibleEntries.length} jurnal {filterStatus.toLowerCase()} sudah dimuat{activeSearch ? ' dari hasil pencarian' : ''}.
+          </div>
+          {canLoadMoreEntries && (
+            <button
+              type="button"
+              onClick={() => loadJournalEntriesPage()}
+              disabled={isLoadingEntries}
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-[10px] font-black uppercase tracking-widest text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLoadingEntries ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />}
+              Muat Lagi
+            </button>
+          )}
+        </div>
+          </>
+        )}
       </SectionCard>
 
       <AnimatePresence>

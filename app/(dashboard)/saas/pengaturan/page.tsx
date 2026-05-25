@@ -12,7 +12,7 @@ export default async function SaasSettingsPage() {
   const orgData = await getActiveOrg()
 
   if (!orgData || !isPlatformAdminEmail(orgData.user?.email)) {
-    redirect('/dashboard')
+    redirect('/dashboard?error=akses-ditolak')
   }
 
   const currentPrices = await getSaasModulePrices()

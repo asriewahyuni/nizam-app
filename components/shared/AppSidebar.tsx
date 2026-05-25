@@ -49,6 +49,7 @@ import {
   Wrench,
   GraduationCap,
   Fingerprint,
+  ClipboardCheck,
   type LucideIcon
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
@@ -76,6 +77,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission_key: 'dashboard' },
       { label: 'Modul Marketplace', href: '/marketplace', icon: Store, permission_key: 'config', admin_only: true },
+      { label: 'Approval Center', href: '/accounting/approvals', icon: ClipboardCheck, permission_key: 'approval', module_key: 'Accounting' },
       { label: 'Audit Integritas', href: '/accounting/audit', icon: ShieldCheck, permission_key: 'audit', module_key: 'Audit' },
     ]
   },
@@ -692,7 +694,7 @@ export function AppSidebar({
 
                       // Define Notification Badges Mapping
                       let badgeCount = 0
-                      if (item.href === '/accounting/audit') badgeCount = badgeMetrics.pendingApprovals
+                      if (item.href === '/accounting/approvals') badgeCount = badgeMetrics.pendingApprovals
                       if (item.href === '/accounting/journal') badgeCount = badgeMetrics.unpostedJournals
                       if (item.href === '/purchasing') badgeCount = badgeMetrics.pendingPurchaseRequests
                       if (item.href === '/hris') badgeCount = badgeMetrics.hrisNotifications
@@ -784,7 +786,7 @@ export function AppSidebar({
                     const isActive = isNavItemActive(item.href)
 
                     let badgeCount = 0
-                    if (item.href === '/accounting/audit') badgeCount = badgeMetrics.pendingApprovals
+                    if (item.href === '/accounting/approvals') badgeCount = badgeMetrics.pendingApprovals
                     if (item.href === '/accounting/journal') badgeCount = badgeMetrics.unpostedJournals
                     if (item.href === '/purchasing') badgeCount = badgeMetrics.pendingPurchaseRequests
                     if (item.href === '/hris') badgeCount = badgeMetrics.hrisNotifications

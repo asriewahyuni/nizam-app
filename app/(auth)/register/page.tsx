@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { signUp } from '@/modules/auth/actions/auth.actions'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { User, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2, Building, ShieldCheck } from 'lucide-react'
+import { User, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react'
 
 type SignUpResult = Awaited<ReturnType<typeof signUp>>
 
@@ -107,70 +107,73 @@ function RegisterPageContent() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="mb-10 text-center">
-        <div className="w-16 h-16 bg-blue-600 rounded-[24px] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-200">
-           <ShieldCheck className="text-white" size={32} />
+      <div className="mb-8 text-center">
+        <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-200">
+           <ShieldCheck className="text-white" size={28} />
         </div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase italic italic">Daftar Akun NIZAM</h1>
-        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">SaaS ENTERPRISE SOLUTION • FREE TRIAL</p>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Daftar Akun NIZAM</h1>
+        <p className="text-slate-500 text-sm font-normal mt-1">Coba gratis, tanpa kartu kredit.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Lengkap Pemilik</label>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-1.5">
+          <label htmlFor="reg-fullname" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Nama Lengkap</label>
           <div className="relative">
              <input
+               id="reg-fullname"
                required
                placeholder="Contoh: Budi Santoso"
                value={formData.fullName}
                onChange={e => setFormData({...formData, fullName: e.target.value})}
-               className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all pr-12"
+               className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all pr-12"
              />
-             <User className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+             <User className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} />
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Koorporasi / Bisnis</label>
+        <div className="space-y-1.5">
+          <label htmlFor="reg-email" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Email Bisnis</label>
           <div className="relative">
              <input
+               id="reg-email"
                type="email"
                required
-               placeholder="nama@perusahaan.com"
+               placeholder="nama@bisnis.com"
                value={formData.email}
                onChange={e => setFormData({...formData, email: e.target.value})}
-               className={`w-full px-6 py-4 bg-slate-50 border rounded-2xl text-sm font-bold text-slate-900 outline-none transition-all pr-12 ${
-                 error && error.includes('Email') ? 'border-rose-300 ring-4 ring-rose-50' : 'border-slate-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50'
+               className={`w-full px-4 py-3.5 bg-slate-50 border rounded-xl text-sm text-slate-900 outline-none transition-all pr-12 ${
+                 error && error.includes('Email') ? 'border-rose-300 ring-2 ring-rose-100' : 'border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
                }`}
              />
-             <Mail className={`absolute right-5 top-1/2 -translate-y-1/2 ${error && error.includes('Email') ? 'text-rose-400' : 'text-slate-300'}`} size={18} />
+             <Mail className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${error && error.includes('Email') ? 'text-rose-400' : 'text-slate-300'}`} size={16} />
           </div>
-          <p className="text-[10px] font-bold text-amber-600 mt-2 flex gap-1.5 items-start">
-             <AlertCircle size={14} className="shrink-0" />
-             Pastikan email ini aktif dan dapat diakses untuk keperluan Lupa Password dan pengiriman Tagihan Billing.
+          <p className="text-xs text-amber-600 mt-1.5 flex gap-1.5 items-start leading-relaxed">
+             <AlertCircle size={13} className="shrink-0 mt-0.5" />
+             Gunakan email aktif. Dipakai untuk lupa sandi dan notifikasi tagihan.
           </p>
         </div>
 
-        <div className="space-y-2">
-           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Create Password</label>
+        <div className="space-y-1.5">
+           <label htmlFor="reg-password" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kata Sandi</label>
            <div className="relative">
-              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} />
               <input
+                id="reg-password"
                 type={showPassword ? 'text' : 'password'}
                 required
                 minLength={8}
-                placeholder="Minimal 8 Karakter"
+                placeholder="Minimal 8 karakter"
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
-                className="w-full py-4 pl-12 pr-12 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all"
+                className="w-full py-3.5 pl-11 pr-12 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((previous) => !previous)}
-                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-                className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
+                aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer p-0.5"
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
            </div>
         </div>
@@ -178,11 +181,11 @@ function RegisterPageContent() {
         <AnimatePresence>
            {error && (
              <motion.div 
-               initial={{ opacity: 0, y: -10 }} 
+               initial={{ opacity: 0, y: -8 }} 
                animate={{ opacity: 1, y: 0 }} 
-               className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-3 text-rose-600 text-[11px] font-black uppercase tracking-tight italic"
+               className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-2.5 text-rose-600 text-sm font-medium"
              >
-                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                <AlertCircle size={15} className="shrink-0 mt-0.5" />
                 {error}
              </motion.div>
            )}
@@ -191,22 +194,19 @@ function RegisterPageContent() {
         <button
           disabled={isPending}
           type="submit"
-          className="w-full py-4 rounded-2xl bg-slate-900 text-white text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl shadow-slate-200 disabled:opacity-50 active:scale-[0.98]"
+          className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-200 disabled:opacity-50 active:scale-[0.98] cursor-pointer"
         >
-          {isPending ? 'Mendaftarkan Akun...' : 'Mulai Sekarang — Gratis'}
-          <ArrowRight size={18} />
+          {isPending ? 'Mendaftar...' : 'Daftar Gratis'}
+          <ArrowRight size={16} />
         </button>
         <input type="hidden" name="plan" value={plan || ''} />
       </form>
 
-      <div className="mt-8 text-center space-y-4">
-         <p className="text-xs text-slate-400 font-bold">
-            Sudah ada akun bisnis?{' '}
-            <Link href="/login" className="text-blue-600 font-black hover:underline uppercase tracking-wider">Login di sini</Link>
+      <div className="mt-6 text-center">
+         <p className="text-sm text-slate-500">
+            Sudah punya akun?{' '}
+            <Link href="/login" className="text-blue-600 font-semibold hover:underline">Masuk</Link>
          </p>
-         <div className="flex items-center justify-center gap-2 text-[9px] text-slate-300 font-black uppercase tracking-[0.2em]">
-            <Building size={12} /> Powered by NIZAM ERP Global
-         </div>
       </div>
     </div>
   )

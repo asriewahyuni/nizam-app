@@ -37,14 +37,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             </p>
           </div>
 
-          <div className="flex gap-4 items-center">
-            <div className="flex -space-x-4">
-              <div className="w-10 h-10 rounded-full border-2 border-slate-950 bg-slate-800" />
-              <div className="w-10 h-10 rounded-full border-2 border-slate-950 bg-slate-700" />
-              <div className="w-10 h-10 rounded-full border-2 border-slate-950 bg-slate-600" />
-            </div>
-            <div className="text-sm font-semibold text-slate-400">
-              <span className="text-white">+24K</span> Pengguna Aktif
+          <div className="flex gap-3 items-center">
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+              <span className="text-sm text-slate-300 font-medium">Sistem aktif & berjalan</span>
             </div>
           </div>
         </div>

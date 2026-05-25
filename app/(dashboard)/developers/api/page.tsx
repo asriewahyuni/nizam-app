@@ -23,7 +23,7 @@ export default async function DeveloperApiPage() {
   if (!orgData) redirect('/onboarding')
 
   const role = String(orgData.role || '').toLowerCase()
-  if (role !== 'owner' && role !== 'admin') redirect('/dashboard')
+  if (role !== 'owner' && role !== 'admin') redirect('/dashboard?error=akses-ditolak')
 
   const [apiKeys, branches, config, webhookDeliveries, callLogs] = await Promise.all([
     listApiKeys(orgData.org.id),

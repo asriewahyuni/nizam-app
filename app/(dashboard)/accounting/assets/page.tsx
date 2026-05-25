@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getFixedAssets } from '@/modules/accounting/actions/assets.actions'
 import { createClient } from '@/lib/supabase/server'
+import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { AssetClient } from './AssetClient'
 
 export const dynamic = 'force-dynamic'
@@ -10,9 +11,8 @@ export default async function AssetsPage() {
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 
-  // Hanya owner, admin, manager yang bisa akses Accounting & Assets
-  if (!['owner', 'admin', 'manager'].includes(orgData.role)) {
-    redirect('/dashboard')
+  if (!hasRolePermission(orgData.role, orgData.permissions, 'assets:read')) {
+    redirect('/dashboard?error=akses-ditolak')
   }
 
   let assets: any[] = []

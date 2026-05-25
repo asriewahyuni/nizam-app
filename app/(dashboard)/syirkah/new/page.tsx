@@ -1,4 +1,5 @@
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
@@ -14,6 +15,10 @@ export const metadata = {
 export default async function NewSyirkahPage() {
   const activeOrgData = await getActiveOrg()
   if (!activeOrgData) redirect('/onboarding')
+
+  if (!hasRolePermission(activeOrgData.role, activeOrgData.permissions, 'syirkah')) {
+    redirect('/dashboard?error=akses-ditolak')
+  }
 
   const supabase = await createClient()
   const { data, error } = await supabase

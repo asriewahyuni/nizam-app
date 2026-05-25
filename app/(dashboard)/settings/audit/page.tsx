@@ -11,7 +11,7 @@ export default async function AuditPage() {
 
   // Hanya C-Level / Manajer yg bisa lihat Audit Trail
   if (!['owner', 'admin'].includes(orgData.role)) {
-    redirect('/dashboard')
+    redirect('/dashboard?error=akses-ditolak')
   }
 
   const logs = await getAuditLogs(100)

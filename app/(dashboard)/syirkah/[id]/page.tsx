@@ -1,4 +1,5 @@
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import {
   getSyirkahContractById,
   getSyirkahCoreJournal,
@@ -37,6 +38,10 @@ export default async function SyirkahDetailPage({ params, searchParams }: {
 }) {
   const activeOrgData = await getActiveOrg()
   if (!activeOrgData) redirect('/onboarding')
+
+  if (!hasRolePermission(activeOrgData.role, activeOrgData.permissions, 'syirkah')) {
+    redirect('/dashboard?error=akses-ditolak')
+  }
 
   const resolvedParams = await params
   const resolvedSearch = await searchParams

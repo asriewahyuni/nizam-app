@@ -1470,9 +1470,12 @@ export async function getJournalEntries(
   filters?: {
     status?: string
     branch_id?: string
+    entry?: string
+    search?: string
     fromDate?: string
     toDate?: string
     limit?: number
+    offset?: number
   }
 ) {
   const { queryPostgres } = await import('@/lib/db/postgres')
@@ -1494,6 +1497,25 @@ export async function getJournalEntries(
   if (filters?.branch_id) {
     whereClauses.push(`je.branch_id = $${params.push(filters.branch_id)}`)
   }
+  if (filters?.entry) {
+    const entry = String(filters.entry).trim()
+    if (entry) {
+      whereClauses.push(`(je.id::text = $${params.push(entry)} OR upper(je.entry_number) = upper($${params.length}))`)
+    }
+  }
+  if (filters?.search) {
+    const search = String(filters.search).trim()
+    if (search) {
+      const searchParam = params.push(`%${search}%`)
+      whereClauses.push(`(
+        je.entry_number ILIKE $${searchParam}
+        OR je.description ILIKE $${searchParam}
+        OR COALESCE(je.notes, '') ILIKE $${searchParam}
+        OR COALESCE(je.reference_type::text, '') ILIKE $${searchParam}
+        OR COALESCE(je.reference_id::text, '') ILIKE $${searchParam}
+      )`)
+    }
+  }
   if (filters?.fromDate) {
     whereClauses.push(`je.entry_date >= $${params.push(filters.fromDate)}`)
   }
@@ -1501,8 +1523,16 @@ export async function getJournalEntries(
     whereClauses.push(`je.entry_date <= $${params.push(filters.toDate)}`)
   }
 
-  const limit = filters?.limit || 50
-  params.push(limit)
+  const requestedLimit = Number(filters?.limit ?? 50)
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 200)
+    : 50
+  const requestedOffset = Number(filters?.offset ?? 0)
+  const offset = Number.isFinite(requestedOffset)
+    ? Math.max(Math.trunc(requestedOffset), 0)
+    : 0
+  const limitParam = params.push(limit)
+  const offsetParam = params.push(offset)
 
   let entryRows: any[] = []
   try {
@@ -1511,7 +1541,8 @@ export async function getJournalEntries(
       FROM   public.journal_entries je
       WHERE  ${whereClauses.join(' AND ')}
       ORDER  BY je.entry_date DESC, je.created_at DESC
-      LIMIT  $${params.length}
+      LIMIT  $${limitParam}
+      OFFSET $${offsetParam}
     `, params)
     entryRows = result.rows
   } catch (err) {
@@ -1565,5 +1596,290 @@ export async function getJournalEntries(
   } catch (err) {
     ;(console as any).error('[getJournalEntries] purchase transparency hydrate error:', err)
     return entries.map((entry) => ({ ...entry, purchase_transparency: null }))
+  }
+}
+
+export type AccountLedgerRow = {
+  line_id: string
+  entry_id: string
+  entry_number: string
+  entry_date: string | Date | null
+  description: string | null
+  reference_type: string | null
+  notes: string | null
+  memo: string | null
+  debit: number
+  credit: number
+  running_balance: number
+  counterparty_accounts: string | null
+}
+
+export type AccountLedgerResult = {
+  account: {
+    id: string
+    code: string
+    name: string
+    type: string | null
+    normal_balance: 'DEBIT' | 'CREDIT'
+  } | null
+  summary: {
+    openingBalance: number
+    totalDebit: number
+    totalCredit: number
+    endingBalance: number
+    rowCount: number
+  }
+  rows: AccountLedgerRow[]
+  hasMore: boolean
+}
+
+type AccountLedgerFilters = {
+  account_id: string
+  branch_id?: string | null
+  status?: string
+  fromDate?: string
+  toDate?: string
+  limit?: number
+  offset?: number
+}
+
+function emptyAccountLedgerResult(): AccountLedgerResult {
+  return {
+    account: null,
+    summary: {
+      openingBalance: 0,
+      totalDebit: 0,
+      totalCredit: 0,
+      endingBalance: 0,
+      rowCount: 0,
+    },
+    rows: [],
+    hasMore: false,
+  }
+}
+
+function normalizeAccountLedgerLimit(value: unknown) {
+  const parsed = Number(value ?? 100)
+  if (!Number.isFinite(parsed)) return 100
+  return Math.min(Math.max(Math.trunc(parsed), 1), 200)
+}
+
+function normalizeAccountLedgerOffset(value: unknown) {
+  const parsed = Number(value ?? 0)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.max(Math.trunc(parsed), 0)
+}
+
+function toLedgerBalance(debit: unknown, credit: unknown, normalBalance: 'DEBIT' | 'CREDIT') {
+  const debitAmount = toNumber(debit)
+  const creditAmount = toNumber(credit)
+  return normalBalance === 'CREDIT'
+    ? creditAmount - debitAmount
+    : debitAmount - creditAmount
+}
+
+function buildAccountLedgerWhere(
+  params: unknown[],
+  filters: AccountLedgerFilters,
+  options?: { beforeDate?: string | null }
+) {
+  const whereClauses = [
+    `je.org_id = $1`,
+    `jl.account_id = $2::uuid`,
+    `(je.void_reason IS NULL OR je.void_reason <> 'HARD_DELETE_HIDDEN')`,
+  ]
+
+  const status = String(filters.status || 'POSTED').trim().toUpperCase()
+  whereClauses.push(`je.status = $${params.push(status || 'POSTED')}`)
+
+  if (filters.branch_id) {
+    whereClauses.push(`je.branch_id = $${params.push(filters.branch_id)}`)
+  }
+
+  if (options?.beforeDate) {
+    whereClauses.push(`je.entry_date < $${params.push(options.beforeDate)}`)
+  } else {
+    if (filters.fromDate) {
+      whereClauses.push(`je.entry_date >= $${params.push(filters.fromDate)}`)
+    }
+    if (filters.toDate) {
+      whereClauses.push(`je.entry_date <= $${params.push(filters.toDate)}`)
+    }
+  }
+
+  return whereClauses.join(' AND ')
+}
+
+// ─────────────────────────────────────────────────────────────
+// getAccountLedger — Summary and paginated movements for one CoA
+// ─────────────────────────────────────────────────────────────
+export async function getAccountLedger(
+  orgId: string,
+  filters: AccountLedgerFilters
+): Promise<AccountLedgerResult> {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const accountId = String(filters.account_id || '').trim()
+  if (!orgId || !accountId) return emptyAccountLedgerResult()
+
+  const limit = normalizeAccountLedgerLimit(filters.limit)
+  const offset = normalizeAccountLedgerOffset(filters.offset)
+
+  try {
+    const accountResult = await queryPostgres<Record<string, unknown>>(`
+      SELECT id, code, name, type, normal_balance
+      FROM public.accounts
+      WHERE org_id = $1
+        AND id = $2::uuid
+      LIMIT 1
+    `, [orgId, accountId])
+
+    const accountRow = accountResult.rows[0]
+    if (!accountRow) return emptyAccountLedgerResult()
+
+    const normalBalance = String(accountRow.normal_balance || '').toUpperCase() === 'CREDIT'
+      ? 'CREDIT'
+      : 'DEBIT'
+    const account = {
+      id: String(accountRow.id || ''),
+      code: String(accountRow.code || ''),
+      name: String(accountRow.name || ''),
+      type: String(accountRow.type || '') || null,
+      normal_balance: normalBalance as 'DEBIT' | 'CREDIT',
+    }
+
+    let openingBalance = 0
+    if (filters.fromDate) {
+      const openingParams: unknown[] = [orgId, accountId]
+      const openingWhere = buildAccountLedgerWhere(openingParams, filters, { beforeDate: filters.fromDate })
+      const openingResult = await queryPostgres<Record<string, unknown>>(`
+        SELECT
+          COALESCE(SUM(jl.debit), 0) AS total_debit,
+          COALESCE(SUM(jl.credit), 0) AS total_credit
+        FROM public.journal_lines jl
+        JOIN public.journal_entries je ON je.id = jl.entry_id
+        WHERE ${openingWhere}
+      `, openingParams)
+      const openingRow = openingResult.rows[0] || {}
+      openingBalance = toLedgerBalance(openingRow.total_debit, openingRow.total_credit, normalBalance)
+    }
+
+    const summaryParams: unknown[] = [orgId, accountId]
+    const summaryWhere = buildAccountLedgerWhere(summaryParams, filters)
+    const summaryResult = await queryPostgres<Record<string, unknown>>(`
+      SELECT
+        COALESCE(SUM(jl.debit), 0) AS total_debit,
+        COALESCE(SUM(jl.credit), 0) AS total_credit,
+        COUNT(*) AS row_count
+      FROM public.journal_lines jl
+      JOIN public.journal_entries je ON je.id = jl.entry_id
+      WHERE ${summaryWhere}
+    `, summaryParams)
+    const summaryRow = summaryResult.rows[0] || {}
+    const totalDebit = toNumber(summaryRow.total_debit)
+    const totalCredit = toNumber(summaryRow.total_credit)
+    const rowCount = Math.trunc(toNumber(summaryRow.row_count))
+    const endingBalance = openingBalance + toLedgerBalance(totalDebit, totalCredit, normalBalance)
+
+    const rowParams: unknown[] = [orgId, accountId]
+    const rowWhere = buildAccountLedgerWhere(rowParams, filters)
+    const normalBalanceParam = rowParams.push(normalBalance)
+    const openingBalanceParam = rowParams.push(openingBalance)
+    const limitParam = rowParams.push(limit)
+    const offsetParam = rowParams.push(offset)
+
+    const rowsResult = await queryPostgres<Record<string, unknown>>(`
+      WITH ledger_rows AS (
+        SELECT
+          jl.id AS line_id,
+          je.id AS entry_id,
+          je.entry_number,
+          je.entry_date,
+          je.created_at,
+          je.description,
+          je.reference_type::text AS reference_type,
+          je.notes,
+          jl.memo,
+          COALESCE(jl.debit, 0) AS debit,
+          COALESCE(jl.credit, 0) AS credit,
+          COALESCE(counterparty.accounts, '-') AS counterparty_accounts,
+          CASE
+            WHEN $${normalBalanceParam} = 'CREDIT'
+              THEN COALESCE(jl.credit, 0) - COALESCE(jl.debit, 0)
+            ELSE COALESCE(jl.debit, 0) - COALESCE(jl.credit, 0)
+          END AS signed_amount
+        FROM public.journal_lines jl
+        JOIN public.journal_entries je ON je.id = jl.entry_id
+        LEFT JOIN LATERAL (
+          SELECT string_agg(counterparty_label, ', ' ORDER BY counterparty_label) AS accounts
+          FROM (
+            SELECT DISTINCT concat(a2.code, ' - ', a2.name) AS counterparty_label
+            FROM public.journal_lines jl2
+            LEFT JOIN public.accounts a2 ON a2.id = jl2.account_id
+            WHERE jl2.entry_id = jl.entry_id
+              AND jl2.account_id <> jl.account_id
+              AND a2.id IS NOT NULL
+          ) counterparty_rows
+        ) counterparty ON TRUE
+        WHERE ${rowWhere}
+      ),
+      numbered_rows AS (
+        SELECT
+          *,
+          $${openingBalanceParam}::numeric
+            + SUM(signed_amount) OVER (
+              ORDER BY entry_date ASC, created_at ASC, entry_number ASC, line_id ASC
+              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS running_balance
+        FROM ledger_rows
+      )
+      SELECT
+        line_id,
+        entry_id,
+        entry_number,
+        entry_date,
+        description,
+        reference_type,
+        notes,
+        memo,
+        debit,
+        credit,
+        running_balance,
+        counterparty_accounts
+      FROM numbered_rows
+      ORDER BY entry_date DESC, created_at DESC, entry_number DESC, line_id DESC
+      LIMIT $${limitParam}
+      OFFSET $${offsetParam}
+    `, rowParams)
+
+    const rows = rowsResult.rows.map((row) => ({
+      line_id: String(row.line_id || ''),
+      entry_id: String(row.entry_id || ''),
+      entry_number: String(row.entry_number || ''),
+      entry_date: row.entry_date as string | Date | null,
+      description: String(row.description || ''),
+      reference_type: String(row.reference_type || ''),
+      notes: String(row.notes || ''),
+      memo: String(row.memo || ''),
+      debit: toNumber(row.debit),
+      credit: toNumber(row.credit),
+      running_balance: toNumber(row.running_balance),
+      counterparty_accounts: String(row.counterparty_accounts || '-'),
+    }))
+
+    return {
+      account,
+      summary: {
+        openingBalance,
+        totalDebit,
+        totalCredit,
+        endingBalance,
+        rowCount,
+      },
+      rows,
+      hasMore: offset + rows.length < rowCount,
+    }
+  } catch (err) {
+    ;(console as any).error('[getAccountLedger] SQL error:', err)
+    return emptyAccountLedgerResult()
   }
 }

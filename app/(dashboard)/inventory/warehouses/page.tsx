@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
+import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { WarehouseClient } from './WarehouseClient'
 
 export const dynamic = 'force-dynamic'
@@ -9,9 +10,8 @@ export default async function WarehousesPage() {
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 
-  // Hanya owner, admin, manager yang bisa akses (opsional, bisa dibatasi di DB RLS)
-  if (!['owner', 'admin', 'manager', 'staff'].includes(orgData.role)) {
-    redirect('/dashboard')
+  if (!hasRolePermission(orgData.role, orgData.permissions, 'inventory:read')) {
+    redirect('/dashboard?error=akses-ditolak')
   }
 
   const activeBranch = await getActiveBranch(orgData.org.id)
