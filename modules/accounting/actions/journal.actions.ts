@@ -1470,6 +1470,7 @@ export async function getJournalEntries(
   filters?: {
     status?: string
     branch_id?: string
+    entry?: string
     fromDate?: string
     toDate?: string
     limit?: number
@@ -1493,6 +1494,12 @@ export async function getJournalEntries(
   }
   if (filters?.branch_id) {
     whereClauses.push(`je.branch_id = $${params.push(filters.branch_id)}`)
+  }
+  if (filters?.entry) {
+    const entry = String(filters.entry).trim()
+    if (entry) {
+      whereClauses.push(`(je.id::text = $${params.push(entry)} OR upper(je.entry_number) = upper($${params.length}))`)
+    }
   }
   if (filters?.fromDate) {
     whereClauses.push(`je.entry_date >= $${params.push(filters.fromDate)}`)

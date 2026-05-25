@@ -36,24 +36,31 @@ function mergeJournalEntries(entryGroups: JournalEntryListItem[][]) {
 export default async function JournalPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string | string[] }>
+  searchParams?: Promise<{ status?: string | string[]; entry?: string | string[] }>
 }) {
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
   const activeBranch = await getActiveBranch(orgData.org.id)
   const resolvedSearchParams = searchParams ? await searchParams : {}
   const requestedStatus = normalizeStatusFilter(resolvedSearchParams.status)
+  const requestedEntry = Array.isArray(resolvedSearchParams.entry)
+    ? resolvedSearchParams.entry[0]
+    : resolvedSearchParams.entry
 
   // Parallel data fetching for performance
-  const [postedEntries, voidedEntries, draftEntries, accounts, fiscalPeriods] = await Promise.all([
-    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'POSTED' }),
-    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'VOIDED' }),
+  const [postedEntries, voidedEntries, draftEntries, targetedEntries, accounts, fiscalPeriods] = await Promise.all([
+    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'POSTED', limit: 200 }),
+    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'VOIDED', limit: 100 }),
     getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'DRAFT', limit: 200 }),
+    requestedEntry
+      ? getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, entry: requestedEntry, limit: 1 })
+      : Promise.resolve([]),
     getChartOfAccounts(orgData.org.id),
     getFiscalPeriods(orgData.org.id),
   ])
-  const entries = mergeJournalEntries([postedEntries, voidedEntries, draftEntries])
-  const initialFilterStatus = requestedStatus || (draftEntries.length > 0 ? 'DRAFT' : 'POSTED')
+  const entries = mergeJournalEntries([targetedEntries, postedEntries, voidedEntries, draftEntries])
+  const targetedStatus = normalizeStatusFilter(String(targetedEntries[0]?.status || ''))
+  const initialFilterStatus = requestedStatus || targetedStatus || (draftEntries.length > 0 ? 'DRAFT' : 'POSTED')
 
   return (
     <JournalClient
