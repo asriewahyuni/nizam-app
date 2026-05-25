@@ -1076,14 +1076,24 @@ function summarizeCashFlowFromLines(
     }
   }
 
-  // Filter: Skip opening balance entries (ADJUSTMENT) and capital injection entries (SYIRKAH_CAPITAL)
-  // These are non-cash or structural entries that don't represent real cash flow transactions
+  // Filter: Skip non-cash / structural entries that should not appear in cash flow
+  // 1. ADJUSTMENT          — opening balance entries
+  // 2. SYIRKAH_CAPITAL     — capital injection (non-operating)
+  // 3. AUTO_MIGRATION_*    — opening cash/bank balances migrated from legacy system
   const SKIP_REFERENCE_TYPES = new Set(['ADJUSTMENT', 'SYIRKAH_CAPITAL'])
+  const SKIP_DESCRIPTION_PREFIXES = ['[AUTO_MIGRATION_OPENING_CASH_BANK]']
+  // Skip penyesuaian saldo awal (koreksi saldo bank, bukan transaksi kas riil)
+  const SKIP_DESCRIPTION_KEYWORDS = ['penyesuaian saldo']
+
   const realLines = lines.filter((line) => {
     if (!line?.entry_id) return false
     const entry = line.entry
     const refType = String(entry?.reference_type || '').trim().toUpperCase()
-    return !SKIP_REFERENCE_TYPES.has(refType)
+    if (SKIP_REFERENCE_TYPES.has(refType)) return false
+    const desc = String(entry?.description || '').trim().toLowerCase()
+    if (SKIP_DESCRIPTION_PREFIXES.some((prefix) => desc.startsWith(prefix.toLowerCase()))) return false
+    if (SKIP_DESCRIPTION_KEYWORDS.some((kw) => desc.includes(kw.toLowerCase()))) return false
+    return true
   })
 
   if (realLines.length === 0) {
