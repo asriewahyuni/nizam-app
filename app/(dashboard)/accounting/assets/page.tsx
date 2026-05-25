@@ -12,7 +12,7 @@ export default async function AssetsPage() {
 
   // Hanya owner, admin, manager yang bisa akses Accounting & Assets
   if (!['owner', 'admin', 'manager'].includes(orgData.role)) {
-    redirect('/dashboard')
+    redirect('/dashboard?error=akses-ditolak')
   }
 
   let assets: any[] = []

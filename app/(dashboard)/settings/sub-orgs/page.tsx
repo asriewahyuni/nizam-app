@@ -16,7 +16,7 @@ export default async function SubOrgsPage() {
   const activeOrgWithParent = orgData.org as typeof orgData.org & { parent_org_id?: string | null }
   const isMainOrganization = !activeOrgWithParent.parent_org_id
   if (!isMainOrganization) {
-    return redirect('/dashboard')
+    return redirect('/dashboard?error=akses-ditolak')
   }
 
   if (orgData.role !== 'owner' && orgData.role !== 'admin') {

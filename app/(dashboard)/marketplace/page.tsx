@@ -31,7 +31,7 @@ export default async function MarketplacePage() {
 
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
-  if (!['owner', 'admin'].includes(orgData.role)) return redirect('/dashboard')
+  if (!['owner', 'admin'].includes(orgData.role)) return redirect('/dashboard?error=akses-ditolak')
 
   const [instances, pricing] = await Promise.all([
     getOrgModuleInstances(orgData.org.id),

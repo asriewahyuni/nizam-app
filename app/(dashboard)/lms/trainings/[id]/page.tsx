@@ -150,7 +150,7 @@ export default async function CompetencyTrainingDetailPage(props: {
   })
 
   if (!accessContext.canRead && !accessContext.canManage) {
-    return redirect('/dashboard')
+    return redirect('/dashboard?error=akses-ditolak')
   }
 
   const [trainingDetail, branches] = await Promise.all([

@@ -11,7 +11,7 @@ export default async function ApprovalsPage() {
 
   // Hanya owner, admin, manager yang bisa akses
   if (!['owner', 'admin', 'manager'].includes(orgData.role)) {
-    redirect('/dashboard')
+    redirect('/dashboard?error=akses-ditolak')
   }
 
   const activeBranch = await getActiveBranch(orgData.org.id)

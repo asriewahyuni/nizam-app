@@ -32,7 +32,7 @@ export default async function LearningMyProgressPage() {
   })
 
   if (!accessContext.canRead && !accessContext.canManage) {
-    return redirect('/dashboard')
+    return redirect('/dashboard?error=akses-ditolak')
   }
 
   const liveCourses = TRAINING_COURSES.filter((c) => c.status === 'LIVE')

@@ -79,7 +79,7 @@ export default async function LMSDashboardPage(props: {
   })
 
   if (!accessContext.canManage) {
-    return redirect('/dashboard')
+    return redirect('/dashboard?error=akses-ditolak')
   }
 
   const [courses, batches] = await Promise.all([

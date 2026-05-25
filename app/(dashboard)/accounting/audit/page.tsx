@@ -11,7 +11,7 @@ export default async function AuditPage() {
 
   // Only owners/admins can see Audit Dashboard
   if (!['owner', 'admin'].includes(orgData.role)) {
-    redirect('/dashboard')
+    redirect('/dashboard?error=akses-ditolak')
   }
 
   const auditData = await getAuditOverview(orgData.org.id)

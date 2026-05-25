@@ -11,7 +11,7 @@ export default async function WarehousesPage() {
 
   // Hanya owner, admin, manager yang bisa akses (opsional, bisa dibatasi di DB RLS)
   if (!['owner', 'admin', 'manager', 'staff'].includes(orgData.role)) {
-    redirect('/dashboard')
+    redirect('/dashboard?error=akses-ditolak')
   }
 
   const activeBranch = await getActiveBranch(orgData.org.id)
