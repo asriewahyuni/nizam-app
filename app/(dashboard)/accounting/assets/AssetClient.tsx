@@ -2,7 +2,7 @@
 
 import React, { startTransition, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Landmark, Building2, CarFront, Monitor, Plus, Calculator, History, Trash2, Calendar, FileText, X, Printer, QrCode, Pencil, DollarSign, AlertTriangle } from 'lucide-react'
+import { Landmark, Building2, CarFront, Monitor, Plus, Calculator, History, Trash2, Calendar, FileText, X, Printer, QrCode, Pencil, DollarSign, AlertTriangle, Download } from 'lucide-react'
 import Barcode from 'react-barcode'
 import { QRCodeCanvas } from 'qrcode.react'
 import { createFixedAsset, runOrganizationDepreciation, updateFixedAsset, deleteFixedAsset, previewOrganizationDepreciation, disposeFixedAsset } from '@/modules/accounting/actions/assets.actions'
@@ -355,6 +355,23 @@ export function AssetClient({
     }
   }
 
+  const handleExportXLSX = () => {
+    if (assets.length === 0) return alert('Tidak ada data aset untuk diunduh.')
+
+    const params = new URLSearchParams({
+      type: 'assets',
+      orgId,
+    })
+
+    if (activeBranchId) {
+      params.set('branchId', activeBranchId)
+    }
+
+    const link = document.createElement('a')
+    link.href = `/api/export?${params.toString()}`
+    link.click()
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-10 animate-in fade-in duration-500 pb-20">
       {/* Header section */}
@@ -371,10 +388,19 @@ export function AssetClient({
         </div>
         
         <div className="flex items-center gap-3">
+          <button
+            disabled={assets.length === 0}
+            onClick={handleExportXLSX}
+            className="flex cursor-pointer items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-700 font-black rounded-3xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download size={20} />
+            Export XLSX
+          </button>
+
           <button 
             disabled={!activeBranchId || depProcessing}
             onClick={handlePreview}
-            className="flex items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 hover:border-blue-200 hover:bg-blue-50 text-blue-600 font-black rounded-3xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex cursor-pointer items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 hover:border-blue-200 hover:bg-blue-50 text-blue-600 font-black rounded-3xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <History size={20} />
             Preview Jurnal
@@ -394,7 +420,7 @@ export function AssetClient({
                 alert("Gagal: " + res.error)
               }
             }}
-            className="flex items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 hover:border-emerald-200 hover:bg-emerald-50 text-emerald-600 font-black rounded-3xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex cursor-pointer items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 hover:border-emerald-200 hover:bg-emerald-50 text-emerald-600 font-black rounded-3xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Calculator size={20} className={depProcessing ? 'animate-spin' : ''} />
             {depProcessing ? 'Sedang Memproses...' : 'Jalankan Penyusutan'}
@@ -403,7 +429,7 @@ export function AssetClient({
           <button 
             disabled={!activeBranchId}
             onClick={() => { setEditingAssetId(null); setShowModal(true); }}
-            className="flex items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-indigo-700 text-white font-black rounded-3xl transition-all shadow-xl shadow-blue-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex cursor-pointer items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-indigo-700 text-white font-black rounded-3xl transition-all shadow-xl shadow-blue-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={24} />
             Registrasi Aset Baru

@@ -14,7 +14,8 @@ import {
   exportProfitLossXLSX,
   exportBalanceSheetXLSX,
   exportGeneralLedgerXLSX,
-  exportZakatReportXLSX
+  exportZakatReportXLSX,
+  exportFixedAssetsXLSX
 } from '@/modules/accounting/actions/export.actions'
 
 export async function GET(request: NextRequest) {
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const searchParams = request.nextUrl.searchParams
-  const type = searchParams.get('type') // pl | bs | gl | zakat
+  const type = searchParams.get('type') // pl | bs | gl | zakat | assets
   const orgId = searchParams.get('orgId')
   const branchId = searchParams.get('branchId')
   const consolidated = searchParams.get('consolidated') === 'true'
@@ -84,12 +85,16 @@ export async function GET(request: NextRequest) {
         buffer = await exportGeneralLedgerXLSX(orgId, orgName, branchId, consolidated)
         filename = `Buku-Besar_${orgName}_${todayInJakarta}.xlsx`
         break
+      case 'assets':
+        buffer = await exportFixedAssetsXLSX(orgId, orgName, branchId)
+        filename = `Aset-Tetap_${orgName}_${todayInJakarta}.xlsx`
+        break
       case 'zakat':
         buffer = await exportZakatReportXLSX(orgId, goldPerGram, silverPerGram, orgName)
         filename = `Zakat-Tijarah_${orgName}_${todayInJakarta}.xlsx`
         break
       default:
-        return NextResponse.json({ error: 'Tipe export tidak valid. Gunakan: pl | bs | gl | zakat' }, { status: 400 })
+        return NextResponse.json({ error: 'Tipe export tidak valid. Gunakan: pl | bs | gl | zakat | assets' }, { status: 400 })
     }
 
     const attachmentDisposition = buildAttachmentContentDisposition(filename)

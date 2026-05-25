@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createSupabaseMock, success } from './helpers/supabase-mock'
 
@@ -34,6 +34,10 @@ import {
 describe('Fixed Assets Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('filters fixed assets by active branch', async () => {
@@ -153,6 +157,9 @@ describe('Fixed Assets Branch Context', () => {
   })
 
   it('runs depreciation only for the active branch and writes branch-aware logs', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-15T00:00:00.000Z'))
+
     const supabase = createSupabaseMock({
       tables: {
         fixed_assets: [

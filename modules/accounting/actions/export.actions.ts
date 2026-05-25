@@ -8,6 +8,7 @@
 
 import { getProfitLoss, getBalanceSheet, getGeneralLedger } from './reports.actions'
 import { getZakatSummary } from './zakat.actions'
+import { getFixedAssets } from './assets.actions'
 import ExcelJS from 'exceljs'
 
 // ─────────────────────────────────────────────────────────────
@@ -306,9 +307,114 @@ export async function exportGeneralLedgerXLSX(
   return Buffer.from(await wb.xlsx.writeBuffer())
 }
 
+// ─────────────────────────────────────────────────────────────
+// 4. EXPORT: Fixed Assets Register
+// ─────────────────────────────────────────────────────────────
+export async function exportFixedAssetsXLSX(
+  orgId: string,
+  orgName: string = 'Organisasi',
+  branchId?: string | null
+): Promise<Buffer> {
+  const assets = await getFixedAssets(orgId, branchId)
+
+  const wb = new ExcelJS.Workbook()
+  addWorkbookMetadata(wb)
+  const sheet = wb.addWorksheet('Aset Tetap', { pageSetup: { paperSize: 9, orientation: 'landscape' } })
+  applyPlainSheetLook(sheet)
+
+  sheet.columns = [
+    { key: 'no', width: 8 },
+    { key: 'code', width: 18 },
+    { key: 'name', width: 32 },
+    { key: 'category', width: 22 },
+    { key: 'branch', width: 24 },
+    { key: 'purchase_date', width: 16 },
+    { key: 'method', width: 14 },
+    { key: 'useful_life', width: 14 },
+    { key: 'purchase_price', width: 20 },
+    { key: 'salvage_value', width: 20 },
+    { key: 'accumulated_depreciation', width: 24 },
+    { key: 'current_book_value', width: 22 },
+    { key: 'status', width: 14 },
+    { key: 'last_depreciation_date', width: 18 },
+  ]
+
+  addNizamHeader(sheet, 'DAFTAR ASET TETAP', new Date().toLocaleDateString('id-ID'), orgName)
+
+  const headerRow = sheet.addRow([
+    'No',
+    'Kode Aset',
+    'Nama Aset',
+    'Kategori',
+    'Unit',
+    'Tanggal Perolehan',
+    'Metode',
+    'Umur (Bulan)',
+    'Harga Perolehan',
+    'Nilai Residu',
+    'Akumulasi Penyusutan',
+    'Nilai Buku',
+    'Status',
+    'Terakhir Susut',
+  ])
+  styleHeaderRow(headerRow)
+
+  assets.forEach((asset: any, index: number) => {
+    const row = sheet.addRow([
+      index + 1,
+      asset.code || '',
+      asset.name || '',
+      asset.category || '',
+      asset.branch?.name || '',
+      asset.purchase_date || '',
+      asset.acquisition_method || '',
+      Number(asset.useful_life_months || 0),
+      formatRupiahExcel(Number(asset.purchase_price || 0)),
+      formatRupiahExcel(Number(asset.salvage_value || 0)),
+      formatRupiahExcel(Number(asset.accumulated_depreciation || 0)),
+      formatRupiahExcel(Number(asset.current_book_value || 0)),
+      asset.status || '',
+      asset.last_depreciation_date || '',
+    ])
+    styleDataRow(row, index % 2 === 0)
+    ;[9, 10, 11, 12].forEach((cellNumber) => {
+      row.getCell(cellNumber).alignment = { horizontal: 'right' }
+    })
+  })
+
+  sheet.addRow([])
+  const totalPurchasePrice = assets.reduce((sum: number, asset: any) => sum + Number(asset.purchase_price || 0), 0)
+  const totalSalvageValue = assets.reduce((sum: number, asset: any) => sum + Number(asset.salvage_value || 0), 0)
+  const totalAccumulatedDepreciation = assets.reduce((sum: number, asset: any) => sum + Number(asset.accumulated_depreciation || 0), 0)
+  const totalBookValue = assets.reduce((sum: number, asset: any) => sum + Number(asset.current_book_value || 0), 0)
+
+  const totalRow = sheet.addRow([
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    'TOTAL',
+    formatRupiahExcel(totalPurchasePrice),
+    formatRupiahExcel(totalSalvageValue),
+    formatRupiahExcel(totalAccumulatedDepreciation),
+    formatRupiahExcel(totalBookValue),
+    '',
+    '',
+  ])
+  styleTotalRow(totalRow)
+  ;[9, 10, 11, 12].forEach((cellNumber) => {
+    totalRow.getCell(cellNumber).alignment = { horizontal: 'right' }
+  })
+
+  return Buffer.from(await wb.xlsx.writeBuffer())
+}
+
 
 // ─────────────────────────────────────────────────────────────
-// 4. EXPORT: Zakat Report (Laporan Zakat Tijarah)
+// 5. EXPORT: Zakat Report (Laporan Zakat Tijarah)
 // Untuk keperluan audit LAZ — CFO requirement
 // ─────────────────────────────────────────────────────────────
 export async function exportZakatReportXLSX(
