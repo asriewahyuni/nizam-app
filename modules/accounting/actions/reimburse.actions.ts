@@ -5,6 +5,14 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createJournalEntry } from './journal.actions'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import {
+  buildPublicStorageObjectPath,
+  buildReceiptStorageKey,
+  isObjectStorageConfigured,
+  uploadObjectToStorage,
+} from '@/lib/storage/object-storage.server'
 
 type ActiveBranchResult =
   | { branchId: string }
@@ -59,25 +67,34 @@ async function syncReimbursementApprovalRequest(params: {
 }
 
 export async function uploadReceipt(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'Tidak terautentikasi.' }
+  const session = await getInternalAuthSession()
+  if (!session) return { success: false, error: 'Tidak terautentikasi.' }
+
+  const orgData = await getActiveOrg()
+  if (!orgData) return { success: false, error: 'Organisasi tidak ditemukan.' }
+
+  if (!isObjectStorageConfigured()) return { success: false, error: 'Storage belum dikonfigurasi.' }
 
   const file = formData.get('file') as File
   if (!file || file.size === 0) return { success: false, error: 'File tidak valid.' }
 
-  const ext = file.name.split('.').pop() || 'jpg'
-  const filePath = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
+  try {
+    const fileBuffer = Buffer.from(await file.arrayBuffer())
+    const storageKey = buildReceiptStorageKey(orgData.org.id, session.user.id, file.name)
 
-  const { error } = await supabase.storage
-    .from('receipts')
-    .upload(filePath, file, { contentType: file.type, upsert: false })
+    await uploadObjectToStorage({
+      key: storageKey,
+      body: fileBuffer,
+      contentType: file.type || 'application/octet-stream',
+      cacheControl: 'private, max-age=86400',
+    })
 
-  if (error) return { success: false, error: `Upload gagal: ${error.message}` }
-
-  const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(filePath)
-
-  return { success: true, url: publicUrl }
+    const url = buildPublicStorageObjectPath(storageKey)
+    return { success: true, url }
+  } catch (err) {
+    console.error('[Receipt] Upload gagal:', err)
+    return { success: false, error: 'Upload nota gagal. Pastikan koneksi stabil dan coba lagi.' }
+  }
 }
 
 export async function getReimbursements(orgId: string, branchId?: string | null) {

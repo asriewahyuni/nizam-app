@@ -19,6 +19,7 @@ import {
   submitMyExpenseClaim,
   deleteMyExpenseClaim,
   updateMyEmployeeProfile,
+  uploadMyAvatar,
 } from '@/modules/hris/actions/self-service.actions'
 import { uploadReceipt } from '@/modules/accounting/actions/reimburse.actions'
 import { updateMyPassword, signOut } from '@/modules/auth/actions/auth.actions'
@@ -526,7 +527,7 @@ export function KaryawanClient({
     setEditAvatarPreview(URL.createObjectURL(file))
     setAvatarUploading(true)
     const fd = new FormData(); fd.set('file', file)
-    const res = await uploadReceipt(fd)
+    const res = await uploadMyAvatar(fd)
     setAvatarUploading(false)
     if (!res.success || !res.url) { showToast(res.error || 'Gagal upload foto.', false); return }
     setEditAvatarUrl(res.url)

@@ -23,6 +23,8 @@ type ObjectStorageConfig = {
 
 const LOGO_PREFIX = 'logos/'
 const EXPORT_PREFIX = 'exports/'
+const RECEIPT_PREFIX = 'receipts/'
+const AVATAR_PREFIX = 'avatars/'
 const DEFAULT_SIGNED_URL_TTL_SECONDS = 60 * 60
 
 let cachedClient: S3Client | null = null
@@ -198,6 +200,36 @@ export function buildExportStorageKey(orgId: string, filename: string, dateFolde
   const [year = 'unknown', month = 'unknown'] = safeDateFolder.split('-')
   const safeName = sanitizeFileName(filename, 'export')
   return `${EXPORT_PREFIX}${orgId}/${year}/${month}/${safeName}`
+}
+
+/**
+ * Menyusun key file nota reimburse per org/user agar mudah dibersihkan.
+ */
+export function buildReceiptStorageKey(orgId: string, userId: string, originalFileName: string): string {
+  const safeName = sanitizeFileName(originalFileName, 'receipt')
+  return `${RECEIPT_PREFIX}${orgId}/${userId}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}-${safeName}`
+}
+
+/**
+ * Menyusun key file avatar karyawan per org/user.
+ */
+export function buildAvatarStorageKey(orgId: string, userId: string, originalFileName: string): string {
+  const safeName = sanitizeFileName(originalFileName, 'avatar')
+  return `${AVATAR_PREFIX}${orgId}/${userId}/${Date.now()}-${safeName}`
+}
+
+/**
+ * Mengecek prefix nota reimburse untuk akses publik.
+ */
+export function isPublicReceiptStorageKey(key: string): boolean {
+  return key.startsWith(RECEIPT_PREFIX)
+}
+
+/**
+ * Mengecek prefix avatar karyawan untuk akses publik.
+ */
+export function isPublicAvatarStorageKey(key: string): boolean {
+  return key.startsWith(AVATAR_PREFIX)
 }
 
 /**

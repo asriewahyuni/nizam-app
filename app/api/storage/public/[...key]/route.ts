@@ -4,7 +4,9 @@ import {
   createSignedStorageGetUrl,
   decodeStorageKeySegments,
   isObjectStorageConfigured,
+  isPublicAvatarStorageKey,
   isPublicLogoStorageKey,
+  isPublicReceiptStorageKey,
 } from '@/lib/storage/object-storage.server'
 import { isPublicThemeAssetStorageKey } from '@/modules/ecommerce/lib/ecommerce.server'
 
@@ -22,7 +24,12 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ke
   const { key: keySegments } = await context.params
   const key = decodeStorageKeySegments(keySegments)
 
-  if (!key || (!isPublicLogoStorageKey(key) && !isPublicThemeAssetStorageKey(key))) {
+  if (!key || (
+    !isPublicLogoStorageKey(key) &&
+    !isPublicThemeAssetStorageKey(key) &&
+    !isPublicReceiptStorageKey(key) &&
+    !isPublicAvatarStorageKey(key)
+  )) {
     return NextResponse.json({ error: 'File tidak ditemukan.' }, { status: 404 })
   }
 

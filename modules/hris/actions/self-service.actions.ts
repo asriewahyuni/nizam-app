@@ -2,6 +2,14 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import {
+  buildAvatarStorageKey,
+  buildPublicStorageObjectPath,
+  isObjectStorageConfigured,
+  uploadObjectToStorage,
+} from '@/lib/storage/object-storage.server'
 
 type SelfEmployee = {
   id: string
@@ -519,10 +527,11 @@ export async function updateMyEmployeeProfile(
   orgId: string,
   payload: { firstName?: string; lastName?: string; avatarUrl?: string | null }
 ) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Sesi tidak ditemukan.' }
+
   const supabase = await createClient()
   const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Sesi tidak ditemukan.' }
 
   const updates: Record<string, unknown> = {}
   if (payload.firstName !== undefined) updates.first_name = payload.firstName.trim()
@@ -535,10 +544,41 @@ export async function updateMyEmployeeProfile(
     .from('employees')
     .update(updates)
     .eq('org_id', orgId)
-    .eq('user_id', user.id)
+    .eq('user_id', session.user.id)
 
   if (error) return { error: error.message || 'Gagal memperbarui profil.' }
 
   revalidatePath('/karyawan')
   return { success: true }
+}
+
+export async function uploadMyAvatar(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
+  const session = await getInternalAuthSession()
+  if (!session) return { success: false, error: 'Tidak terautentikasi.' }
+
+  const orgData = await getActiveOrg()
+  if (!orgData) return { success: false, error: 'Organisasi tidak ditemukan.' }
+
+  if (!isObjectStorageConfigured()) return { success: false, error: 'Storage belum dikonfigurasi.' }
+
+  const file = formData.get('file') as File
+  if (!file || file.size === 0) return { success: false, error: 'File tidak valid.' }
+
+  try {
+    const fileBuffer = Buffer.from(await file.arrayBuffer())
+    const storageKey = buildAvatarStorageKey(orgData.org.id, session.user.id, file.name)
+
+    await uploadObjectToStorage({
+      key: storageKey,
+      body: fileBuffer,
+      contentType: file.type || 'image/jpeg',
+      cacheControl: 'public, max-age=31536000, immutable',
+    })
+
+    const url = buildPublicStorageObjectPath(storageKey)
+    return { success: true, url }
+  } catch (err) {
+    console.error('[Avatar] Upload gagal:', err)
+    return { success: false, error: 'Upload foto gagal. Pastikan ukuran file tidak terlalu besar dan coba lagi.' }
+  }
 }
