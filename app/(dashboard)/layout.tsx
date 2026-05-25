@@ -73,7 +73,7 @@ export default async function DashboardLayout({
   // If the org is a demo org but the cookie is gone, force signout.
   const isDemoOrg = orgData.org.settings?.is_demo === true || orgData.org.is_demo === true
   if (isDemoOrg && !isDemo && !adminImpersonation) {
-    redirect('/auth/signout')
+    redirect('/auth/signout?reason=session-expired')
   }
 
   // ── SUBSCRIPTION EXPIRY ENFORCEMENT ──────────────────────────────────────

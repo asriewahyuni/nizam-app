@@ -35,7 +35,7 @@ describe('signout routes', () => {
       auth: { signOut },
     })
 
-    const response = await GET()
+    const response = await GET(new Request('http://brain.kliknizam.app/auth/signout'))
 
     expect(signOut).toHaveBeenCalledTimes(1)
     expect(deleteCookie).toHaveBeenCalledWith('nizam_internal_session')
@@ -45,7 +45,31 @@ describe('signout routes', () => {
     expect(deleteCookie).toHaveBeenCalledWith('nizam_admin_impersonation')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
     expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toMatch(/^https:\/\/kliknizam\.app\/?$/)
+    expect(response.headers.get('location')).toBe('http://brain.kliknizam.app/login?notice=logged-out')
+  })
+
+  it('redirects forced signout to the session expired login notice', async () => {
+    const deleteCookie = vi.fn()
+    const signOut = vi.fn().mockResolvedValue({ error: null })
+
+    mocks.cookies.mockResolvedValue({ delete: deleteCookie })
+    mocks.createClient.mockResolvedValue({
+      auth: { signOut },
+    })
+
+    const response = await GET(
+      new Request('http://brain.kliknizam.app/auth/signout?reason=session-expired')
+    )
+
+    expect(signOut).toHaveBeenCalledTimes(1)
+    expect(deleteCookie).toHaveBeenCalledWith('nizam_internal_session')
+    expect(deleteCookie).toHaveBeenCalledWith('nizam_demo_org_id')
+    expect(deleteCookie).toHaveBeenCalledWith('nizam_active_org_id')
+    expect(deleteCookie).toHaveBeenCalledWith('nizam_active_branch_id')
+    expect(deleteCookie).toHaveBeenCalledWith('nizam_admin_impersonation')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe('http://brain.kliknizam.app/login?notice=session-expired')
   })
 
   it('clears the internal session and returns JSON from POST /api/auth/signout', async () => {

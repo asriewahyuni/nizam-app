@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn(),
 }))
 
+vi.mock('server-only', () => ({}))
+
 vi.mock('@/lib/supabase/server', () => ({
   createClient: mocks.createClient,
   createAdminClient: mocks.createAdminClient,
@@ -243,7 +245,7 @@ describe('Auth Actions', () => {
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_admin_impersonation')
     expect(signOutMock).toHaveBeenCalledOnce()
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
-    expect(mocks.redirect).toHaveBeenCalledWith('https://kliknizam.app')
+    expect(mocks.redirect).toHaveBeenCalledWith('/login?notice=logged-out')
   })
 
   it('signs in employee by NIK using a shared auth user and keeps active org preference', async () => {
@@ -404,7 +406,7 @@ describe('Auth Actions', () => {
         sameSite: 'lax',
       })
     )
-    expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
+    expect(mocks.redirect).toHaveBeenCalledWith('/karyawan')
   })
 
   it('marks every employee row tied to the same auth user when requesting password reset', async () => {

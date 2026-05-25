@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { SIGNOUT_REDIRECT_URL, signOutServerSession } from '@/lib/auth/signout.server'
+import { buildSignOutRedirectUrl, signOutServerSession } from '@/lib/auth/signout.server'
 
-export async function GET() {
+export async function GET(request: Request) {
   await signOutServerSession()
-  return NextResponse.redirect(new URL(SIGNOUT_REDIRECT_URL))
+  const { searchParams } = new URL(request.url)
+  return NextResponse.redirect(buildSignOutRedirectUrl(request.url, searchParams.get('reason')))
 }

@@ -4,13 +4,47 @@ import React, { useState, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signIn, signInWithNik, requestPasswordReset } from '@/modules/auth/actions/auth.actions'
 import Link from 'next/link'
-import { Building2, IdCard, ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react'
+import { AlertCircle, Building2, CheckCircle2, Gamepad2, IdCard, ArrowRight, Eye, EyeOff, Info, ShieldCheck } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
+
+type AuthNotice = 'logged-out' | 'session-expired'
+
+const noticeMessages: Record<AuthNotice, string> = {
+  'logged-out': 'Anda sudah keluar dari akun.',
+  'session-expired': 'Sesi Anda sudah berakhir. Silakan masuk kembali.',
+}
+
+function getAuthNotice(value: string | null): AuthNotice | null {
+  return value === 'logged-out' || value === 'session-expired' ? value : null
+}
+
+function AuthBanner({
+  tone,
+  children,
+}: {
+  tone: 'error' | 'info' | 'success'
+  children: React.ReactNode
+}) {
+  const Icon = tone === 'error' ? AlertCircle : tone === 'success' ? CheckCircle2 : Info
+  const toneClass = tone === 'error'
+    ? 'bg-rose-500/10 text-rose-300 border-rose-500/25'
+    : tone === 'success'
+      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
+      : 'bg-sky-500/10 text-sky-300 border-sky-500/25'
+
+  return (
+    <div role="status" className={`mb-6 px-4 py-3 rounded-xl text-xs font-bold leading-relaxed border flex items-start gap-3 ${toneClass}`}>
+      <Icon size={16} className="mt-0.5 shrink-0" />
+      <span>{children}</span>
+    </div>
+  )
+}
 
 function LoginForm() {
   const searchParams = useSearchParams()
   const initialTab = searchParams.get('tab') === 'karyawan' ? 'karyawan' : 'bisnis'
   const error = searchParams.get('error')
+  const notice = getAuthNotice(searchParams.get('notice'))
 
   const [tab, setTab] = useState<'bisnis' | 'karyawan'>(initialTab)
   const [showPass, setShowPass] = useState(false)
@@ -73,18 +107,21 @@ function LoginForm() {
 
       {/* Error Banner */}
       {error && (
-        <div className="mb-6 px-4 py-3 rounded-xl text-xs font-bold leading-relaxed bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-start gap-3">
-          <div className="mt-0.5 animate-pulse">■</div>
-          {decodeURIComponent(error)}
-        </div>
+        <AuthBanner tone="error">{decodeURIComponent(error)}</AuthBanner>
+      )}
+
+      {/* Notice Banner */}
+      {notice && !error && (
+        <AuthBanner tone={notice === 'logged-out' ? 'success' : 'info'}>
+          {noticeMessages[notice]}
+        </AuthBanner>
       )}
 
       {/* Reset Message */}
       {resetMsg && (
-        <div className={`mb-6 px-4 py-3 rounded-xl text-xs font-bold leading-relaxed flex items-start gap-3 ${resetMsg.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-          <div className="mt-0.5">{resetMsg.type === 'success' ? '✓' : '■'}</div>
+        <AuthBanner tone={resetMsg.type === 'success' ? 'success' : 'error'}>
           {resetMsg.text}
-        </div>
+        </AuthBanner>
       )}
 
       <AnimatePresence initial={false} mode="wait">
@@ -155,7 +192,8 @@ function LoginForm() {
                 href="/demo"
                 className="inline-flex w-full justify-center items-center gap-2 px-5 py-3.5 bg-slate-800/50 text-slate-300 text-[11px] font-black rounded-xl hover:bg-slate-700/50 hover:text-white transition-all border border-white/5 uppercase tracking-[0.15em]"
               >
-                🎮 Coba Lingkungan Demo
+                <Gamepad2 size={14} />
+                Coba Lingkungan Demo
               </Link>
             </div>
           </motion.div>

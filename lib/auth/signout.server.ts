@@ -7,7 +7,16 @@ import { ACTIVE_BRANCH_COOKIE, ACTIVE_ORG_COOKIE } from '@/modules/organization/
 const ADMIN_IMPERSONATION_COOKIE = 'nizam_admin_impersonation'
 const DEMO_ORG_COOKIE = 'nizam_demo_org_id'
 
-export const SIGNOUT_REDIRECT_URL = 'https://kliknizam.app'
+export const SIGNOUT_REDIRECT_PATH = '/login?notice=logged-out'
+export const SESSION_EXPIRED_REDIRECT_PATH = '/login?notice=session-expired'
+
+export function buildSignOutRedirectUrl(requestUrl: string | URL, reason?: string | null) {
+  const redirectPath = reason === 'session-expired'
+    ? SESSION_EXPIRED_REDIRECT_PATH
+    : SIGNOUT_REDIRECT_PATH
+
+  return new URL(redirectPath, requestUrl)
+}
 
 /**
  * Best-effort signout for internal auth mode.

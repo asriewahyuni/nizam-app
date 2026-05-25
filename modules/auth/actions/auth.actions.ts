@@ -1267,7 +1267,7 @@ export async function signOut() {
   cookieStore.delete(ACTIVE_BRANCH_COOKIE)
   cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
   revalidatePath('/', 'layout')
-  redirect('https://kliknizam.app')
+  redirect('/login?notice=logged-out')
 }
 
 export async function getSession() {
