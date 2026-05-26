@@ -607,7 +607,7 @@ export function AppSidebar({
       {/* Attendance Gate Toast */}
       {attendanceToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="flex items-center gap-2.5 bg-slate-900 text-white text-sm font-semibold px-4 py-3 rounded-2xl shadow-xl">
+          <div className="flex items-center gap-2.5 bg-slate-900 text-white text-sm font-semibold px-4 py-3 rounded-lg shadow-lg">
             <Lock size={15} className="text-amber-400 shrink-0" />
             <span>Lakukan clock-in terlebih dahulu</span>
           </div>
@@ -615,22 +615,22 @@ export function AppSidebar({
       )}
       
       <aside className={`
-        ${effectiveIsCollapsed ? 'w-20' : 'w-64'} 
-        transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col h-full bg-white border-r border-slate-100 group/sidebar z-50 print:hidden
+        ${effectiveIsCollapsed ? 'w-16' : 'w-60'}
+        transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col h-full bg-white border-r border-slate-200 group/sidebar z-50 print:hidden
         ${isMobileOpen ? 'fixed inset-y-0 left-0 shadow-2xl translate-x-0' : 'fixed inset-y-0 left-0 -translate-x-full md:relative md:translate-x-0 md:flex'}
       `}>
       {/* Collapse Toggle Button */}
       <button
         onClick={toggleCollapse}
-        className="absolute -right-3 top-24 w-6 h-6 bg-white border border-slate-200 rounded-full hidden md:flex items-center justify-center text-slate-400 hover:text-emerald-600 shadow-sm z-50 transition-transform hover:scale-110"
+        className="absolute -right-3 top-24 w-6 h-6 bg-white border border-slate-200 rounded-full hidden md:flex items-center justify-center text-slate-400 hover:text-slate-700 shadow-sm z-50 transition-colors"
       >
         <ChevronLeft size={14} className={`transition-transform duration-300 ${effectiveIsCollapsed ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Logo Section */}
-      <div className={`h-20 flex items-center px-6 ${effectiveIsCollapsed ? 'justify-center' : 'gap-3'}`}>
+      <div className={`h-14 flex items-center border-b border-slate-100 px-4 ${effectiveIsCollapsed ? 'justify-center' : 'gap-2.5'}`}>
         <>
-          <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-md shrink-0 overflow-hidden group-hover:scale-110 transition-transform">
+          <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
             <Image
               src="/logo.png"
               alt="NIZAM Logo"
@@ -641,15 +641,15 @@ export function AppSidebar({
           </div>
           {!effectiveIsCollapsed && (
             <div className="flex flex-col justify-center overflow-hidden animate-in fade-in duration-500">
-              <span className="font-black text-slate-900 text-lg tracking-tighter leading-tight uppercase">NIZAM</span>
-              <MiniErpWordmark className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-400 opacity-80" erpClassName="text-amber-500" />
+              <span className="font-bold text-slate-900 text-base tracking-tight leading-tight">Nizam</span>
+              <MiniErpWordmark className="text-[9px] font-semibold tracking-[0.15em] uppercase text-slate-400" erpClassName="text-slate-400" />
             </div>
           )}
         </>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-6 overflow-y-auto no-scrollbar scroll-smooth">
+      <nav className="flex-1 px-3 py-4 overflow-y-auto no-scrollbar scroll-smooth">
         {!hasMounted ? (
           <div className="space-y-6" aria-hidden="true">
             {SIDEBAR_NAV_SKELETON_GROUPS.map((itemCount, groupIndex) => (
@@ -659,7 +659,7 @@ export function AppSidebar({
                   {Array.from({ length: itemCount }).map((_, itemIndex) => (
                     <div
                       key={`sidebar-skeleton-item-${groupIndex}-${itemIndex}`}
-                      className="h-12 rounded-2xl bg-slate-100/80"
+                      className="h-8 rounded-md bg-slate-100/80"
                     />
                   ))}
                 </div>
@@ -672,18 +672,18 @@ export function AppSidebar({
           const groupKey = `${group.group}-${fullPath}`
 
           return (
-            <div key={group.group} className="mb-6">
+            <div key={group.group} className="mb-4">
               {effectiveIsCollapsed ? (
-                <p className="px-4 mb-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none flex items-center justify-center gap-2">
-                  •••
+                <p className="px-2 mb-2 text-[10px] font-semibold text-slate-300 uppercase tracking-[0.12em] leading-none flex items-center justify-center">
+                  ···
                 </p>
               ) : (
                 <details key={groupKey} name="app-sidebar-categories" open={hasActiveItem || undefined} className="group/details">
-                  <summary className="mb-2 flex w-full list-none items-center justify-between rounded-2xl px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 transition-all hover:bg-slate-50 hover:text-slate-600 cursor-pointer [&::-webkit-details-marker]:hidden">
+                  <summary className="mb-1.5 flex w-full list-none items-center justify-between rounded-md px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400 transition-colors duration-150 hover:text-slate-600 cursor-pointer [&::-webkit-details-marker]:hidden">
                     <span>{group.group}</span>
                     <ChevronRight
-                      size={14}
-                      className="text-slate-300 transition-transform duration-200 group-open/details:rotate-90 group-open/details:text-[#003366]"
+                      size={12}
+                      className="text-slate-300 transition-transform duration-200 group-open/details:rotate-90"
                     />
                   </summary>
                   <ul className="space-y-1.5">
@@ -716,21 +716,21 @@ export function AppSidebar({
                               setIsMobileOpen(false)
                             }}
                             title={effectiveIsCollapsed ? item.label : (locked ? 'Clock-in dulu untuk akses menu ini' : '')}
-                            className={`flex items-center rounded-2xl text-sm font-bold transition-all duration-200 group/item relative
-                              ${effectiveIsCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'}
+                            className={`flex items-center rounded-md text-sm font-medium transition-colors duration-150 group/item relative
+                              ${effectiveIsCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2'}
                               ${locked
                                 ? 'opacity-40 cursor-not-allowed'
                                 : isActive
-                                  ? 'bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
-                                  : 'text-slate-500 hover:text-[#003366] hover:bg-[#003366]/5'
+                                  ? 'bg-[#003366] text-white'
+                                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                               }`}
                           >
                             <div className="flex items-center gap-3.5 relative">
                               <div className="relative">
                                 <Icon
-                                  size={18}
-                                  strokeWidth={isActive ? 2.5 : 2}
-                                  className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover/item:text-emerald-500'}`}
+                                  size={16}
+                                  strokeWidth={isActive ? 2 : 1.75}
+                                  className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover/item:text-slate-700'}`}
                                 />
                                 {locked && (
                                   <div className="absolute -top-1 -right-1.5 w-3 h-3 rounded-full bg-amber-400 border border-white flex items-center justify-center">
@@ -767,8 +767,8 @@ export function AppSidebar({
                                   </div>
                                 )}
                                 <ChevronRight
-                                  size={14}
-                                  className={`transition-all ${isActive ? 'text-white opacity-50' : 'text-slate-300 opacity-0 -translate-x-1 group-hover/item:opacity-100 group-hover/item:translate-x-0'}`}
+                                  size={12}
+                                  className={`transition-all ${isActive ? 'text-white/40' : 'text-slate-300 opacity-0 group-hover/item:opacity-100'}`}
                                 />
                               </div>
                             )}
@@ -808,19 +808,19 @@ export function AppSidebar({
                             setIsMobileOpen(false)
                           }}
                           title={locked ? 'Clock-in dulu' : item.label}
-                          className={`flex items-center justify-center rounded-2xl p-3 text-sm font-bold transition-all duration-200 group/item relative
+                          className={`flex items-center justify-center rounded-md p-2.5 text-sm font-medium transition-colors duration-150 group/item relative
                             ${locked
                               ? 'opacity-40 cursor-not-allowed'
                               : isActive
-                                ? 'bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
-                                : 'text-slate-500 hover:text-[#003366] hover:bg-[#003366]/5'
+                                ? 'bg-[#003366] text-white'
+                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
                             }`}
                         >
                           <div className="relative">
                             <Icon
-                              size={18}
-                              strokeWidth={isActive ? 2.5 : 2}
-                              className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover/item:text-emerald-500'}`}
+                              size={16}
+                              strokeWidth={isActive ? 2 : 1.75}
+                              className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover/item:text-slate-700'}`}
                             />
                             {locked && (
                               <div className="absolute -top-1 -right-1.5 w-3 h-3 rounded-full bg-amber-400 border border-white flex items-center justify-center">
@@ -845,21 +845,20 @@ export function AppSidebar({
       </nav>
 
       {/* Footer / Role */}
-      <div className={`p-4 mt-auto border-t border-slate-200 bg-slate-100/80 hover:bg-slate-100 transition-colors ${effectiveIsCollapsed ? 'flex flex-col items-center gap-4' : 'flex items-center justify-between w-full'}`}>
+      <div className={`p-3 mt-auto border-t border-slate-100 bg-white ${effectiveIsCollapsed ? 'flex flex-col items-center gap-3' : 'flex items-center justify-between w-full'}`}>
         <div className={`flex items-center gap-3 ${effectiveIsCollapsed ? '' : 'min-w-0 flex-1'}`}>
           <Link href="/profil-saya" onMouseEnter={() => prefetchRoute('/profil-saya')} onFocus={() => prefetchRoute('/profil-saya')} onTouchStart={() => prefetchRoute('/profil-saya')} onPointerDown={() => prefetchRoute('/profil-saya')} onClick={() => {
             prefetchRoute('/profil-saya')
             notifyRouteLoadingStart()
             setIsMobileOpen(false)
-          }} className="w-10 h-10 shrink-0 rounded-full bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center text-sm font-black text-white shadow-md relative hover:ring-2 hover:ring-blue-400 hover:scale-105 transition-all" title="Edit Profil Saya">
+          }} className="w-8 h-8 shrink-0 rounded-full bg-slate-700 overflow-hidden flex items-center justify-center text-xs font-semibold text-white relative hover:ring-2 hover:ring-slate-300 transition-all cursor-pointer" title="Edit Profil Saya">
               {user?.fullName?.slice(0, 1).toUpperCase() || userRole?.slice(0, 1).toUpperCase()}
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-800" />
             </Link>
             {!effectiveIsCollapsed && (
               <div className="flex flex-col overflow-hidden min-w-0 flex-1">
-                <p className="text-sm font-black text-slate-900 truncate mb-0.5 leading-tight tracking-tight">{user?.fullName || userRole}</p>
-                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest truncate">{jobTitle || userRole}</p>
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.18em] truncate mt-0.5">{planName}</p>
+                <p className="text-sm font-semibold text-slate-800 truncate leading-tight">{user?.fullName || userRole}</p>
+                <p className="text-[11px] text-slate-500 truncate">{jobTitle || userRole} &middot; {planName}</p>
               </div>
             )}
           </div>
@@ -877,7 +876,7 @@ export function AppSidebar({
                 setIsMobileOpen(false)
               }}
               title={isOwnerOrAdmin ? 'Pengaturan Bisnis' : 'Profil & Password Saya'}
-              className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
             >
               <Settings size={18} strokeWidth={1.5} />
             </Link>
@@ -886,7 +885,7 @@ export function AppSidebar({
               onClick={handleClientSignOut}
               disabled={isSigningOut}
               title={isDemo ? "Keluar & Reset Demo" : "Keluar"}
-              className={`p-2.5 rounded-xl transition-all disabled:cursor-wait disabled:opacity-60 ${isDemo ? 'text-orange-500 hover:text-orange-600 hover:bg-orange-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
+              className={`p-2 rounded-md transition-colors cursor-pointer disabled:cursor-wait disabled:opacity-60 ${isDemo ? 'text-orange-500 hover:text-orange-600 hover:bg-orange-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
             >
               <LogOut size={18} strokeWidth={2} className={isSigningOut ? 'animate-pulse' : ''} />
             </button>

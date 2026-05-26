@@ -318,17 +318,15 @@ export default async function DashboardLayout({
           {isEssPage ? children : isStaffEmployee ? children : (
             <div className="max-w-7xl mx-auto print:max-w-none">
               {allowAllBranchSelection && !activeBranch && (
-                <div className="mb-6 rounded-[28px] border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">
+                <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
                   <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Mode Semua Unit</div>
-                      <p className="mt-1 text-sm font-bold text-slate-900">
-                        Ringkasan lintas unit sedang aktif. Pilih satu unit dari header untuk membuat transaksi baru.
+                      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-amber-600">Mode Semua Unit</p>
+                      <p className="mt-0.5 text-sm font-medium text-slate-700">
+                        Ringkasan lintas unit aktif. Pilih satu unit dari header untuk membuat transaksi.
                       </p>
                     </div>
-                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-700">
-                      Read-only agregat
-                    </div>
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-600">Read-only</span>
                   </div>
                 </div>
               )}

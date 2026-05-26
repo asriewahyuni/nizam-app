@@ -58,10 +58,10 @@ export function MetricCard({
     }
     return {
       bg: 'bg-white',
-      border: 'border-slate-100',
+      border: 'border-slate-200',
       icon: 'bg-slate-100 text-slate-600 group-hover:bg-blue-600 group-hover:text-white',
-      label: 'text-slate-500 group-hover:text-blue-600',
-      value: 'text-slate-900 group-hover:text-blue-700',
+      label: 'text-slate-500',
+      value: 'text-slate-900',
     }
   }
 
@@ -69,44 +69,43 @@ export function MetricCard({
 
   return (
     <motion.div
-      whileHover={isEmpty ? {} : { y: -4 }}
-      whileTap={isEmpty ? {} : { scale: 0.98 }}
+      whileHover={isEmpty ? {} : { y: -2 }}
+      whileTap={isEmpty ? {} : { scale: 0.99 }}
       onClick={() => !isEmpty && router.push(href)}
-      className={`group relative rounded-2xl p-5 border transition-all duration-300
+      className={`group relative rounded-xl p-4 border transition-colors duration-150
         ${styles.bg} ${styles.border}
-        ${isEmpty ? 'shadow-sm' : 'shadow-md hover:shadow-lg hover:border-blue-300'}
-        h-full flex flex-col justify-between min-h-[200px]`}
+        ${isEmpty ? '' : 'hover:border-slate-300 cursor-pointer'}
+        h-full flex flex-col justify-between min-h-[160px]`}
       title={hint}
     >
-      <div className="flex items-start justify-between gap-3 mb-6">
-        <div className={`shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm border border-current/10 ${styles.icon}`}>
-          <Icon size={20} strokeWidth={2} />
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <div className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-150 ${styles.icon}`}>
+          <Icon size={18} strokeWidth={2} />
         </div>
 
-        <div className="flex flex-col items-end flex-1 min-w-0 gap-2">
-          <span className={`text-xs font-bold uppercase tracking-wider text-right transition-colors ${styles.label}`} title={label}>
+        <div className="flex flex-col items-end flex-1 min-w-0 gap-1.5">
+          <span className={`text-[10px] font-semibold uppercase tracking-wide text-right transition-colors ${styles.label}`} title={label}>
             {label}
           </span>
 
           {isEmpty ? (
-            <span className="px-2 py-1 rounded-lg bg-slate-100 text-slate-500 text-[10px] font-semibold" title="No data available">—</span>
+            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 text-[10px] font-medium" title="No data available">—</span>
           ) : trendIndicator ? (
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${trendIndicator.bg}`} title={`${trend > 0 ? 'Increase' : 'Decrease'} of ${Math.abs(trend)}%`}>
-              <trendIndicator.icon size={12} className={trendIndicator.color} />
-              <span className={`text-xs font-bold ${trendIndicator.color}`}>{trend > 0 ? '+' : ''}{trend}%</span>
+            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${trendIndicator.bg}`} title={`${trend! > 0 ? '+' : ''}${trend}%`}>
+              <trendIndicator.icon size={11} className={trendIndicator.color} />
+              <span className={`text-[10px] font-semibold ${trendIndicator.color}`}>{trend! > 0 ? '+' : ''}{trend}%</span>
             </div>
           ) : null}
         </div>
       </div>
 
-      <div className="space-y-3 mt-auto">
-        <div className={`text-2xl font-black font-mono tracking-tight ${styles.value} ${isEmpty ? 'opacity-50' : ''}`} title={typeof value === 'string' ? value : ''}>
+      <div className="mt-auto">
+        <div className={`text-xl font-bold font-mono tracking-tight ${styles.value} ${isEmpty ? 'opacity-40' : ''}`} title={typeof value === 'string' ? value : ''}>
           {isEmpty ? '—' : value}
         </div>
       </div>
 
-      {!isEmpty && <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-blue-500" title="Click to view details">→</div>}
-      {danger && <div className="absolute top-0 right-0 w-1 h-8 bg-rose-400 rounded-b-lg" title="Warning: requires attention" />}
+      {danger && <div className="absolute top-0 right-0 w-1 h-6 bg-rose-400 rounded-b" title="Perlu perhatian" />}
     </motion.div>
   )
 }

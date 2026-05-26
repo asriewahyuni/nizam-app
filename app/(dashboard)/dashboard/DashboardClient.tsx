@@ -263,55 +263,55 @@ function AttendanceTodayWidget({ summary }: { summary: AttendanceSummary }) {
    }
 
    return (
-      <div className="bg-white rounded-[28px] border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
          {/* Header */}
-         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-50">
+         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100">
             <div className="flex items-center gap-3">
-               <div className="w-9 h-9 rounded-2xl bg-indigo-50 flex items-center justify-center">
-                  <Users size={18} className="text-indigo-600" />
+               <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                  <Users size={16} className="text-indigo-600" />
                </div>
                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Kehadiran Hari Ini</p>
-                  <p className="text-xs font-bold text-slate-500">{summary.date}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Kehadiran Hari Ini</p>
+                  <p className="text-xs font-medium text-slate-400">{summary.date}</p>
                </div>
             </div>
-            <Link href="/hris?tab=attendance" className="text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-700 flex items-center gap-1 transition-colors">
+            <Link href="/hris?tab=attendance" className="text-[10px] font-medium text-indigo-500 hover:text-indigo-700 flex items-center gap-1 transition-colors">
                Lihat Semua <ChevronRight size={12} />
             </Link>
          </div>
 
-         <div className="px-6 py-4">
+         <div className="px-5 py-4">
             {/* Stats row */}
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-3 gap-3 mb-4">
                <div className="text-center">
-                  <p className="text-2xl font-black text-emerald-600">{summary.presentCount}</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">Hadir</p>
+                  <p className="text-xl font-bold text-emerald-600">{summary.presentCount}</p>
+                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-0.5">Hadir</p>
                </div>
                <div className="text-center">
-                  <p className="text-2xl font-black text-amber-500">{summary.lateCount}</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">Terlambat</p>
+                  <p className="text-xl font-bold text-amber-500">{summary.lateCount}</p>
+                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-0.5">Terlambat</p>
                </div>
                <div className="text-center">
-                  <p className="text-2xl font-black text-rose-500">{summary.absentCount}</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">Belum Absen</p>
+                  <p className="text-xl font-bold text-rose-500">{summary.absentCount}</p>
+                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-0.5">Belum Absen</p>
                </div>
             </div>
 
             {/* Progress bar */}
             <div className="mb-4">
                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-bold text-slate-400">{summary.presentCount} / {summary.totalEmployees} karyawan</span>
-                  <span className="text-[10px] font-black text-indigo-600">{pct}%</span>
+                  <span className="text-[10px] font-medium text-slate-400">{summary.presentCount} / {summary.totalEmployees} karyawan</span>
+                  <span className="text-[10px] font-semibold text-indigo-600">{pct}%</span>
                </div>
-               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                     className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-indigo-400 transition-all duration-700"
+                     className="h-full rounded-full bg-indigo-500 transition-all duration-700"
                      style={{ width: `${pct}%` }}
                   />
                </div>
             </div>
 
-            {/* Employee list (max 6, sorted: hadir first) */}
+            {/* Employee list (max 9, sorted: hadir first) */}
             {summary.list.length === 0 ? (
                <p className="text-sm text-slate-400 text-center py-2">Belum ada karyawan terdaftar.</p>
             ) : (
@@ -321,23 +321,23 @@ function AttendanceTodayWidget({ summary }: { summary: AttendanceSummary }) {
                      return (
                         <div
                            key={emp.employeeId}
-                           className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-slate-50 border border-slate-100"
+                           className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100"
                         >
-                           <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${hadir ? 'bg-emerald-100' : 'bg-slate-200'}`}>
+                           <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${hadir ? 'bg-emerald-100' : 'bg-slate-200'}`}>
                               {hadir
-                                 ? <CheckCircle2 size={14} className="text-emerald-600" />
-                                 : <XCircle size={14} className="text-slate-400" />
+                                 ? <CheckCircle2 size={13} className="text-emerald-600" />
+                                 : <XCircle size={13} className="text-slate-400" />
                               }
                            </div>
                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-bold text-slate-800 truncate leading-tight">{emp.employeeName || '—'}</p>
+                              <p className="text-xs font-medium text-slate-800 truncate leading-tight">{emp.employeeName || '—'}</p>
                               {hadir ? (
-                                 <p className="text-[10px] text-emerald-600 font-bold leading-tight flex items-center gap-1">
+                                 <p className="text-[10px] text-emerald-600 font-medium leading-tight flex items-center gap-1">
                                     <Clock size={9} />
                                     {fmtTime(emp.checkIn)} {emp.checkOut ? `→ ${fmtTime(emp.checkOut)}` : ''}
                                  </p>
                               ) : (
-                                 <p className="text-[10px] text-slate-400 font-bold leading-tight">Belum absen</p>
+                                 <p className="text-[10px] text-slate-400 font-medium leading-tight">Belum absen</p>
                               )}
                            </div>
                         </div>
@@ -346,7 +346,7 @@ function AttendanceTodayWidget({ summary }: { summary: AttendanceSummary }) {
                </div>
             )}
             {summary.list.length > 9 && (
-               <Link href="/hris?tab=attendance" className="mt-3 block text-center text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-600 transition-colors">
+               <Link href="/hris?tab=attendance" className="mt-3 block text-center text-[10px] font-medium text-indigo-400 hover:text-indigo-600 transition-colors">
                   +{summary.list.length - 9} karyawan lainnya →
                </Link>
             )}
@@ -367,35 +367,35 @@ export function DashboardClient({ data }: DashboardClientProps) {
          variants={container}
          initial={false}
          animate="show"
-         className="space-y-12 pb-20"
+         className="space-y-8 pb-16"
       >
          {/* Header Section */}
-         <motion.div variants={item} className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2 border-b border-slate-100">
+         <motion.div variants={item} className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
             <div className="space-y-1">
-               <h1 className="text-4xl font-black text-slate-900 tracking-tighter flex items-center gap-4">
-                  <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-100 text-white">
-                     <BarChart3 size={28} />
+               <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+                  <div className="p-2 bg-blue-600 rounded-lg text-white">
+                     <BarChart3 size={20} />
                   </div>
                   Overview
                </h1>
-               <div className="flex items-center gap-3 pl-1">
-                  <p className="text-sm text-slate-400 font-medium tracking-tight">Real-time business intelligence for <span className="text-slate-900 font-bold">{data.orgName}</span></p>
+               <div className="flex items-center gap-2 pl-1">
+                  <p className="text-sm text-slate-500 font-medium">Ringkasan bisnis untuk <span className="text-slate-900 font-semibold">{data.orgName}</span></p>
                   <div className="h-1 w-1 bg-slate-300 rounded-full" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-1.5 bg-amber-50 px-3 py-1 rounded-full border border-amber-100 italic">
-                     <Star size={10} className="fill-amber-500" /> Pareto Mode
-                  </p>
+                  <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                     Pareto Mode
+                  </span>
                </div>
             </div>
 
-            <div className="flex items-center gap-3">
-               <button className="bg-white border border-slate-200 p-3 rounded-2xl text-slate-400 hover:text-slate-900 transition-all shadow-sm">
-                  <Search size={20} />
+            <div className="flex items-center gap-2">
+               <button className="bg-white border border-slate-200 p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer">
+                  <Search size={18} />
                </button>
             </div>
          </motion.div>
 
-         {/* Grid: Metric Cards - Responsive with Status Indicators */}
-         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5 lg:gap-6">
+         {/* Grid: Metric Cards */}
+         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {data.metrics.map((m) => {
                const Icon = ICON_MAP[m.icon] || Wallet
                const isEmpty = String(m.value).trim() === 'Rp 0' || String(m.value).trim() === '0'
@@ -425,26 +425,26 @@ export function DashboardClient({ data }: DashboardClientProps) {
             </motion.div>
          )}
 
-         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Revenue Trend Chart - Clean & Pro */}
-            <motion.div variants={item} className="lg:col-span-2 space-y-5">
-               <div className="flex items-center justify-between px-2">
+         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Revenue Trend Chart */}
+            <motion.div variants={item} className="lg:col-span-2 space-y-3">
+               <div className="flex items-center justify-between">
                   <div>
-                     <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest">Financial Performance</h2>
-                     <p className="text-[10px] font-bold text-slate-400 italic">Moving average revenue vs net profit</p>
+                     <h2 className="text-sm font-semibold text-slate-800">Performa Keuangan</h2>
+                     <p className="text-xs font-medium text-slate-400">Revenue vs Net Profit (bulanan)</p>
                   </div>
-                  <div className="flex items-center gap-4 bg-slate-50 p-2 px-4 rounded-xl border border-slate-100">
-                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-200" />
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">Revenue</span>
+                  <div className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                     <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-[10px] font-medium text-slate-600">Revenue</span>
                      </div>
-                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-200" />
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">Profit</span>
+                     <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        <span className="text-[10px] font-medium text-slate-600">Profit</span>
                      </div>
                   </div>
                </div>
-               <div className="bg-white rounded-[40px] p-10 border border-slate-100 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.04)] h-[380px] group transition-all">
+               <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm h-[320px]">
                   <SafeResponsiveContainer>
                      <AreaChart data={data.analytics} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                         <defs>
@@ -468,9 +468,9 @@ export function DashboardClient({ data }: DashboardClientProps) {
                         <YAxis hide={true} />
                         <Tooltip
                            cursor={{ stroke: '#f1f5f9', strokeWidth: 2 }}
-                           contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', padding: '20px' }}
-                           itemStyle={{ fontWeight: 800, fontSize: '12px' }}
-                           labelStyle={{ fontWeight: 900, fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '8px' }}
+                           contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', padding: '12px' }}
+                           itemStyle={{ fontWeight: 600, fontSize: '12px' }}
+                           labelStyle={{ fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' }}
                            formatter={(value: number | string) => [formatRupiah(Number(value || 0)), '']}
                         />
                         <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" />
@@ -480,36 +480,36 @@ export function DashboardClient({ data }: DashboardClientProps) {
                </div>
             </motion.div>
 
-            {/* Pareto High Impact Card - Dark Mode Aesthetic */}
-            <motion.div variants={item} className="lg:col-span-1 space-y-5">
-               <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Market Impact</h2>
-               <Link href="/reports/pareto" className="block h-full group relative z-10">
-                  <div className="bg-slate-900 rounded-[48px] p-10 text-white relative overflow-hidden shadow-[0_30px_60px_-15px_rgba(15,23,42,0.3)] h-full min-h-[380px] hover:ring-2 hover:ring-emerald-500/50 transition-all group-hover:shadow-emerald-900/40">
-                     <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12 group-hover:rotate-0 transition-transform duration-700 pointer-events-none">
-                        <Trophy size={180} strokeWidth={1} />
+            {/* Pareto High Impact Card */}
+            <motion.div variants={item} className="lg:col-span-1 space-y-3">
+               <h2 className="text-sm font-semibold text-slate-800">Market Impact</h2>
+               <Link href="/reports/pareto" className="block h-full group">
+                  <div className="bg-slate-900 rounded-xl p-5 text-white relative overflow-hidden border border-slate-800 h-full min-h-[320px] hover:bg-slate-800 transition-colors">
+                     <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+                        <Trophy size={120} strokeWidth={1} />
                      </div>
-                     <div className="relative z-10 flex flex-col justify-between h-full pointer-events-none">
-                        <div className="space-y-6 pointer-events-auto">
+                     <div className="relative z-10 flex flex-col justify-between h-full">
+                        <div className="space-y-4">
                            <div>
-                              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-[9px] font-black uppercase tracking-widest border border-amber-500/20 mb-4">
-                                 <Target size={12} /> Pareto Focus
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/20 text-amber-400 rounded text-[9px] font-semibold uppercase tracking-wide border border-amber-500/20 mb-3">
+                                 <Target size={10} /> Pareto Focus
                               </div>
-                              <p className="text-2xl font-black leading-tight italic tracking-tighter">
-                                 {pareto.top20Count} Produk penguasa pendapatan.
+                              <p className="text-lg font-bold leading-snug">
+                                 {pareto.top20Count} produk penguasa pendapatan.
                               </p>
-                              <p className="text-[11px] font-medium text-slate-400 mt-2 leading-relaxed">
-                                 Strategi 80/20 otomatis mendeteksi item pelarisan untuk optimasi stok.
+                              <p className="text-xs font-medium text-slate-400 mt-1.5 leading-relaxed">
+                                 80/20 otomatis mendeteksi item pelarisan.
                               </p>
                            </div>
-                           <div className="space-y-4">
+                           <div className="space-y-2">
                               {pareto.paretoProducts.slice(0, 3).map((p, i) => (
-                                 <div key={p.name} className="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-white/5 hover:bg-white/10 transition-all cursor-default">
-                                    <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-[11px] font-black font-mono">#{i + 1}</div>
+                                 <div key={p.name} className="flex items-center gap-3 bg-white/5 p-2.5 rounded-lg border border-white/5">
+                                    <div className="w-7 h-7 rounded-md bg-white/10 flex items-center justify-center text-[10px] font-semibold font-mono">#{i + 1}</div>
                                     <div className="flex-1 overflow-hidden">
-                                       <span className="text-xs font-bold text-slate-50 truncate block">{p.name}</span>
-                                       <div className="flex items-center gap-2">
-                                          <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">{formatRupiah(p.revenue)}</span>
-                                          <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest leading-none">/ {formatRupiah(p.profit || 0)} PROFIT</span>
+                                       <span className="text-xs font-medium text-slate-50 truncate block">{p.name}</span>
+                                       <div className="flex items-center gap-1.5">
+                                          <span className="text-[9px] font-medium text-emerald-400">{formatRupiah(p.revenue)}</span>
+                                          <span className="text-[9px] font-medium text-blue-400">/ {formatRupiah(p.profit || 0)}</span>
                                        </div>
                                     </div>
                                  </div>
@@ -517,20 +517,20 @@ export function DashboardClient({ data }: DashboardClientProps) {
                            </div>
                         </div>
 
-                        <div className="pt-8 mt-auto border-t border-white/10 pointer-events-auto">
+                        <div className="pt-4 mt-4 border-t border-white/10">
                            <div className="flex justify-between items-center">
-                              <div className="flex gap-6">
+                              <div className="flex gap-4">
                                  <div>
-                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-1">Total Revenue</p>
-                                    <p className="text-sm font-black text-white font-mono tracking-tighter">{formatRupiah(pareto.totalRevenue)}</p>
+                                    <p className="text-[9px] font-medium text-slate-500 uppercase tracking-wide mb-0.5">Total Revenue</p>
+                                    <p className="text-sm font-semibold text-white font-mono">{formatRupiah(pareto.totalRevenue)}</p>
                                  </div>
                                  <div>
-                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-1">Total Profit</p>
-                                    <p className="text-sm font-black text-blue-400 font-mono tracking-tighter">{formatRupiah(pareto.totalProfit)}</p>
+                                    <p className="text-[9px] font-medium text-slate-500 uppercase tracking-wide mb-0.5">Total Profit</p>
+                                    <p className="text-sm font-semibold text-blue-400 font-mono">{formatRupiah(pareto.totalProfit)}</p>
                                  </div>
                               </div>
-                              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-emerald-500 group-hover:scale-110 transition-all shadow-xl">
-                                 <ChevronRight size={24} />
+                              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-emerald-600 transition-colors">
+                                 <ChevronRight size={18} />
                               </div>
                            </div>
                         </div>
@@ -539,58 +539,58 @@ export function DashboardClient({ data }: DashboardClientProps) {
                </Link>
             </motion.div>
 
-            {/* Customer Pareto High Impact Card */}
-            <motion.div variants={item} className="lg:col-span-1 space-y-5">
-               <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Top Customers (80/20)</h2>
-               <Link href="/contacts" className="block h-full group relative z-10">
-                  <div className="bg-indigo-900 rounded-[48px] p-10 text-white relative overflow-hidden shadow-[0_30px_60px_-15px_rgba(49,46,129,0.3)] h-full min-h-[380px] hover:ring-2 hover:ring-indigo-400/50 transition-all group-hover:shadow-indigo-900/50">
-                     <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12 group-hover:rotate-0 transition-transform duration-700 pointer-events-none">
-                        <Star size={180} strokeWidth={1} />
+            {/* Customer Pareto Card */}
+            <motion.div variants={item} className="lg:col-span-1 space-y-3">
+               <h2 className="text-sm font-semibold text-slate-800">Top Customers (80/20)</h2>
+               <Link href="/contacts" className="block h-full group">
+                  <div className="bg-indigo-900 rounded-xl p-5 text-white relative overflow-hidden border border-indigo-800 h-full min-h-[320px] hover:bg-indigo-800 transition-colors">
+                     <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+                        <Star size={120} strokeWidth={1} />
                      </div>
-                     <div className="relative z-10 flex flex-col justify-between h-full pointer-events-none">
-                        <div className="space-y-6 pointer-events-auto">
+                     <div className="relative z-10 flex flex-col justify-between h-full">
+                        <div className="space-y-4">
                            <div>
-                              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-[9px] font-black uppercase tracking-widest border border-amber-500/20 mb-4">
-                                 <Target size={12} /> VIP Whales
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/20 text-amber-400 rounded text-[9px] font-semibold uppercase tracking-wide border border-amber-500/20 mb-3">
+                                 <Target size={10} /> Top Clients
                               </div>
-                              <p className="text-2xl font-black leading-tight italic tracking-tighter">
-                                 {paretoCust.top20Count} Klien sumbang 80% omset.
+                              <p className="text-lg font-bold leading-snug">
+                                 {paretoCust.top20Count} klien sumbang 80% omset.
                               </p>
-                              <p className="text-[11px] font-medium text-indigo-200 mt-2 leading-relaxed">
-                                 Prioritaskan layanan ekstra untuk daftar pelanggan emas ini.
+                              <p className="text-xs font-medium text-indigo-200 mt-1.5 leading-relaxed">
+                                 Prioritaskan layanan ekstra untuk pelanggan utama.
                               </p>
                            </div>
-                           <div className="space-y-4">
+                           <div className="space-y-2">
                               {paretoCust.paretoCustomers.slice(0, 3).map((c, i) => (
-                                 <div key={c.name} className="flex items-center gap-4 bg-white/5 p-3 rounded-2xl border border-white/5 hover:bg-white/10 transition-all cursor-default relative overflow-hidden">
-                                    <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-[11px] font-black font-mono relative z-10">#{i + 1}</div>
-                                    <div className="flex-1 overflow-hidden relative z-10">
-                                       <span className="text-xs font-bold text-slate-50 truncate block">{c.name}</span>
-                                       <div className="flex items-center gap-2">
-                                          <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">{formatRupiah(c.revenue)}</span>
-                                          <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest leading-none">/ {formatRupiah(c.profit || 0)} PROFIT</span>
+                                 <div key={c.name} className="flex items-center gap-3 bg-white/5 p-2.5 rounded-lg border border-white/5">
+                                    <div className="w-7 h-7 rounded-md bg-white/10 flex items-center justify-center text-[10px] font-semibold font-mono">#{i + 1}</div>
+                                    <div className="flex-1 overflow-hidden">
+                                       <span className="text-xs font-medium text-slate-50 truncate block">{c.name}</span>
+                                       <div className="flex items-center gap-1.5">
+                                          <span className="text-[9px] font-medium text-emerald-400">{formatRupiah(c.revenue)}</span>
+                                          <span className="text-[9px] font-medium text-blue-400">/ {formatRupiah(c.profit || 0)}</span>
                                        </div>
                                     </div>
-                                    {i === 0 && <div className="absolute right-0 top-0 h-full w-12 bg-gradient-to-l from-amber-400/20 to-transparent flex items-center justify-end pr-2"><Trophy size={14} className="text-amber-400" /></div>}
+                                    {i === 0 && <Trophy size={12} className="text-amber-400 shrink-0" />}
                                  </div>
                               ))}
                            </div>
                         </div>
 
-                        <div className="pt-8 mt-auto border-t border-white/10 pointer-events-auto">
+                        <div className="pt-4 mt-4 border-t border-white/10">
                            <div className="flex justify-between items-center">
-                              <div className="flex gap-6">
+                              <div className="flex gap-4">
                                  <div>
-                                    <p className="text-[8px] font-bold text-indigo-300 uppercase tracking-[0.2em] mb-1">VIP Revenue</p>
-                                    <p className="text-sm font-black text-white font-mono tracking-tighter">{formatRupiah(paretoCust.top20Revenue)}</p>
+                                    <p className="text-[9px] font-medium text-indigo-300 uppercase tracking-wide mb-0.5">VIP Revenue</p>
+                                    <p className="text-sm font-semibold text-white font-mono">{formatRupiah(paretoCust.top20Revenue)}</p>
                                  </div>
                                  <div>
-                                    <p className="text-[8px] font-bold text-indigo-300 uppercase tracking-[0.2em] mb-1">VIP Profit</p>
-                                    <p className="text-sm font-black text-blue-400 font-mono tracking-tighter">{formatRupiah(paretoCust.top20Profit)}</p>
+                                    <p className="text-[9px] font-medium text-indigo-300 uppercase tracking-wide mb-0.5">VIP Profit</p>
+                                    <p className="text-sm font-semibold text-blue-400 font-mono">{formatRupiah(paretoCust.top20Profit)}</p>
                                  </div>
                               </div>
-                              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-amber-500 group-hover:scale-110 transition-all shadow-xl">
-                                 <ChevronRight size={24} />
+                              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-amber-500 transition-colors">
+                                 <ChevronRight size={18} />
                               </div>
                            </div>
                         </div>
@@ -601,135 +601,103 @@ export function DashboardClient({ data }: DashboardClientProps) {
 
          </div>
 
-         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
-            {/* Top Products - More like a list of achievements */}
-            <motion.div variants={item} className="xl:col-span-1 space-y-5">
-               <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Star Products</h2>
-               <div className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-sm space-y-6">
+         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {/* Top Products */}
+            <motion.div variants={item} className="xl:col-span-1 space-y-3">
+               <h2 className="text-sm font-semibold text-slate-800">Produk Terlaris</h2>
+               <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
                   {topProducts.length === 0 ? (
-                     <div className="py-24 text-center opacity-30 font-black text-xs uppercase italic border-2 border-dashed border-slate-100 rounded-3xl">No performance data</div>
+                     <div className="py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">Belum ada data produk</div>
                   ) : (
-                     <div className="space-y-3">
+                     <div className="space-y-1">
                         {topProducts.slice(0, 7).map((p, i) => (
-                           <div key={i} className="p-4 flex justify-between items-center group hover:bg-slate-50 rounded-2xl transition-all border border-transparent hover:border-slate-100">
-                              <div className="flex items-center gap-4 overflow-hidden">
-                                 <div className="shrink-0 w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xs font-black text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
-                                    0{i + 1}
-                                 </div>
-                                 <div className="flex flex-col overflow-hidden">
-                                    <span className="text-sm font-black text-slate-900 truncate tracking-tight">{p.name}</span>
-                                    <div className="flex items-center gap-2">
-                                       <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">{formatRupiah(p.revenue)}</span>
-                                       <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">/ {formatRupiah(p.profit || 0)} PROFIT</span>
-                                    </div>
+                           <div key={i} className="p-2.5 flex items-center gap-3 group hover:bg-slate-50 rounded-lg transition-colors">
+                              <div className="shrink-0 w-7 h-7 rounded-md bg-slate-100 flex items-center justify-center text-[10px] font-semibold text-slate-500 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                 {i + 1}
+                              </div>
+                              <div className="flex flex-col overflow-hidden flex-1">
+                                 <span className="text-sm font-medium text-slate-900 truncate">{p.name}</span>
+                                 <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-medium text-emerald-600">{formatRupiah(p.revenue)}</span>
+                                    <span className="text-[10px] font-medium text-blue-500">/ {formatRupiah(p.profit || 0)}</span>
                                  </div>
                               </div>
                            </div>
                         ))}
                      </div>
                   )}
-                  <Link href="/inventory" className="w-full py-4 border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-                     All Products <ChevronRight size={14} />
+                  <Link href="/inventory" className="mt-3 w-full py-2.5 border border-slate-200 rounded-lg text-[10px] font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
+                     Semua Produk <ChevronRight size={12} />
                   </Link>
                </div>
             </motion.div>
 
-            {/* Expense Progress - With more visual weight */}
-            <motion.div variants={item} className="xl:col-span-1 space-y-5">
-               <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Cost Centers</h2>
-               <div className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-sm space-y-6 flex flex-col justify-between h-full min-h-[460px]">
-                  <div className="space-y-7">
+            {/* Cost Centers */}
+            <motion.div variants={item} className="xl:col-span-1 space-y-3">
+               <h2 className="text-sm font-semibold text-slate-800">Pengeluaran Terbesar</h2>
+               <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col h-full min-h-[400px]">
+                  <div className="space-y-4 flex-1">
                      {data.topExpenses.length === 0 ? (
-                        <div className="text-center py-20 opacity-30 font-bold text-xs border-2 border-dashed border-slate-100 rounded-3xl">No costs recorded</div>
+                        <div className="text-center py-12 text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">Belum ada data pengeluaran</div>
                      ) : (
                         data.topExpenses.slice(0, 6).map((exp) => (
-                           <div key={exp.name} className="space-y-2 group">
+                           <div key={exp.name} className="space-y-1.5 group">
                               <div className="flex justify-between items-end">
-                                 <span className="text-[11px] font-black text-slate-500 uppercase tracking-tighter group-hover:text-slate-900 transition-colors">{exp.name}</span>
-                                 <span className="text-xs font-black text-slate-900 font-mono tracking-tighter">{formatRupiah(exp.value)}</span>
+                                 <span className="text-xs font-medium text-slate-600 group-hover:text-slate-900 transition-colors truncate pr-2">{exp.name}</span>
+                                 <span className="text-xs font-semibold text-slate-900 font-mono shrink-0">{formatRupiah(exp.value)}</span>
                               </div>
-                              <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100 shadow-inner">
+                              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                                  <motion.div
                                     initial={{ width: 0 }}
                                     animate={{ width: `${Math.max(5, (exp.value / Math.max(...data.topExpenses.map(e => e.value))) * 100)}%` }}
-                                    className="h-full bg-slate-300 group-hover:bg-rose-500 rounded-full transition-all duration-500 shadow-sm"
+                                    className="h-full bg-slate-300 group-hover:bg-rose-400 rounded-full transition-colors duration-300"
                                  />
                               </div>
                            </div>
                         ))
                      )}
                   </div>
-                  <div className="mt-8 p-6 bg-rose-50 rounded-3xl border border-rose-100 space-y-1">
-                     <p className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em]">Efficiency Status</p>
-                     <p className="text-sm font-bold text-rose-700 leading-tight">Biaya operasional stabil dalam 30 hari terakhir. Fokus pada optimasi vendor logistik.</p>
+                  <div className="mt-4 pt-3 border-t border-slate-100">
+                     <p className="text-xs font-medium text-slate-500">Pantau biaya terbesar untuk efisiensi operasional.</p>
                   </div>
                </div>
             </motion.div>
 
-            {/* Quick Strategic Actions - Buttons that pop */}
-            <motion.div variants={item} className="xl:col-span-1 space-y-5">
-               <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Strategy Hub</h2>
-               <div className="grid grid-cols-1 gap-6 h-full">
-                  <div className="bg-emerald-600 rounded-[40px] p-10 text-white flex flex-col justify-between shadow-2xl shadow-emerald-100 relative overflow-hidden group">
-                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-125 transition-transform duration-700">
-                        <Package size={120} strokeWidth={1} />
+            {/* Quick Actions */}
+            <motion.div variants={item} className="xl:col-span-1 space-y-3">
+               <h2 className="text-sm font-semibold text-slate-800">Aksi Cepat</h2>
+               <div className="grid grid-cols-1 gap-3">
+                  <Link href="/inventory" className="bg-emerald-600 rounded-xl p-4 text-white flex items-center justify-between hover:bg-emerald-700 transition-colors group cursor-pointer">
+                     <div>
+                        <p className="text-[10px] font-medium uppercase tracking-wider opacity-70 mb-1">Inventory</p>
+                        <p className="text-base font-semibold leading-snug">Kelola stok produk</p>
                      </div>
-                     <div className="relative z-10">
-                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] opacity-60 mb-3">Inventory Optimization</h3>
-                        <p className="text-2xl font-black leading-[1.1] italic tracking-tighter">
-                           Cegah &quot;Loss Sales&quot; di produk Pareto.
-                        </p>
-                        <p className="text-[11px] font-medium opacity-70 mt-3 leading-relaxed">System mendeteksi 4 item Pareto hampir habis. Segera restock.</p>
+                     <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                        <Package size={18} />
                      </div>
-                     <Link href="/inventory" className="w-14 h-14 rounded-[20px] bg-white text-emerald-600 flex items-center justify-center hover:scale-110 transition-all shadow-xl shadow-emerald-900/20 active:scale-95 mt-10">
-                        <ArrowUpRight size={28} />
-                     </Link>
-                  </div>
+                  </Link>
 
-                  <div className="bg-white rounded-[40px] p-10 border border-slate-100 flex flex-col justify-between shadow-sm group hover:border-blue-200 transition-all">
-                     <div className="flex items-start gap-6">
-                        <div className="w-16 h-16 rounded-[24px] bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-all shadow-inner border border-slate-100">
-                           <Target size={32} strokeWidth={2.5} />
-                        </div>
-                        <div className="space-y-1">
-                           <h3 className="text-lg font-black text-slate-900 tracking-tight">Budget Policy</h3>
-                           <p className="text-xs font-bold text-slate-400 italic">Financial discipline tracking.</p>
-                        </div>
+                  <Link href="/accounting/budgets" className="bg-white rounded-xl p-4 border border-slate-200 flex items-center justify-between hover:border-blue-300 hover:bg-blue-50/30 transition-colors group cursor-pointer">
+                     <div>
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 mb-1">Budget</p>
+                        <p className="text-base font-semibold text-slate-900">Audit anggaran</p>
+                        <p className="text-xs font-medium text-slate-400">Financial discipline</p>
                      </div>
-                     <div className="mt-8 flex items-center justify-between">
-                        <Link href="/accounting/budgets" className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2 group-hover:gap-4 transition-all">
-                           Audit Budgets <ChevronRight size={16} />
-                        </Link>
-                        <div className="flex -space-x-3">
-                           {[1, 2, 3].map(i => (
-                              <div key={i} className="w-9 h-9 rounded-full bg-slate-100 border-2 border-white shadow-sm" />
-                           ))}
-                        </div>
+                     <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                        <Target size={18} />
                      </div>
-                  </div>
+                  </Link>
 
-                  <div className="bg-gradient-to-br from-cyan-50 via-white to-emerald-50 rounded-[40px] p-10 border border-cyan-100 flex flex-col justify-between shadow-sm group hover:border-emerald-200 transition-all overflow-hidden relative">
-                     <div className="absolute right-0 top-0 p-8 opacity-10 text-emerald-700 group-hover:scale-110 transition-transform duration-700">
-                        <GraduationCap size={120} strokeWidth={1.2} />
+                  <Link href="/learning" className="bg-white rounded-xl p-4 border border-slate-200 flex items-center justify-between hover:border-emerald-300 hover:bg-emerald-50/30 transition-colors group cursor-pointer">
+                     <div>
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 mb-1">Learning</p>
+                        <p className="text-base font-semibold text-slate-900">Learning Hub</p>
+                        <p className="text-xs font-medium text-slate-400">Training & evaluasi tim</p>
                      </div>
-                     <div className="relative z-10 flex items-start gap-6">
-                        <div className="w-16 h-16 rounded-[24px] bg-white flex items-center justify-center text-emerald-600 shadow-inner border border-emerald-100">
-                           <GraduationCap size={30} strokeWidth={2.5} />
-                        </div>
-                        <div className="space-y-1">
-                           <h3 className="text-lg font-black text-slate-900 tracking-tight">Peningkatan Kompetensi</h3>
-                           <p className="text-xs font-bold text-slate-500 italic">Training, evaluasi, dan progress tim.</p>
-                        </div>
+                     <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
+                        <GraduationCap size={18} />
                      </div>
-                     <div className="relative z-10 mt-8 flex items-center justify-between">
-                        <Link href="/learning" className="text-xs font-black text-emerald-700 uppercase tracking-widest flex items-center gap-2 group-hover:gap-4 transition-all">
-                           Buka Learning Hub <ChevronRight size={16} />
-                        </Link>
-                        <div className="rounded-2xl bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 shadow-sm border border-emerald-100">
-                           Shortcut Baru
-                        </div>
-                     </div>
-                  </div>
+                  </Link>
                </div>
             </motion.div>
          </div>
