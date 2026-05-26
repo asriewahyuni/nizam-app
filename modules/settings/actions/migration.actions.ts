@@ -2008,6 +2008,8 @@ export async function importOpeningArMigration(
         is_auto: true,
         notes: OPENING_AR_IMPORT_TAG,
         created_by: authData.user.id,
+        contact_id: customer.id,
+        due_date: dueDate || null,
       })
       .select('id')
       .single()
@@ -2293,6 +2295,8 @@ export async function importOpeningApMigration(
         is_auto: true,
         notes: OPENING_AP_IMPORT_TAG,
         created_by: authData.user.id,
+        contact_id: supplier.id,
+        due_date: dueDate || null,
       })
       .select('id')
       .single()

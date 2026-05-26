@@ -25,6 +25,10 @@ export interface CreateJournalEntryInput {
   auto_post?: boolean // if true, immediately post after creation
   allow_org_scope?: boolean
   skipRevalidate?: boolean
+  /** Contact yang terkait — diisi untuk jurnal manual AP/AR agar muncul di aging dengan atribusi yang benar */
+  contact_id?: string | null
+  /** Tanggal jatuh tempo — diisi untuk menentukan aging bucket pada laporan AP/AR */
+  due_date?: string | null
 }
 
 const JOURNAL_ENTRY_MAX_INSERT_RETRIES = 5
@@ -110,6 +114,8 @@ async function insertJournalEntryHeaderWithRetry(
         notes: input.notes || null,
         status: 'DRAFT',
         created_by: userId,
+        contact_id: input.contact_id || null,
+        due_date: input.due_date || null,
       })
       .select()
       .single()

@@ -168,6 +168,130 @@ async function getPostedEntryIds(
   return data.map((entry: any) => entry.id)
 }
 
+/**
+ * Mengambil baris aging yang dapat diatribusikan ke contact tertentu
+ * dari jurnal POSTED yang memiliki contact_id (biasanya jurnal manual).
+ *
+ * Jurnal dengan reference_type SALE/PURCHASE sudah dihitung via modul
+ * penjualan/pembelian, sehingga hanya reference_type MANUAL (atau null)
+ * yang diproses di sini agar tidak terjadi double-counting.
+ *
+ * Saldo per entri dihitung sebagai:
+ *   AR: debit - credit (akun ASSET — saldo normal DEBIT)
+ *   AP: credit - debit (akun LIABILITY — saldo normal CREDIT)
+ */
+async function getContactAttributedJournalRows(
+  db: any,
+  orgId: string,
+  accountCode: string,
+  type: 'AR' | 'AP',
+  today: string,
+  settlementAccountId: string | null,
+  sourceLabel: string,
+  branchId?: BranchFilter
+): Promise<AgingReportRow[]> {
+  // Ambil jurnal POSTED yang punya contact_id, bukan dari modul sales/purchase
+  let entryQuery = db
+    .from('journal_entries')
+    .select('id, contact_id, entry_date, due_date, entry_number, description')
+    .eq('org_id', orgId)
+    .eq('status', 'POSTED')
+    .not('contact_id', 'is', null)
+    .not('reference_type', 'in', '("SALE","PURCHASE","SALES_RETURN","PURCHASE_RETURN","PAYMENT_IN","PAYMENT_OUT","PURCHASE_PAYMENT")')
+
+  if (branchId) {
+    entryQuery = entryQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
+  }
+
+  const { data: entries, error: entryError } = await entryQuery
+  if (entryError || !Array.isArray(entries) || entries.length === 0) return []
+
+  const entryIds = entries.map((e: any) => e.id)
+
+  // Ambil account_id untuk kode akun yang diminta
+  const { data: accountRows } = await db
+    .from('accounts')
+    .select('id, code')
+    .eq('org_id', orgId)
+    .eq('code', accountCode)
+    .limit(1)
+
+  const targetAccountId = accountRows?.[0]?.id
+  if (!targetAccountId) return []
+
+  // Ambil journal lines yang menyentuh akun target
+  const { data: lines, error: lineError } = await db
+    .from('journal_lines')
+    .select('entry_id, debit, credit')
+    .in('entry_id', entryIds)
+    .eq('account_id', targetAccountId)
+
+  if (lineError || !Array.isArray(lines) || lines.length === 0) return []
+
+  // Hitung net balance per entry_id
+  const netByEntry: Record<string, number> = {}
+  for (const line of lines) {
+    const debit = Number(line.debit || 0)
+    const credit = Number(line.credit || 0)
+    const net = type === 'AR' ? (debit - credit) : (credit - debit)
+    netByEntry[line.entry_id] = (netByEntry[line.entry_id] || 0) + net
+  }
+
+  // Kumpulkan contact_id yang dibutuhkan
+  const entryById: Record<string, any> = {}
+  for (const entry of entries) entryById[entry.id] = entry
+
+  const contactIds = [...new Set(
+    Object.keys(netByEntry)
+      .filter(id => (netByEntry[id] || 0) > 0.01)
+      .map(id => entryById[id]?.contact_id)
+      .filter(Boolean)
+  )]
+
+  let contactMap: Record<string, string> = {}
+  if (contactIds.length > 0) {
+    const { data: contacts } = await db
+      .from('contacts')
+      .select('id, name')
+      .in('id', contactIds)
+    if (contacts) {
+      for (const c of contacts) contactMap[c.id] = c.name
+    }
+  }
+
+  const rows: AgingReportRow[] = []
+  for (const [entryId, net] of Object.entries(netByEntry)) {
+    if (net <= 0.01) continue
+    const entry = entryById[entryId]
+    if (!entry) continue
+
+    const dueDateStr = entry.due_date
+      ? String(entry.due_date).slice(0, 10)
+      : String(entry.entry_date || '').slice(0, 10) || today
+
+    rows.push({
+      id: `journal-${accountCode}-${entryId}`,
+      contact_id: entry.contact_id,
+      contact_name: contactMap[entry.contact_id] || 'Unknown',
+      doc_number: entry.entry_number || `JE-${entryId.slice(0, 8).toUpperCase()}`,
+      doc_href: `/accounting/journal?entry=${entryId}`,
+      due_date: dueDateStr,
+      grand_total: net,
+      paid_amount: 0,
+      returned_amount: 0,
+      outstanding: net,
+      days_overdue: Math.max(0, diffDateOnlyStrings(today, dueDateStr)),
+      aging_bucket: agingBucket(dueDateStr, today),
+      source_type: 'JOURNAL_MANUAL',
+      source_label: sourceLabel,
+      source_account_code: accountCode,
+      settlement_account_id: settlementAccountId,
+    })
+  }
+
+  return rows
+}
+
 async function getAccountCodeBalances(
   db: any,
   orgId: string,
@@ -389,15 +513,24 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     }
 
     // 3. Reconciliation with GL (1201 + 1404 + 1205)
-    const balances = await getAccountCodeBalances(db, orgId, ['1201', '1404', '1205'], branchId)
+    //    Jurnal manual dengan contact_id tampil sebagai baris ter-atribusi.
+    //    Sisanya (tanpa contact) menjadi "Unallocated (Buku Besar)".
+    const [balances, ar1201Attributed, ar1404Attributed, ar1205Attributed] = await Promise.all([
+      getAccountCodeBalances(db, orgId, ['1201', '1404', '1205'], branchId),
+      getContactAttributedJournalRows(db, orgId, '1201', 'AR', today, settlementAccounts['1201'] || null, 'Piutang Manual (1201)', branchId),
+      getContactAttributedJournalRows(db, orgId, '1404', 'AR', today, settlementAccounts['1404'] || null, 'Piutang Salam Manual (1404)', branchId),
+      getContactAttributedJournalRows(db, orgId, '1205', 'AR', today, settlementAccounts['1205'] || null, 'Piutang Istishna Manual (1205)', branchId),
+    ])
+
+    // Tambahkan attributed rows ke results terlebih dahulu
+    results.push(...ar1201Attributed, ...ar1404Attributed, ...ar1205Attributed)
+
     const tradeArGlBalance = Number(balances['1201'] || 0)
     const tradeArModuleTotal = results
-      .filter((row: AgingReportRow) => row.source_type === 'SALES')
+      .filter((row: AgingReportRow) => row.source_type === 'SALES' || row.source_type === 'JOURNAL_MANUAL' && row.source_account_code === '1201')
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const tradeArDiff = tradeArGlBalance - tradeArModuleTotal
 
-    // Hanya tampilkan Unallocated jika GL punya lebih dari modul (ada jurnal manual)
-    // Jika modul > GL (jurnal belum terbentuk), jangan tambahkan baris negatif
     if (tradeArDiff > 10) {
       results.push({
         id: 'manual-ar-adj',
@@ -421,7 +554,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
 
     const salamReceivableGlBalance = Number(balances['1404'] || 0)
     const salamReceivableModuleTotal = results
-      .filter((row: AgingReportRow) => row.source_type === 'SALAM_VENDOR_RECEIVABLE')
+      .filter((row: AgingReportRow) => row.source_type === 'SALAM_VENDOR_RECEIVABLE' || row.source_type === 'JOURNAL_MANUAL' && row.source_account_code === '1404')
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const salamReceivableDiff = salamReceivableGlBalance - salamReceivableModuleTotal
 
@@ -448,7 +581,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
 
     const istishnaReceivableGlBalance = Number(balances['1205'] || 0)
     const istishnaReceivableModuleTotal = results
-      .filter((row: AgingReportRow) => row.source_type === 'ISTISHNA_VENDOR_RECEIVABLE')
+      .filter((row: AgingReportRow) => row.source_type === 'ISTISHNA_VENDOR_RECEIVABLE' || row.source_type === 'JOURNAL_MANUAL' && row.source_account_code === '1205')
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const istishnaReceivableDiff = istishnaReceivableGlBalance - istishnaReceivableModuleTotal
 
@@ -615,14 +748,23 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     }
 
     // 3. Direct AP (Non-Trade) & Taxes from GL (2101, 2201, 2301, 2401, 2602, 2603)
-    const balances = await getAccountCodeBalances(db, orgId, ['2101', '2201', '2301', '2401', '2602', '2603'], branchId)
+    //    Jurnal manual dengan contact_id tampil sebagai baris ter-atribusi.
+    //    Sisanya (tanpa contact) menjadi "Unallocated (Buku Besar)".
+    const [apBalances, ap2101Attributed, ap2602Attributed, ap2603Attributed] = await Promise.all([
+      getAccountCodeBalances(db, orgId, ['2101', '2201', '2301', '2401', '2602', '2603'], branchId),
+      getContactAttributedJournalRows(db, orgId, '2101', 'AP', today, settlementAccounts['2101'] || null, 'Hutang Manual (2101)', branchId),
+      getContactAttributedJournalRows(db, orgId, '2602', 'AP', today, settlementAccounts['2602'] || null, 'Hutang Salam Manual (2602)', branchId),
+      getContactAttributedJournalRows(db, orgId, '2603', 'AP', today, settlementAccounts['2603'] || null, 'Hutang Istishna Manual (2603)', branchId),
+    ])
+
+    // Tambahkan attributed rows ke results
+    results.push(...ap2101Attributed, ...ap2602Attributed, ...ap2603Attributed)
 
     const tradeApModuleTotal = results
-      .filter((row: AgingReportRow) => row.source_type === 'PURCHASING')
+      .filter((row: AgingReportRow) => row.source_type === 'PURCHASING' || row.source_type === 'JOURNAL_MANUAL' && row.source_account_code === '2101')
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
-    const tradeApDiff = Number(balances['2101'] || 0) - tradeApModuleTotal
+    const tradeApDiff = Number(apBalances['2101'] || 0) - tradeApModuleTotal
 
-    // Hanya tampilkan Unallocated jika GL punya lebih dari modul (ada jurnal manual)
     if (tradeApDiff > 10) {
       results.push({
         id: `gl-2101-manual`,
@@ -645,9 +787,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     }
 
     const salamLiabilityModuleTotal = results
-      .filter((row: AgingReportRow) => row.source_type === 'SALAM_SALES_LIABILITY')
+      .filter((row: AgingReportRow) => row.source_type === 'SALAM_SALES_LIABILITY' || row.source_type === 'JOURNAL_MANUAL' && row.source_account_code === '2602')
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
-    const salamLiabilityDiff = Number(balances['2602'] || 0) - salamLiabilityModuleTotal
+    const salamLiabilityDiff = Number(apBalances['2602'] || 0) - salamLiabilityModuleTotal
 
     if (salamLiabilityDiff > 10) {
       results.push({
@@ -671,9 +813,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     }
 
     const istishnaLiabilityModuleTotal = results
-      .filter((row: AgingReportRow) => row.source_type === 'ISTISHNA_SALES_LIABILITY')
+      .filter((row: AgingReportRow) => row.source_type === 'ISTISHNA_SALES_LIABILITY' || row.source_type === 'JOURNAL_MANUAL' && row.source_account_code === '2603')
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
-    const istishnaLiabilityDiff = Number(balances['2603'] || 0) - istishnaLiabilityModuleTotal
+    const istishnaLiabilityDiff = Number(apBalances['2603'] || 0) - istishnaLiabilityModuleTotal
 
     if (istishnaLiabilityDiff > 10) {
       results.push({
@@ -696,7 +838,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       })
     }
 
-    const taxOutstanding = Number(balances['2201'] || 0)
+    const taxOutstanding = Number(apBalances['2201'] || 0)
     if (Math.abs(taxOutstanding) > 0.01) {
       results.push({
         id: `gl-tax-2201`,
@@ -724,7 +866,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     ]
 
     for (const liability of otherLiabilityRows) {
-      const balance = Number((balances as any)[liability.code] || 0)
+      const balance = Number((apBalances as any)[liability.code] || 0)
       if (Math.abs(balance) <= 0.01) continue
 
       results.push({
