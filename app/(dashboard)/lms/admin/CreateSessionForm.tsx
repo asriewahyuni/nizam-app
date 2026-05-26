@@ -5,70 +5,73 @@ import { createLmsSession } from '@/modules/edu/actions/lms-commercial.actions'
 
 type Batch = { id: string; name: string; learning_courses?: { title?: string } | null }
 
+const inputCls = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-100'
+const labelCls = 'block text-xs font-semibold text-slate-600 mb-1'
+
 export default function CreateSessionForm({ batches }: { batches: Batch[] }) {
   const [state, action, isPending] = useActionState(createLmsSession, {})
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
-    if (state?.success) {
-      formRef.current?.reset()
-    }
+    if (state?.success) formRef.current?.reset()
   }, [state])
 
   return (
-    <form ref={formRef} action={action} className="mt-6 grid gap-5">
+    <form ref={formRef} action={action} className="grid gap-4">
       {state?.error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700">
           {state.error}
         </div>
       )}
       {state?.success && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-          Sesi berhasil dibuat!
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-700">
+          Sesi berhasil dibuat.
         </div>
       )}
 
-      <label className="block text-sm">
-        <div className="font-bold text-slate-900 mb-1.5">Pilih Batch</div>
-        <select name="batchId" required className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50">
-          <option value="">-- Pilih Batch --</option>
+      <div>
+        <label className={labelCls}>Batch <span className="text-red-400">*</span></label>
+        <select name="batchId" required className={inputCls}>
+          <option value="">Pilih batch...</option>
           {batches.map((b) => (
-            <option key={b.id} value={b.id}>{b.name} ({b.learning_courses?.title})</option>
+            <option key={b.id} value={b.id}>
+              {b.name}{b.learning_courses?.title ? ` · ${b.learning_courses.title}` : ''}
+            </option>
           ))}
         </select>
-      </label>
-
-      <label className="block text-sm">
-        <div className="font-bold text-slate-900 mb-1.5">Judul Sesi</div>
-        <input name="title" required placeholder="Contoh: Sesi 1 - Pengenalan" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-      </label>
-
-      <div className="grid grid-cols-2 gap-4">
-        <label className="block text-sm">
-          <div className="font-bold text-slate-900 mb-1.5">Waktu Mulai</div>
-          <input type="datetime-local" name="startTime" required className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-        </label>
-        <label className="block text-sm">
-          <div className="font-bold text-slate-900 mb-1.5">Waktu Selesai</div>
-          <input type="datetime-local" name="endTime" required className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-        </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <label className="block text-sm">
-          <div className="font-bold text-slate-900 mb-1.5">Nama Instruktur</div>
-          <input name="instructorName" placeholder="Contoh: Budi Santoso" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-        </label>
-        <label className="block text-sm">
-          <div className="font-bold text-slate-900 mb-1.5">Link / Lokasi</div>
-          <input name="locationUrl" placeholder="Zoom link / Nama Gedung" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-        </label>
+      <div>
+        <label className={labelCls}>Judul Sesi <span className="text-red-400">*</span></label>
+        <input name="title" required placeholder="Contoh: Sesi 1 — Pengenalan" className={inputCls} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>Waktu Mulai <span className="text-red-400">*</span></label>
+          <input type="datetime-local" name="startTime" required className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Waktu Selesai <span className="text-red-400">*</span></label>
+          <input type="datetime-local" name="endTime" required className={inputCls} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>Instruktur</label>
+          <input name="instructorName" placeholder="Nama instruktur..." className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Link / Lokasi</label>
+          <input name="locationUrl" placeholder="Zoom link / Nama gedung" className={inputCls} />
+        </div>
       </div>
 
       <button
         type="submit"
         disabled={isPending}
-        className="mt-2 w-full rounded-2xl bg-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+        className="mt-1 inline-flex cursor-pointer items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isPending ? 'Menyimpan...' : 'Buat Sesi'}
       </button>

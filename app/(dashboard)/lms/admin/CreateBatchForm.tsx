@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from 'react'
 import { createLmsBatch } from '@/modules/edu/actions/lms-commercial.actions'
 import BatchStructureBuilder from './BatchStructureBuilder'
+import { Monitor, Building2, GitMerge } from 'lucide-react'
 
 type Course = {
   id: string
@@ -11,100 +12,107 @@ type Course = {
   is_active: boolean
 }
 
+const inputCls = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-colors focus:border-slate-400 focus:ring-2 focus:ring-slate-100'
+const labelCls = 'block text-xs font-semibold text-slate-600 mb-1'
+
 export default function CreateBatchForm({ courses }: { courses: Course[] }) {
   const [state, action, isPending] = useActionState(createLmsBatch, {})
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
-    if (state?.success) {
-      formRef.current?.reset()
-    }
+    if (state?.success) formRef.current?.reset()
   }, [state])
 
   return (
-    <form ref={formRef} action={action} className="mt-6 grid gap-5">
+    <form ref={formRef} action={action} className="grid gap-4">
       {state?.error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700">
           {state.error}
         </div>
       )}
       {state?.success && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-          Batch berhasil disimpan!
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-700">
+          Batch berhasil disimpan.
         </div>
       )}
 
-      <label className="block text-sm">
-        <div className="font-bold text-slate-900 mb-1.5">Pilih Course</div>
-        <select name="courseId" required className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50">
-          <option value="">-- Pilih Course --</option>
+      {/* Course */}
+      <div>
+        <label className={labelCls}>Course <span className="text-red-400">*</span></label>
+        <select name="courseId" required className={inputCls}>
+          <option value="">Pilih course...</option>
           {courses.filter((c) => c.is_active).map((c) => (
             <option key={c.id} value={c.id}>{c.title}</option>
           ))}
         </select>
-      </label>
+      </div>
 
-      <label className="block text-sm">
-        <div className="font-bold text-slate-900 mb-1.5">Nama Batch</div>
-        <input name="name" required placeholder="Contoh: Batch 1 - 2024" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-      </label>
-
+      {/* Nama Batch */}
       <div>
-        <div className="font-bold text-slate-900 mb-2 text-sm">Mode Pembelajaran</div>
+        <label className={labelCls}>Nama Batch <span className="text-red-400">*</span></label>
+        <input name="name" required placeholder="Contoh: Batch 1 · Mei 2025" className={inputCls} />
+      </div>
+
+      {/* Mode */}
+      <div>
+        <label className={labelCls}>Mode Pembelajaran</label>
         <div className="grid grid-cols-3 gap-2">
           {([
-            { value: 'OFFLINE', label: 'Offline', icon: '🏢' },
-            { value: 'ONLINE', label: 'Online', icon: '💻' },
-            { value: 'HYBRID', label: 'Hybrid', icon: '🔀' },
-          ] as const).map((opt) => (
-            <label key={opt.value} className="cursor-pointer">
-              <input type="radio" name="mode" value={opt.value} defaultChecked={opt.value === 'OFFLINE'} className="sr-only peer" />
-              <div className="flex flex-col items-center gap-1 rounded-2xl border-2 border-slate-200 bg-white px-3 py-3 text-center text-xs font-bold text-slate-500 transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700">
-                <span className="text-lg">{opt.icon}</span>
-                {opt.label}
+            { value: 'OFFLINE', label: 'Offline',  Icon: Building2 },
+            { value: 'ONLINE',  label: 'Online',   Icon: Monitor },
+            { value: 'HYBRID',  label: 'Hybrid',   Icon: GitMerge },
+          ] as const).map(({ value, label, Icon }) => (
+            <label key={value} className="cursor-pointer">
+              <input type="radio" name="mode" value={value} defaultChecked={value === 'OFFLINE'} className="sr-only peer" />
+              <div className="flex flex-col items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-center text-xs font-semibold text-slate-500 transition-all duration-150 cursor-pointer peer-checked:border-slate-800 peer-checked:bg-slate-900 peer-checked:text-white hover:border-slate-300">
+                <Icon className="h-4 w-4" />
+                {label}
               </div>
             </label>
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <label className="block text-sm">
-          <div className="font-bold text-slate-900 mb-1.5">Tanggal Mulai</div>
-          <input type="date" name="startDate" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-        </label>
-        <label className="block text-sm">
-          <div className="font-bold text-slate-900 mb-1.5">Tanggal Selesai</div>
-          <input type="date" name="endDate" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-        </label>
+      {/* Tanggal */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>Tanggal Mulai</label>
+          <input type="date" name="startDate" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Tanggal Selesai</label>
+          <input type="date" name="endDate" className={inputCls} />
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <label className="block text-sm">
-          <div className="font-bold text-slate-900 mb-1.5">Kuota (0 = Unlimited)</div>
-          <input type="number" name="quota" min="0" defaultValue="0" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-        </label>
+      {/* Kuota */}
+      <div>
+        <label className={labelCls}>Kuota Peserta</label>
+        <input type="number" name="quota" min="0" defaultValue="0" className={inputCls} />
+        <p className="mt-1 text-[11px] text-slate-400">Isi 0 untuk unlimited.</p>
       </div>
 
-      <label className="block text-sm">
-        <div className="font-bold text-slate-900 mb-1.5">Deskripsi Batch <span className="text-slate-400 font-normal">(opsional)</span></div>
-        <textarea name="description" rows={2} placeholder="Informasi singkat tentang batch ini untuk calon peserta..." className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50 resize-none" />
-      </label>
+      {/* Deskripsi */}
+      <div>
+        <label className={labelCls}>Deskripsi <span className="font-normal text-slate-400">(opsional)</span></label>
+        <textarea name="description" rows={2} placeholder="Informasi singkat untuk calon peserta..." className={inputCls + ' resize-none'} />
+      </div>
 
-      <label className="block text-sm">
-        <div className="font-bold text-slate-900 mb-1.5">Instruksi Pembayaran <span className="text-slate-400 font-normal">(opsional)</span></div>
-        <textarea name="paymentInstructions" rows={3} placeholder={'Contoh:\nTransfer ke BCA 1234567890 a.n. PT Contoh\nKonfirmasi via WhatsApp ke 08xx-xxxx-xxxx'} className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50 resize-none text-xs" />
-        <p className="mt-1 text-xs text-slate-400">Akan ditampilkan ke peserta setelah mendaftar.</p>
-      </label>
+      {/* Instruksi Pembayaran */}
+      <div>
+        <label className={labelCls}>Instruksi Pembayaran <span className="font-normal text-slate-400">(opsional)</span></label>
+        <textarea name="paymentInstructions" rows={2} placeholder="Transfer ke BCA 123456 a.n. PT Contoh..." className={inputCls + ' resize-none'} />
+      </div>
 
-      <div className="pt-2">
+      {/* Fee & Cost Structure */}
+      <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
         <BatchStructureBuilder />
       </div>
 
       <button
         type="submit"
         disabled={isPending}
-        className="mt-2 inline-flex justify-center rounded-2xl bg-blue-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-blue-700 shadow-xl shadow-blue-100 disabled:opacity-60 disabled:cursor-not-allowed"
+        className="mt-1 inline-flex cursor-pointer items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isPending ? 'Menyimpan...' : 'Simpan Batch'}
       </button>

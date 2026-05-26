@@ -2,17 +2,18 @@ import Link from 'next/link'
 import { unstable_noStore as noStore } from 'next/cache'
 import { redirect } from 'next/navigation'
 import {
-  ArrowLeft,
   ArrowRight,
-  ClipboardCheck,
-  FileText,
-  GraduationCap,
-  PlusCircle,
-  Settings,
-  ShieldCheck,
-  Users,
+  BookOpen,
   CalendarDays,
-  Banknote,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  GraduationCap,
+  LayoutGrid,
+  ListChecks,
+  PlusCircle,
+  Settings2,
+  Users,
 } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.server'
@@ -27,25 +28,56 @@ import CreateBatchForm from './CreateBatchForm'
 import CreateCourseForm from './CreateCourseForm'
 import CreateSessionForm from './CreateSessionForm'
 
-function StatCard({
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function batchStatusBadge(status: string) {
+  const map: Record<string, string> = {
+    OPEN:      'bg-emerald-50 text-emerald-700 border-emerald-200 ring-0',
+    ONGOING:   'bg-blue-50 text-blue-700 border-blue-200',
+    CLOSED:    'bg-slate-100 text-slate-500 border-slate-200',
+    COMPLETED: 'bg-slate-100 text-slate-700 border-slate-200',
+  }
+  return map[status] ?? 'bg-slate-100 text-slate-500 border-slate-200'
+}
+
+function SectionHeader({
+  icon: Icon,
   label,
-  value,
-  hint,
-  colorClass = 'text-slate-900',
+  title,
+  count,
 }: {
+  icon: React.ElementType
   label: string
-  value: string
-  hint: string
-  colorClass?: string
+  title: string
+  count?: number
 }) {
   return (
-    <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
-      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-        {label}
+    <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
+          <Icon className="h-4 w-4 text-slate-500" />
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</p>
+          <h2 className="text-sm font-bold text-slate-800">{title}</h2>
+        </div>
       </div>
-      <div className={`mt-2 text-3xl font-black tracking-tight ${colorClass}`}>{value}</div>
-      <p className="mt-1 text-xs font-bold text-slate-400 uppercase tracking-wide">{hint}</p>
+      {count !== undefined && (
+        <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
+          {count}
+        </span>
+      )}
     </div>
+  )
+}
+
+function EmptyRow({ message }: { message: string }) {
+  return (
+    <tr>
+      <td colSpan={99} className="py-10 text-center text-sm text-slate-400">
+        {message}
+      </td>
+    </tr>
   )
 }
 
@@ -71,18 +103,18 @@ export default async function LearningAdminPage() {
     parent_org_id: orgData.org.parent_org_id,
   })
 
-  const summary = getTrainingCenterSummary()
+  getTrainingCenterSummary()
   const [batches, courses, sessions] = await Promise.all([
     getLmsBatches(orgData.org.id),
     getLmsCourses(orgData.org.id),
-    getAllLmsSessions(orgData.org.id)
+    getAllLmsSessions(orgData.org.id),
   ])
 
   const totals = dashboard.courseSummaries.reduce(
     (acc, course) => {
-      acc.pending += course.pendingAnswerCount
+      acc.pending  += course.pendingAnswerCount
       acc.reviewed += course.reviewedAnswerCount
-      acc.final += course.finalAssessmentCount
+      acc.final    += course.finalAssessmentCount
       acc.competent += course.competentCount
       return acc
     },
@@ -97,400 +129,355 @@ export default async function LearningAdminPage() {
   const sourceLabel = accessContext.source ? sourceLabelMap[accessContext.source] : 'Trainer'
 
   return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-             <Settings size={32} className="text-blue-600" />
-             Admin & Trainer LMS
-          </h1>
-          <p className="text-sm text-slate-500 font-medium">Pantau progress peserta, review submission, dan kelola angkatan untuk {orgData.org.name}.</p>
+    <div className="space-y-5">
+
+      {/* ── Page Header ──────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          {/* Breadcrumb */}
+          <div className="mb-1 flex items-center gap-1.5 text-xs text-slate-400">
+            <span>LMS</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-slate-600 font-medium">Admin</span>
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">Learning Management</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {orgData.org.name} &middot; {sourceLabel}
+          </p>
         </div>
 
-        <div className="flex flex-wrap gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-2">
           {accessContext.canReviewAssessments && (
             <Link
               href="/lms/assessment-center"
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white text-sm font-bold rounded-2xl hover:bg-black shadow-xl shadow-slate-200 transition-all"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50"
             >
-              Panel Penilai <ArrowRight size={18} />
+              <ListChecks className="h-4 w-4" />
+              Panel Penilai
             </Link>
           )}
           {accessContext.canManage && (
             <Link
-              href="/lms#buat-pelatihan"
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all"
+              href="#buat-pelatihan"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-slate-800"
             >
-              <PlusCircle size={18} /> Buat Program
+              <PlusCircle className="h-4 w-4" />
+              Buat Program
             </Link>
           )}
         </div>
       </div>
 
-      {/* ── Stats Assessment ── */}
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Pending Review"
-          value={String(totals.pending)}
-          hint="Submission menunggu ditinjau"
-          colorClass="text-amber-500"
-        />
-        <StatCard
-          label="Sudah Direview"
-          value={String(totals.reviewed)}
-          hint="Jawaban ditindaklanjuti"
-          colorClass="text-blue-600"
-        />
-        <StatCard
-          label="Asesmen Final"
-          value={String(totals.final)}
-          hint="Keputusan akhir tersimpan"
-          colorClass="text-slate-700"
-        />
-        <StatCard
-          label="Kompeten"
-          value={String(totals.competent)}
-          hint="Lulus assessment"
-          colorClass="text-emerald-500"
-        />
-      </section>
-
-      {/* ── Course Assessment Overview ── */}
-      {dashboard.courseSummaries.length > 0 ? (
-        <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <ClipboardCheck className="h-6 w-6 text-slate-400" />
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Assessment Overview
-              </div>
-              <h2 className="mt-1 text-xl font-black text-slate-900">
-                Status assessment per course
-              </h2>
+      {/* ── KPI Row ──────────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 divide-x divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white md:grid-cols-4">
+        {[
+          { label: 'Pending Review',  value: totals.pending,  color: 'text-amber-600',   icon: Clock },
+          { label: 'Sudah Direview',  value: totals.reviewed, color: 'text-blue-600',    icon: ListChecks },
+          { label: 'Asesmen Final',   value: totals.final,    color: 'text-slate-700',   icon: Settings2 },
+          { label: 'Kompeten',        value: totals.competent,color: 'text-emerald-600', icon: CheckCircle2 },
+        ].map(({ label, value, color, icon: Icon }) => (
+          <div key={label} className="flex items-center gap-4 px-6 py-5">
+            <Icon className={`h-5 w-5 shrink-0 ${color}`} />
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium text-slate-500">{label}</p>
+              <p className={`mt-0.5 text-2xl font-bold tabular-nums ${color}`}>{value}</p>
             </div>
           </div>
+        ))}
+      </div>
 
-          <div className="mt-6 grid gap-6 xl:grid-cols-2">
-            {dashboard.courseSummaries.map((course) => (
-              <div
-                key={course.courseSlug}
-                className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                      {course.levelCode}
-                    </div>
-                    <h3 className="mt-1.5 text-base font-black text-slate-900">{course.title}</h3>
-                    <p className="mt-1 text-sm text-slate-600">{course.audience}</p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">
-                    {course.status}
-                  </span>
-                </div>
-
-                <div className="mt-4 grid grid-cols-4 gap-2">
-                  {[
-                    { label: 'Pending', value: course.pendingAnswerCount },
-                    { label: 'Review', value: course.reviewedAnswerCount },
-                    { label: 'Final', value: course.finalAssessmentCount },
-                    { label: 'Lulus', value: course.competentCount },
-                  ].map(({ label, value }) => (
-                    <div
-                      key={label}
-                      className="rounded-[18px] border border-slate-200 bg-white p-3 text-center"
-                    >
-                      <div className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                        {label}
+      {/* ── Assessment per Course ─────────────────────────────────────────────── */}
+      {dashboard.courseSummaries.length > 0 && (
+        <section className="rounded-xl border border-slate-200 bg-white">
+          <div className="px-6 pt-5 pb-4">
+            <SectionHeader
+              icon={ListChecks}
+              label="Assessment"
+              title="Status per Course"
+              count={dashboard.courseSummaries.length}
+            />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-t border-slate-100 bg-slate-50">
+                  <th className="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Course</th>
+                  <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Pending</th>
+                  <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Review</th>
+                  <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Final</th>
+                  <th className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Kompeten</th>
+                  <th className="px-6 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {dashboard.courseSummaries.map((course) => (
+                  <tr key={course.courseSlug} className="transition-colors hover:bg-slate-50/60">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                          <GraduationCap className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-800">{course.title}</p>
+                          <p className="text-xs text-slate-400">{course.levelCode} &middot; {course.audience}</p>
+                        </div>
                       </div>
-                      <div className="mt-1.5 text-xl font-black text-slate-900">{value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-2">
-                  {accessContext.canReviewAssessments ? (
-                    <Link
-                      href={course.reviewerHref}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 shadow-xl shadow-blue-100"
-                    >
-                      Review Penilai
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  ) : null}
-                  <Link
-                    href={course.syllabusHref}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 shadow-sm"
-                  >
-                    Lihat Materi
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-              </div>
-            ))}
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className={`inline-block min-w-[28px] rounded-md px-2 py-0.5 text-sm font-bold tabular-nums ${course.pendingAnswerCount > 0 ? 'bg-amber-50 text-amber-700' : 'text-slate-400'}`}>
+                        {course.pendingAnswerCount}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className="text-sm font-medium tabular-nums text-slate-700">{course.reviewedAnswerCount}</span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className="text-sm font-medium tabular-nums text-slate-700">{course.finalAssessmentCount}</span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className={`inline-block min-w-[28px] rounded-md px-2 py-0.5 text-sm font-bold tabular-nums ${course.competentCount > 0 ? 'bg-emerald-50 text-emerald-700' : 'text-slate-400'}`}>
+                        {course.competentCount}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        {accessContext.canReviewAssessments && (
+                          <Link
+                            href={course.reviewerHref}
+                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
+                          >
+                            Review
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </Link>
+                        )}
+                        <Link
+                          href={course.syllabusHref}
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                        >
+                          Materi
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
-      ) : null}
+      )}
 
-      {/* ── Manajemen Batch / Angkatan ── */}
-      <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-3">
-          <CalendarDays className="h-6 w-6 text-slate-400" />
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-              Commercial
-            </div>
-            <h2 className="mt-1 text-xl font-black text-slate-900">
-              Manajemen Angkatan / Batch
-            </h2>
-          </div>
+      {/* ── Batch / Angkatan ─────────────────────────────────────────────────── */}
+      <section className="rounded-xl border border-slate-200 bg-white">
+        <div className="px-6 pt-5 pb-4">
+          <SectionHeader icon={CalendarDays} label="Commercial" title="Manajemen Angkatan / Batch" count={batches.length} />
         </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm">
-            <h3 className="text-base font-black text-slate-900">Buka Batch Baru</h3>
-            <p className="mt-1 text-sm text-slate-500 font-medium">
-              Buat angkatan baru untuk course tertentu dan tetapkan harganya.
+        <div className="grid xl:grid-cols-[380px_1fr] divide-y xl:divide-y-0 xl:divide-x divide-slate-100">
+          {/* Form */}
+          <div className="p-6">
+            <p className="mb-4 text-xs font-medium text-slate-500">
+              Buat angkatan baru, tetapkan tanggal, kuota, dan mode pembelajaran.
             </p>
             <CreateBatchForm courses={courses} />
           </div>
 
-          <div className="space-y-4">
-            <h3 className="text-base font-black text-slate-900">Daftar Batch Aktif</h3>
-            {batches.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-slate-300 p-8 text-center text-sm font-bold text-slate-400 italic">
-                Belum ada batch yang dibuat.
-              </div>
-            ) : (
-              batches.map((b: any) => (
-                <div key={b.id} className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100 inline-block">
-                        {b.status}
-                      </div>
-                      <h4 className="mt-3 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">{b.name}</h4>
-                      <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest">{b.learning_courses?.title}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-600">
-                        <Banknote className="h-3.5 w-3.5" />
-                        Rp{b.price?.toLocaleString('id-ID')}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-5 pt-5 border-t border-slate-50 flex gap-6 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                    <span>Kuota: <span className="text-slate-900">{b.quota === 0 ? 'Unlimited' : b.quota}</span></span>
-                    <span>Mulai: <span className="text-slate-900">{b.start_date ? String(b.start_date) : '-'}</span></span>
-                  </div>
-                </div>
-              ))
-            )}
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Nama Batch</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Status</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Mode</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Harga</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Kuota</th>
+                  <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Mulai</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {batches.length === 0 ? (
+                  <EmptyRow message="Belum ada batch. Buat batch pertama di panel kiri." />
+                ) : (
+                  batches.map((b: any) => (
+                    <tr key={b.id} className="transition-colors hover:bg-slate-50/60">
+                      <td className="px-5 py-3.5">
+                        <p className="font-semibold text-slate-800">{b.name}</p>
+                        <p className="text-xs text-slate-400">{b.learning_courses?.title}</p>
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <span className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-semibold ${batchStatusBadge(b.status)}`}>
+                          {b.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3.5 text-xs text-slate-500">{b.mode ?? 'OFFLINE'}</td>
+                      <td className="px-3 py-3.5 text-right text-sm font-medium tabular-nums text-slate-700">
+                        {b.price ? `Rp${Number(b.price).toLocaleString('id-ID')}` : <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="px-3 py-3.5 text-right text-sm tabular-nums text-slate-500">
+                        {b.quota === 0 ? '∞' : b.quota}
+                      </td>
+                      <td className="px-5 py-3.5 text-right text-xs text-slate-500">
+                        {b.start_date ? String(b.start_date) : <span className="text-slate-300">—</span>}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      {/* ── Manajemen Sesi ── */}
-      <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-3">
-          <CalendarDays className="h-6 w-6 text-slate-400" />
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-              Commercial
-            </div>
-            <h2 className="mt-1 text-xl font-black text-slate-900">
-              Manajemen Jadwal Sesi
-            </h2>
-          </div>
+      {/* ── Jadwal Sesi ──────────────────────────────────────────────────────── */}
+      <section className="rounded-xl border border-slate-200 bg-white">
+        <div className="px-6 pt-5 pb-4">
+          <SectionHeader icon={CalendarDays} label="Sesi Live" title="Jadwal Sesi Pembelajaran" count={sessions.length} />
         </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm">
-            <h3 className="text-base font-black text-slate-900">Buat Sesi Baru</h3>
-            <p className="mt-1 text-sm text-slate-500 font-medium">
-              Tambahkan jadwal sesi belajar (Live/Offline) untuk sebuah batch.
+        <div className="grid xl:grid-cols-[380px_1fr] divide-y xl:divide-y-0 xl:divide-x divide-slate-100">
+          {/* Form */}
+          <div className="p-6">
+            <p className="mb-4 text-xs font-medium text-slate-500">
+              Tambahkan jadwal sesi live/offline untuk suatu batch.
             </p>
             <CreateSessionForm batches={batches} />
           </div>
 
-          <div className="space-y-4">
-            <h3 className="text-base font-black text-slate-900 mb-4 px-2">Daftar Sesi Terjadwal</h3>
-            {sessions.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-slate-300 p-8 text-center text-sm font-bold text-slate-400 italic">
-                Belum ada sesi untuk batch mana pun.
-              </div>
-            ) : (
-              sessions.map((s: any) => (
-                <div key={s.id} className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100 inline-block">
-                        {s.lms_course_batches?.name}
-                      </div>
-                      <h4 className="mt-3 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">{s.title}</h4>
-                      <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest">{s.instructor_name || 'Instruktur TBA'}</p>
-                    </div>
-                  </div>
-                  <div className="mt-5 pt-5 border-t border-slate-50 flex items-center justify-between gap-6 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                    <span>Mulai: <span className="text-slate-900">{new Date(s.start_time).toLocaleString('id-ID')}</span></span>
-                    <SessionQRClient sessionId={s.id} sessionTitle={s.title} />
-                  </div>
-                </div>
-              ))
-            )}
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Sesi</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Batch</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Instruktur</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Waktu Mulai</th>
+                  <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">QR</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sessions.length === 0 ? (
+                  <EmptyRow message="Belum ada sesi terjadwal." />
+                ) : (
+                  sessions.map((s: any) => (
+                    <tr key={s.id} className="transition-colors hover:bg-slate-50/60">
+                      <td className="px-5 py-3.5">
+                        <p className="font-semibold text-slate-800">{s.title}</p>
+                      </td>
+                      <td className="px-3 py-3.5 text-xs text-slate-500">{s.lms_course_batches?.name}</td>
+                      <td className="px-3 py-3.5 text-xs text-slate-500">{s.instructor_name || <span className="text-slate-300">TBA</span>}</td>
+                      <td className="px-3 py-3.5 text-xs text-slate-600">
+                        {new Date(s.start_time).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <SessionQRClient sessionId={s.id} sessionTitle={s.title} />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      {/* ── Katalog Course ── */}
-      <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-              Course Catalog
-            </div>
-            <h2 className="mt-1 text-xl font-black text-slate-900">
-              Semua course di Training Center
-            </h2>
-          </div>
-          <div className="rounded-full bg-slate-50 border border-slate-100 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
-            {courses.length} course
-          </div>
+      {/* ── Katalog Course ────────────────────────────────────────────────────── */}
+      <section id="buat-pelatihan" className="rounded-xl border border-slate-200 bg-white">
+        <div className="px-6 pt-5 pb-4">
+          <SectionHeader icon={BookOpen} label="Course Catalog" title="Program Pelatihan" count={courses.length} />
         </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-          {/* Form Buat Course */}
-          <div id="buat-pelatihan" className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm">
-            <h3 className="text-base font-black text-slate-900">Buat Program / Course Baru</h3>
-            <p className="mt-1 text-sm text-slate-500 font-medium">
-              Tambahkan materi course ke dalam katalog organisasi Anda.
+        <div className="grid xl:grid-cols-[380px_1fr] divide-y xl:divide-y-0 xl:divide-x divide-slate-100">
+          {/* Form */}
+          <div className="p-6">
+            <p className="mb-4 text-xs font-medium text-slate-500">
+              Tambahkan course baru ke dalam katalog pelatihan organisasi.
             </p>
             <CreateCourseForm />
           </div>
 
-          <div className="space-y-4">
-            {courses.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-slate-300 p-8 text-center text-sm font-bold text-slate-400 italic">
-                Belum ada course di katalog. Silakan buat course baru.
-              </div>
-            ) : (
-              courses.map((course: any) => {
-                const lessons = getTrainingLessonsForCourse(course.slug) || []
-                const isLive = course.is_active
-
-            return (
-              <div
-                key={course.slug}
-                className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group"
-              >
-                <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest border ${
-                          isLive ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-slate-50 text-slate-400 border-slate-100'
-                        }`}
-                      >
-                        {isLive ? 'Live' : 'Soon'}
-                      </span>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        {course.level_code || 'ALL'}
-                      </span>
-                    </div>
-                    <h3 className="mt-3 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">{course.title}</h3>
-                    <p className="mt-1.5 text-sm font-medium text-slate-500 leading-relaxed">{course.description || '-'}</p>
-                    <div className="mt-4 flex flex-wrap gap-3 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                      <span>{lessons.length} lesson</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-3">
-                    <Link
-                      href={`/lms/course/${course.slug}`}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 shadow-sm"
-                    >
-                      <GraduationCap className="h-4 w-4 text-slate-400" />
-                      Lihat Course
-                    </Link>
-                    {isLive && lessons[0] ? (
-                      <Link
-                        href={`/lms/course/${course.slug}/lesson/${lessons[0].slug}`}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700 shadow-xl shadow-blue-100"
-                      >
-                        Buka Lesson 1
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            )
-          })
-          )}
+          {/* Course list */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Course</th>
+                  <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Level</th>
+                  <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Status</th>
+                  <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {courses.length === 0 ? (
+                  <EmptyRow message="Belum ada course. Buat program pertama di panel kiri." />
+                ) : (
+                  courses.map((course: any) => {
+                    const lessons = getTrainingLessonsForCourse(course.slug) || []
+                    return (
+                      <tr key={course.slug} className="transition-colors hover:bg-slate-50/60">
+                        <td className="px-5 py-3.5">
+                          <p className="font-semibold text-slate-800">{course.title}</p>
+                          <p className="text-xs text-slate-400 line-clamp-1">{course.description || '—'}</p>
+                        </td>
+                        <td className="px-3 py-3.5 text-center">
+                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                            {course.level_code || 'ALL'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3.5 text-center">
+                          <span className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-semibold ${course.is_active ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-400'}`}>
+                            {course.is_active ? 'Aktif' : 'Draft'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              href={`/lms/course/${course.slug}`}
+                              className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                            >
+                              <LayoutGrid className="h-3.5 w-3.5" />
+                              Detail
+                            </Link>
+                            {course.is_active && lessons[0] && (
+                              <Link
+                                href={`/lms/course/${course.slug}/lesson/${lessons[0].slug}`}
+                                className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
+                              >
+                                Lesson 1
+                                <ArrowRight className="h-3.5 w-3.5" />
+                              </Link>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      {/* ── Navigasi Cepat ── */}
-      <section className="grid gap-6 md:grid-cols-3">
-        <div className="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm hover:shadow-md transition-all group">
-          <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-             <Users size={24} />
-          </div>
-          <h3 className="mt-5 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">Manajemen Peserta</h3>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500 font-medium">
-            Kelola program pelatihan internal, tambah peserta, dan pantau status per program.
-          </p>
-          <Link
-            href="/lms#daftar-pelatihan"
-            className="mt-6 inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-400 group-hover:text-blue-600 transition-colors"
-          >
-            Buka Program
-            <ArrowRight className="h-4 w-4" />
+      {/* ── Quick Links ───────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-5 py-3.5">
+        <span className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">Shortcut</span>
+        <Link href="/lms" className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
+          <Users className="h-4 w-4" /> Tampilan Peserta
+        </Link>
+        {accessContext.canReviewAssessments && (
+          <Link href="/lms/assessment-center" className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
+            <ListChecks className="h-4 w-4" /> Panel Penilai
           </Link>
-        </div>
+        )}
+        <Link href="/lms/my-progress" className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
+          <GraduationCap className="h-4 w-4" /> My Progress
+        </Link>
+        <Link href="/lms/admin/assessment-templates" className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
+          <BookOpen className="h-4 w-4" /> Template Assessment
+        </Link>
+      </div>
 
-        <div className="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm hover:shadow-md transition-all group">
-          <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-             <FileText size={24} />
-          </div>
-          <h3 className="mt-5 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">Review Assessment</h3>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500 font-medium">
-            Tinjau jawaban peserta, beri feedback, dan putuskan status kompeten.
-          </p>
-          {accessContext.canReviewAssessments ? (
-            <Link
-              href="/lms/assessment-center"
-              className="mt-6 inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-400 group-hover:text-blue-600 transition-colors"
-            >
-              Panel Penilai
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          ) : (
-            <span className="mt-6 block text-[11px] font-black uppercase tracking-widest text-slate-300">
-              Tidak ada akses
-            </span>
-          )}
-        </div>
-
-        <div className="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm hover:shadow-md transition-all group">
-          <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-             <ShieldCheck size={24} />
-          </div>
-          <h3 className="mt-5 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">Lihat Progress</h3>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500 font-medium">
-            Simulasikan view peserta untuk memastikan alur materi sudah benar.
-          </p>
-          <Link
-            href="/lms/my-progress"
-            className="mt-6 inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-400 group-hover:text-blue-600 transition-colors"
-          >
-            My Progress View
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </section>
     </div>
   )
 }
