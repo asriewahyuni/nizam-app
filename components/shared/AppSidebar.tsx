@@ -557,13 +557,13 @@ export function AppSidebar({
     )
 
     const activeGroupRoutes = activeGroup ? activeGroup.items.map((item) => item.href) : []
-    const profileRoute = isOwnerOrAdmin ? '/settings/business' : '/profil-saya'
+    const settingsRoute = isOwnerOrAdmin ? '/settings/business' : '/karyawan'
 
     return Array.from(new Set([
       '/dashboard',
       ...topRoutes,
       ...activeGroupRoutes,
-      profileRoute,
+      settingsRoute,
       '/billing',
     ])).filter((href) => href !== fullPath)
   }, [
@@ -847,14 +847,10 @@ export function AppSidebar({
       {/* Footer / Role */}
       <div className={`p-3 mt-auto border-t border-slate-100 bg-white ${effectiveIsCollapsed ? 'flex flex-col items-center gap-3' : 'flex items-center justify-between w-full'}`}>
         <div className={`flex items-center gap-3 ${effectiveIsCollapsed ? '' : 'min-w-0 flex-1'}`}>
-          <Link href="/profil-saya" onMouseEnter={() => prefetchRoute('/profil-saya')} onFocus={() => prefetchRoute('/profil-saya')} onTouchStart={() => prefetchRoute('/profil-saya')} onPointerDown={() => prefetchRoute('/profil-saya')} onClick={() => {
-            prefetchRoute('/profil-saya')
-            notifyRouteLoadingStart()
-            setIsMobileOpen(false)
-          }} className="w-8 h-8 shrink-0 rounded-full bg-slate-700 overflow-hidden flex items-center justify-center text-xs font-semibold text-white relative hover:ring-2 hover:ring-slate-300 transition-all cursor-pointer" title="Edit Profil Saya">
-              {user?.fullName?.slice(0, 1).toUpperCase() || userRole?.slice(0, 1).toUpperCase()}
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-800" />
-            </Link>
+          <div className="w-8 h-8 shrink-0 rounded-full bg-slate-700 overflow-hidden flex items-center justify-center text-xs font-semibold text-white relative" title={user?.fullName || userRole}>
+            {user?.fullName?.slice(0, 1).toUpperCase() || userRole?.slice(0, 1).toUpperCase()}
+            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-800" />
+          </div>
             {!effectiveIsCollapsed && (
               <div className="flex flex-col overflow-hidden min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-800 truncate leading-tight">{user?.fullName || userRole}</p>
@@ -864,18 +860,18 @@ export function AppSidebar({
           </div>
 
           <div className={`flex items-center shrink-0 ${effectiveIsCollapsed ? 'flex-col gap-2' : 'gap-1'}`}>
-            <Link 
-              href={isOwnerOrAdmin ? '/settings/business' : '/profil-saya'} 
-              onMouseEnter={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')}
-              onFocus={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')}
-              onTouchStart={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')}
-              onPointerDown={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')}
+            <Link
+              href={isOwnerOrAdmin ? '/settings/business' : '/karyawan'}
+              onMouseEnter={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/karyawan')}
+              onFocus={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/karyawan')}
+              onTouchStart={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/karyawan')}
+              onPointerDown={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/karyawan')}
               onClick={() => {
-                prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')
+                prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/karyawan')
                 notifyRouteLoadingStart()
                 setIsMobileOpen(false)
               }}
-              title={isOwnerOrAdmin ? 'Pengaturan Bisnis' : 'Profil & Password Saya'}
+              title={isOwnerOrAdmin ? 'Pengaturan Bisnis' : 'Portal Karyawan'}
               className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
             >
               <Settings size={18} strokeWidth={1.5} />
