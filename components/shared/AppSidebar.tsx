@@ -79,6 +79,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Modul Marketplace', href: '/marketplace', icon: Store, permission_key: 'config', admin_only: true },
       { label: 'Approval Center', href: '/accounting/approvals', icon: ClipboardCheck, permission_key: 'approval', module_key: 'Accounting' },
       { label: 'Audit Integritas', href: '/accounting/audit', icon: ShieldCheck, permission_key: 'audit', module_key: 'Audit' },
+      { label: 'Pengaturan', href: '/settings/business', icon: Settings, permission_key: 'config', admin_only: true },
     ]
   },
   {
@@ -844,46 +845,7 @@ export function AppSidebar({
         })}
       </nav>
 
-      {/* Settings — nav item mandiri di atas footer */}
-      {(() => {
-        const settingsHref = isOwnerOrAdmin ? '/settings/business' : '/karyawan'
-        const settingsLabel = isOwnerOrAdmin ? 'Pengaturan' : 'Portal Karyawan'
-        const isSettingsActive = fullPath.startsWith('/settings') || (!isOwnerOrAdmin && fullPath.startsWith('/karyawan'))
-        return (
-          <div className="px-3 pb-2 border-t border-slate-100 pt-2">
-            <Link
-              href={settingsHref}
-              onMouseEnter={() => prefetchRoute(settingsHref)}
-              onFocus={() => prefetchRoute(settingsHref)}
-              onTouchStart={() => prefetchRoute(settingsHref)}
-              onPointerDown={() => prefetchRoute(settingsHref)}
-              onClick={() => {
-                prefetchRoute(settingsHref)
-                notifyRouteLoadingStart()
-                setIsMobileOpen(false)
-              }}
-              title={settingsLabel}
-              className={`flex items-center rounded-md text-sm font-medium transition-colors duration-150 group/settings
-                ${effectiveIsCollapsed ? 'justify-center p-2.5' : 'px-3 py-2 gap-3.5'}
-                ${isSettingsActive
-                  ? 'bg-[#003366] text-white'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-            >
-              <Settings
-                size={16}
-                strokeWidth={isSettingsActive ? 2 : 1.75}
-                className={`shrink-0 ${isSettingsActive ? 'text-white' : 'text-slate-400 group-hover/settings:text-slate-700'}`}
-              />
-              {!effectiveIsCollapsed && (
-                <span className="tracking-tight truncate">{settingsLabel}</span>
-              )}
-            </Link>
-          </div>
-        )
-      })()}
-
-      {/* Footer — hanya avatar + nama + logout */}
+      {/* Footer — avatar + nama + logout */}
       <div className={`p-3 border-t border-slate-100 bg-white ${effectiveIsCollapsed ? 'flex flex-col items-center gap-2' : 'flex items-center justify-between w-full gap-3'}`}>
         <div className={`flex items-center gap-3 ${effectiveIsCollapsed ? '' : 'min-w-0 flex-1'}`}>
           <div className="w-8 h-8 shrink-0 rounded-full bg-slate-700 overflow-hidden flex items-center justify-center text-xs font-semibold text-white relative" title={user?.fullName || userRole}>
