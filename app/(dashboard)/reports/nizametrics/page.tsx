@@ -17,7 +17,7 @@ export default async function NizametricsPage() {
   ])
 
   return (
-    <div className="p-10 min-h-screen">
+    <div className="p-5 min-h-screen">
       <NizametricsClient
         orgId={orgData.org.id}
         activeBranchId={activeBranch?.id ?? null}

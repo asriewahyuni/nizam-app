@@ -256,7 +256,7 @@ export function RouteProgressBar() {
           }`}
         >
           <div
-            className={`rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] shadow-lg backdrop-blur ${
+            className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] shadow-lg backdrop-blur ${
               isActive
                 ? 'border-sky-300/70 bg-slate-950/88 text-sky-100'
                 : 'border-emerald-200/80 bg-white/92 text-slate-800'

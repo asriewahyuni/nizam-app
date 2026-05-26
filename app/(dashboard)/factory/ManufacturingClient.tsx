@@ -342,7 +342,7 @@ export function ManufacturingClient({
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
             <Factory size={28} className="text-blue-600" />
             Nizam Manufacturing
           </h1>
@@ -352,7 +352,7 @@ export function ManufacturingClient({
           </p>
         </div>
 
-        <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-100">
+        <div className="flex bg-slate-100/50 p-1 rounded-xl border border-slate-100">
            <button
               onClick={() => setActiveTab('SPK')}
               className={`px-6 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'SPK' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
@@ -394,12 +394,12 @@ export function ManufacturingClient({
       </div>
 
       {!activeBranchId && (
-        <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-white text-amber-500 border border-amber-100 flex items-center justify-center shrink-0">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white text-amber-500 border border-amber-100 flex items-center justify-center shrink-0">
             <AlertTriangle size={22} />
           </div>
           <div className="space-y-1">
-            <h3 className="text-sm font-black text-amber-900 uppercase tracking-widest">Pilih Unit Aktif</h3>
+            <h3 className="text-sm font-semibold text-amber-900 uppercase tracking-wide">Pilih Unit Aktif</h3>
             <p className="text-sm font-medium text-amber-800/80">
               Anda sedang melihat data lintas unit. Pilih satu unit dari header untuk membuat BoM, menerbitkan SPK, mencatat biaya produksi, atau menyelesaikan produksi.
             </p>
@@ -412,28 +412,28 @@ export function ManufacturingClient({
           <div key="spk" className="space-y-6">
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {spkStats.map((stat, i) => (
-                  <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${stat.color}`}>
+                  <div key={i} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4">
+                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.color}`}>
                         <stat.icon size={24} />
                      </div>
                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                        <p className="text-xl font-black text-slate-900">{stat.value}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{stat.label}</p>
+                        <p className="text-xl font-semibold text-slate-900">{stat.value}</p>
                      </div>
                   </div>
                 ))}
              </div>
 
-             <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
+             <div className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                 <table className="w-full text-left">
                    <thead className="bg-slate-50 border-b border-slate-100">
                       <tr>
-                         <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">No. SPK & Produk</th>
-                         <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Qty Rencana</th>
-                         <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Status</th>
-                         <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Waktu & Dateline</th>
-                         <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
+                         <th className="px-8 py-5 text-xs font-semibold text-slate-400 uppercase tracking-wide">No. SPK & Produk</th>
+                         <th className="px-6 py-5 text-xs font-semibold text-slate-400 uppercase tracking-wide text-right">Qty Rencana</th>
+                         <th className="px-6 py-5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Status</th>
+                         <th className="px-6 py-5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Waktu & Dateline</th>
+                         <th className="px-8 py-5 text-xs font-semibold text-slate-400 uppercase tracking-wide text-right">Aksi</th>
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-50">
@@ -449,23 +449,23 @@ export function ManufacturingClient({
                           <tr key={wo.id} className={`hover:bg-slate-50/50 transition ${isOverdue ? 'bg-rose-50/30' : isUrgent ? 'bg-amber-50/30' : ''}`}>
                              <td className="px-8 py-5">
                                 <div className="flex items-center gap-2">
-                                  <p className="text-sm font-black text-slate-900">{wo.wo_number}</p>
-                                  {isOverdue && <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[9px] font-black uppercase rounded-full tracking-widest flex items-center gap-1"><AlertTriangle size={10}/> Terlambat</span>}
-                                  {!isOverdue && isUrgent && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black uppercase rounded-full tracking-widest flex items-center gap-1"><Clock size={10}/> Segera</span>}
+                                  <p className="text-sm font-semibold text-slate-900">{wo.wo_number}</p>
+                                  {isOverdue && <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[9px] font-semibold uppercase rounded-full tracking-wide flex items-center gap-1"><AlertTriangle size={10}/> Terlambat</span>}
+                                  {!isOverdue && isUrgent && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-semibold uppercase rounded-full tracking-wide flex items-center gap-1"><Clock size={10}/> Segera</span>}
                                 </div>
                                 <p className="text-xs text-slate-500">{wo.bom?.product?.name}</p>
                                 <div className="flex items-center gap-2 mt-1">
-                                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-[0.18em] border border-blue-100">
+                                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[9px] font-semibold uppercase tracking-wide border border-blue-100">
                                     {wo.branch?.name || 'Semua Unit'}
                                   </span>
                                   {wo.bom?.branch?.name && (
-                                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-black uppercase tracking-[0.18em] border border-slate-200">
+                                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-semibold uppercase tracking-wide border border-slate-200">
                                       BOM {wo.bom.branch.name}
                                     </span>
                                   )}
                                 </div>
                              </td>
-                             <td className="px-6 py-5 text-right font-black text-slate-900">{formatQty(wo.quantity_planned)} Unit</td>
+                             <td className="px-6 py-5 text-right font-semibold text-slate-900">{formatQty(wo.quantity_planned)} Unit</td>
                              <td className="px-6 py-5">
                                 <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-tighter border ${
                                   wo.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
@@ -487,7 +487,7 @@ export function ManufacturingClient({
                                  <div className="flex justify-end gap-2">
                                  <button
                                    onClick={() => handleOpenPrintPreview(wo)}
-                                   className="px-4 py-2 bg-white text-slate-700 text-[10px] font-black uppercase rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
+                                   className="px-4 py-2 bg-white text-slate-700 text-[10px] font-semibold uppercase rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
                                  >
                                    <Printer size={14} />
                                    Cetak SPK
@@ -496,7 +496,7 @@ export function ManufacturingClient({
                                    <button 
                                      disabled={!activeBranchId || loading}
                                      onClick={() => handleRelease(wo)} 
-                                     className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                     className="px-4 py-2 bg-blue-600 text-white text-[10px] font-semibold uppercase rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                    >
                                      {loading ? 'Processing...' : 'Mulai Produksi'}
                                    </button>
@@ -509,7 +509,7 @@ export function ManufacturingClient({
                                         setSelectedWo(wo)
                                         setShowFinishModal(true)
                                       }} 
-                                      className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-lg shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-semibold uppercase rounded-lg shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                       Selesaikan
                                     </button>
@@ -543,8 +543,8 @@ export function ManufacturingClient({
         ) : (
           <motion.div key="bom" variants={container} initial="hidden" animate="show" exit="hidden" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
              {boms.length === 0 ? (
-                <div className="col-span-full py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300">
+                <div className="col-span-full py-20 bg-white rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="w-16 h-16 rounded-xl bg-slate-50 flex items-center justify-center text-slate-300">
                     <Layers size={32} />
                   </div>
                   <div className="space-y-1">
@@ -561,20 +561,20 @@ export function ManufacturingClient({
                  }, 0) || 0;
 
                  return (
-                  <motion.div key={bom.id} variants={item} className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm space-y-6 relative group overflow-hidden">
+                  <motion.div key={bom.id} variants={item} className="bg-white rounded-xl p-8 border border-slate-100 shadow-sm space-y-6 relative group overflow-hidden">
                      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-all">
                         <FileText size={80} strokeWidth={1} />
                      </div>
                      <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                           <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-lg tracking-widest">{bom.code}</span>
+                           <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-semibold uppercase rounded-lg tracking-wide">{bom.code}</span>
                            <div className="flex flex-col items-end">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Est. HPP / Unit</span>
-                              <span className="text-sm font-black text-rose-600">{formatRupiah(estimatedHppPerUnit)}</span>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Est. HPP / Unit</span>
+                              <span className="text-sm font-semibold text-rose-600">{formatRupiah(estimatedHppPerUnit)}</span>
                            </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-[0.18em] border border-indigo-100">
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-semibold uppercase tracking-wide border border-indigo-100">
                             {bom.branch?.name || 'Shared / Semua Unit'}
                           </span>
                         </div>
@@ -583,13 +583,13 @@ export function ManufacturingClient({
                      </div>
                      
                      <div className="pt-6 border-t border-slate-50 space-y-3">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Komposisi Bahan</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Komposisi Bahan</p>
                         <div className="space-y-2">
                            {bom.items && bom.items.length > 0 ? (
                              bom.items.map((bi: any, idx: number) => (
                                <div key={idx} className="flex justify-between items-center text-xs font-bold text-slate-600 p-2 bg-slate-50 rounded-xl">
                                   <span>{bi.product?.name || 'Unknown Product'}</span>
-                                  <span className="text-blue-600 font-black">{bi.quantity} <span className="text-[10px] text-slate-400 font-bold uppercase">{bi.unit || bi.product?.unit}</span></span>
+                                  <span className="text-blue-600 font-semibold">{bi.quantity} <span className="text-[10px] text-slate-400 font-bold uppercase">{bi.unit || bi.product?.unit}</span></span>
                                </div>
                              ))
                            ) : (
@@ -610,7 +610,7 @@ export function ManufacturingClient({
                             })) || [])
                             setShowBomModal(true)
                           }}
-                          className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 hover:gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide flex items-center gap-2 hover:gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                            Edit Resep <ChevronRight size={14} />
                         </button>
@@ -626,7 +626,7 @@ export function ManufacturingClient({
                               setLoading(false)
                             }
                           }}
-                          className="flex items-center gap-2 px-3 py-1 text-[10px] font-black text-rose-400 hover:text-rose-600 transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center gap-2 px-3 py-1 text-[10px] font-semibold text-rose-400 hover:text-rose-600 transition-all uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Trash2 size={12} /> Hapus
                         </button>
@@ -694,7 +694,7 @@ export function ManufacturingClient({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none print:text-[11px] print:leading-relaxed"
+              className="relative w-full max-w-4xl bg-white rounded-xl shadow-md overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none print:text-[11px] print:leading-relaxed"
             >
               <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-4 wo-print-no-print print:hidden">
                 <div>
@@ -722,8 +722,8 @@ export function ManufacturingClient({
                 <div className="border-b-2 border-slate-900 pb-6 mb-6">
                   <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
                     <div>
-                      <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">{companyName}</p>
-                      <h2 className="text-3xl font-black text-slate-900 tracking-tight mt-2">Surat Perintah Kerja</h2>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{companyName}</p>
+                      <h2 className="text-3xl font-semibold text-slate-900 tracking-tight mt-2">Surat Perintah Kerja</h2>
                       <p className="text-sm font-bold text-blue-600 mt-1">{selectedPrintWo.wo_number}</p>
                       <p className="text-xs text-slate-500 mt-3 max-w-xl">
                         Dokumen operasional untuk pelaksanaan produksi berdasarkan resep dan target output yang sudah ditetapkan.
@@ -738,16 +738,16 @@ export function ManufacturingClient({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
-                  <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Produk Jadi</p>
-                    <p className="text-lg font-black text-slate-900 mt-2">{selectedPrintWo.bom?.product?.name || '-'}</p>
+                  <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/60">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Produk Jadi</p>
+                    <p className="text-lg font-semibold text-slate-900 mt-2">{selectedPrintWo.bom?.product?.name || '-'}</p>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Qty Target</p>
-                    <p className="text-lg font-black text-slate-900 mt-2">{formatQty(selectedPrintWo.quantity_planned)} Unit</p>
+                  <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/60">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Qty Target</p>
+                    <p className="text-lg font-semibold text-slate-900 mt-2">{formatQty(selectedPrintWo.quantity_planned)} Unit</p>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status</p>
+                  <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/60">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Status</p>
                     <div className="mt-2">
                       <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-tighter border ${
                         selectedPrintWo.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
@@ -758,33 +758,33 @@ export function ManufacturingClient({
                       </span>
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 p-4 bg-white">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tanggal Dibuat</p>
+                  <div className="rounded-xl border border-slate-200 p-4 bg-white">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Tanggal Dibuat</p>
                     <p className="text-sm font-bold text-slate-900 mt-2">{formatDate(selectedPrintWo.created_at)}</p>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 p-4 bg-white">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Batas Selesai</p>
+                  <div className="rounded-xl border border-slate-200 p-4 bg-white">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Batas Selesai</p>
                     <p className="text-sm font-bold text-slate-900 mt-2">{selectedPrintWo.deadline_date ? formatDate(selectedPrintWo.deadline_date) : '-'}</p>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 p-4 bg-white">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Resep Produksi</p>
+                  <div className="rounded-xl border border-slate-200 p-4 bg-white">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Resep Produksi</p>
                     <p className="text-sm font-bold text-slate-900 mt-2">{selectedPrintWo.bom?.code || '-'}</p>
                   </div>
                 </div>
 
-                <div className="rounded-[28px] border border-slate-200 overflow-hidden mb-6">
+                <div className="rounded-xl border border-slate-200 overflow-hidden mb-6">
                   <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
-                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Komposisi Bahan Produksi</h4>
+                    <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">Komposisi Bahan Produksi</h4>
                     <p className="text-xs text-slate-500 mt-1">Total kebutuhan mengikuti satuan yang dipasang di resep.</p>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse">
                       <thead className="bg-white">
                         <tr>
-                          <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Bahan</th>
-                          <th className="px-4 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Qty per Unit</th>
-                          <th className="px-4 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Total Kebutuhan</th>
-                          <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Satuan</th>
+                          <th className="px-6 py-4 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400 border-b border-slate-200">Bahan</th>
+                          <th className="px-4 py-4 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400 border-b border-slate-200">Qty per Unit</th>
+                          <th className="px-4 py-4 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-400 border-b border-slate-200">Total Kebutuhan</th>
+                          <th className="px-6 py-4 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400 border-b border-slate-200">Satuan</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -798,7 +798,7 @@ export function ManufacturingClient({
                               <tr key={`${bi.product_id || idx}-${idx}`} className="odd:bg-slate-50/40">
                                 <td className="px-6 py-4 text-sm font-bold text-slate-900 border-b border-slate-100">{bi.product?.name || 'Bahan produksi'}</td>
                                 <td className="px-4 py-4 text-sm text-right text-slate-700 border-b border-slate-100">{formatQty(qtyPerUnit)}</td>
-                                <td className="px-4 py-4 text-sm text-right font-black text-slate-900 border-b border-slate-100">{formatQty(totalNeed)}</td>
+                                <td className="px-4 py-4 text-sm text-right font-semibold text-slate-900 border-b border-slate-100">{formatQty(totalNeed)}</td>
                                 <td className="px-6 py-4 text-sm text-slate-700 border-b border-slate-100">{unitLabel}</td>
                               </tr>
                             )
@@ -816,15 +816,15 @@ export function ManufacturingClient({
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-6">
-                  <div className="rounded-[28px] border border-slate-200 p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Catatan Produksi</p>
+                  <div className="rounded-xl border border-slate-200 p-6">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Catatan Produksi</p>
                     <p className="text-sm text-slate-700 leading-relaxed mt-3">
                       {selectedPrintWo.notes?.trim() || 'Tidak ada catatan tambahan pada SPK ini.'}
                     </p>
                   </div>
 
-                  <div className="rounded-[28px] border border-slate-200 p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-8">Paraf Operasional</p>
+                  <div className="rounded-xl border border-slate-200 p-6">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-8">Paraf Operasional</p>
                     <div className="space-y-8">
                       <div>
                         <p className="text-xs text-slate-500 mb-8">Pelaksana Produksi</p>
@@ -849,7 +849,7 @@ export function ManufacturingClient({
         {showSpkModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSpkModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-md p-8">
                <div className="flex items-center justify-between mb-8">
                   <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
                      <Zap size={20} className="text-emerald-500" /> Terbitkan SPK Baru
@@ -858,12 +858,12 @@ export function ManufacturingClient({
                </div>
                <form onSubmit={handleCreateSpk} className="space-y-6">
                   <div className="space-y-2 text-left">
-                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">No SPK (Internal Number)</label>
-                     <input name="wo_number" required placeholder="SPK-XXXXX" defaultValue={draftSpkNumber} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-bold" />
+                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">No SPK (Internal Number)</label>
+                     <input name="wo_number" required placeholder="SPK-XXXXX" defaultValue={draftSpkNumber} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold" />
                   </div>
                   <div className="space-y-2 text-left">
-                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Pilih Resep Produksi (BoM)</label>
-                     <select name="bom_id" required className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-bold">
+                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Pilih Resep Produksi (BoM)</label>
+                     <select name="bom_id" required className="w-full px-5 py-4 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold">
                         <option value="">-- Pilih Produk Jadi --</option>
                         {boms.map(b => (
                            <option key={b.id} value={b.id}>{b.code} - {b.product?.name}</option>
@@ -872,15 +872,15 @@ export function ManufacturingClient({
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2 text-left">
-                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Jumlah Target Produksi</label>
-                       <input name="quantity_planned" type="number" required placeholder="0" className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-bold text-xl" />
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Jumlah Target Produksi</label>
+                       <input name="quantity_planned" type="number" required placeholder="0" className="w-full px-5 py-4 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 font-bold text-xl" />
                     </div>
                     <div className="space-y-2 text-left">
-                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Batas Selesai (Dateline)</label>
-                       <input name="deadline_date" type="date" required className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:border-rose-500 font-bold text-slate-700" />
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Batas Selesai (Dateline)</label>
+                       <input name="deadline_date" type="date" required className="w-full px-5 py-4 bg-white border border-slate-200 rounded-xl outline-none focus:border-rose-500 font-bold text-slate-700" />
                     </div>
                   </div>
-                  <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-500 text-white font-black rounded-2xl shadow-xl shadow-emerald-100">
+                  <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-500 text-white font-semibold rounded-xl shadow-xl shadow-emerald-100">
                      {loading ? 'Processing...' : 'Terbitkan Sekarang'}
                   </button>
                </form>
@@ -891,7 +891,7 @@ export function ManufacturingClient({
         {showBomModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowBomModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 flex flex-col max-h-[90vh]">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl bg-white rounded-xl shadow-md p-8 flex flex-col max-h-[90vh]">
                <div className="flex items-center justify-between mb-8">
                   <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
                      <Settings size={20} className="text-blue-500" /> {editingBom ? 'Edit Bill of Materials' : 'Setup Bill of Materials'}
@@ -901,20 +901,20 @@ export function ManufacturingClient({
                <form onSubmit={handleCreateBom} className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
                   <div className="grid grid-cols-2 gap-4">
                      <div className="space-y-2 text-left">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Pilih Produk Jadi</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Pilih Produk Jadi</label>
                         <select name="product_id" required defaultValue={editingBom?.product?.id} className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none">
                            <option value="">-- Pilih Produk --</option>
                            {products.filter(p => ['Siap Jual', 'Layanan'].includes(p.category) || !p.category).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                      </div>
                      <div className="space-y-2 text-left">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Kode BoM</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Kode BoM</label>
                         <input name="code" required defaultValue={editingBom?.code} placeholder="BOM-PRD-01" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
                      </div>
                   </div>
                   
-                  <div className="p-6 bg-slate-50 rounded-2xl space-y-4">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Komposisi Bahan Baku</p>
+                  <div className="p-6 bg-slate-50 rounded-xl space-y-4">
+                     <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Komposisi Bahan Baku</p>
                      <div className="flex gap-2">
                         <select id="item-product" className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm" onChange={(e) => {
                            const p = products.find(prod => prod.id === e.target.value);
@@ -963,7 +963,7 @@ export function ManufacturingClient({
                              <div key={idx} className="flex justify-between items-center p-3 bg-white rounded-xl border border-slate-100 text-sm">
                                 <span className="font-bold text-slate-700">{p?.name}</span>
                                 <div className="flex items-center gap-4">
-                                   <span className="font-black text-blue-600">{item.quantity} <span className="text-blue-400 font-bold text-xs">{(item as any).unit || p?.unit || 'Pcs'}</span></span>
+                                   <span className="font-semibold text-blue-600">{item.quantity} <span className="text-blue-400 font-bold text-xs">{(item as any).unit || p?.unit || 'Pcs'}</span></span>
                                    <button type="button" onClick={() => setBomItems(bomItems.filter((_, i) => i !== idx))} className="text-rose-500"><X size={14} /></button>
                                 </div>
                              </div>
@@ -972,7 +972,7 @@ export function ManufacturingClient({
                      </div>
                   </div>
 
-                  <button type="submit" disabled={loading} className="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl shadow-xl hover:bg-black">
+                  <button type="submit" disabled={loading} className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl shadow-xl hover:bg-black">
                      {loading ? 'Processing...' : (editingBom ? 'Update Resep' : 'Simpan Resep')}
                   </button>
                </form>
@@ -984,7 +984,7 @@ export function ManufacturingClient({
         {showFinishModal && selectedWo && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowFinishModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 flex flex-col max-h-[90vh]">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl bg-white rounded-xl shadow-md p-8 flex flex-col max-h-[90vh]">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
@@ -997,8 +997,8 @@ export function ManufacturingClient({
 
               <form onSubmit={handleFinishSpk} className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar text-left">
                 {/* Inventory Section */}
-                <div className="p-6 bg-slate-50 rounded-2xl space-y-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <div className="p-6 bg-slate-50 rounded-xl space-y-4">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
                     <Package size={12} /> Tujuan Penyimpanan Stok
                   </p>
                   <div className="grid grid-cols-2 gap-4">
@@ -1024,15 +1024,15 @@ export function ManufacturingClient({
                 </div>
 
                 {/* Overhead Section & HPP Calculation */}
-                <div className="p-6 border border-slate-100 rounded-2xl space-y-4">
+                <div className="p-6 border border-slate-100 rounded-xl space-y-4">
                   <div className="flex justify-between items-center">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-2">
                       <Zap size={12} /> Biaya Tambahan (Labor/Overhead)
                     </p>
                     <button
                       type="button"
                       onClick={() => setOverheadCosts([...overheadCosts, { description: '', amount: 0, cost_type: 'LABOR' }])}
-                      className="text-[10px] font-black text-blue-600 uppercase"
+                      className="text-[10px] font-semibold text-blue-600 uppercase"
                     >
                       + Tambah Biaya
                     </button>
@@ -1105,11 +1105,11 @@ export function ManufacturingClient({
                         </div>
                         <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
                           <span className="font-bold text-slate-800">Total HPP Produksi:</span>
-                          <span className="font-black text-rose-600">{formatRupiah(grandTotalHPP)}</span>
+                          <span className="font-semibold text-rose-600">{formatRupiah(grandTotalHPP)}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm">
                           <span className="font-bold text-slate-800">HPP per Unit (Modal Bersih):</span>
-                          <span className="font-black text-rose-600">{formatRupiah(hppPerUnit)}</span>
+                          <span className="font-semibold text-rose-600">{formatRupiah(hppPerUnit)}</span>
                         </div>
 
                         <div className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-3">
@@ -1127,7 +1127,7 @@ export function ManufacturingClient({
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-bold text-emerald-900">Rekomendasi Harga Jual:</span>
-                            <span className="text-lg font-black text-emerald-600">{formatRupiah(suggestedPrice)}</span>
+                            <span className="text-lg font-semibold text-emerald-600">{formatRupiah(suggestedPrice)}</span>
                           </div>
                           <p className="text-[10px] text-emerald-600/80 leading-snug">Formula: HPP / (100% - Margin%). Harga yang dioptimalkan untuk melindungi margin bersih Anda.</p>
                         </div>
@@ -1137,7 +1137,7 @@ export function ManufacturingClient({
                 </div>
 
                 <div className="pt-4">
-                  <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-100 flex items-center justify-center gap-3">
+                  <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-600 text-white font-semibold rounded-xl shadow-xl shadow-emerald-100 flex items-center justify-center gap-3">
                     {loading ? 'Processing...' : <><CheckCircle2 size={20} /> Konfirmasi & Selesaikan Produksi</>}
                   </button>
                   <p className="text-[10px] text-center text-slate-400 mt-4 px-8">Menyelesaikan SPK akan otomatis memotong stok bahan baku dan menambah stok produk jadi sesuai resep.</p>
@@ -1155,7 +1155,7 @@ export function ManufacturingClient({
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-rose-100"
+              className="relative w-full max-w-lg bg-white rounded-xl shadow-md overflow-hidden border border-rose-100"
             >
               <div className="bg-rose-50 p-8 flex flex-col items-center text-center space-y-4">
                 <div className="w-20 h-20 bg-white rounded-full shadow-xl shadow-rose-200/50 flex items-center justify-center relative overflow-hidden">
@@ -1169,23 +1169,23 @@ export function ManufacturingClient({
                   <div className="absolute inset-0 bg-rose-500/5 animate-pulse" />
                 </div>
                 <div className="space-y-1">
-                  <h2 className="text-2xl font-black text-rose-900 leading-tight uppercase tracking-tight">Kekurangan Stok Bahan!</h2>
-                  <p className="text-rose-600/70 font-bold text-xs uppercase tracking-widest">Peringatan Ketersediaan Inventory</p>
+                  <h2 className="text-2xl font-semibold text-rose-900 leading-tight uppercase tracking-tight">Kekurangan Stok Bahan!</h2>
+                  <p className="text-rose-600/70 font-bold text-xs uppercase tracking-wide">Peringatan Ketersediaan Inventory</p>
                 </div>
               </div>
 
               <div className="p-8 space-y-6">
                 <div className="space-y-3">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Daftar Bahan Kurang:</p>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Daftar Bahan Kurang:</p>
                   <div className="space-y-2">
                     {shortItems.map((item, i) => (
-                      <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 transition hover:border-rose-200 group">
+                      <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 transition hover:border-rose-200 group">
                         <div className="flex flex-col">
-                          <span className="text-sm font-black text-slate-800">{item.name}</span>
+                          <span className="text-sm font-semibold text-slate-800">{item.name}</span>
                           <span className="text-[10px] font-bold text-slate-400">Inventory saat ini: {item.available}</span>
                         </div>
                         <div className="flex flex-col items-end">
-                          <span className="text-xs font-black text-rose-600">Butuh {item.needed}</span>
+                          <span className="text-xs font-semibold text-rose-600">Butuh {item.needed}</span>
                           <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full mt-1">-{item.needed - item.available}</span>
                         </div>
                       </div>
@@ -1193,15 +1193,15 @@ export function ManufacturingClient({
                   </div>
                 </div>
 
-                <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 relative overflow-hidden">
+                <div className="bg-amber-50 rounded-xl p-5 border border-amber-100 relative overflow-hidden">
                   <div className="relative z-10 flex gap-4">
                     <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center shrink-0">
                       <Layers size={20} className="text-amber-500" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs font-black text-amber-900">Bahan baku tidak mencukupi.</p>
+                      <p className="text-xs font-semibold text-amber-900">Bahan baku tidak mencukupi.</p>
                       <p className="text-[10px] font-medium text-amber-700/80 leading-relaxed italic">
-                        Klik <span className="font-black">Lanjut Produksi</span> untuk sistem Backorder (Stok Minus), atau <span className="font-black text-blue-600">Ganti Akad</span> untuk beralih ke Pre-Order (Salam/Istisna).
+                        Klik <span className="font-semibold">Lanjut Produksi</span> untuk sistem Backorder (Stok Minus), atau <span className="font-semibold text-blue-600">Ganti Akad</span> untuk beralih ke Pre-Order (Salam/Istisna).
                       </p>
                     </div>
                   </div>
@@ -1218,7 +1218,7 @@ export function ManufacturingClient({
                         proceedWithRelease(pendingWo.id)
                       }
                     }}
-                    className="w-full py-5 bg-slate-900 text-white font-black rounded-[24px] shadow-xl hover:bg-black transition-all transform hover:-translate-y-1 active:scale-95 text-xs tracking-widest uppercase"
+                    className="w-full py-5 bg-slate-900 text-white font-semibold rounded-[24px] shadow-xl hover:bg-black transition-all transform hover:-translate-y-1 active:scale-95 text-xs tracking-wide uppercase"
                   >
                     Bypass & Lanjut Produksi
                   </button>
@@ -1226,7 +1226,7 @@ export function ManufacturingClient({
                   <button
                     disabled={loading}
                     onClick={handleRequestToPurchasing}
-                    className="w-full py-5 bg-blue-600 text-white font-black rounded-[24px] shadow-xl hover:bg-blue-700 transition-all transform hover:-translate-y-1 active:scale-95 text-xs tracking-widest uppercase flex items-center justify-center gap-2"
+                    className="w-full py-5 bg-blue-600 text-white font-semibold rounded-[24px] shadow-xl hover:bg-blue-700 transition-all transform hover:-translate-y-1 active:scale-95 text-xs tracking-wide uppercase flex items-center justify-center gap-2"
                   >
                     <Truck size={14} /> {loading ? 'Mengirim...' : 'Kirim Rikues ke Purchasing'}
                   </button>
@@ -1236,7 +1236,7 @@ export function ManufacturingClient({
                       setShowStockWarningModal(false)
                       setShowQuotationPrompt(true)
                     }}
-                    className="w-full py-4 bg-rose-50 text-rose-600 font-bold rounded-[20px] hover:bg-rose-100 transition-all text-[10px] tracking-widest uppercase border border-rose-100"
+                    className="w-full py-4 bg-rose-50 text-rose-600 font-bold rounded-[20px] hover:bg-rose-100 transition-all text-[10px] tracking-wide uppercase border border-rose-100"
                   >
                     Batalkan SPK Ini
                   </button>
@@ -1254,13 +1254,13 @@ export function ManufacturingClient({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-md bg-white rounded-[40px] shadow-2xl p-10 text-center space-y-8"
+              className="relative w-full max-w-md bg-white rounded-xl shadow-md p-5 text-center space-y-8"
             >
               <div className="w-24 h-24 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto shadow-inner border-4 border-white">
                 <TrendingUp size={44} />
               </div>
               <div className="space-y-4">
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Alihkan ke Akad Pre-Order?</h3>
+                <h3 className="text-2xl font-semibold text-slate-900 tracking-tight leading-tight">Alihkan ke Akad Pre-Order?</h3>
                 <p className="text-sm font-medium text-slate-500 px-4">
                   Produksi tertunda karena stok kurang. Ingin beralih ke menu <span className="font-bold text-blue-600 italic">Penawaran (Quotation)</span> untuk mencatat akad Salam/Istisna agar operasional tetap aman?
                 </p>
@@ -1268,13 +1268,13 @@ export function ManufacturingClient({
               <div className="flex gap-4">
                 <button
                   onClick={() => setShowQuotationPrompt(false)}
-                  className="flex-1 py-5 bg-slate-100 text-slate-600 font-bold rounded-3xl hover:bg-slate-200 transition text-[11px] uppercase tracking-widest"
+                  className="flex-1 py-5 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition text-[11px] uppercase tracking-wide"
                 >
                   Nanti Saja
                 </button>
                 <button
                   onClick={() => router.push('/sales/quotations')}
-                  className="flex-1 py-5 bg-blue-600 text-white font-black rounded-3xl hover:bg-blue-500 shadow-xl shadow-blue-100 transition text-[11px] uppercase tracking-widest"
+                  className="flex-1 py-5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-500 shadow-xl shadow-blue-100 transition text-[11px] uppercase tracking-wide"
                 >
                   Ya, Alihkan
                 </button>

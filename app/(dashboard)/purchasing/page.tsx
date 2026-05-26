@@ -27,8 +27,8 @@ export default async function PurchasingPage() {
   ])
 
   return (
-    <div className="p-10 space-y-10">
-      <Suspense fallback={<div className="p-10 text-center font-black animate-pulse">Loading Purchasing Dashboard...</div>}>
+    <div className="p-5 space-y-10">
+      <Suspense fallback={<div className="p-5 text-center font-semibold animate-pulse">Loading Purchasing Dashboard...</div>}>
         <PurchasingClient 
           orgId={orgId}
           orgName={orgName}

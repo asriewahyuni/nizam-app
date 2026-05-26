@@ -139,7 +139,7 @@ export function MobilePullToRefresh({ scrollContainerId }: { scrollContainerId: 
           size={14}
           className={`${refreshing ? 'animate-spin text-blue-600' : ready ? 'text-emerald-600' : 'text-slate-500'}`}
         />
-        <span className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">{indicatorLabel}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">{indicatorLabel}</span>
       </div>
     </div>
   )

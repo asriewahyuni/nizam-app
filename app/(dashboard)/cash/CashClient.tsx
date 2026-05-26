@@ -429,31 +429,31 @@ export function CashClient({
         actions={
           <>
             {canUseHoldingView ? (
-              <div className="flex bg-blue-50 p-1 rounded-2xl border border-blue-100 mr-2 shadow-inner">
+              <div className="flex bg-blue-50 p-1 rounded-xl border border-blue-100 mr-2 shadow-inner">
                 <button
                   onClick={() => handleCashViewChange('parent')}
-                  className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${!isHoldingView ? 'bg-white text-blue-700 shadow-md' : 'text-blue-400 hover:text-blue-600'}`}
+                  className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${!isHoldingView ? 'bg-white text-blue-700 shadow-md' : 'text-blue-400 hover:text-blue-600'}`}
                 >
                   Kas Induk
                 </button>
                 <button
                   onClick={() => handleCashViewChange('holding')}
-                  className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${isHoldingView ? 'bg-white text-blue-700 shadow-md' : 'text-blue-400 hover:text-blue-600'}`}
+                  className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${isHoldingView ? 'bg-white text-blue-700 shadow-md' : 'text-blue-400 hover:text-blue-600'}`}
                 >
                   Kas Holding
                 </button>
               </div>
             ) : null}
-            <div className="flex bg-slate-100/60 p-1 rounded-2xl border border-slate-100 mr-2 shadow-inner">
+            <div className="flex bg-slate-100/60 p-1 rounded-xl border border-slate-100 mr-2 shadow-inner">
                <button
                   onClick={() => setActiveTab('overview')}
-                  className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'overview' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`px-6 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${activeTab === 'overview' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                >
                  Overview
                </button>
                <button
                   onClick={() => setActiveTab('reconcile')}
-                  className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'reconcile' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`px-6 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${activeTab === 'reconcile' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                >
                  Rekonsiliasi
                </button>
@@ -463,7 +463,7 @@ export function CashClient({
               <div className="flex items-center gap-2">
                 <a
                   href="/accounting/coa-requests"
-                  className="flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wide border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
                   title="Persetujuan & Riwayat CoA"
                 >
                   Persetujuan CoA
@@ -489,7 +489,7 @@ export function CashClient({
               /* Entitas anak: diarahkan ke halaman pengajuan */
               <a
                 href="/accounting/coa-requests"
-                className="flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-all shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wide border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-all shadow-sm"
                 title="Ajukan rekening baru melalui organisasi induk/holding"
               >
                 <Building2 size={14} />
@@ -521,24 +521,24 @@ export function CashClient({
       />
 
       {!canWriteCash ? (
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
           Pilih unit aktif terlebih dahulu untuk menambah rekening, mencatat transaksi, atau unggah mutasi bank.
         </div>
       ) : null}
       {isHoldingView && hasCrossEntityAccounts ? (
-        <div className="rounded-3xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-900 shadow-sm">
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-900 shadow-sm">
           Mode holding aktif: kartu rekening dan aktivitas terbaru menampilkan organisasi induk + seluruh entitas anak. Pencatatan transaksi baru dan rekonsiliasi tetap diproses dari unit aktif organisasi induk.
         </div>
       ) : isParentButRestricted ? (
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
           Anda berada di organisasi induk, tetapi pembuatan rekening hanya bisa dari konteks Unit Utama. Pindah unit aktif ke Unit Utama organisasi induk lalu coba lagi.
         </div>
       ) : canUseHoldingView && hasCrossEntityAccounts ? (
-        <div className="rounded-3xl border border-slate-200 bg-slate-50 px-6 py-4 text-sm font-semibold text-slate-700 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-6 py-4 text-sm font-semibold text-slate-700 shadow-sm">
           Mode induk aktif: yang tampil hanya rekening dan mutasi organisasi induk. Pindah ke `Kas Holding` untuk melihat seluruh entitas.
         </div>
       ) : isAllBranchesView ? (
-        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-900 shadow-sm">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-900 shadow-sm">
           Mode semua unit aktif: total likuiditas dan daftar rekening di bawah ini mencakup seluruh unit dalam entitas ini. Pencatatan transaksi baru tetap memakai unit aktif {activeBranchName || 'yang sedang dipilih'}.
         </div>
       ) : null}
@@ -586,12 +586,12 @@ export function CashClient({
             {/* Account Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {visibleBankAccounts.length === 0 ? (
-                <div className="col-span-full py-24 bg-white rounded-[40px] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center space-y-6 shadow-inner">
+                <div className="col-span-full py-24 bg-white rounded-xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center space-y-6 shadow-inner">
                   <div className="w-20 h-20 rounded-[32px] bg-slate-50 flex items-center justify-center text-slate-200 border border-slate-100 shadow-sm">
                     <PiggyBank size={36} strokeWidth={1.5} />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="font-black text-slate-900 text-xl tracking-tight">Belum ada Rekening</h3>
+                    <h3 className="font-semibold text-slate-900 text-xl tracking-tight">Belum ada Rekening</h3>
                     <p className="text-sm text-slate-400 max-w-xs mx-auto font-medium">Tambahkan rekening bank atau kas kecil Anda untuk mulai mencatat transaksi.</p>
                   </div>
                 </div>
@@ -614,19 +614,19 @@ export function CashClient({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.1 }}
                       whileHover={{ y: -8, scale: 1.02 }}
-                      className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.03)] group relative overflow-hidden"
+                      className="bg-white rounded-xl p-8 border border-slate-100 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.03)] group relative overflow-hidden"
                     >
                       <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-all duration-500 ease-out" />
 
                       <div className="flex items-start justify-between mb-10 relative z-10">
-                        <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-emerald-500 group-hover:text-white transition-all duration-500 shadow-sm">
+                        <div className="w-14 h-14 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-emerald-500 group-hover:text-white transition-all duration-500 shadow-sm">
                           <Wallet size={28} strokeWidth={2} />
                         </div>
                         <div className="text-right">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">{acc.bank_name}</span>
-                           <span className="text-xs font-black text-slate-900 font-mono tracking-tighter bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">{acc.account_number || 'Cash Asset'}</span>
+                           <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block mb-1">{acc.bank_name}</span>
+                           <span className="text-xs font-semibold text-slate-900 font-mono tracking-tighter bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">{acc.account_number || 'Cash Asset'}</span>
                            {showScopeBadge && (
-                             <span className="mt-2 inline-flex items-center rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-blue-700 border border-blue-100">
+                             <span className="mt-2 inline-flex items-center rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-blue-700 border border-blue-100">
                                {isCrossEntity
                                  ? `${acc.org_name || 'Entitas Anak'}${acc.branch_name ? ` • ${acc.branch_name}` : ''}`
                                  : (acc.branch_name || 'Semua Unit')}
@@ -636,8 +636,8 @@ export function CashClient({
                       </div>
 
                       <div className="space-y-1 relative z-10">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Saldo Saat Ini</p>
-                        <h2 className="text-3xl font-black text-slate-900 leading-none tracking-tighter font-mono">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Saldo Saat Ini</p>
+                        <h2 className="text-3xl font-semibold text-slate-900 leading-none tracking-tighter font-mono">
                           {formatRupiah(acc.balances?.balance || 0)}
                         </h2>
                         <div className="flex items-center gap-2 mt-4">
@@ -648,11 +648,11 @@ export function CashClient({
 
                       <div className="mt-10 pt-8 border-t border-slate-50 flex items-center justify-between relative z-10">
                         {!canOpenDetails ? (
-                          <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
+                          <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
                             Lintas Entitas
                           </span>
                         ) : accountMutationCount === 0 ? (
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-100 px-4 py-2 rounded-xl border border-slate-200">
+                          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-100 px-4 py-2 rounded-xl border border-slate-200">
                             Belum ada mutasi
                           </span>
                         ) : (
@@ -667,7 +667,7 @@ export function CashClient({
                               }
                               document.getElementById('recent-activities')?.scrollIntoView({ behavior: 'smooth' })
                             }}
-                            className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-2 uppercase tracking-widest bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100"
+                            className="text-[10px] font-semibold text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-2 uppercase tracking-wide bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100"
                           >
                             Mutasi Detail ({detailCountLabel}) <ChevronRight size={14} strokeWidth={3} />
                           </button>
@@ -676,11 +676,11 @@ export function CashClient({
                           <button className="p-3 text-slate-300 hover:text-slate-900 transition-colors bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100">
                             <MoreHorizontal size={18} />
                           </button>
-                          <div className="absolute right-0 bottom-full mb-3 w-52 bg-white rounded-3xl border border-slate-100 shadow-2xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-30 overflow-hidden ring-4 ring-slate-900/5">
+                          <div className="absolute right-0 bottom-full mb-3 w-52 bg-white rounded-xl border border-slate-100 shadow-md opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-30 overflow-hidden ring-4 ring-slate-900/5">
                             {isOwner && !isCrossEntity && (
                               <button
                                 onClick={() => handleDeleteAccount(acc.id, acc.bank_name)}
-                                className="w-full flex items-center gap-3 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 transition-colors"
+                                className="w-full flex items-center gap-3 px-5 py-4 text-[10px] font-semibold uppercase tracking-wide text-rose-500 hover:bg-rose-50 transition-colors"
                               >
                                 <Trash2 size={16} /> Hapus Rekening
                               </button>
@@ -713,7 +713,7 @@ export function CashClient({
                               setFilterAccountId(null)
                               setExpandedTransactionId(null)
                             }}
-                            className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 rounded-lg shadow-sm border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                            className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-600 rounded-lg shadow-sm border border-emerald-100 hover:bg-emerald-100 transition-colors"
                           >
                             Semua Rekening
                           </button>
@@ -724,7 +724,7 @@ export function CashClient({
                               setFilterStatus('POSTED')
                               setExpandedTransactionId(null)
                             }}
-                            className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${filterStatus === 'POSTED' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
+                            className={`px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-lg transition-all ${filterStatus === 'POSTED' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
                             POSTED
                          </button>
                          <button
@@ -732,7 +732,7 @@ export function CashClient({
                               setFilterStatus('VOIDED')
                               setExpandedTransactionId(null)
                             }}
-                            className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${filterStatus === 'VOIDED' ? 'bg-white text-rose-600 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
+                            className={`px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-lg transition-all ${filterStatus === 'VOIDED' ? 'bg-white text-rose-600 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
                             VOIDED
                          </button>
                        </div>
@@ -743,10 +743,10 @@ export function CashClient({
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50/50 border-b border-slate-100">
-                           <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tanggal</th>
-                           <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Rincian Transaksi</th>
-                           <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Nominal (IDR)</th>
-                           <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Aksi</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Tanggal</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Rincian Transaksi</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Nominal (IDR)</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-center">Aksi</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
@@ -755,7 +755,7 @@ export function CashClient({
                               <td colSpan={4} className="py-40 text-center">
                                 <div className="flex flex-col items-center gap-3 opacity-40">
                                   <History size={40} className="text-slate-400" />
-                                  <span className="text-xs font-black uppercase tracking-widest">
+                                  <span className="text-xs font-semibold uppercase tracking-wide">
                                     {filterStatus === 'POSTED' && !hasPostedTransactionsInScope && hasVoidedTransactionsInScope
                                       ? (filterAccountId
                                           ? 'Tidak ada mutasi posted untuk rekening ini. Ada mutasi voided, pindah ke tab VOIDED.'
@@ -789,29 +789,29 @@ export function CashClient({
                                   <tr className={`${isExpanded ? 'bg-slate-50/80' : 'hover:bg-slate-50/80'} transition-all group`}>
                                     <td className="px-8 py-6 align-top">
                                       <div className="flex flex-col">
-                                        <span className="text-xs font-black text-slate-900 font-mono italic">#{tx.id.substring(0,6)}</span>
+                                        <span className="text-xs font-semibold text-slate-900 font-mono italic">#{tx.id.substring(0,6)}</span>
                                         <span className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(tx.transaction_date, 'short')}</span>
                                       </div>
                                     </td>
                                     <td className="px-8 py-6 align-top">
                                       <div className="flex flex-col gap-1.5">
-                                        <span className="text-sm font-black text-slate-900 leading-tight">{tx.description}</span>
+                                        <span className="text-sm font-semibold text-slate-900 leading-tight">{tx.description}</span>
                                         <div className="flex items-center gap-2">
-                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase">
+                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[9px] font-semibold text-slate-500 uppercase">
                                             <Building size={10} /> {accountLabel}
                                           </div>
-                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 rounded text-[9px] font-black text-indigo-500 uppercase">
+                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 rounded text-[9px] font-semibold text-indigo-500 uppercase">
                                             <Activity size={10} /> {tx.category?.name || 'Uncategorized'}
                                           </div>
                                           {isHoldingView && (tx.org_name || tx.org_id !== orgId) ? (
-                                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded text-[9px] font-black text-emerald-600 uppercase">
+                                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded text-[9px] font-semibold text-emerald-600 uppercase">
                                               <Building2 size={10} /> {tx.org_name || 'Entitas'}{tx.branch_name ? ` / ${tx.branch_name}` : ''}
                                             </div>
                                           ) : null}
                                         </div>
                                       </div>
                                     </td>
-                                    <td className={`px-8 py-6 align-top text-right font-black font-mono tracking-tighter text-sm ${tx.type === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    <td className={`px-8 py-6 align-top text-right font-semibold font-mono tracking-tighter text-sm ${tx.type === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                       {tx.type === 'IN' ? '+' : '-'} {formatRupiah(tx.amount)}
                                     </td>
                                     <td className="px-8 py-6 align-top text-center">
@@ -819,7 +819,7 @@ export function CashClient({
                                         <button
                                           type="button"
                                           onClick={() => setExpandedTransactionId((currentId) => currentId === tx.id ? null : tx.id)}
-                                          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 transition-colors hover:bg-slate-100"
+                                          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 transition-colors hover:bg-slate-100"
                                         >
                                           Detail
                                           <ChevronDown size={12} className={isExpanded ? 'rotate-180 transition-transform' : 'transition-transform'} />
@@ -842,53 +842,53 @@ export function CashClient({
                                   {isExpanded ? (
                                     <tr className="bg-slate-50/50">
                                       <td colSpan={4} className="px-8 pb-8">
-                                        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                                        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                                           <div className="mb-4 flex items-center justify-between gap-3">
-                                            <h4 className="text-xs font-black uppercase tracking-[0.16em] text-slate-700">Detail Riwayat Mutasi</h4>
-                                            <span className={`rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-widest ${tx.status === 'POSTED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                                            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-700">Detail Riwayat Mutasi</h4>
+                                            <span className={`rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${tx.status === 'POSTED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
                                               {tx.status}
                                             </span>
                                           </div>
                                           <div className="grid grid-cols-1 gap-4 text-xs text-slate-600 md:grid-cols-2 lg:grid-cols-3">
                                             <div>
-                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Jenis Mutasi</p>
+                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Jenis Mutasi</p>
                                               <p className="mt-1 font-bold text-slate-900">{transactionTypeLabel}</p>
                                             </div>
                                             <div>
-                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tanggal Transaksi</p>
+                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Tanggal Transaksi</p>
                                               <p className="mt-1 font-bold text-slate-900">{formatDate(tx.transaction_date, 'long')}</p>
                                             </div>
                                             <div>
-                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Dicatat Pada</p>
+                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Dicatat Pada</p>
                                               <p className="mt-1 font-bold text-slate-900">{formatDateTime(tx.created_at)}</p>
                                             </div>
                                             <div>
-                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rekening</p>
+                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Rekening</p>
                                               <p className="mt-1 font-bold text-slate-900">{accountLabel}{accountNumber ? ` • ${accountNumber}` : ''}</p>
                                             </div>
                                             <div>
-                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Akun Lawan</p>
+                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Akun Lawan</p>
                                               <p className="mt-1 font-bold text-slate-900">{categoryDetail}</p>
                                             </div>
                                             <div>
-                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nomor Referensi</p>
+                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Nomor Referensi</p>
                                               <p className="mt-1 font-bold text-slate-900">{tx.reference_number || '-'}</p>
                                             </div>
                                             <div>
-                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Jurnal Terkait</p>
+                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Jurnal Terkait</p>
                                               <p className="mt-1 font-bold text-slate-900">{tx.journal_entry_id || '-'}</p>
                                             </div>
                                             <div>
-                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Terakhir Diperbarui</p>
+                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Terakhir Diperbarui</p>
                                               <p className="mt-1 font-bold text-slate-900">{updatedAtLabel}</p>
                                             </div>
                                             <div>
-                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">ID Mutasi Lengkap</p>
+                                              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">ID Mutasi Lengkap</p>
                                               <p className="mt-1 break-all font-mono text-[11px] font-bold text-slate-900">{tx.id}</p>
                                             </div>
                                             {isHoldingView && (tx.org_name || tx.org_id !== orgId) ? (
                                               <div className="md:col-span-2 lg:col-span-3">
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Entitas</p>
+                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Entitas</p>
                                                 <p className="mt-1 font-bold text-slate-900">
                                                   {tx.org_name || 'Entitas'}{tx.branch_name ? ` / ${tx.branch_name}` : ''}
                                                 </p>
@@ -910,14 +910,14 @@ export function CashClient({
               </div>
 
               <div className="space-y-8">
-                 <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-[40px] p-10 text-white relative overflow-hidden group shadow-2xl">
+                 <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-5 text-white relative overflow-hidden group shadow-md">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 blur-3xl" />
                     <div className="relative z-10 space-y-8">
                       <div className="w-16 h-16 rounded-[24px] bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
                         <TrendingUp size={32} className="text-emerald-400" />
                       </div>
                       <div className="space-y-3">
-                        <h3 className="font-black text-2xl tracking-tighter italic">Auto-Journaling Engine</h3>
+                        <h3 className="font-semibold text-2xl tracking-tighter italic">Auto-Journaling Engine</h3>
                         <p className="text-xs text-slate-400 font-medium leading-relaxed">Setiap mutasi kas akan otomatis meluncurkan entri jurnal ganda di CoA organisasi Anda. Akuntabilitas instan tanpa input manual.</p>
                       </div>
                       <div className="pt-4">
@@ -926,17 +926,17 @@ export function CashClient({
                     </div>
                  </div>
 
-                 <SectionCard className="p-10 space-y-6">
+                 <SectionCard className="p-5 space-y-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shadow-sm border border-blue-100">
                         <Download size={20} />
                       </div>
-                      <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Ekspor Laporan</h4>
+                      <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">Ekspor Laporan</h4>
                     </div>
                     <p className="text-xs text-slate-400 font-medium">Download mutasi kas dalam format PDF atau Excel untuk keperluan audit dan arsip.</p>
                     <div className="grid grid-cols-2 gap-3">
-                       <button className="py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Format PDF</button>
-                       <button className="py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Format XLSX</button>
+                       <button className="py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-semibold uppercase tracking-wide transition-all">Format PDF</button>
+                       <button className="py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-semibold uppercase tracking-wide transition-all">Format XLSX</button>
                     </div>
                  </SectionCard>
               </div>
@@ -952,25 +952,25 @@ export function CashClient({
           >
             <div className="space-y-8">
               {isHoldingView ? (
-                <div className="rounded-3xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-900 shadow-sm">
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-900 shadow-sm">
                   Mode holding tetap mengizinkan rekonsiliasi, tetapi proses impor CSV hanya berjalan untuk {reconcileScopeLabel}. Gunakan toggle `Kas Induk` jika Anda ingin fokus penuh pada rekening organisasi induk saja.
                 </div>
               ) : null}
-              <SectionCard className="p-10 space-y-10">
+              <SectionCard className="p-5 space-y-10">
                 <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Rekening Target</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Pilih Rekening Target</label>
                   <div className="grid grid-cols-1 gap-3">
                     {bankAccounts.map(acc => (
                       <button
                         key={acc.id}
                         onClick={() => setSelectedBankId(acc.id)}
-                        className={`flex items-center gap-4 px-6 py-5 rounded-2xl border-2 text-left transition-all group ${selectedBankId === acc.id ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-md shadow-emerald-100' : 'bg-white border-slate-100 hover:border-slate-200'}`}
+                        className={`flex items-center gap-4 px-6 py-5 rounded-xl border-2 text-left transition-all group ${selectedBankId === acc.id ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-md shadow-emerald-100' : 'bg-white border-slate-100 hover:border-slate-200'}`}
                       >
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${selectedBankId === acc.id ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'}`}>
                            <Building2 size={20} />
                         </div>
                         <div>
-                          <span className="text-xs font-black uppercase tracking-tight block">{acc.bank_name}</span>
+                          <span className="text-xs font-semibold uppercase tracking-tight block">{acc.bank_name}</span>
                           <span className="text-[10px] font-medium text-slate-400 font-mono tracking-tighter">{acc.account_number || 'Cash Asset Account'}</span>
                         </div>
                       </button>
@@ -980,7 +980,7 @@ export function CashClient({
 
                 <div className="space-y-6 pt-10 border-t border-slate-50">
                   <div className="space-y-2">
-                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest tracking-tighter">Import CSV Mutasi</h4>
+                    <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide tracking-tighter">Import CSV Mutasi</h4>
                     <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">
                       Unggah riwayat transaksi dari e-banking (BCA, Mandiri, BNI, dll) untuk pencocokan otomatis pada {reconcileScopeLabel}.
                     </p>
@@ -988,11 +988,11 @@ export function CashClient({
                   <form onSubmit={handleUploadCSV} className="space-y-6">
                     <div className="relative group">
                        <input type="file" name="csv" accept=".csv" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                       <div className="w-full py-12 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center gap-4 group-hover:bg-slate-50 group-hover:border-blue-400 group-hover:text-blue-500 transition-all duration-300 shadow-inner">
+                       <div className="w-full py-12 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-4 group-hover:bg-slate-50 group-hover:border-blue-400 group-hover:text-blue-500 transition-all duration-300 shadow-inner">
                           <Upload size={32} strokeWidth={1.5} />
                           <div className="text-center">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] block">Seret & Lepas File</span>
-                            <span className="text-[8px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Atau klik untuk memilih (.csv)</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide block">Seret & Lepas File</span>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase mt-1 tracking-wide">Atau klik untuk memilih (.csv)</span>
                           </div>
                        </div>
                     </div>
@@ -1015,18 +1015,18 @@ export function CashClient({
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50/50 border-b border-slate-100">
-                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tanggal</th>
-                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Keterangan Bank</th>
-                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Nominal (IDR)</th>
-                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
+                        <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Tanggal</th>
+                        <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Keterangan Bank</th>
+                        <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Nominal (IDR)</th>
+                        <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-center">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
                         <td colSpan={4} className="py-40 text-center">
                           <div className="flex flex-col items-center gap-6 text-slate-200">
-                            <div className="w-24 h-24 rounded-[40px] bg-slate-50/50 flex items-center justify-center border border-slate-100 shadow-inner"><Building2 size={48} strokeWidth={1} /></div>
-                            <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-300">Belum ada mutasi yang diunggah</span>
+                            <div className="w-24 h-24 rounded-xl bg-slate-50/50 flex items-center justify-center border border-slate-100 shadow-inner"><Building2 size={48} strokeWidth={1} /></div>
+                            <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">Belum ada mutasi yang diunggah</span>
                           </div>
                         </td>
                       </tr>
@@ -1044,35 +1044,35 @@ export function CashClient({
         {showAccountModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAccountModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-md overflow-hidden flex flex-col">
                <div className="px-10 py-8 bg-emerald-600 text-white flex justify-between items-start">
                   <div>
-                    <h3 className="text-2xl font-black tracking-tight flex items-center gap-3"><Building2 /> Add Bank Account</h3>
+                    <h3 className="text-2xl font-semibold tracking-tight flex items-center gap-3"><Building2 /> Add Bank Account</h3>
                     <p className="text-xs text-emerald-100 mt-1 font-medium italic">Define a new ledger account for your cash or bank assets.</p>
                   </div>
-                  <button onClick={() => setShowAccountModal(false)} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition"><X size={20} /></button>
+                  <button onClick={() => setShowAccountModal(false)} className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition"><X size={20} /></button>
                </div>
 
-               <form onSubmit={handleCreateAccount} className="p-10 space-y-6">
+               <form onSubmit={handleCreateAccount} className="p-5 space-y-6">
                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Account Display Name</label>
-                    <input name="bank_name" required placeholder="e.g. BCA Operasional Utama" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-emerald-500 transition-all shadow-inner" />
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Account Display Name</label>
+                    <input name="bank_name" required placeholder="e.g. BCA Operasional Utama" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm font-bold focus:bg-white focus:border-emerald-500 transition-all shadow-inner" />
                  </div>
 
                  <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><Hash size={12}/> Account Number</label>
-                      <input name="account_number" placeholder="8821..." className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-black font-mono focus:bg-white focus:border-emerald-500 transition-all shadow-inner" />
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1 flex items-center gap-1.5"><Hash size={12}/> Account Number</label>
+                      <input name="account_number" placeholder="8821..." className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm font-semibold font-mono focus:bg-white focus:border-emerald-500 transition-all shadow-inner" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5"><User size={12}/> Holder Name</label>
-                      <input name="account_holder" placeholder="PT. Nizam Digital" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold focus:bg-white focus:border-emerald-500 transition-all shadow-inner" />
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1 flex items-center gap-1.5"><User size={12}/> Holder Name</label>
+                      <input name="account_holder" placeholder="PT. Nizam Digital" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm font-bold focus:bg-white focus:border-emerald-500 transition-all shadow-inner" />
                     </div>
                  </div>
 
                  {placementNodes.length > 0 ? (
                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penempatan Rekening (Organisasi & Unit)</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Penempatan Rekening (Organisasi & Unit)</label>
                       <div className="relative">
                         <select 
                           name="target_org_branch" 
@@ -1081,7 +1081,7 @@ export function CashClient({
                              const selectedOrgId = e.target.value.split('|')[0]
                              setTargetOrgId(selectedOrgId)
                           }}
-                          className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner"
+                          className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner"
                         >
                            {placementNodes.map(node => (
                              <optgroup key={node.orgId} label={`Organisasi: ${node.orgName}`}>
@@ -1100,9 +1100,9 @@ export function CashClient({
                  ) : (
                    branches.length > 0 && (
                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penempatan Rekening (Unit)</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Penempatan Rekening (Unit)</label>
                         <div className="relative">
-                          <select name="target_branch_id" defaultValue={activeBranchId || undefined} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner">
+                          <select name="target_branch_id" defaultValue={activeBranchId || undefined} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner">
                              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                           </select>
                           <ChevronRight className="absolute right-5 top-1/2 -translate-y-1/2 rotate-90 text-slate-300 pointer-events-none" size={16} />
@@ -1112,9 +1112,9 @@ export function CashClient({
                  )}
 
                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mapped GL Account (CoA)</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Mapped GL Account (CoA)</label>
                     <div className="relative">
-                      <select name="account_id" required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner">
+                      <select name="account_id" required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner">
                          <option value="">Select Asset Account...</option>
                          {dynamicGlAccounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
                       </select>
@@ -1123,7 +1123,7 @@ export function CashClient({
                  </div>
 
                  <div className="flex gap-4 pt-6 border-t border-slate-50">
-                   <button type="button" onClick={() => setShowAccountModal(false)} className="flex-1 py-5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Cancel</button>
+                   <button type="button" onClick={() => setShowAccountModal(false)} className="flex-1 py-5 text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-600 transition-colors">Cancel</button>
                    <SafeButton type="submit" variant="primary" size="lg" className="flex-[2] shadow-xl shadow-emerald-100" isLoading={loading}>
                      SAVE ACCOUNT
                    </SafeButton>
@@ -1136,28 +1136,28 @@ export function CashClient({
         {showTransactionModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeTransactionModal} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-xl bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-xl bg-white rounded-xl shadow-md overflow-hidden flex flex-col max-h-[90vh]">
                <div className="px-10 py-8 bg-blue-600 text-white flex justify-between items-start shrink-0">
                   <div>
-                    <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
+                    <h3 className="text-2xl font-semibold tracking-tight flex items-center gap-3">
                        {txType === 'IN' ? <ArrowDownRight /> : txType === 'OUT' ? <ArrowUpRight /> : <ArrowRightLeft />}
                        Record {txType === 'TRANSFER' ? 'Transfer' : 'Mutation'}
                     </h3>
                     <p className="text-xs text-blue-100 mt-1 font-medium italic">Create an instant double-entry transaction record.</p>
                   </div>
-                  <div className="flex bg-white/10 p-1 rounded-2xl border border-white/20">
-                     <button type="button" onClick={() => setTxType('IN')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${txType === 'IN' ? 'bg-white text-emerald-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>IN</button>
-                     <button type="button" onClick={() => setTxType('OUT')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${txType === 'OUT' ? 'bg-white text-rose-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>OUT</button>
-                     <button type="button" onClick={() => setTxType('TRANSFER')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${txType === 'TRANSFER' ? 'bg-white text-blue-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>XFER</button>
+                  <div className="flex bg-white/10 p-1 rounded-xl border border-white/20">
+                     <button type="button" onClick={() => setTxType('IN')} className={`px-4 py-2 text-[9px] font-semibold uppercase tracking-wide rounded-xl transition-all ${txType === 'IN' ? 'bg-white text-emerald-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>IN</button>
+                     <button type="button" onClick={() => setTxType('OUT')} className={`px-4 py-2 text-[9px] font-semibold uppercase tracking-wide rounded-xl transition-all ${txType === 'OUT' ? 'bg-white text-rose-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>OUT</button>
+                     <button type="button" onClick={() => setTxType('TRANSFER')} className={`px-4 py-2 text-[9px] font-semibold uppercase tracking-wide rounded-xl transition-all ${txType === 'TRANSFER' ? 'bg-white text-blue-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>XFER</button>
                   </div>
                </div>
 
-               <form onSubmit={handleCreateTransaction} className="flex-1 overflow-y-auto p-10 space-y-8">
+               <form onSubmit={handleCreateTransaction} className="flex-1 overflow-y-auto p-5 space-y-8">
                  <input type="hidden" name="type" value={txType} />
                  
                  <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Source Account</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Source Account</label>
                       <select
                         name="bank_account_id"
                         required
@@ -1173,27 +1173,27 @@ export function CashClient({
                             setTxTargetBankId('')
                           }
                         }}
-                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all"
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all"
                       >
                          <option value="">Select Account...</option>
                          {bankAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.bank_name}</option>)}
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Date</label>
-                      <input type="date" name="transaction_date" value={txDate} onChange={(e) => setTxDate(e.target.value)} required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all font-mono" />
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Date</label>
+                      <input type="date" name="transaction_date" value={txDate} onChange={(e) => setTxDate(e.target.value)} required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all font-mono" />
                     </div>
                  </div>
 
                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Transaction Description</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Transaction Description</label>
                      <input 
                         name="description" 
                         required 
                         placeholder="e.g. Payment for Store Rent / Office Supplies" 
                         value={txDescription}
                         onChange={(e) => setTxDescription(e.target.value)}
-                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all" 
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all" 
                      />
                  </div>
 
@@ -1215,7 +1215,7 @@ export function CashClient({
                               Available Kas: {formatRupiah(availableCashBalance)}
                             </p>
                             {isAmountExceedingAvailable ? (
-                              <p className="text-[10px] font-black text-rose-600">
+                              <p className="text-[10px] font-semibold text-rose-600">
                                 Nominal melampaui available sebesar {formatRupiah(txAmount - availableCashBalance)}.
                               </p>
                             ) : null}
@@ -1225,7 +1225,7 @@ export function CashClient({
                     </div>
                     
                     <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1 flex items-center gap-1.5">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.1em] ml-1 flex items-center gap-1.5">
                           <ExternalLink size={12}/> {txType === 'TRANSFER' ? 'Target Account' : 'Counterparty Account'}
                         </label>
                         {txType === 'TRANSFER' ? (
@@ -1239,7 +1239,7 @@ export function CashClient({
                                 setTxTargetCounterAccountId('')
                               }}
                               required
-                              className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all"
+                              className="w-full px-6 py-4 bg-slate-900 text-white rounded-xl text-xs font-semibold uppercase tracking-wide outline-none shadow-xl border border-slate-800 transition-all"
                             >
                                <option value="">Select Target...</option>
                                {transferTargetBankOptions.map((bankAccount) => (
@@ -1261,7 +1261,7 @@ export function CashClient({
                         ) : (
                           <>
                             {isCategoryLocked && <input type="hidden" name="category_id" value={txCategoryId} />}
-                            <select name="category_id" value={txCategoryId} onChange={(e) => setTxCategoryId(e.target.value)} required disabled={isCategoryLocked} className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
+                            <select name="category_id" value={txCategoryId} onChange={(e) => setTxCategoryId(e.target.value)} required disabled={isCategoryLocked} className="w-full px-6 py-4 bg-slate-900 text-white rounded-xl text-xs font-semibold uppercase tracking-wide outline-none shadow-xl border border-slate-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
                                <option value="">Select Ledger Account...</option>
                                {['EXPENSE', 'LIABILITY', 'ASSET', 'REVENUE', 'EQUITY'].map(type => {
                                  const group = categoryAccounts.filter(a => a.type === type);
@@ -1284,7 +1284,7 @@ export function CashClient({
                  {txType === 'TRANSFER' && isInterOrgTransfer && (
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div className="space-y-1">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1">
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.1em] ml-1">
                          Akun Investasi Induk (OUT)
                        </label>
                        <select
@@ -1292,7 +1292,7 @@ export function CashClient({
                          required
                          value={effectiveSourceCounterAccountId}
                          onChange={(e) => setTxSourceCounterAccountId(e.target.value)}
-                         className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all"
+                         className="w-full px-6 py-4 bg-slate-900 text-white rounded-xl text-xs font-semibold uppercase tracking-wide outline-none shadow-xl border border-slate-800 transition-all"
                        >
                          <option value="">Select Source Investment Account...</option>
                          {sourceInterOrgCounterAccounts.map((account) => (
@@ -1312,7 +1312,7 @@ export function CashClient({
                        )}
                      </div>
                      <div className="space-y-1">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1">
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.1em] ml-1">
                          Akun Modal/Pendanaan Entitas Tujuan (IN)
                        </label>
                        <select
@@ -1320,7 +1320,7 @@ export function CashClient({
                          required
                          value={effectiveTargetCounterAccountId}
                          onChange={(e) => setTxTargetCounterAccountId(e.target.value)}
-                         className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all"
+                         className="w-full px-6 py-4 bg-slate-900 text-white rounded-xl text-xs font-semibold uppercase tracking-wide outline-none shadow-xl border border-slate-800 transition-all"
                        >
                          <option value="">Select Target Financing Account...</option>
                          {['EQUITY', 'LIABILITY'].map(type => {
@@ -1340,7 +1340,7 @@ export function CashClient({
                    </div>
                  )}
 
-                 <div className="bg-slate-50 p-6 rounded-[28px] border border-slate-100 text-[10px] font-medium text-slate-400 leading-relaxed italic flex gap-3">
+                 <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 text-[10px] font-medium text-slate-400 leading-relaxed italic flex gap-3">
                     <AlertCircle size={16} className="shrink-0 text-slate-300" />
                     {txType === 'OUT'
                       ? 'Choosing an EXPENSE account will decrease equity. Choosing a LIABILITY will settle or create a debt.'
@@ -1352,12 +1352,12 @@ export function CashClient({
                  </div>
 
                  <div className="flex gap-4 pt-4 shrink-0">
-                   <button type="button" onClick={closeTransactionModal} className="flex-1 py-5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Abort</button>
+                   <button type="button" onClick={closeTransactionModal} className="flex-1 py-5 text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-600 transition-colors">Abort</button>
                    <SafeButton
                      type="submit"
                      variant="primary"
                      size="lg"
-                     className="flex-[2] shadow-2xl shadow-blue-100"
+                     className="flex-[2] shadow-md shadow-blue-100"
                      isLoading={loading}
                      disabled={isAmountExceedingAvailable}
                    >
@@ -1374,12 +1374,12 @@ export function CashClient({
       <div className="fixed bottom-8 right-8 z-[100] flex flex-col gap-2">
         <AnimatePresence>
           {error && (
-            <motion.div initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
+            <motion.div initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
               <AlertCircle size={18} /> {error}
             </motion.div>
           )}
           {success && (
-            <motion.div initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
+            <motion.div initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
               <CheckCircle2 size={18} /> {success}
             </motion.div>
           )}

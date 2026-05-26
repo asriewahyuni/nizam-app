@@ -50,7 +50,7 @@ export function ForexClient({ orgId, history }: { orgId: string; history: ForexR
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
               <TrendingUp className="h-5 w-5 text-emerald-600" />
@@ -59,7 +59,7 @@ export function ForexClient({ orgId, history }: { orgId: string; history: ForexR
           </div>
           <p className="text-2xl font-bold text-emerald-600 font-mono">{formatRupiah(totalGain)}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center">
               <TrendingDown className="h-5 w-5 text-rose-600" />
@@ -68,7 +68,7 @@ export function ForexClient({ orgId, history }: { orgId: string; history: ForexR
           </div>
           <p className="text-2xl font-bold text-rose-600 font-mono">{formatRupiah(totalLoss)}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm md:col-span-2">
+        <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm md:col-span-2">
           <div className="flex items-center gap-3 mb-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${netFx >= 0 ? 'bg-blue-50' : 'bg-amber-50'}`}>
               <DollarSign className={`h-5 w-5 ${netFx >= 0 ? 'text-blue-600' : 'text-amber-600'}`} />
@@ -82,7 +82,7 @@ export function ForexClient({ orgId, history }: { orgId: string; history: ForexR
       </div>
 
       {/* History Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-50 flex items-center justify-between">
           <h3 className="text-sm font-semibold tracking-tight text-slate-900">Riwayat Realisasi</h3>
           <span className="text-[10px] font-medium text-slate-400">{items.length} transaksi</span>
@@ -182,7 +182,7 @@ export function ForexClient({ orgId, history }: { orgId: string; history: ForexR
       </div>
 
       {/* Info */}
-      <div className="rounded-2xl bg-indigo-50 border border-indigo-100 p-6">
+      <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-6">
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
             <FileText className="h-5 w-5 text-indigo-600" />

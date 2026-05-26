@@ -20,7 +20,7 @@ export function VersionIntegrityButton() {
       <button
         onClick={() => setOpen(true)}
         title="Version Integrity — lihat changelog"
-        className="relative group flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[10px] font-black tracking-tight
+        className="relative group flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[10px] font-semibold tracking-tight
           bg-gradient-to-r from-slate-900 to-blue-900 text-white
           shadow-lg shadow-slate-200 hover:shadow-xl hover:from-blue-800 hover:to-blue-950
           transition-all duration-200 border border-white/10"
@@ -49,7 +49,7 @@ export function VersionIntegrityButton() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               onClick={e => e.stopPropagation()}
-              className="relative w-full max-w-2xl max-h-[75vh] overflow-y-auto rounded-[28px] bg-white shadow-2xl border border-slate-200"
+              className="relative w-full max-w-2xl max-h-[75vh] overflow-y-auto rounded-xl bg-white shadow-md border border-slate-200"
             >
               {/* X Button — absolute di pojok modal, selalu keliatan */}
               <button
@@ -66,10 +66,10 @@ export function VersionIntegrityButton() {
                     <ShieldCheck className="h-5 w-5 text-emerald-300" />
                   </div>
                   <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-200">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-200">
                       Version Integrity
                     </div>
-                    <h2 className="text-lg font-black tracking-tight">
+                    <h2 className="text-lg font-semibold tracking-tight">
                       {NIZAM_VERSION_LABEL}
                     </h2>
                   </div>
@@ -216,7 +216,7 @@ function LogEntry({ entry, isFirst }: { entry: VersionLogEntry; isFirst: boolean
       <div className="flex-1 min-w-0 pb-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded border ${typeColors[entry.type]}`}>
+            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded border ${typeColors[entry.type]}`}>
               {entry.type}
             </span>
             {isFirst && (

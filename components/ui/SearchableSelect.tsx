@@ -54,7 +54,7 @@ export function SearchableSelect({
 
   return (
     <div className="space-y-1 relative w-full" ref={containerRef}>
-      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">{label}</label>
+      <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 px-1">{label}</label>
       <div 
         onClick={() => setIsOpen(!isOpen)}
         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-slate-900 text-[11px] cursor-pointer hover:border-indigo-300 transition-all flex justify-between items-center min-h-[44px]"
@@ -64,14 +64,14 @@ export function SearchableSelect({
             {selectedOption ? (selectedOption.code ? `${selectedOption.code} - ${selectedOption.name}` : selectedOption.name) : placeholder}
           </span>
           {selectedOption?.balance !== undefined && (
-            <span className="text-[9px] text-emerald-600 font-black uppercase mt-0.5">Saldo: {formatRupiah(selectedOption.balance)}</span>
+            <span className="text-[9px] text-emerald-600 font-semibold uppercase mt-0.5">Saldo: {formatRupiah(selectedOption.balance)}</span>
           )}
         </div>
         <div className="text-slate-400 text-[8px]">▼</div>
       </div>
 
       {isOpen && (
-        <div className="absolute z-[1000] top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+        <div className="absolute z-[1000] top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-md p-2 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
           <input 
             autoFocus
             className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] outline-none focus:border-indigo-500 mb-2 font-medium"
@@ -102,7 +102,7 @@ export function SearchableSelect({
                   </div>
                   <div className="text-right">
                     {opt.balance !== undefined && (
-                       <span className={`text-[10px] font-black ${value === opt.id ? 'text-white' : 'text-emerald-600'}`}>
+                       <span className={`text-[10px] font-semibold ${value === opt.id ? 'text-white' : 'text-emerald-600'}`}>
                          {formatRupiah(opt.balance)}
                        </span>
                     )}

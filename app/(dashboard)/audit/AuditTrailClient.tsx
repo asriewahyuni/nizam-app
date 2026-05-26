@@ -54,7 +54,7 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col h-[600px]">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-[600px]">
       {/* Search & Filters */}
       <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
         <div className="relative flex-1">
@@ -64,7 +64,7 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
             placeholder="Cari aksi, tabel, atau user..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-2xl py-3 pl-12 pr-4 text-sm font-medium focus:ring-2 focus:ring-[#003366] focus:border-transparent transition-all outline-none shadow-sm"
+            className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-sm font-medium focus:ring-2 focus:ring-[#003366] focus:border-transparent transition-all outline-none shadow-sm"
           />
         </div>
 
@@ -74,7 +74,7 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
               key={type}
               onClick={() => setFilterType(type)}
               className={cn(
-                "px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border shrink-0",
+                "px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all border shrink-0",
                 filterType === type 
                   ? "bg-[#003366] text-white border-transparent shadow-lg shadow-blue-900/20 scale-105" 
                   : "bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600"
@@ -97,7 +97,7 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
           filteredLogs.map((log) => (
             <div 
               key={log.id} 
-              className="group relative flex items-start gap-4 p-4 rounded-2xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/20 transition-all shadow-sm hover:shadow-md h-fit"
+              className="group relative flex items-start gap-4 p-4 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/20 transition-all shadow-sm hover:shadow-md h-fit"
             >
               {/* Timeline dot */}
               <div className="hidden md:flex flex-col items-center gap-1 shrink-0 pt-1">
@@ -111,12 +111,12 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
               <div className="flex-1 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={cn(
-                    "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border",
+                    "px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border",
                     getActionStyles(log.action)
                   )}>
                     {log.action}
                   </span>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
                     <Table size={10} />
                     {log.table_name}
                   </span>
@@ -126,7 +126,7 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
                   </span>
                 </div>
 
-                <p className="text-sm font-black text-slate-800 tracking-tight leading-relaxed py-1">
+                <p className="text-sm font-semibold text-slate-800 tracking-tight leading-relaxed py-1">
                   {log.description}
                 </p>
 
@@ -152,7 +152,7 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
       </div>
 
       <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
            Sistem Monitoring NIZAM Terenkripsi & Immutable
         </p>
       </div>

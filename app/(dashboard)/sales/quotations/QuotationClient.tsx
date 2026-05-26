@@ -409,13 +409,13 @@ export default function QuotationClient({
         />
 
         {success && (
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700">
             {success}
           </div>
         )}
 
         {error && !showModal && (
-          <div className="rounded-2xl border border-rose-100 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-700">
+          <div className="rounded-xl border border-rose-100 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-700">
             {error}
           </div>
         )}
@@ -437,11 +437,11 @@ export default function QuotationClient({
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">No. Ref</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Penawaran</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
+                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">No. Ref</th>
+                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Customer</th>
+                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Total Penawaran</th>
+                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-center">Status</th>
+                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -451,18 +451,18 @@ export default function QuotationClient({
 
                   return (
                     <tr key={quotation.id} className="hover:bg-slate-50">
-                      <td className="px-8 py-6 text-xs font-black text-blue-600">
+                      <td className="px-8 py-6 text-xs font-semibold text-blue-600">
                         {quotation.sale_number || `SQ-${quotation.id.slice(0, 8)}`}
                       </td>
                       <td className="px-8 py-6 font-bold">{customer?.name || '-'}</td>
-                      <td className="px-8 py-6 text-right font-black">{formatRupiah(totals.grandTotal)}</td>
+                      <td className="px-8 py-6 text-right font-semibold">{formatRupiah(totals.grandTotal)}</td>
                       <td className="px-8 py-6 text-center">
                         <StatusBadge label="Pending Quotation" variant="warning" />
                       </td>
                       <td className="px-8 py-6 text-right space-x-2">
                         <button
                           onClick={() => handleConvert(quotation.id)}
-                          className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all"
+                          className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-semibold uppercase tracking-wide hover:bg-emerald-600 hover:text-white transition-all"
                         >
                           Terima & Jadi Order
                         </button>
@@ -498,26 +498,26 @@ export default function QuotationClient({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-4xl bg-white rounded-3xl p-8 max-h-[90vh] overflow-y-auto shadow-2xl"
+              className="relative w-full max-w-4xl bg-white rounded-xl p-8 max-h-[90vh] overflow-y-auto shadow-md"
             >
               <h3 className="text-xl font-bold mb-6">Buat Penawaran Harga Baru</h3>
 
               {error && (
-                <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm font-bold">
+                <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-3 text-rose-600 text-sm font-bold">
                   <AlertCircle size={18} />
                   {error}
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl">
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-xl">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Customer</label>
                       <button
                         type="button"
                         onClick={openCustomerModal}
-                        className="text-[10px] font-black text-blue-600 hover:text-blue-800 transition-colors"
+                        className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 transition-colors"
                       >
                         + CUSTOMER BARU
                       </button>
@@ -537,7 +537,7 @@ export default function QuotationClient({
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal Penawaran</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Tanggal Penawaran</label>
                     <input
                       type="date"
                       value={quoteDate}
@@ -549,17 +549,17 @@ export default function QuotationClient({
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center mb-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Item Penawaran</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Item Penawaran</label>
                     <button
                       type="button"
                       onClick={handleAddLine}
-                      className="text-[10px] font-black text-blue-600 hover:text-blue-800 transition-colors"
+                      className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 transition-colors"
                     >
                       + TAMBAH BARIS
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-12 gap-2 px-1 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                  <div className="grid grid-cols-12 gap-2 px-1 text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
                     <div className="col-span-4">Nama Produk / Jasa</div>
                     <div className="col-span-2">Kuantitas</div>
                     <div className="col-span-3">Harga Satuan</div>
@@ -623,16 +623,16 @@ export default function QuotationClient({
 
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                    <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+                    <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-amber-600">
                           Diskon Tambahan
                         </label>
                         <div className="inline-flex rounded-xl border border-amber-200 bg-white p-1">
                           <button
                             type="button"
                             onClick={() => setManualDiscountMode('FIXED')}
-                            className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${
+                            className={`px-3 py-1 text-[10px] font-semibold rounded-lg transition-all ${
                               manualDiscountMode === 'FIXED'
                                 ? 'bg-amber-500 text-white shadow-sm'
                                 : 'text-amber-700 hover:text-amber-900'
@@ -643,7 +643,7 @@ export default function QuotationClient({
                           <button
                             type="button"
                             onClick={() => setManualDiscountMode('PERCENT')}
-                            className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${
+                            className={`px-3 py-1 text-[10px] font-semibold rounded-lg transition-all ${
                               manualDiscountMode === 'PERCENT'
                                 ? 'bg-amber-500 text-white shadow-sm'
                                 : 'text-amber-700 hover:text-amber-900'
@@ -694,7 +694,7 @@ export default function QuotationClient({
                         <button
                           type="button"
                           onClick={handleApplyPromo}
-                          className="px-4 h-11 bg-slate-900 text-white font-black text-[10px] tracking-widest uppercase rounded-xl hover:bg-slate-800 transition-colors"
+                          className="px-4 h-11 bg-slate-900 text-white font-semibold text-[10px] tracking-wide uppercase rounded-xl hover:bg-slate-800 transition-colors"
                         >
                           Terapkan
                         </button>
@@ -707,7 +707,7 @@ export default function QuotationClient({
                         <button
                           type="button"
                           onClick={() => setAppliedPromo(null)}
-                          className="text-emerald-900 font-bold hover:text-rose-500 uppercase tracking-widest text-[9px] px-2 py-1 bg-white rounded-lg shadow-sm"
+                          className="text-emerald-900 font-bold hover:text-rose-500 uppercase tracking-wide text-[9px] px-2 py-1 bg-white rounded-lg shadow-sm"
                         >
                           Hapus
                         </button>
@@ -715,7 +715,7 @@ export default function QuotationClient({
                     )}
                   </div>
 
-                  <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50 p-6 shadow-inner">
+                  <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50 p-6 shadow-inner">
                     <div className="flex items-center justify-between text-sm font-bold text-blue-900">
                       <span>Subtotal Barang</span>
                       <span>{formatRupiah(subtotal)}</span>
@@ -744,21 +744,21 @@ export default function QuotationClient({
                       </p>
                     )}
                     <div className="border-t border-blue-200 pt-3 flex justify-between items-center">
-                      <div className="text-[10px] md:text-xs font-black text-blue-900 uppercase tracking-widest">
+                      <div className="text-[10px] md:text-xs font-semibold text-blue-900 uppercase tracking-wide">
                         Total Penawaran Estimasi
                       </div>
-                      <div className="text-xl md:text-3xl font-black text-blue-600 drop-shadow-sm">{formatRupiah(grandTotal)}</div>
+                      <div className="text-xl md:text-3xl font-semibold text-blue-600 drop-shadow-sm">{formatRupiah(grandTotal)}</div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Catatan Penawaran</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Catatan Penawaran</label>
                     <textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       rows={4}
                       placeholder="Tulis catatan tambahan, syarat pembayaran, atau masa berlaku penawaran..."
-                      className="w-full rounded-2xl border px-4 py-3 text-sm outline-none focus:border-blue-600"
+                      className="w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600"
                     />
                   </div>
                 </div>
@@ -814,7 +814,7 @@ export default function QuotationClient({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none print:text-[11px] print:leading-relaxed"
+              className="relative w-full max-w-3xl bg-white rounded-xl shadow-md overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none print:text-[11px] print:leading-relaxed"
             >
               {(() => {
                 const customer = pickRelation(viewQuotation.contacts)
@@ -829,7 +829,7 @@ export default function QuotationClient({
                       <div className="flex flex-col text-left">
                         <div className="flex items-center gap-4">
                           <img src={companyProfile.logo} alt="Logo Perusahaan" className="w-14 h-14 object-contain" />
-                          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{companyProfile.name}</h2>
+                          <h2 className="text-2xl font-semibold text-slate-900 uppercase tracking-tighter">{companyProfile.name}</h2>
                         </div>
                         <p className="text-xs font-medium text-slate-700 max-w-[420px] mt-1">{companyProfile.address}</p>
                         <div className="flex items-center gap-4 mt-2 text-[10px] font-bold text-slate-500">
@@ -842,7 +842,7 @@ export default function QuotationClient({
 
                     <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center print:bg-transparent print:border-none print:px-0 print:pt-0 print:mb-0">
                       <div className="print:text-center print:w-full">
-                        <h3 className="text-xl font-bold text-slate-900 print:text-2xl print:tracking-widest">
+                        <h3 className="text-xl font-bold text-slate-900 print:text-2xl print:tracking-wide">
                           QUOTATION / SURAT PENAWARAN
                         </h3>
                         <p className="text-sm font-semibold text-blue-600 print:text-slate-900 print:mt-1">{quotationNumber}</p>
@@ -858,7 +858,7 @@ export default function QuotationClient({
                     <div className="p-6 overflow-y-auto w-full print:overflow-visible print:px-0 print:py-0">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-sm">
                         <div>
-                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">
+                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wide mb-1 print:text-slate-600">
                             Customer / Klien
                           </p>
                           <p className="font-bold text-slate-900">{customer?.name || 'Unknown'}</p>
@@ -869,7 +869,7 @@ export default function QuotationClient({
                           )}
                         </div>
                         <div className="md:text-right">
-                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">
+                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wide mb-1 print:text-slate-600">
                             Tanggal Dokumen
                           </p>
                           <p className="font-bold text-slate-900">{viewQuotation.sale_date || '-'}</p>
@@ -889,19 +889,19 @@ export default function QuotationClient({
                       <table className="w-full mb-6 relative border-collapse print:border print:border-slate-200">
                         <thead className="border-y border-slate-100 bg-slate-50/50 print:bg-slate-100 print:text-slate-900">
                           <tr>
-                            <th className="py-3 px-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200">
+                            <th className="py-3 px-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wide print:text-slate-900 print:border print:border-slate-200">
                               Deskripsi Barang/Jasa
                             </th>
-                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200 w-20">
+                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wide print:text-slate-900 print:border print:border-slate-200 w-20">
                               Qty
                             </th>
-                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200">
+                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wide print:text-slate-900 print:border print:border-slate-200">
                               Harga
                             </th>
-                            <th className="py-3 px-2 text-right text-[10px] font-bold text-rose-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200">
+                            <th className="py-3 px-2 text-right text-[10px] font-bold text-rose-400 uppercase tracking-wide print:text-slate-900 print:border print:border-slate-200">
                               Diskon
                             </th>
-                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200">
+                            <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wide print:text-slate-900 print:border print:border-slate-200">
                               Total
                             </th>
                           </tr>
@@ -937,7 +937,7 @@ export default function QuotationClient({
                         </tbody>
                       </table>
 
-                      <div className="w-full bg-slate-50 rounded-2xl p-4 flex flex-col gap-2 shadow-inner print:shadow-none print:border print:border-slate-200">
+                      <div className="w-full bg-slate-50 rounded-xl p-4 flex flex-col gap-2 shadow-inner print:shadow-none print:border print:border-slate-200">
                         <div className="flex justify-between text-xs font-semibold text-slate-500">
                           <span>Subtotal Barang:</span>
                           <span>{formatRupiah(totals.subtotal)}</span>
@@ -962,13 +962,13 @@ export default function QuotationClient({
                         )}
                         <div className="border-t border-slate-200 mt-2 pt-2 flex justify-between items-center">
                           <span className="font-bold text-slate-900 text-sm">TOTAL PENAWARAN:</span>
-                          <span className="font-black text-blue-600 text-lg">{formatRupiah(totals.grandTotal)}</span>
+                          <span className="font-semibold text-blue-600 text-lg">{formatRupiah(totals.grandTotal)}</span>
                         </div>
                       </div>
 
                       {viewQuotation.notes && (
-                        <div className="mt-6 border border-slate-200 bg-white rounded-2xl p-4">
-                          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3">Catatan Penawaran</h4>
+                        <div className="mt-6 border border-slate-200 bg-white rounded-xl p-4">
+                          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Catatan Penawaran</h4>
                           <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{viewQuotation.notes}</p>
                         </div>
                       )}
@@ -1023,12 +1023,12 @@ export default function QuotationClient({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl"
+              className="relative w-full max-w-lg rounded-xl bg-white p-8 shadow-md"
             >
               <h3 className="text-xl font-bold mb-6">Tambah Customer Baru</h3>
 
               {customerError && (
-                <div className="mb-6 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-600">
+                <div className="mb-6 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-600">
                   {customerError}
                 </div>
               )}

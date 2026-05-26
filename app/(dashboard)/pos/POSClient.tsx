@@ -1010,8 +1010,8 @@ export default function POSClient({
                    )}
                 </div>
                 <div>
-                   <h1 className="text-sm md:text-lg font-black tracking-tight leading-none">{orgSettings.brand_name || 'Nizam POS'}</h1>
-                  <div className="text-[8px] md:text-[10px] font-bold text-white/70 uppercase tracking-widest flex items-center gap-1 mt-0.5">
+                   <h1 className="text-sm md:text-lg font-semibold tracking-tight leading-none">{orgSettings.brand_name || 'Nizam POS'}</h1>
+                  <div className="text-[8px] md:text-[10px] font-bold text-white/70 uppercase tracking-wide flex items-center gap-1 mt-0.5">
                      <MapPin size={8} className="md:w-[10px]" /> {activeBranchName || 'Pilih Unit Aktif'}
                   </div>
                </div>
@@ -1024,7 +1024,7 @@ export default function POSClient({
                   type="button"
                   onClick={handleExitPos}
                   disabled={loading || shiftBusy}
-                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg md:rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-colors shadow-sm cursor-pointer block disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg md:rounded-xl text-[10px] md:text-xs font-semibold uppercase tracking-wide transition-colors shadow-sm cursor-pointer block disabled:opacity-50 disabled:cursor-not-allowed"
                >
                   <span className="md:hidden">{activeShiftSession ? 'SHIFT' : 'LOGOUT'}</span>
                   <span className="hidden md:inline">{activeShiftSession ? 'Tutup Shift' : 'Logout POS'}</span>
@@ -1046,7 +1046,7 @@ export default function POSClient({
             <div className="shrink-0 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
                <div className="px-4 md:px-6 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex flex-wrap items-center gap-2">
-                     <div className={`px-3 py-2 rounded-2xl border text-[10px] md:text-xs font-black uppercase tracking-widest flex items-center gap-2 ${
+                     <div className={`px-3 py-2 rounded-xl border text-[10px] md:text-xs font-semibold uppercase tracking-wide flex items-center gap-2 ${
                         activeShiftSession
                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                            : 'border-amber-200 bg-amber-50 text-amber-700'
@@ -1055,25 +1055,25 @@ export default function POSClient({
                         {activeShiftSession ? `Shift Aktif ${activeShiftSession.registerCode}` : 'Shift Belum Dibuka'}
                      </div>
                      {activeShiftSession && (
-                        <div className="px-3 py-2 rounded-2xl border border-slate-200 bg-slate-50 text-[10px] md:text-xs font-bold text-slate-600 flex items-center gap-2">
+                        <div className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-[10px] md:text-xs font-bold text-slate-600 flex items-center gap-2">
                            <Wallet size={14} className="text-blue-600" />
                            Expected Cash {formatRupiah(activeShiftSession.expectedCash)}
                         </div>
                      )}
                      {activeShiftSession?.openedAt && (
-                        <div className="px-3 py-2 rounded-2xl border border-slate-200 bg-slate-50 text-[10px] md:text-xs font-bold text-slate-600 flex items-center gap-2">
+                        <div className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-[10px] md:text-xs font-bold text-slate-600 flex items-center gap-2">
                            <Clock3 size={14} className="text-slate-500" />
                            Buka {formatShiftTimestamp(activeShiftSession.openedAt)}
                         </div>
                      )}
                      {activeShiftCashierLabel && (
-                        <div className="px-3 py-2 rounded-2xl border border-sky-200 bg-sky-50 text-[10px] md:text-xs font-bold text-sky-700 flex items-center gap-2">
+                        <div className="px-3 py-2 rounded-xl border border-sky-200 bg-sky-50 text-[10px] md:text-xs font-bold text-sky-700 flex items-center gap-2">
                            <User size={14} className="text-sky-600" />
                            Kasir {activeShiftCashierLabel}
                         </div>
                      )}
                      {!activeShiftSession && latestClosedShift && shiftState.enableSettlement && hasAnySettlementBalance && (
-                        <div className="px-3 py-2 rounded-2xl border border-blue-200 bg-blue-50 text-[10px] md:text-xs font-bold text-blue-700 flex items-center gap-2">
+                        <div className="px-3 py-2 rounded-xl border border-blue-200 bg-blue-50 text-[10px] md:text-xs font-bold text-blue-700 flex items-center gap-2">
                            <ArrowRightLeft size={14} />
                            Pending Settlement {formatRupiah(
                               availableSettlement.CASH + availableSettlement.TRANSFER + availableSettlement.QRIS
@@ -1081,7 +1081,7 @@ export default function POSClient({
                         </div>
                      )}
                      {!activeShiftSession && latestClosedShift?.closedAt && (
-                        <div className="px-3 py-2 rounded-2xl border border-slate-200 bg-slate-50 text-[10px] md:text-xs font-bold text-slate-600 flex items-center gap-2">
+                        <div className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-[10px] md:text-xs font-bold text-slate-600 flex items-center gap-2">
                            <Clock3 size={14} className="text-slate-500" />
                            Tutup {formatShiftTimestamp(latestClosedShift.closedAt)}
                         </div>
@@ -1093,7 +1093,7 @@ export default function POSClient({
                         <button
                            type="button"
                            onClick={() => setShowShiftHistory((current) => !current)}
-                           className="px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-all shadow-sm flex items-center gap-2"
+                           className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-[10px] md:text-xs font-semibold uppercase tracking-wide text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-all shadow-sm flex items-center gap-2"
                         >
                            <CalendarDays size={14} />
                            Histori {historyShiftCount > 0 ? `${historyShiftCount} Shift` : 'Harian'}
@@ -1109,7 +1109,7 @@ export default function POSClient({
                               setOpenShiftCashierPassword('')
                               setShowOpenShiftModal(true)
                            }}
-                           className="px-4 py-2.5 rounded-2xl bg-slate-900 text-white text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-sm"
+                           className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-[10px] md:text-xs font-semibold uppercase tracking-wide hover:bg-black transition-all shadow-sm"
                         >
                            Buka Shift
                         </button>
@@ -1124,7 +1124,7 @@ export default function POSClient({
                               setShiftNotice(null)
                               setShowCloseShiftModal(true)
                            }}
-                           className="px-4 py-2.5 rounded-2xl bg-rose-600 text-white text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-sm"
+                           className="px-4 py-2.5 rounded-xl bg-rose-600 text-white text-[10px] md:text-xs font-semibold uppercase tracking-wide hover:bg-rose-700 transition-all shadow-sm"
                         >
                            Tutup Shift
                         </button>
@@ -1138,7 +1138,7 @@ export default function POSClient({
                               setSettlementNotes('')
                               setShowSettlementModal(true)
                            }}
-                           className="px-4 py-2.5 rounded-2xl bg-blue-600 text-white text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-sm"
+                           className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] md:text-xs font-semibold uppercase tracking-wide hover:bg-blue-700 transition-all shadow-sm"
                         >
                            Settlement
                         </button>
@@ -1157,11 +1157,11 @@ export default function POSClient({
 
                {shiftState.schemaReady && showShiftHistory && (
                   <div className="px-4 md:px-6 pb-4">
-                     <div className="rounded-[28px] border border-slate-200 bg-slate-50/80 overflow-hidden">
+                     <div className="rounded-xl border border-slate-200 bg-slate-50/80 overflow-hidden">
                         <div className="px-4 md:px-5 py-4 border-b border-slate-200 bg-white/80 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                            <div>
-                              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Rekam Shift Per Hari</div>
-                              <div className="text-sm md:text-base font-black text-slate-900 mt-1">
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">Rekam Shift Per Hari</div>
+                              <div className="text-sm md:text-base font-semibold text-slate-900 mt-1">
                                  {historyShiftCount > 0
                                     ? `${historyShiftCount} shift terekam di unit ${activeBranchName || 'aktif'}`
                                     : 'Belum ada histori shift tersimpan'}
@@ -1172,7 +1172,7 @@ export default function POSClient({
                            </div>
                            <div className="flex flex-wrap items-center gap-2">
                               {historyBusy && (
-                                 <div className="px-3 py-2 rounded-2xl border border-blue-200 bg-blue-50 text-[10px] md:text-xs font-bold text-blue-700">
+                                 <div className="px-3 py-2 rounded-xl border border-blue-200 bg-blue-50 text-[10px] md:text-xs font-bold text-blue-700">
                                     Memuat histori...
                                  </div>
                               )}
@@ -1180,7 +1180,7 @@ export default function POSClient({
                                  <button
                                     type="button"
                                     onClick={() => refreshShiftHistory('replace')}
-                                    className="px-3 py-2 rounded-2xl border border-slate-200 bg-white text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                                    className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-[10px] md:text-xs font-semibold uppercase tracking-wide text-slate-600 hover:text-slate-900 hover:border-slate-300"
                                  >
                                     Refresh
                                  </button>
@@ -1190,14 +1190,14 @@ export default function POSClient({
 
                         <div className="max-h-[360px] overflow-y-auto px-4 md:px-5 py-4 space-y-4">
                            {shiftHistory.message && (
-                              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-medium text-amber-800">
+                              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-medium text-amber-800">
                                  {shiftHistory.message}
                               </div>
                            )}
 
                            {shiftHistory.days.length === 0 && !shiftHistory.message && (
-                              <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-5 py-8 text-center">
-                                 <div className="text-sm font-black text-slate-700">Belum ada shift tertutup</div>
+                              <div className="rounded-xl border border-dashed border-slate-200 bg-white px-5 py-8 text-center">
+                                 <div className="text-sm font-semibold text-slate-700">Belum ada shift tertutup</div>
                                  <div className="text-[11px] font-medium text-slate-500 mt-2">
                                     Setelah shift ditutup, histori hariannya akan muncul di sini lengkap dengan status settlement.
                                  </div>
@@ -1208,12 +1208,12 @@ export default function POSClient({
                               <div key={day.dateKey} className="rounded-[24px] border border-slate-200 bg-white overflow-hidden shadow-sm">
                                  <div className="px-4 md:px-5 py-4 border-b border-slate-100 bg-slate-50/70 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                     <div>
-                                       <div className="text-sm md:text-base font-black text-slate-900">{formatShiftDayLabel(day.dateKey)}</div>
+                                       <div className="text-sm md:text-base font-semibold text-slate-900">{formatShiftDayLabel(day.dateKey)}</div>
                                        <div className="text-[11px] font-medium text-slate-500 mt-1">
                                           {day.totals.shiftCount} shift • {day.totals.transactionCount} transaksi • sales bruto {formatRupiah(day.totals.grossSales)}
                                        </div>
                                     </div>
-                                    <div className={`px-3 py-2 rounded-2xl border text-[10px] md:text-xs font-black uppercase tracking-widest ${
+                                    <div className={`px-3 py-2 rounded-xl border text-[10px] md:text-xs font-semibold uppercase tracking-wide ${
                                        day.totals.pendingSettlement > 0
                                           ? 'border-blue-200 bg-blue-50 text-blue-700'
                                           : 'border-emerald-200 bg-emerald-50 text-emerald-700'
@@ -1237,12 +1237,12 @@ export default function POSClient({
                                        ].filter(Boolean).join(' • ')
 
                                        return (
-                                          <div key={session.id} className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4 space-y-4">
+                                          <div key={session.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-4">
                                              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                                 <div>
                                                    <div className="flex flex-wrap items-center gap-2">
-                                                      <div className="text-sm font-black text-slate-900">{session.registerCode}</div>
-                                                      <div className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                                                      <div className="text-sm font-semibold text-slate-900">{session.registerCode}</div>
+                                                      <div className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
                                                          sessionPendingSettlement > 0
                                                             ? 'bg-blue-100 text-blue-700'
                                                             : 'bg-emerald-100 text-emerald-700'
@@ -1263,41 +1263,41 @@ export default function POSClient({
                                                    </div>
                                                 </div>
                                                 <div className="text-left md:text-right">
-                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sales Bruto</div>
-                                                   <div className="text-sm md:text-base font-black text-slate-900">{formatRupiah(session.totals.grossSales)}</div>
+                                                   <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Sales Bruto</div>
+                                                   <div className="text-sm md:text-base font-semibold text-slate-900">{formatRupiah(session.totals.grossSales)}</div>
                                                 </div>
                                              </div>
 
                                              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                                                <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Transaksi</div>
-                                                   <div className="mt-1 text-sm font-black text-slate-800">{session.totals.transactionCount}</div>
+                                                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                                   <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Transaksi</div>
+                                                   <div className="mt-1 text-sm font-semibold text-slate-800">{session.totals.transactionCount}</div>
                                                 </div>
-                                                <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tunai</div>
-                                                   <div className="mt-1 text-sm font-black text-slate-800">{formatRupiah(session.totals.byMethod.CASH)}</div>
+                                                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                                   <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Tunai</div>
+                                                   <div className="mt-1 text-sm font-semibold text-slate-800">{formatRupiah(session.totals.byMethod.CASH)}</div>
                                                 </div>
-                                                <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Transfer</div>
-                                                   <div className="mt-1 text-sm font-black text-slate-800">{formatRupiah(session.totals.byMethod.TRANSFER)}</div>
+                                                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                                   <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Transfer</div>
+                                                   <div className="mt-1 text-sm font-semibold text-slate-800">{formatRupiah(session.totals.byMethod.TRANSFER)}</div>
                                                 </div>
-                                                <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">QRIS</div>
-                                                   <div className="mt-1 text-sm font-black text-slate-800">{formatRupiah(session.totals.byMethod.QRIS)}</div>
+                                                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                                   <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">QRIS</div>
+                                                   <div className="mt-1 text-sm font-semibold text-slate-800">{formatRupiah(session.totals.byMethod.QRIS)}</div>
                                                 </div>
-                                                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
-                                                   <div className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Expected</div>
-                                                   <div className="mt-1 text-sm font-black text-emerald-700">{formatRupiah(session.expectedCash)}</div>
+                                                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                                                   <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Expected</div>
+                                                   <div className="mt-1 text-sm font-semibold text-emerald-700">{formatRupiah(session.expectedCash)}</div>
                                                 </div>
-                                                <div className={`rounded-2xl border p-3 ${
+                                                <div className={`rounded-xl border p-3 ${
                                                    (session.varianceAmount || 0) === 0
                                                       ? 'border-slate-200 bg-white'
                                                       : (session.varianceAmount || 0) > 0
                                                          ? 'border-emerald-200 bg-emerald-50'
                                                          : 'border-rose-200 bg-rose-50'
                                                 }`}>
-                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Selisih</div>
-                                                   <div className={`mt-1 text-sm font-black ${
+                                                   <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Selisih</div>
+                                                   <div className={`mt-1 text-sm font-semibold ${
                                                       (session.varianceAmount || 0) === 0
                                                          ? 'text-slate-800'
                                                          : (session.varianceAmount || 0) > 0
@@ -1310,8 +1310,8 @@ export default function POSClient({
                                              </div>
 
                                              {(session.openingNotes || session.closingNotes) && (
-                                                <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
-                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Catatan Shift</div>
+                                                <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+                                                   <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Catatan Shift</div>
                                                    {session.openingNotes && (
                                                       <div className="text-[11px] font-medium text-slate-600">
                                                          Buka: {session.openingNotes}
@@ -1325,10 +1325,10 @@ export default function POSClient({
                                                 </div>
                                              )}
 
-                                             <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+                                             <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                                                 <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Log Settlement</div>
-                                                   <div className={`text-[10px] font-black uppercase tracking-widest ${
+                                                   <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Log Settlement</div>
+                                                   <div className={`text-[10px] font-semibold uppercase tracking-wide ${
                                                       sessionPendingSettlement > 0 ? 'text-blue-600' : 'text-emerald-600'
                                                    }`}>
                                                       {sessionPendingSettlement > 0
@@ -1350,10 +1350,10 @@ export default function POSClient({
                                                          ].filter(Boolean).join(' • ')
 
                                                          return (
-                                                            <div key={`${session.id}-${settlement.method}-${settlement.createdAt || index}`} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+                                                            <div key={`${session.id}-${settlement.method}-${settlement.createdAt || index}`} className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
                                                                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                                                                   <div>
-                                                                     <div className="text-xs font-black text-slate-900">
+                                                                     <div className="text-xs font-semibold text-slate-900">
                                                                         {settlement.method} {formatRupiah(settlement.grossAmount)}
                                                                      </div>
                                                                      <div className="text-[11px] font-medium text-slate-500 mt-1">
@@ -1392,7 +1392,7 @@ export default function POSClient({
                                  type="button"
                                  onClick={() => refreshShiftHistory('append')}
                                  disabled={historyBusy}
-                                 className="px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-600 hover:text-slate-900 hover:border-slate-300 disabled:opacity-50"
+                                 className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-[10px] md:text-xs font-semibold uppercase tracking-wide text-slate-600 hover:text-slate-900 hover:border-slate-300 disabled:opacity-50"
                               >
                                  {historyBusy ? 'Memuat...' : 'Muat Hari Sebelumnya'}
                               </button>
@@ -1417,7 +1417,7 @@ export default function POSClient({
                         placeholder="Cari Produk..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full h-12 md:h-14 pl-12 pr-6 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-800 placeholder-slate-400 focus:border-blue-500 outline-none transition-all text-sm md:text-lg"
+                        className="w-full h-12 md:h-14 pl-12 pr-6 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 placeholder-slate-400 focus:border-blue-500 outline-none transition-all text-sm md:text-lg"
                         autoFocus
                      />
                   </div>
@@ -1428,10 +1428,10 @@ export default function POSClient({
                   {!activeBranchId ? (
                      <div className="h-full min-h-[320px] flex items-center justify-center">
                         <div className="max-w-md w-full bg-white border border-slate-200 rounded-[32px] shadow-sm p-8 text-center">
-                           <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+                           <div className="w-14 h-14 mx-auto rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
                               <MapPin size={26} />
                            </div>
-                           <h3 className="text-lg font-black text-slate-800 mb-2">Pilih Unit Aktif</h3>
+                           <h3 className="text-lg font-semibold text-slate-800 mb-2">Pilih Unit Aktif</h3>
                            <p className="text-sm font-medium text-slate-500 leading-relaxed">
                               POS hanya bisa dipakai di satu unit aktif. Pilih unit dari header terlebih dahulu agar stok dan jurnal tidak tercampur.
                            </p>
@@ -1443,11 +1443,11 @@ export default function POSClient({
                            <button
                               key={p.id}
                               onClick={() => addToCart(p)}
-                              className="bg-white p-3 md:p-4 rounded-3xl border border-slate-200 shadow-sm hover:border-blue-500 hover:shadow-xl hover:-translate-y-1 transition-all text-left group flex flex-col min-h-[140px] md:h-44 relative z-0"
+                              className="bg-white p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:shadow-xl hover:-translate-y-1 transition-all text-left group flex flex-col min-h-[140px] md:h-44 relative z-0"
                            >
-                              <div className="text-[8px] md:text-[10px] font-black text-blue-500 bg-blue-50 w-fit px-2 py-1 rounded-md mb-2">{p.sku || 'NO-SKU'}</div>
+                              <div className="text-[8px] md:text-[10px] font-semibold text-blue-500 bg-blue-50 w-fit px-2 py-1 rounded-md mb-2">{p.sku || 'NO-SKU'}</div>
                               <h3 className="font-bold text-xs md:text-sm text-slate-800 leading-tight flex-1 line-clamp-3">{p.name}</h3>
-                              <div className="text-sm md:text-lg font-black text-[#003366] mt-2 group-hover:scale-105 origin-left transition-transform">
+                              <div className="text-sm md:text-lg font-semibold text-[#003366] mt-2 group-hover:scale-105 origin-left transition-transform">
                                  {formatRupiah(p.selling_price)}
                               </div>
                               {isStockTrackedProduct(p) ? (
@@ -1473,20 +1473,20 @@ export default function POSClient({
           `}>
                <div className="md:hidden absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsMobileCartOpen(false)} />
 
-               <div className="ml-auto w-[85%] sm:w-[450px] md:w-[400px] lg:w-[450px] bg-white border-l border-slate-200 shadow-2xl flex flex-col relative animate-in slide-in-from-right duration-300">
+               <div className="ml-auto w-[85%] sm:w-[450px] md:w-[400px] lg:w-[450px] bg-white border-l border-slate-200 shadow-md flex flex-col relative animate-in slide-in-from-right duration-300">
                   {/* Mobile Cart Header */}
                   <div className="md:hidden p-5 flex items-center justify-between bg-[#003366] text-white">
-                     <h2 className="font-black uppercase tracking-widest text-sm">Pesanan Saya</h2>
+                     <h2 className="font-semibold uppercase tracking-wide text-sm">Pesanan Saya</h2>
                      <button onClick={() => setIsMobileCartOpen(false)} className="p-2 bg-white/10 rounded-lg"><X size={18} /></button>
                   </div>
 
                   {/* Customer Selection */}
                   <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50">
                      <div className="flex justify-between items-center mb-3">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block">Database Pelanggan</label>
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 block">Database Pelanggan</label>
                         <button 
                            onClick={() => setShowAddCustomer(!showAddCustomer)} 
-                           className={`px-3 py-1.5 rounded-full border-2 text-[11px] font-black flex items-center gap-1.5 transition-all shadow-sm ${
+                           className={`px-3 py-1.5 rounded-full border-2 text-[11px] font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
                               showAddCustomer 
                               ? 'border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100' 
                               : 'border-[#003366] bg-white text-[#003366] hover:bg-blue-50'
@@ -1527,16 +1527,16 @@ export default function POSClient({
                               initial={{ opacity: 0, x: 20 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, scale: 0.9 }}
-                              className="p-3 bg-white border border-slate-100 rounded-2xl flex items-center gap-3 shadow-sm"
+                              className="p-3 bg-white border border-slate-100 rounded-xl flex items-center gap-3 shadow-sm"
                            >
                               <div className="flex-1 min-w-0">
                                  <div className="font-bold text-slate-800 text-xs truncate leading-tight">{item.name}</div>
-                                 <div className="text-[10px] font-black text-blue-600 mt-1">{formatRupiah(item.price)} / {item.unit}</div>
+                                 <div className="text-[10px] font-semibold text-blue-600 mt-1">{formatRupiah(item.price)} / {item.unit}</div>
                               </div>
 
                               <div className="flex items-center gap-1.5 bg-slate-50 rounded-xl p-1 border border-slate-100">
                                  <button onClick={() => updateQty(item.id, -1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-white text-slate-600 shadow-sm"><Minus size={12} /></button>
-                                 <span className="w-5 text-center font-black text-xs">{item.qty}</span>
+                                 <span className="w-5 text-center font-semibold text-xs">{item.qty}</span>
                                  <button onClick={() => updateQty(item.id, +1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-100 text-blue-600 shadow-sm"><Plus size={12} /></button>
                               </div>
 
@@ -1550,7 +1550,7 @@ export default function POSClient({
                      {cart.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60 py-12">
                            <ShoppingCart size={40} className="mb-4 text-slate-200" />
-                           <span className="text-[10px] font-black uppercase tracking-widest">Kosong</span>
+                           <span className="text-[10px] font-semibold uppercase tracking-wide">Kosong</span>
                         </div>
                      )}
                   </div>
@@ -1559,12 +1559,12 @@ export default function POSClient({
                   <div className="bg-slate-900 text-white shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:rounded-t-[32px] overflow-hidden">
                      <div className="p-4 md:p-6 pb-2 border-b border-white/10 flex flex-col gap-2">
                         <div className="flex justify-between items-center text-[10px]">
-                           <span className="font-black uppercase tracking-widest text-slate-400">Subtotal</span>
+                           <span className="font-semibold uppercase tracking-wide text-slate-400">Subtotal</span>
                            <span className="font-bold">{formatRupiah(cartSubtotal)}</span>
                         </div>
                         {appliedPromo && (
                            <div className="flex justify-between items-center text-[10px] text-blue-400">
-                              <span className="font-black uppercase tracking-widest flex items-center gap-1">
+                              <span className="font-semibold uppercase tracking-wide flex items-center gap-1">
                                  Kupon <Tag size={10}/> {appliedPromo.code}
                                  <button onClick={() => setAppliedPromo(null)} className="ml-1 text-rose-400 hover:text-rose-300"><X size={12}/></button>
                               </span>
@@ -1572,7 +1572,7 @@ export default function POSClient({
                            </div>
                         )}
                         <div className="flex justify-between items-center text-[10px] text-emerald-400">
-                           <span className="font-black uppercase tracking-widest">Diskon Manual</span>
+                           <span className="font-semibold uppercase tracking-wide">Diskon Manual</span>
                            <input
                               className="w-24 h-7 bg-white/10 border border-white/10 rounded-lg text-right px-2 font-bold outline-none focus:bg-white/20"
                               value={discountAmount}
@@ -1583,7 +1583,7 @@ export default function POSClient({
                            />
                         </div>
                         <div className="flex justify-between items-center text-[10px] text-rose-400">
-                           <span className="font-black uppercase tracking-widest text-rose-400">Pajak</span>
+                           <span className="font-semibold uppercase tracking-wide text-rose-400">Pajak</span>
                            <select
                               className="w-24 h-7 bg-white/10 border border-white/10 rounded-lg text-right px-1 font-bold outline-none appearance-none"
                               value={taxPercent}
@@ -1614,19 +1614,19 @@ export default function POSClient({
                                     className="w-full h-8 pl-7 pr-3 bg-black/20 border border-white/10 rounded-lg text-[10px] font-bold text-white placeholder-slate-500 outline-none focus:border-blue-500 shadow-inner" 
                                  />
                               </div>
-                              <button onClick={() => void handleApplyPromo()} className="h-8 px-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-black text-[10px] tracking-widest uppercase transition-colors">CEK</button>
+                              <button onClick={() => void handleApplyPromo()} className="h-8 px-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-semibold text-[10px] tracking-wide uppercase transition-colors">CEK</button>
                            </div>
                         )}
                      </div>
 
                      <div className="p-4 md:p-6 pt-3">
                         <div className="flex justify-between items-center mb-4">
-                           <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grand Total</div>
-                           <div className="text-xl md:text-2xl font-black text-emerald-400">{formatRupiah(grandTotal)}</div>
+                           <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Grand Total</div>
+                           <div className="text-xl md:text-2xl font-semibold text-emerald-400">{formatRupiah(grandTotal)}</div>
                         </div>
 
                         {shouldEnforceShift && !activeShiftSession?.id && (
-                           <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-amber-700">
+                           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-amber-700">
                               Buka shift POS dulu agar checkout aktif.
                            </div>
                         )}
@@ -1634,7 +1634,7 @@ export default function POSClient({
                         <button
                            disabled={!activeBranchId || cart.length === 0 || (shouldEnforceShift && !activeShiftSession?.id)}
                            onClick={() => setShowPayment(true)}
-                           className="w-full h-14 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl md:rounded-2xl font-black text-xs md:text-base tracking-widest uppercase transition-colors flex items-center justify-center gap-3 shadow-lg"
+                           className="w-full h-14 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl md:rounded-xl font-semibold text-xs md:text-base tracking-wide uppercase transition-colors flex items-center justify-center gap-3 shadow-lg"
                         >
                            <CreditCard size={20} /> CHECKOUT
                         </button>
@@ -1648,28 +1648,28 @@ export default function POSClient({
          <div className={`md:hidden fixed bottom-6 left-4 right-4 z-40 ${isMobileCartOpen || showPayment ? 'hidden' : 'block'}`}>
             <button
                onClick={() => setIsMobileCartOpen(true)}
-               className="w-full h-16 bg-[#003366] text-white rounded-[28px] shadow-2xl flex items-center justify-between px-6 border border-white/10 relative overflow-hidden group"
+               className="w-full h-16 bg-[#003366] text-white rounded-xl shadow-md flex items-center justify-between px-6 border border-white/10 relative overflow-hidden group"
             >
                <div className="absolute inset-0 bg-blue-500/20 translate-y-full group-active:translate-y-0 transition-transform" />
                <div className="flex items-center gap-3 relative z-10">
-                  <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center">
+                  <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
                      <div className="relative">
                         <ShoppingCart size={20} />
                         {cart.length > 0 && (
-                           <span className="absolute -top-2 -right-2 w-5 h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center scale-90 md:scale-100">
+                           <span className="absolute -top-2 -right-2 w-5 h-5 bg-rose-500 text-white text-[10px] font-semibold rounded-full flex items-center justify-center scale-90 md:scale-100">
                               {cart.reduce((a, c) => a + c.qty, 0)}
                            </span>
                         )}
                      </div>
                   </div>
                   <div className="text-left">
-                     <div className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-1">Items in Cart</div>
-                     <div className="text-xs font-black uppercase tracking-tighter">Lihat Detail Pesanan</div>
+                     <div className="text-[10px] font-semibold text-white/50 uppercase tracking-wide leading-none mb-1">Items in Cart</div>
+                     <div className="text-xs font-semibold uppercase tracking-tighter">Lihat Detail Pesanan</div>
                   </div>
                </div>
                <div className="text-right relative z-10">
-                  <div className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-0.5 opacity-70 italic">Total Tagihan</div>
-                  <div className="text-lg font-black text-emerald-400 leading-none">{formatRupiah(grandTotal)}</div>
+                  <div className="text-[9px] font-semibold text-emerald-400 uppercase tracking-wide mb-0.5 opacity-70 italic">Total Tagihan</div>
+                  <div className="text-lg font-semibold text-emerald-400 leading-none">{formatRupiah(grandTotal)}</div>
                </div>
             </button>
          </div>
@@ -1681,12 +1681,12 @@ export default function POSClient({
                      initial={{ opacity: 0, y: 20, scale: 0.98 }}
                      animate={{ opacity: 1, y: 0, scale: 1 }}
                      exit={{ opacity: 0, y: 20, scale: 0.98 }}
-                     className="my-auto flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl md:max-h-[90vh] md:rounded-[32px]"
+                     className="my-auto flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-md md:max-h-[90vh] md:rounded-[32px]"
                   >
                      <div className="px-5 md:px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                         <div>
-                           <h3 className="text-lg md:text-xl font-black text-slate-900">Buka Shift POS</h3>
-                           <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mt-1">Unit {activeBranchName || 'Aktif'}</p>
+                           <h3 className="text-lg md:text-xl font-semibold text-slate-900">Buka Shift POS</h3>
+                           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-1">Unit {activeBranchName || 'Aktif'}</p>
                         </div>
                         <button onClick={() => setShowOpenShiftModal(false)} className="p-2 rounded-full hover:bg-white text-slate-400 hover:text-slate-700">
                            <X size={20} />
@@ -1694,52 +1694,52 @@ export default function POSClient({
                      </div>
 
                      <div className="flex-1 overflow-y-auto p-5 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-[11px] md:text-xs font-semibold text-blue-800">
+                        <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-[11px] md:text-xs font-semibold text-blue-800">
                            Buka shift wajib otorisasi kasir dengan login NIK. Shift akan tercatat atas nama NIK yang lolos verifikasi.
                         </div>
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Login NIK Kasir</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Login NIK Kasir</label>
                            <input
                               value={openShiftCashierNik}
                               onChange={(e) => setOpenShiftCashierNik(e.target.value.toUpperCase())}
-                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                               placeholder="Contoh: K-0001"
                            />
                         </div>
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Sandi Kasir</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Sandi Kasir</label>
                            <input
                               type="password"
                               value={openShiftCashierPassword}
                               onChange={(e) => setOpenShiftCashierPassword(e.target.value)}
-                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                               placeholder="••••••••"
                            />
                         </div>
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Kode Register</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Kode Register</label>
                            <input
                               value={shiftRegisterCode}
                               onChange={(e) => setShiftRegisterCode(e.target.value.toUpperCase())}
-                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                               placeholder="REG-1"
                            />
                         </div>
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Modal Awal Kas</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Modal Awal Kas</label>
                            <input
                               value={openingCashInput}
                               onChange={(e) => setOpeningCashInput(formatMoneyInput(parseMoneyInput(e.target.value)))}
-                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                               placeholder="0"
                            />
                         </div>
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Akun Kas Laci</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Akun Kas Laci</label>
                            <select
                               value={shiftCashAccountId}
                               onChange={(e) => setShiftCashAccountId(e.target.value)}
-                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                            >
                               <option value="">Pilih akun kas...</option>
                               {posAccountOptions.map((account) => (
@@ -1748,11 +1748,11 @@ export default function POSClient({
                            </select>
                         </div>
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Akun Sumber Modal Awal</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Akun Sumber Modal Awal</label>
                            <select
                               value={shiftOpeningSourceAccountId}
                               onChange={(e) => setShiftOpeningSourceAccountId(e.target.value)}
-                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                            >
                               <option value="">Pilih akun sumber modal...</option>
                               {posAccountOptions
@@ -1766,11 +1766,11 @@ export default function POSClient({
                            </p>
                         </div>
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Akun Transfer</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Akun Transfer</label>
                            <select
                               value={shiftTransferAccountId}
                               onChange={(e) => setShiftTransferAccountId(e.target.value)}
-                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                            >
                               <option value="">Pilih akun transfer...</option>
                               {posAccountOptions.map((account) => (
@@ -1779,11 +1779,11 @@ export default function POSClient({
                            </select>
                         </div>
                         <div className="space-y-2 md:col-span-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Akun QRIS / EDC</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Akun QRIS / EDC</label>
                            <select
                               value={shiftQrisAccountId}
                               onChange={(e) => setShiftQrisAccountId(e.target.value)}
-                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                            >
                               <option value="">Pilih akun QRIS...</option>
                               {posAccountOptions.map((account) => (
@@ -1792,11 +1792,11 @@ export default function POSClient({
                            </select>
                         </div>
                         <div className="space-y-2 md:col-span-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Catatan Pembuka</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Catatan Pembuka</label>
                            <textarea
                               value={openShiftNotes}
                               onChange={(e) => setOpenShiftNotes(e.target.value)}
-                              className="w-full min-h-[88px] px-4 py-3 bg-white border border-slate-200 rounded-2xl font-medium text-sm outline-none"
+                              className="w-full min-h-[88px] px-4 py-3 bg-white border border-slate-200 rounded-xl font-medium text-sm outline-none"
                               placeholder="Contoh: Buka shift pagi, float awal lengkap."
                            />
                         </div>
@@ -1815,7 +1815,7 @@ export default function POSClient({
                         <button
                            onClick={handleOpenShift}
                            disabled={shiftBusy}
-                           className="px-6 py-3 rounded-2xl bg-slate-900 text-white text-sm font-black hover:bg-black disabled:opacity-50"
+                           className="px-6 py-3 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-50"
                         >
                            {shiftBusy ? 'Membuka Shift...' : 'Buka Shift'}
                         </button>
@@ -1832,12 +1832,12 @@ export default function POSClient({
                      initial={{ opacity: 0, y: 20, scale: 0.98 }}
                      animate={{ opacity: 1, y: 0, scale: 1 }}
                      exit={{ opacity: 0, y: 20, scale: 0.98 }}
-                     className="w-full max-w-2xl rounded-[32px] bg-white shadow-2xl overflow-hidden"
+                     className="w-full max-w-2xl rounded-[32px] bg-white shadow-md overflow-hidden"
                   >
                      <div className="px-6 md:px-8 py-5 border-b border-slate-100 bg-rose-50/70 flex items-center justify-between">
                         <div>
-                           <h3 className="text-lg md:text-xl font-black text-slate-900">Tutup Shift POS</h3>
-                           <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mt-1">{activeShiftSession.registerCode}</p>
+                           <h3 className="text-lg md:text-xl font-semibold text-slate-900">Tutup Shift POS</h3>
+                           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-1">{activeShiftSession.registerCode}</p>
                            <p className="text-xs font-semibold text-slate-500 mt-1">Buka Shift: {formatShiftTimestamp(activeShiftSession.openedAt)}</p>
                            {activeShiftCashierLabel && (
                               <p className="text-xs font-semibold text-slate-500 mt-0.5">Kasir Aktif: {activeShiftCashierLabel}</p>
@@ -1849,72 +1849,72 @@ export default function POSClient({
                      </div>
 
                      <div className="p-6 md:p-8 space-y-5">
-                        <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800">
+                        <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800">
                            {canUsePrivilegedCloseShiftOverride
                               ? 'Shift ini dibuka oleh akun Anda. Sebagai owner/admin/manager, Anda boleh langsung menutup shift tanpa mengisi login NIK.'
                               : 'Tutup shift harus memakai login NIK kasir yang membuka shift ini.'}
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Modal Awal</div>
-                              <div className="text-sm font-black text-slate-800">{formatRupiah(activeShiftSession.openingCash)}</div>
+                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Modal Awal</div>
+                              <div className="text-sm font-semibold text-slate-800">{formatRupiah(activeShiftSession.openingCash)}</div>
                            </div>
-                           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Sales Tunai</div>
-                              <div className="text-sm font-black text-slate-800">{formatRupiah(activeShiftSession.totals.byMethod.CASH)}</div>
+                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Sales Tunai</div>
+                              <div className="text-sm font-semibold text-slate-800">{formatRupiah(activeShiftSession.totals.byMethod.CASH)}</div>
                            </div>
-                           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Kembalian</div>
-                              <div className="text-sm font-black text-slate-800">{formatRupiah(activeShiftSession.totals.totalChange)}</div>
+                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Kembalian</div>
+                              <div className="text-sm font-semibold text-slate-800">{formatRupiah(activeShiftSession.totals.totalChange)}</div>
                            </div>
-                           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Expected</div>
-                              <div className="text-sm font-black text-emerald-700">{formatRupiah(activeShiftSession.expectedCash)}</div>
+                           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                              <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 mb-1">Expected</div>
+                              <div className="text-sm font-semibold text-emerald-700">{formatRupiah(activeShiftSession.expectedCash)}</div>
                            </div>
-                           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Durasi</div>
-                              <div className="text-sm font-black text-slate-800">{formatShiftDuration(activeShiftSession.openedAt, null)}</div>
+                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Durasi</div>
+                              <div className="text-sm font-semibold text-slate-800">{formatShiftDuration(activeShiftSession.openedAt, null)}</div>
                            </div>
                         </div>
 
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Login NIK Kasir</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Login NIK Kasir</label>
                            <input
                               value={closeShiftCashierNik}
                               onChange={(e) => setCloseShiftCashierNik(e.target.value.toUpperCase())}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                               placeholder={canUsePrivilegedCloseShiftOverride ? 'Kosongkan jika pakai sesi owner/admin ini' : 'Contoh: K-0001'}
                            />
                         </div>
 
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Sandi Kasir</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Sandi Kasir</label>
                            <input
                               type="password"
                               value={closeShiftCashierPassword}
                               onChange={(e) => setCloseShiftCashierPassword(e.target.value)}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                               placeholder={canUsePrivilegedCloseShiftOverride ? 'Kosongkan jika pakai sesi owner/admin ini' : '••••••••'}
                            />
                         </div>
 
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Kas Fisik Saat Tutup Shift</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Kas Fisik Saat Tutup Shift</label>
                            <input
                               value={closingCashInput}
                               onChange={(e) => setClosingCashInput(formatMoneyInput(parseMoneyInput(e.target.value)))}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                               placeholder="0"
                            />
                         </div>
 
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Catatan Penutup</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Catatan Penutup</label>
                            <textarea
                               value={closeShiftNotes}
                               onChange={(e) => setCloseShiftNotes(e.target.value)}
-                              className="w-full min-h-[110px] px-4 py-3 bg-white border border-slate-200 rounded-2xl font-medium text-sm outline-none"
+                              className="w-full min-h-[110px] px-4 py-3 bg-white border border-slate-200 rounded-xl font-medium text-sm outline-none"
                               placeholder="Contoh: Selisih karena pembulatan kembalian / setor manual."
                            />
                         </div>
@@ -1933,7 +1933,7 @@ export default function POSClient({
                         <button
                            onClick={handleCloseShift}
                            disabled={shiftBusy}
-                           className="px-6 py-3 rounded-2xl bg-rose-600 text-white text-sm font-black hover:bg-rose-700 disabled:opacity-50"
+                           className="px-6 py-3 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50"
                         >
                            {shiftBusy ? 'Menutup Shift...' : 'Tutup Shift'}
                         </button>
@@ -1950,12 +1950,12 @@ export default function POSClient({
                      initial={{ opacity: 0, y: 20, scale: 0.98 }}
                      animate={{ opacity: 1, y: 0, scale: 1 }}
                      exit={{ opacity: 0, y: 20, scale: 0.98 }}
-                     className="w-full max-w-2xl rounded-[32px] bg-white shadow-2xl overflow-hidden"
+                     className="w-full max-w-2xl rounded-[32px] bg-white shadow-md overflow-hidden"
                   >
                      <div className="px-6 md:px-8 py-5 border-b border-slate-100 bg-blue-50/70 flex items-center justify-between">
                         <div>
-                           <h3 className="text-lg md:text-xl font-black text-slate-900">Settlement Shift POS</h3>
-                           <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mt-1">{latestClosedShift.registerCode}</p>
+                           <h3 className="text-lg md:text-xl font-semibold text-slate-900">Settlement Shift POS</h3>
+                           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-1">{latestClosedShift.registerCode}</p>
                            <p className="text-xs font-semibold text-slate-500 mt-1">Buka Shift: {formatShiftTimestamp(latestClosedShift.openedAt)}</p>
                            <p className="text-xs font-semibold text-slate-500 mt-0.5">Tutup Shift: {formatShiftTimestamp(latestClosedShift.closedAt)}</p>
                         </div>
@@ -1965,7 +1965,7 @@ export default function POSClient({
                      </div>
 
                      <div className="p-6 md:p-8 space-y-5">
-                        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-800">
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-800">
                            Settlement wajib memakai login NIK kasir shift ini atau otorisator owner/admin/manager agar jejak audit harian tetap lengkap.
                         </div>
 
@@ -1975,7 +1975,7 @@ export default function POSClient({
                                  key={method}
                                  type="button"
                                  onClick={() => setSettlementMethod(method)}
-                                 className={`p-3 rounded-2xl border-2 font-black text-[11px] uppercase tracking-widest transition-all ${
+                                 className={`p-3 rounded-xl border-2 font-semibold text-[11px] uppercase tracking-wide transition-all ${
                                     settlementMethod === method
                                        ? 'border-blue-600 bg-blue-50 text-blue-700'
                                        : 'border-slate-200 bg-white text-slate-400'
@@ -1987,22 +1987,22 @@ export default function POSClient({
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Akun Sumber</div>
-                              <div className="text-sm font-black text-slate-800">{getAccountName(settlementMethod === 'CASH' ? latestClosedShift.cashAccountId : settlementMethod === 'TRANSFER' ? latestClosedShift.transferAccountId : latestClosedShift.qrisAccountId)}</div>
+                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Akun Sumber</div>
+                              <div className="text-sm font-semibold text-slate-800">{getAccountName(settlementMethod === 'CASH' ? latestClosedShift.cashAccountId : settlementMethod === 'TRANSFER' ? latestClosedShift.transferAccountId : latestClosedShift.qrisAccountId)}</div>
                            </div>
-                           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Sisa Settlement</div>
-                              <div className="text-sm font-black text-emerald-700">{formatRupiah(settlementRemaining)}</div>
+                           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                              <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 mb-1">Sisa Settlement</div>
+                              <div className="text-sm font-semibold text-emerald-700">{formatRupiah(settlementRemaining)}</div>
                            </div>
                         </div>
 
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Akun Tujuan</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Akun Tujuan</label>
                            <select
                               value={settlementTargetAccountId}
                               onChange={(e) => setSettlementTargetAccountId(e.target.value)}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                            >
                               <option value="">Pilih akun tujuan...</option>
                               {accounts
@@ -2014,43 +2014,43 @@ export default function POSClient({
                         </div>
 
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nominal Settlement</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Nominal Settlement</label>
                            <input
                               value={settlementAmountInput}
                               onChange={(e) => setSettlementAmountInput(formatMoneyInput(parseMoneyInput(e.target.value)))}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                               placeholder="0"
                            />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-2">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Login NIK Otorisasi</label>
+                              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Login NIK Otorisasi</label>
                               <input
                                  value={settlementAuthorizerNik}
                                  onChange={(e) => setSettlementAuthorizerNik(e.target.value.toUpperCase())}
-                                 className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                                 className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                                  placeholder="Contoh: K-0001"
                               />
                            </div>
                            <div className="space-y-2">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Sandi Otorisasi</label>
+                              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Sandi Otorisasi</label>
                               <input
                                  type="password"
                                  value={settlementAuthorizerPassword}
                                  onChange={(e) => setSettlementAuthorizerPassword(e.target.value)}
-                                 className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                                 className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none"
                                  placeholder="••••••••"
                               />
                            </div>
                         </div>
 
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Catatan Settlement</label>
+                           <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Catatan Settlement</label>
                            <textarea
                               value={settlementNotes}
                               onChange={(e) => setSettlementNotes(e.target.value)}
-                              className="w-full min-h-[110px] px-4 py-3 bg-white border border-slate-200 rounded-2xl font-medium text-sm outline-none"
+                              className="w-full min-h-[110px] px-4 py-3 bg-white border border-slate-200 rounded-xl font-medium text-sm outline-none"
                               placeholder="Contoh: Setor kas akhir shift ke bank operasional."
                            />
                         </div>
@@ -2069,7 +2069,7 @@ export default function POSClient({
                         <button
                            onClick={handleSettlement}
                            disabled={shiftBusy || settlementRemaining <= 0}
-                           className="px-6 py-3 rounded-2xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700 disabled:opacity-50"
+                           className="px-6 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
                         >
                            {shiftBusy ? 'Posting Settlement...' : 'Posting Settlement'}
                         </button>
@@ -2087,70 +2087,70 @@ export default function POSClient({
                      initial={{ opacity: 0, y: 100 }}
                      animate={{ opacity: 1, y: 0 }}
                      exit={{ opacity: 0, y: 100 }}
-                     className="relative w-full h-full md:h-auto md:max-w-4xl bg-white md:rounded-[40px] shadow-2xl flex flex-col md:flex-row overflow-hidden"
+                     className="relative w-full h-full md:h-auto md:max-w-4xl bg-white md:rounded-xl shadow-md flex flex-col md:flex-row overflow-hidden"
                   >
                      {/* Summary Side */}
-                     <div className="w-full md:w-[45%] bg-[#003366] text-white p-6 md:p-10 flex flex-col justify-between relative">
+                     <div className="w-full md:w-[45%] bg-[#003366] text-white p-6 md:p-5 flex flex-col justify-between relative">
                         <div className="relative z-10">
                            <div className="flex justify-between items-center md:block mb-8 md:mb-0">
-                              <div className="w-12 h-12 md:w-16 md:h-16 bg-white/10 rounded-[18px] md:rounded-3xl flex items-center justify-center border border-white/20 backdrop-blur-sm">
+                              <div className="w-12 h-12 md:w-16 md:h-16 bg-white/10 rounded-[18px] md:rounded-xl flex items-center justify-center border border-white/20 backdrop-blur-sm">
                                  <Receipt size={24} className="text-white md:hidden" />
                                  <Receipt size={32} className="text-white hidden md:block" />
                               </div>
                               <button onClick={() => setShowPayment(false)} className="md:hidden p-2 bg-white/10 rounded-lg"><X size={18} /></button>
                            </div>
-                           <h2 className="text-2xl md:text-3xl font-black mb-1 md:mb-2 tracking-tight">Pembayaran</h2>
+                           <h2 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2 tracking-tight">Pembayaran</h2>
                            <p className="text-white/60 font-bold text-xs md:text-sm mb-6 md:mb-12">Total {cart.reduce((a, c) => a + c.qty, 0)} Items Terpilih.</p>
 
                            <div className="space-y-3 md:space-y-4">
                               <div className="flex justify-between items-center py-1.5 md:py-2 border-b border-white/10 text-[10px] md:text-base">
-                                 <span className="font-bold text-white/50 uppercase md:normal-case tracking-widest md:tracking-normal">Subtotal</span>
-                                 <span className="font-black md:text-lg">{formatRupiah(cartSubtotal)}</span>
+                                 <span className="font-bold text-white/50 uppercase md:normal-case tracking-wide md:tracking-normal">Subtotal</span>
+                                 <span className="font-semibold md:text-lg">{formatRupiah(cartSubtotal)}</span>
                               </div>
                               {(parsedDiscount > 0 || taxPercent > 0) && (
                                  <div className="flex justify-between items-center py-1.5 md:py-2 border-b border-white/10 text-[10px] md:text-base text-white/70 italic">
                                     <span>Adjustments (Disc/Tax)</span>
-                                    <span className="font-black">{formatRupiah(taxNominal - parsedDiscount)}</span>
+                                    <span className="font-semibold">{formatRupiah(taxNominal - parsedDiscount)}</span>
                                  </div>
                               )}
                               <div className="flex justify-between items-center pt-4 md:pt-6">
-                                 <span className="font-black text-white uppercase tracking-widest text-[10px] md:text-xs">TOTAL AKHIR</span>
-                                 <span className="font-black text-2xl md:text-4xl text-emerald-400">{formatRupiah(grandTotal)}</span>
+                                 <span className="font-semibold text-white uppercase tracking-wide text-[10px] md:text-xs">TOTAL AKHIR</span>
+                                 <span className="font-semibold text-2xl md:text-4xl text-emerald-400">{formatRupiah(grandTotal)}</span>
                               </div>
                            </div>
                         </div>
                      </div>
 
                      {/* Form Side */}
-                     <div className="flex-1 bg-slate-50 p-6 md:p-10 overflow-y-auto">
+                     <div className="flex-1 bg-slate-50 p-6 md:p-5 overflow-y-auto">
                         {successData ? (
                            <div className="h-full flex flex-col items-center justify-center text-center py-10 md:py-0">
                               <motion.div initial={{ scale: 0 }} animate={{ scale: 1, rotate: 360 }} transition={{ type: 'spring' }} className="w-20 h-20 md:w-24 md:h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6">
                                  <CheckCircle2 size={40} className="md:w-[48px]" />
                               </motion.div>
-                              <h2 className="text-xl md:text-2xl font-black text-slate-800 mb-2 italic">TRANSAKSI SUKSES</h2>
+                              <h2 className="text-xl md:text-2xl font-semibold text-slate-800 mb-2 italic">TRANSAKSI SUKSES</h2>
                               <p className="text-slate-500 font-bold text-xs md:text-sm mb-8 max-w-xs mx-auto">Saldo inventory otomatis terpotong & jurnal tercatat.</p>
 
-                              <div className="bg-white border border-slate-200 rounded-3xl p-6 w-full mb-8 shadow-sm max-w-sm">
+                              <div className="bg-white border border-slate-200 rounded-xl p-6 w-full mb-8 shadow-sm max-w-sm">
                                  <div className="flex justify-between items-center mb-4 text-[10px] md:text-xs">
-                                    <span className="uppercase font-black text-slate-400 tracking-widest">Total Bayar</span>
-                                    <span className="font-black text-slate-800">{formatRupiah(successData.total)}</span>
+                                    <span className="uppercase font-semibold text-slate-400 tracking-wide">Total Bayar</span>
+                                    <span className="font-semibold text-slate-800">{formatRupiah(successData.total)}</span>
                                  </div>
                                  <div className="flex justify-between items-center pt-4 border-t border-dashed border-slate-200">
-                                    <span className="text-[10px] md:text-xs uppercase font-black text-blue-500 tracking-widest italic">KEMBALIAN</span>
-                                    <span className="font-black text-xl md:text-2xl text-blue-600">{formatRupiah(successData.change)}</span>
+                                    <span className="text-[10px] md:text-xs uppercase font-semibold text-blue-500 tracking-wide italic">KEMBALIAN</span>
+                                    <span className="font-semibold text-xl md:text-2xl text-blue-600">{formatRupiah(successData.change)}</span>
                                  </div>
                               </div>
 
-                              <div className="bg-white border border-slate-200 rounded-3xl p-5 w-full mb-5 shadow-sm max-w-sm text-left">
-                                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                              <div className="bg-white border border-slate-200 rounded-xl p-5 w-full mb-5 shadow-sm max-w-sm text-left">
+                                 <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
                                     Custom Pesan WhatsApp
                                  </label>
                                  <textarea
                                     value={successData.customWaMessage || ''}
                                     onChange={(e) => setSuccessData((prev) => prev ? { ...prev, customWaMessage: e.target.value } : prev)}
                                     placeholder="Contoh: Sampai jumpa lagi, Kak. Promo pekan depan siap menunggu."
-                                    className="w-full min-h-[110px] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-emerald-400 focus:bg-white resize-y"
+                                    className="w-full min-h-[110px] rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-emerald-400 focus:bg-white resize-y"
                                  />
                                  <p className="mt-2 text-[10px] text-slate-500 font-medium leading-relaxed">
                                     Pesan ini akan ikut di tombol WhatsApp. Placeholder didukung: {`{customer_name}`}, {`{sale_id}`}, {`{item_count}`}, {`{subtotal}`}, {`{discount}`}, {`{tax}`}, {`{total}`}.
@@ -2158,38 +2158,38 @@ export default function POSClient({
                               </div>
 
                               <div className="grid grid-cols-2 gap-3 w-full max-w-sm mb-3">
-                                 <button onClick={() => window.print()} className="py-4 bg-white border border-slate-200 text-slate-600 font-black tracking-widest uppercase text-[10px] rounded-2xl hover:bg-slate-100 shadow-sm w-full">Struk Fisik</button>
-                                 <button onClick={sendWaReceipt} className="py-4 bg-emerald-50 border border-emerald-200 text-emerald-600 font-black tracking-widest uppercase text-[10px] rounded-2xl hover:bg-emerald-100 shadow-sm w-full flex items-center justify-center gap-1.5"><MessageCircle size={14} /> WhatsApp</button>
+                                 <button onClick={() => window.print()} className="py-4 bg-white border border-slate-200 text-slate-600 font-semibold tracking-wide uppercase text-[10px] rounded-xl hover:bg-slate-100 shadow-sm w-full">Struk Fisik</button>
+                                 <button onClick={sendWaReceipt} className="py-4 bg-emerald-50 border border-emerald-200 text-emerald-600 font-semibold tracking-wide uppercase text-[10px] rounded-xl hover:bg-emerald-100 shadow-sm w-full flex items-center justify-center gap-1.5"><MessageCircle size={14} /> WhatsApp</button>
                               </div>
-                              <button onClick={resetPOS} className="w-full max-w-sm py-5 bg-blue-600 text-white font-black tracking-widest uppercase text-xs rounded-2xl hover:bg-blue-500 shadow-lg shadow-blue-500/20 mt-2">PESANAN BERIKUTNYA</button>
+                              <button onClick={resetPOS} className="w-full max-w-sm py-5 bg-blue-600 text-white font-semibold tracking-wide uppercase text-xs rounded-xl hover:bg-blue-500 shadow-lg shadow-blue-500/20 mt-2">PESANAN BERIKUTNYA</button>
                            </div>
                         ) : (
                            <div className="flex flex-col h-full">
                               <div className="hidden md:flex justify-between items-center mb-4">
-                                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Penyelesaian Transaksi</h3>
+                                 <h3 className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Penyelesaian Transaksi</h3>
                                  <button onClick={() => setShowPayment(false)} className="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg"><X size={18} /></button>
                               </div>
 
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Metode Pembayaran</label>
+                              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Metode Pembayaran</label>
                               <div className="grid grid-cols-3 gap-2 md:gap-3 mb-8">
-                                 <button onClick={() => setPaymentMethod('CASH')} className={`p-3 md:p-4 rounded-xl md:rounded-2xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'CASH' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
+                                 <button onClick={() => setPaymentMethod('CASH')} className={`p-3 md:p-4 rounded-xl md:rounded-xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'CASH' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
                                     <Banknote size={20} className="md:w-[24px]" />
-                                    <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest">Tunai</span>
+                                    <span className="text-[8px] md:text-[10px] font-semibold uppercase tracking-wide">Tunai</span>
                                  </button>
-                                 <button onClick={() => setPaymentMethod('QRIS')} className={`p-3 md:p-4 rounded-xl md:rounded-2xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'QRIS' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
+                                 <button onClick={() => setPaymentMethod('QRIS')} className={`p-3 md:p-4 rounded-xl md:rounded-xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'QRIS' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
                                     <QrCode size={20} className="md:w-[24px]" />
-                                    <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest">QRIS / EDC</span>
+                                    <span className="text-[8px] md:text-[10px] font-semibold uppercase tracking-wide">QRIS / EDC</span>
                                  </button>
-                                 <button onClick={() => setPaymentMethod('TRANSFER')} className={`p-3 md:p-4 rounded-xl md:rounded-2xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'TRANSFER' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
+                                 <button onClick={() => setPaymentMethod('TRANSFER')} className={`p-3 md:p-4 rounded-xl md:rounded-xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'TRANSFER' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
                                     <CreditCard size={20} className="md:w-[24px]" />
-                                    <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest">Transfer</span>
+                                    <span className="text-[8px] md:text-[10px] font-semibold uppercase tracking-wide">Transfer</span>
                                  </button>
                               </div>
 
                               <div className="space-y-6 flex-1">
                                  {requiresWarehouseSelection && (
                                  <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Gudang Pengeluaran</label>
+                                    <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Gudang Pengeluaran</label>
                                     <select
                                        value={selectedWarehouseId}
                                        onChange={e => setSelectedWarehouseId(e.target.value)}
@@ -2209,7 +2209,7 @@ export default function POSClient({
                                  )}
 
                                  <div className="space-y-1.5 opacity-80 pointer-events-none mb-6">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-emerald-700 ml-1 flex items-center gap-1.5">
+                                    <label className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 ml-1 flex items-center gap-1.5">
                                        <CheckCircle2 size={12} /> Auto-Routed ke Rekening POS
                                     </label>
                                     <div className="w-full h-12 md:h-14 px-4 bg-slate-100/80 border border-slate-200/60 rounded-xl font-bold text-xs md:text-sm text-slate-500 flex items-center shadow-inner italic">
@@ -2220,9 +2220,9 @@ export default function POSClient({
                                  {paymentMethod === 'CASH' && (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                                        <div className="space-y-2">
-                                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Nominal Tunai Diterima</label>
+                                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">Nominal Tunai Diterima</label>
                                           <div className="relative">
-                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 font-black text-xs md:text-sm">Rp</span>
+                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 font-semibold text-xs md:text-sm">Rp</span>
                                              <input
                                                 type="text"
                                                 value={amountTendered}
@@ -2230,7 +2230,7 @@ export default function POSClient({
                                                    const val = e.target.value.replace(/\D/g, '')
                                                    setAmountTendered(val ? new Intl.NumberFormat('id-ID').format(Number(val)) : '')
                                                 }}
-                                                className="w-full h-14 md:h-16 pl-10 md:pl-12 pr-6 bg-white border border-slate-200 rounded-xl font-black text-lg md:text-2xl text-slate-800 outline-none focus:border-[#003366] transition-all shadow-sm"
+                                                className="w-full h-14 md:h-16 pl-10 md:pl-12 pr-6 bg-white border border-slate-200 rounded-xl font-semibold text-lg md:text-2xl text-slate-800 outline-none focus:border-[#003366] transition-all shadow-sm"
                                                 placeholder="0"
                                              />
                                           </div>
@@ -2258,22 +2258,22 @@ export default function POSClient({
 
                                        {changeDue > 0 && amountTendered && (
                                           <div className="p-3 md:p-4 mt-2 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-between animate-in fade-in">
-                                             <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-orange-600/70">Kembalian</span>
-                                             <span className="text-sm md:text-lg font-black text-orange-600">{formatRupiah(changeDue)}</span>
+                                             <span className="text-[10px] md:text-xs font-bold uppercase tracking-wide text-orange-600/70">Kembalian</span>
+                                             <span className="text-sm md:text-lg font-semibold text-orange-600">{formatRupiah(changeDue)}</span>
                                           </div>
                                        )}
                                     </div>
                                  )}
 
                                  <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
+                                    <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-1">
                                        Custom Pesan WhatsApp
                                     </label>
                                     <textarea
                                        value={customWaMessage}
                                        onChange={(e) => setCustomWaMessage(e.target.value)}
                                        placeholder="Pesan tambahan untuk pelanggan. Bisa dipakai untuk ucapan, promo, atau info penjemputan."
-                                       className="w-full min-h-[110px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-[#003366] shadow-sm resize-y"
+                                       className="w-full min-h-[110px] rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-[#003366] shadow-sm resize-y"
                                     />
                                     <p className="text-[10px] text-slate-500 font-medium leading-relaxed px-1">
                                        Otomatis ikut ke pesan WA struk POS. Placeholder yang didukung: {`{customer_name}`}, {`{sale_id}`}, {`{item_count}`}, {`{subtotal}`}, {`{discount}`}, {`{tax}`}, {`{total}`}.
@@ -2282,7 +2282,7 @@ export default function POSClient({
                               </div>
 
                               <div className="pt-6 mt-auto">
-                                 <button disabled={loading || !activeBranchId || (requiresWarehouseSelection && !selectedWarehouseId)} onClick={handlePay} className="w-full h-16 md:h-[72px] bg-[#003366] hover:bg-[#002244] text-white flex flex-col items-center justify-center gap-1 rounded-2xl md:rounded-[20px] shadow-xl transition-all font-black text-[11px] md:text-xs tracking-widest disabled:opacity-50">
+                                 <button disabled={loading || !activeBranchId || (requiresWarehouseSelection && !selectedWarehouseId)} onClick={handlePay} className="w-full h-16 md:h-[72px] bg-[#003366] hover:bg-[#002244] text-white flex flex-col items-center justify-center gap-1 rounded-xl md:rounded-[20px] shadow-xl transition-all font-semibold text-[11px] md:text-xs tracking-wide disabled:opacity-50">
                                     {loading ? (
                                        <span className="animate-spin border-2 border-white/20 border-t-white rounded-full w-5 h-5 mb-0.5" />
                                     ) : (

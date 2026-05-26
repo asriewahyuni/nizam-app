@@ -164,7 +164,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
+          <h1 className="text-4xl font-semibold text-slate-900 tracking-tight flex items-center gap-4">
             <Zap size={40} className="text-amber-500 fill-amber-500" />
             Manajemen Zakat Tijarah
           </h1>
@@ -172,12 +172,12 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
             Kalkulator Zakat Maal Perusahaan — Nishab: <strong>20 Dinar (85gr Emas)</strong> atau <strong>200 Dirham (595gr Perak)</strong>.
             Harga dikunci pada awal haul.
           </p>
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-[10px] font-black uppercase tracking-widest text-slate-700">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-[10px] font-semibold uppercase tracking-wide text-slate-700">
             <Building2 size={12} />
             {summary.scopeLabel || 'Level Organisasi'}
           </div>
-          <div className="max-w-3xl rounded-3xl border border-blue-100 bg-blue-50/80 px-5 py-4 text-sm text-blue-900">
-            <p className="font-black uppercase tracking-widest text-[10px] text-blue-700 mb-1">Boundary Modul</p>
+          <div className="max-w-3xl rounded-xl border border-blue-100 bg-blue-50/80 px-5 py-4 text-sm text-blue-900">
+            <p className="font-semibold uppercase tracking-wide text-[10px] text-blue-700 mb-1">Boundary Modul</p>
             <p className="font-medium leading-relaxed">
               Zakat Tijarah dihitung untuk seluruh organisasi, bukan per unit. {activeBranchName
                 ? `Unit aktif saat ini adalah ${activeBranchName}, tetapi haul, nishab, dan pembayaran zakat tetap memakai agregat organisasi.`
@@ -185,8 +185,8 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
             </p>
           </div>
           {summary.isTradeZakatApplicable === false && (
-            <div className="max-w-3xl rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
-              <p className="font-black uppercase tracking-widest text-[10px] text-amber-700 mb-1">Status Zakat Tijarah</p>
+            <div className="max-w-3xl rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+              <p className="font-semibold uppercase tracking-wide text-[10px] text-amber-700 mb-1">Status Zakat Tijarah</p>
               <p className="font-medium leading-relaxed">
                 {summary.tradeZakatIneligibilityReason || 'Usaha terdeteksi sebagai layanan/jasa, sehingga zakat tijarah tidak diterapkan.'}
               </p>
@@ -195,22 +195,22 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
         </div>
 
         {/* Price Control */}
-        <div className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-wrap items-end gap-4">
+        <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-wrap items-end gap-4">
           <div className="space-y-1">
-            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-1"><Settings2 size={10}/> Emas/Gr (Referensi)</p>
+            <p className="text-[9px] font-semibold text-amber-500 uppercase tracking-wide flex items-center gap-1"><Settings2 size={10}/> Emas/Gr (Referensi)</p>
             <input type="number" value={goldPrice} onChange={(e) => setGoldPrice(parseInt(e.target.value))}
-              className="w-28 bg-amber-50 border border-amber-200 rounded-xl p-2 font-black text-xs text-amber-700 outline-none focus:ring-2 ring-amber-300 transition-all" />
+              className="w-28 bg-amber-50 border border-amber-200 rounded-xl p-2 font-semibold text-xs text-amber-700 outline-none focus:ring-2 ring-amber-300 transition-all" />
           </div>
           <div className="space-y-1">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Settings2 size={10}/> Perak/Gr (Referensi)</p>
+            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1"><Settings2 size={10}/> Perak/Gr (Referensi)</p>
             <input type="number" value={silverPrice} onChange={(e) => setSilverPrice(parseInt(e.target.value))}
-              className="w-28 bg-slate-50 border border-slate-200 rounded-xl p-2 font-black text-xs text-slate-600 outline-none focus:ring-2 ring-slate-200 transition-all" />
+              className="w-28 bg-slate-50 border border-slate-200 rounded-xl p-2 font-semibold text-xs text-slate-600 outline-none focus:ring-2 ring-slate-200 transition-all" />
           </div>
-          <button onClick={applyPrices} className="bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-[10px] font-black hover:bg-slate-800 transition-all shadow-lg active:scale-95">
+          <button onClick={applyPrices} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-semibold hover:bg-slate-800 transition-all shadow-lg active:scale-95">
             PREVIEW
           </button>
           
-          <button onClick={handleAutoPrice} disabled={loading} className="bg-amber-100 text-amber-700 font-black px-4 py-2.5 rounded-2xl text-[10px] hover:bg-amber-200 transition-all flex items-center justify-center gap-2 border border-amber-300 disabled:opacity-50">
+          <button onClick={handleAutoPrice} disabled={loading} className="bg-amber-100 text-amber-700 font-semibold px-4 py-2.5 rounded-xl text-[10px] hover:bg-amber-200 transition-all flex items-center justify-center gap-2 border border-amber-300 disabled:opacity-50">
             <Globe size={14} /> AUTO GLOBAL RATE
           </button>
         </div>
@@ -220,7 +220,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
       <AnimatePresence>
         {msg && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-            className={`p-4 rounded-2xl text-sm font-bold flex items-center gap-3 ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+            className={`p-4 rounded-xl text-sm font-bold flex items-center gap-3 ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
             {msg.type === 'ok' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
             {msg.text}
             <button onClick={() => setMsg(null)} className="ml-auto opacity-50 hover:opacity-100"><XCircle size={16}/></button>
@@ -229,26 +229,26 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
       </AnimatePresence>
 
       {/* Haul Banner */}
-      <div className={`p-6 rounded-[28px] border-2 flex flex-wrap items-center justify-between gap-4 ${
+      <div className={`p-6 rounded-xl border-2 flex flex-wrap items-center justify-between gap-4 ${
         summary.haulStatus === 'ACTIVE' ? 'bg-emerald-50 border-emerald-200' :
         summary.haulStatus === 'BATAL'  ? 'bg-rose-50 border-rose-200' :
         summary.haulStatus === 'COMPLETED' ? 'bg-amber-50 border-amber-200' :
         'bg-slate-50 border-slate-200'
       }`}>
         <div className="flex items-center gap-4">
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs ${haulCfg.color}`}>
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-xs ${haulCfg.color}`}>
             {haulCfg.icon} {haulCfg.label}
           </div>
           {summary.haulStatus === 'ACTIVE' && (
             <div className="space-y-0.5">
-              <p className="text-xs font-black text-slate-700">Mulai: {summary.haulStartDate} &nbsp;|&nbsp; Hari ke-{summary.haulDaysElapsed} / 354</p>
+              <p className="text-xs font-semibold text-slate-700">Mulai: {summary.haulStartDate} &nbsp;|&nbsp; Hari ke-{summary.haulDaysElapsed} / 354</p>
               <div className="w-48 h-2 bg-slate-200 rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${Math.min(100, (summary.haulDaysElapsed / 354) * 100)}%` }}/>
               </div>
               <div className="flex items-center gap-3">
                 <p className="text-[10px] text-slate-400 font-bold">Sisa {summary.haulDaysRemaining} hari</p>
                 {maghribCountdown && (
-                  <p className="text-[9px] text-amber-600 font-black flex items-center gap-1 bg-amber-100/60 px-2 py-0.5 rounded-full border border-amber-200" title={`Puncak pergantian hari: waktu maghrib (${maghribTimeStr}) di lokasi ${geoLocName}`}>
+                  <p className="text-[9px] text-amber-600 font-semibold flex items-center gap-1 bg-amber-100/60 px-2 py-0.5 rounded-full border border-amber-200" title={`Puncak pergantian hari: waktu maghrib (${maghribTimeStr}) di lokasi ${geoLocName}`}>
                     <Sunset size={10}/> {maghribCountdown} (Maghrib {maghribTimeStr} - {geoLocName})
                   </p>
                 )}
@@ -257,7 +257,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
           )}
           {summary.haulStatus === 'ACTIVE' && (
             <div className="space-y-0.5 pl-4 border-l border-emerald-200">
-              <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Harga Dikunci (Awal Haul)</p>
+              <p className="text-[9px] font-semibold text-emerald-600 uppercase tracking-wide">Harga Dikunci (Awal Haul)</p>
               <p className="text-xs font-bold text-slate-700">Emas: Rp {summary.hauledPrices.goldPerGram.toLocaleString('id-ID')}/gr</p>
               <p className="text-xs font-bold text-slate-700">Perak: Rp {summary.hauledPrices.silverPerGram.toLocaleString('id-ID')}/gr</p>
             </div>
@@ -270,18 +270,18 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
         <div className="flex gap-3">
           {summary.haulStatus === 'ACTIVE' && (
             <button onClick={handleCheckHaul} disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 text-[10px] font-black text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
+              className="flex items-center gap-2 px-4 py-2 text-[10px] font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
               <RefreshCw size={12}/> CEK STATUS HAUL
             </button>
           )}
           {(summary.haulStatus === 'NO_HAUL' || summary.haulStatus === 'BATAL') && summary.isZakatObligated && (
             <button onClick={handleStartHaul} disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 text-[10px] font-black text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all">
+              className="flex items-center gap-2 px-4 py-2 text-[10px] font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all">
               <Play size={12}/> MULAI HAUL BARU
             </button>
           )}
           {(summary.haulStatus === 'NO_HAUL' || summary.haulStatus === 'BATAL') && !summary.isZakatObligated && (
-            <div className="px-4 py-2 text-[10px] font-black text-slate-400 bg-slate-100 rounded-xl">
+            <div className="px-4 py-2 text-[10px] font-semibold text-slate-400 bg-slate-100 rounded-xl">
               {summary.isTradeZakatApplicable === false
                 ? (summary.tradeZakatIneligibilityReason || 'Zakat tijarah tidak berlaku untuk usaha layanan/jasa.')
                 : 'Aset belum mencapai nishab — haul belum dapat dimulai'}
@@ -293,7 +293,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
       {/* Hero Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Zakat Card */}
-        <div className="lg:col-span-2 bg-gradient-to-br from-amber-500 to-amber-700 p-10 rounded-[48px] shadow-2xl shadow-amber-200 relative overflow-hidden group">
+        <div className="lg:col-span-2 bg-gradient-to-br from-amber-500 to-amber-700 p-5 rounded-xl shadow-md shadow-amber-200 relative overflow-hidden group">
           <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/20 to-transparent" />
           <div className="relative z-10 h-full flex flex-col space-y-8">
             <div className="flex justify-between items-start">
@@ -302,49 +302,49 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
               </div>
               <div className="flex flex-col items-end gap-2">
                 {summary.isZakatObligated ? (
-                  <span className="bg-white/20 backdrop-blur-md text-white px-5 py-2 rounded-full text-[10px] font-black border border-white/20">WAJIB ZAKAT</span>
+                  <span className="bg-white/20 backdrop-blur-md text-white px-5 py-2 rounded-full text-[10px] font-semibold border border-white/20">WAJIB ZAKAT</span>
                 ) : (
-                  <span className="bg-white/10 text-white/50 px-5 py-2 rounded-full text-[10px] font-black border border-white/10">
+                  <span className="bg-white/10 text-white/50 px-5 py-2 rounded-full text-[10px] font-semibold border border-white/10">
                     {summary.isTradeZakatApplicable === false ? 'TIDAK BERLAKU (LAYANAN)' : 'DI BAWAH NISHAB'}
                   </span>
                 )}
                 
                 {summary.haulStatus === 'ACTIVE' && (
-                  <div className="bg-black/20 backdrop-blur-md text-white px-4 py-2 rounded-full text-[9px] font-black border border-white/10 shadow-inner flex items-center gap-2">
+                  <div className="bg-black/20 backdrop-blur-md text-white px-4 py-2 rounded-full text-[9px] font-semibold border border-white/10 shadow-inner flex items-center gap-2">
                     <Timer size={12}/> HAUL: SISA {summary.haulDaysRemaining} HARI 
                   </div>
                 )}
                 
                 {summary.haulStatus === 'COMPLETED' && (
-                  <button onClick={() => setShowPayDialog(true)} className="bg-emerald-500 hover:bg-emerald-400 text-white px-5 py-2 rounded-full text-[10px] font-black shadow-xl shadow-emerald-500/20 flex items-center gap-2 transition-all active:scale-95">
+                  <button onClick={() => setShowPayDialog(true)} className="bg-emerald-500 hover:bg-emerald-400 text-white px-5 py-2 rounded-full text-[10px] font-semibold shadow-xl shadow-emerald-500/20 flex items-center gap-2 transition-all active:scale-95">
                     <Wallet size={12}/> BAYAR ZAKAT (TUNAIKAN)
                   </button>
                 )}
               </div>
             </div>
             <div className="space-y-3">
-              <p className="text-white/60 text-[10px] font-bold uppercase tracking-[0.2em]">Estimasi Zakat Harus Dibayar (2.5%)</p>
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-white font-mono tracking-tighter leading-none italic break-all">
+              <p className="text-white/60 text-[10px] font-bold uppercase tracking-wide">Estimasi Zakat Harus Dibayar (2.5%)</p>
+              <h2 className="text-3xl md:text-4xl lg:text-5xl font-semibold text-white font-mono tracking-tighter leading-none italic break-all">
                 {formatRupiah(summary.zakatAmount)}
               </h2>
             </div>
 
             <AnimatePresence mode="wait">
               {showPayDialog ? (
-                <motion.div key="pay-form" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/20 text-white shadow-inner">
+                <motion.div key="pay-form" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 text-white shadow-inner">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2"><Wallet size={16}/> Bayar Zakat</h3>
+                    <h3 className="font-semibold text-sm uppercase tracking-wide flex items-center gap-2"><Wallet size={16}/> Bayar Zakat</h3>
                     <button onClick={() => setShowPayDialog(false)} className="text-white/50 hover:text-white"><XCircle size={16}/></button>
                   </div>
                   
                   <div className="space-y-3 mb-4">
-                    <label className="text-[10px] font-black text-white/70 uppercase tracking-widest">Sumber Dana (Kas & Bank)</label>
+                    <label className="text-[10px] font-semibold text-white/70 uppercase tracking-wide">Sumber Dana (Kas & Bank)</label>
                     <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                       {summary.zakatAssets.filter((a: any) => a.type === 'CASH').map((acc: any) => (
                         <button key={acc.id || acc.code} onClick={() => setSelectedBank(acc.id)} 
                           className={`text-left p-3 rounded-xl border-2 transition-all flex justify-between items-center ${selectedBank === acc.id ? 'border-white bg-white/20' : 'border-white/10 bg-white/5 hover:border-white/20'}`}>
                           <div>
-                            <p className="text-xs font-black">{acc.name}</p>
+                            <p className="text-xs font-semibold">{acc.name}</p>
                             <p className="text-[10px] font-bold text-white/70">Saldo: {formatRupiah(acc.balance)}</p>
                           </div>
                           {selectedBank === acc.id && <CheckCircle2 size={16} className="text-white"/>}
@@ -353,7 +353,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                     </div>
                   </div>
                   <button onClick={handlePayZakat} disabled={paying || !selectedBank}
-                    className="w-full py-3 bg-white text-amber-700 hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-xs font-black shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                    className="w-full py-3 bg-white text-amber-700 hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-xs font-semibold shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
                     {paying ? <RotateCcw size={16} className="animate-spin" /> : <ShieldCheck size={16} />} 
                     KONFIRMASI BAYAR & JURNAL
                   </button>
@@ -428,17 +428,17 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                   })()}
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white/10 rounded-2xl p-4 flex flex-col justify-center border border-white/5 relative overflow-hidden">
+                    <div className="bg-white/10 rounded-xl p-4 flex flex-col justify-center border border-white/5 relative overflow-hidden">
                       <div className="absolute right-0 bottom-0 opacity-10 translate-x-1/4 translate-y-1/4"><Coins size={64}/></div>
-                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">Nishab Emas</p>
-                      <p className="text-white font-black text-[10px] mb-1 opacity-80">{summary.fiqh.dinarCount} Dinar × {summary.fiqh.gramsPerDinar}gr</p>
-                      <p className="text-white font-black text-sm font-mono break-all">{formatRupiah(nishabGold)}</p>
+                      <p className="text-white/50 text-[9px] font-semibold uppercase tracking-wide mb-1">Nishab Emas</p>
+                      <p className="text-white font-semibold text-[10px] mb-1 opacity-80">{summary.fiqh.dinarCount} Dinar × {summary.fiqh.gramsPerDinar}gr</p>
+                      <p className="text-white font-semibold text-sm font-mono break-all">{formatRupiah(nishabGold)}</p>
                     </div>
-                    <div className="bg-white/10 rounded-2xl p-4 flex flex-col justify-center border border-white/5 relative overflow-hidden">
+                    <div className="bg-white/10 rounded-xl p-4 flex flex-col justify-center border border-white/5 relative overflow-hidden">
                       <div className="absolute right-0 bottom-0 opacity-10 translate-x-1/4 translate-y-1/4"><Coins size={64}/></div>
-                      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest mb-1">Nishab Perak</p>
-                      <p className="text-white font-black text-[10px] mb-1 opacity-80">{summary.fiqh.dirhamCount} Dirham × {summary.fiqh.gramsPerDirham}gr</p>
-                      <p className="text-white font-black text-sm font-mono break-all">{formatRupiah(nishabSilver)}</p>
+                      <p className="text-white/50 text-[9px] font-semibold uppercase tracking-wide mb-1">Nishab Perak</p>
+                      <p className="text-white font-semibold text-[10px] mb-1 opacity-80">{summary.fiqh.dirhamCount} Dirham × {summary.fiqh.gramsPerDirham}gr</p>
+                      <p className="text-white font-semibold text-sm font-mono break-all">{formatRupiah(nishabSilver)}</p>
                     </div>
                   </div>
                   <p className="text-white/40 text-[8px] font-bold italic">
@@ -453,16 +453,16 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
         </div>
 
         {/* Asset Card */}
-        <div className="bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm flex flex-col justify-between space-y-6">
+        <div className="bg-white p-8 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-6">
           <div className="space-y-4">
             <div className="flex justify-between items-center text-indigo-500">
-              <span className="text-[10px] font-black uppercase tracking-widest italic">Total Aset Zakat</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide italic">Total Aset Zakat</span>
               <Wallet size={20} />
             </div>
-            <h3 className="text-3xl font-black text-slate-900 font-mono tracking-tighter leading-none">{formatRupiah(summary.totalAssets)}</h3>
+            <h3 className="text-3xl font-semibold text-slate-900 font-mono tracking-tighter leading-none">{formatRupiah(summary.totalAssets)}</h3>
           </div>
-          <div className="p-4 bg-indigo-50 rounded-3xl space-y-3">
-            <div className="flex justify-between items-center text-[10px] font-black text-indigo-900 uppercase">
+          <div className="p-4 bg-indigo-50 rounded-xl space-y-3">
+            <div className="flex justify-between items-center text-[10px] font-semibold text-indigo-900 uppercase">
               vs Nishab Perak (Terendah) <TrendingUp size={14}/>
             </div>
             <div className="w-full bg-indigo-200 h-2.5 rounded-full overflow-hidden">
@@ -475,7 +475,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
           </div>
           {/* Breakdown */}
           <div className="space-y-2 pt-4 border-t border-slate-100">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Komponen Harta Zakat</p>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Komponen Harta Zakat</p>
             
             <div className="grid grid-cols-1 gap-2">
               <div className="flex justify-between items-center text-xs py-2 px-3 bg-blue-50/50 rounded-xl border border-blue-100/50">
@@ -483,7 +483,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500"/>
                   Kas & Bank
                 </span>
-                <span className="font-black text-blue-900">{formatRupiah(summary.breakdown.totalCash)}</span>
+                <span className="font-semibold text-blue-900">{formatRupiah(summary.breakdown.totalCash)}</span>
               </div>
 
               <div className="flex justify-between items-center text-xs py-2 px-3 bg-purple-50/50 rounded-xl border border-purple-100/50">
@@ -491,7 +491,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                   <div className="w-1.5 h-1.5 rounded-full bg-purple-500"/>
                   Piutang (AR)
                 </span>
-                <span className="font-black text-purple-900">{formatRupiah(summary.breakdown.totalAR)}</span>
+                <span className="font-semibold text-purple-900">{formatRupiah(summary.breakdown.totalAR)}</span>
               </div>
 
               <div className="flex justify-between items-center text-xs py-2 px-3 bg-amber-50/50 rounded-xl border border-amber-100/50">
@@ -499,7 +499,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                   <div className="w-1.5 h-1.5 rounded-full bg-amber-500"/>
                   Persediaan
                 </span>
-                <span className="font-black text-amber-900">{formatRupiah(summary.breakdown.totalInventory)}</span>
+                <span className="font-semibold text-amber-900">{formatRupiah(summary.breakdown.totalInventory)}</span>
               </div>
 
               <div className="flex justify-between items-center text-xs py-2 px-3 bg-rose-50/50 rounded-xl border border-rose-100/50">
@@ -507,7 +507,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                   <div className="w-1.5 h-1.5 rounded-full bg-rose-500"/>
                   Hutang Lancar (Pengurang)
                 </span>
-                <span className="font-black text-rose-900">- {formatRupiah(summary.breakdown.totalAP || 0)}</span>
+                <span className="font-semibold text-rose-900">- {formatRupiah(summary.breakdown.totalAP || 0)}</span>
               </div>
             </div>
 
@@ -516,8 +516,8 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
             </p>
 
             <div className="flex flex-col sm:flex-row justify-between items-center py-4 px-5 bg-indigo-600 rounded-[24px] shadow-xl shadow-indigo-100 mt-4 gap-2">
-              <span className="text-white text-[10px] font-black uppercase tracking-[0.15em] opacity-80">Total Harta Zakat</span>
-              <span className="font-black text-white text-lg font-mono tracking-tighter">{formatRupiah(summary.totalAssets)}</span>
+              <span className="text-white text-[10px] font-semibold uppercase tracking-[0.15em] opacity-80">Total Harta Zakat</span>
+              <span className="font-semibold text-white text-lg font-mono tracking-tighter">{formatRupiah(summary.totalAssets)}</span>
             </div>
             
             <p className="text-[8px] text-slate-400 italic px-1 leading-relaxed mt-2 opacity-75">
@@ -529,10 +529,10 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
 
       {/* Chart + History */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        <div className="lg:col-span-2 bg-white rounded-[48px] border border-slate-100 shadow-sm p-10 space-y-8">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-8">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-black text-slate-900 text-sm uppercase tracking-widest">Komparasi Aset vs Nishab</h4>
+              <h4 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">Komparasi Aset vs Nishab</h4>
               <p className="text-[10px] text-slate-400 font-bold italic mt-1">
                 Nishab dihitung dari harga {summary.haulStatus === 'ACTIVE' ? 'awal haul (DIKUNCI)' : 'referensi saat ini'}
               </p>
@@ -559,8 +559,8 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
           </div>
 
           {/* Fiqh Notes */}
-          <div className="bg-indigo-50 rounded-3xl p-5 space-y-2">
-            <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-2"><Info size={12}/> Kaidah Fiqh Zakat Tijarah</p>
+          <div className="bg-indigo-50 rounded-xl p-5 space-y-2">
+            <p className="text-[10px] font-semibold text-indigo-700 uppercase tracking-wide flex items-center gap-2"><Info size={12}/> Kaidah Fiqh Zakat Tijarah</p>
             <ul className="text-[10px] text-indigo-600 font-medium space-y-1 leading-relaxed">
               <li>• <strong>Harta Zakat:</strong> Kas &amp; Bank + Piutang Dagang + Persediaan + Laba Bersih</li>
               <li>• <strong>Tidak Kena:</strong> Aset Tetap (kendaraan, gedung, perabot, komputer, dst)</li>
@@ -576,8 +576,8 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
         {/* Right sidebar */}
         <div className="space-y-6">
           {/* Haul History */}
-          <div className="bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm space-y-6">
-            <h5 className="font-black text-xs uppercase tracking-widest text-slate-400 flex items-center gap-3">
+          <div className="bg-white p-8 rounded-xl border border-slate-100 shadow-sm space-y-6">
+            <h5 className="font-semibold text-xs uppercase tracking-wide text-slate-400 flex items-center gap-3">
               <History size={16}/> Riwayat Haul
             </h5>
             <div className="space-y-3">
@@ -588,10 +588,10 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                 </div>
               ) : (
                 summary.haulHistory.map((h: any, i: number) => (
-                  <div key={h.id} className={`p-4 rounded-2xl border text-xs ${h.status === 'ACTIVE' ? 'bg-emerald-50 border-emerald-100' : h.status === 'BATAL' ? 'bg-rose-50 border-rose-100' : 'bg-slate-50 border-slate-100'}`}>
+                  <div key={h.id} className={`p-4 rounded-xl border text-xs ${h.status === 'ACTIVE' ? 'bg-emerald-50 border-emerald-100' : h.status === 'BATAL' ? 'bg-rose-50 border-rose-100' : 'bg-slate-50 border-slate-100'}`}>
                     <div className="flex justify-between items-center mb-1">
-                      <span className="font-black text-slate-700">{h.haul_start_date}</span>
-                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${h.status === 'ACTIVE' ? 'bg-emerald-200 text-emerald-800' : h.status === 'BATAL' ? 'bg-rose-200 text-rose-800' : 'bg-slate-200 text-slate-600'}`}>{h.status}</span>
+                      <span className="font-semibold text-slate-700">{h.haul_start_date}</span>
+                      <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${h.status === 'ACTIVE' ? 'bg-emerald-200 text-emerald-800' : h.status === 'BATAL' ? 'bg-rose-200 text-rose-800' : 'bg-slate-200 text-slate-600'}`}>{h.status}</span>
                     </div>
                     <p className="text-slate-500 font-medium">Emas: Rp {Number(h.gold_price_per_gram).toLocaleString('id-ID')}/gr</p>
                     <p className="text-slate-500 font-medium">Perak: Rp {Number(h.silver_price_per_gram).toLocaleString('id-ID')}/gr</p>
@@ -603,27 +603,27 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
           </div>
 
           {/* Syariah Add-on */}
-          <div className="bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm space-y-4">
-            <p className="text-[10px] font-black text-slate-900 uppercase italic tracking-widest">Mode Syariah Organisasi</p>
+          <div className="bg-white p-8 rounded-xl border border-slate-100 shadow-sm space-y-4">
+            <p className="text-[10px] font-semibold text-slate-900 uppercase italic tracking-wide">Mode Syariah Organisasi</p>
             <p className="text-[11px] font-medium text-slate-500 leading-relaxed italic">
               {summary.isShariahEnabled 
                 ? 'Mode Syariah organisasi aktif. Struktur akun Syariah (Syirkah, Qard, SALAM, ISTISHNA, Ijarah, Zakat) juga disiapkan di CoA Anda.'
                 : 'Aktifkan mode Syariah organisasi sekaligus siapkan akun Syariah (Syirkah, Qard, SALAM, ISTISHNA, Ijarah, Zakat) di CoA Anda.'}
             </p>
-            <div className="rounded-3xl border border-slate-100 bg-slate-50 px-4 py-3 text-[10px] font-medium leading-relaxed text-slate-500">
+            <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-[10px] font-medium leading-relaxed text-slate-500">
               <p><strong className="text-slate-700">SALAM:</strong> pembelian dan penjualan wajib tunai lunas di depan, barang menyusul.</p>
               <p><strong className="text-slate-700">ISTISHNA:</strong> pembelian dan penjualan boleh memakai DP atau pembayaran bertahap.</p>
             </div>
 
             {shariahSetup && (
-              <div className={`rounded-3xl border px-4 py-3 text-[10px] font-medium leading-relaxed ${
+              <div className={`rounded-xl border px-4 py-3 text-[10px] font-medium leading-relaxed ${
                 shariahSetup.status === 'READY'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                   : shariahSetup.status === 'INCOMPLETE'
                     ? 'border-amber-200 bg-amber-50 text-amber-700'
                     : 'border-slate-200 bg-slate-50 text-slate-500'
               }`}>
-                <p className="text-[9px] font-black uppercase tracking-widest">Health Check Setup</p>
+                <p className="text-[9px] font-semibold uppercase tracking-wide">Health Check Setup</p>
                 {shariahSetup.status === 'READY' ? (
                   <p className="mt-1">
                     Akun inti syariah siap dipakai. {shariahSetup.readyCount}/{shariahSetup.requiredCount} akun inti aktif.
@@ -637,7 +637,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                       {(shariahSetup.issues || []).map((issue: any) => (
                         <span
                           key={issue.code}
-                          className="rounded-full border border-amber-200 bg-white px-2 py-1 text-[9px] font-black text-amber-700"
+                          className="rounded-full border border-amber-200 bg-white px-2 py-1 text-[9px] font-semibold text-amber-700"
                         >
                           {issue.code} {issue.status === 'MISSING' ? 'belum ada' : 'nonaktif'}
                         </span>
@@ -652,14 +652,14 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
               </div>
             )}
             
-            <div className="rounded-3xl border border-slate-200 bg-white px-4 py-4 text-[10px] font-medium leading-relaxed text-slate-500">
-              <p className="font-black uppercase tracking-widest text-slate-700">Pengaturan Dipindah</p>
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 text-[10px] font-medium leading-relaxed text-slate-500">
+              <p className="font-semibold uppercase tracking-wide text-slate-700">Pengaturan Dipindah</p>
               <p className="mt-1">
                 Aktivasi, perbaikan setup, dan nonaktifkan mode syariah sekarang dipusatkan di menu CoA agar pengaturan akunnya tidak terpencar.
               </p>
               <a
                 href="/settings/accounts#shariah-mode"
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-[10px] font-black text-indigo-600 transition-all hover:bg-indigo-100"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-[10px] font-semibold text-indigo-600 transition-all hover:bg-indigo-100"
               >
                 <Settings2 size={14} />
                 BUKA PENGATURAN MODE SYARIAH

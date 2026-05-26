@@ -136,10 +136,10 @@ export function StartupWizard({
                       className={`flex items-center gap-3 shrink-0 cursor-pointer transition-all ${isActive ? 'opacity-100 scale-100' : 'opacity-40 hover:opacity-60 scale-95'}`}
                     >
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : isDone ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                        {isDone ? <CheckCircle2 size={16} /> : <span className="text-xs font-black">{idx + 1}</span>}
+                        {isDone ? <CheckCircle2 size={16} /> : <span className="text-xs font-semibold">{idx + 1}</span>}
                       </div>
                       <div className="flex flex-col">
-                        <span className={`text-[11px] font-black uppercase tracking-widest ${isActive ? 'text-slate-900' : 'text-slate-500'}`}>{step.title}</span>
+                        <span className={`text-[11px] font-semibold uppercase tracking-wide ${isActive ? 'text-slate-900' : 'text-slate-500'}`}>{step.title}</span>
                         {isActive && (
                           <div className="flex flex-col gap-0.5">
                             <span className="text-[10px] font-medium text-slate-500 leading-tight">{step.description}</span>

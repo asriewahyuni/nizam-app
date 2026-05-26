@@ -58,14 +58,14 @@ export default async function MarketplacePage() {
     <div className="space-y-10">
 
       {/* ── Hero ── */}
-      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-8 text-white shadow-2xl">
+      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-8 text-white shadow-md">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl opacity-10 -mr-32 -mt-32" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500 rounded-full blur-3xl opacity-10 -ml-20 -mb-20" />
         <div className="relative">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest mb-4">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide mb-4">
             <Sparkles className="h-3 w-3" /> Modul Marketplace
           </div>
-          <h1 className="text-3xl font-black tracking-tight">Pilih Operasional Bisnis Anda</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Pilih Operasional Bisnis Anda</h1>
           <p className="mt-2 text-slate-300 text-sm font-medium max-w-xl">
             Modul inti sudah aktif. Pilih modul operasional untuk mendefinisikan model bisnis Anda.
           </p>
@@ -97,7 +97,7 @@ export default async function MarketplacePage() {
             <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
               <ShieldCheck className="h-3 w-3 text-emerald-600" />
             </div>
-            <span className="text-sm font-black text-slate-900">Modul Inti</span>
+            <span className="text-sm font-semibold text-slate-900">Modul Inti</span>
           </div>
           <div className="flex-1 h-px bg-slate-200" />
           <span className="text-xs text-slate-400 font-medium">Selalu aktif — sudah termasuk dalam paket</span>
@@ -117,7 +117,7 @@ export default async function MarketplacePage() {
             <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
               <Zap className="h-3 w-3 text-blue-600" />
             </div>
-            <span className="text-sm font-black text-slate-900">Modul Operasional</span>
+            <span className="text-sm font-semibold text-slate-900">Modul Operasional</span>
           </div>
           <div className="flex-1 h-px bg-slate-200" />
         </div>
@@ -138,7 +138,7 @@ export default async function MarketplacePage() {
           ].map((item, idx, arr) => (
             <div key={item.step} className="flex items-center gap-1">
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
-                <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-[8px] font-black text-white flex-shrink-0">
+                <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-[8px] font-semibold text-white flex-shrink-0">
                   {item.step}
                 </div>
                 <span className="text-[10px] font-bold text-slate-500">{item.label}</span>
@@ -179,7 +179,7 @@ export default async function MarketplacePage() {
 // ── Core Module Card ─────────────────────────────────────────────────────────
 function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: boolean }) {
   return (
-    <div className={`flex items-center gap-4 rounded-2xl border px-5 py-4 transition-all ${
+    <div className={`flex items-center gap-4 rounded-xl border px-5 py-4 transition-all ${
       enabled
         ? 'border-emerald-100 bg-emerald-50/40'
         : 'border-slate-200 bg-white hover:shadow-md hover:border-blue-200'
@@ -195,7 +195,7 @@ function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: bool
       </div>
 
       {enabled ? (
-        <span className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
+        <span className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
           <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
         </span>
       ) : (
@@ -226,7 +226,7 @@ function OperationalModuleCard({
   const isAvailable = !isLocked && !isReady && !isPending && !isInactive
 
   return (
-    <div className={`relative flex flex-col rounded-3xl border p-6 transition-all
+    <div className={`relative flex flex-col rounded-xl border p-6 transition-all
       ${isReady    ? 'border-blue-200 bg-white shadow-md ring-1 ring-blue-50 hover:shadow-lg' : ''}
       ${isPending  ? 'border-amber-200 bg-amber-50/30 shadow-sm' : ''}
       ${isInactive ? 'border-slate-200 bg-slate-50/60' : ''}
@@ -245,12 +245,12 @@ function OperationalModuleCard({
 
       {/* ── Icon + Name ── */}
       <div className="flex items-start gap-4">
-        <div className={`w-14 h-14 rounded-2xl ${mod.color} flex items-center justify-center text-2xl shadow-lg flex-shrink-0
+        <div className={`w-14 h-14 rounded-xl ${mod.color} flex items-center justify-center text-2xl shadow-lg flex-shrink-0
           ${(isInactive || isLocked) ? 'opacity-40 grayscale' : ''}`}>
           {mod.icon}
         </div>
         <div className="pr-20">
-          <h3 className="text-base font-black text-slate-900 leading-tight">{mod.name}</h3>
+          <h3 className="text-base font-semibold text-slate-900 leading-tight">{mod.name}</h3>
           <p className="text-xs font-semibold text-slate-400 mt-0.5">{mod.tagline}</p>
         </div>
       </div>
@@ -284,7 +284,7 @@ function OperationalModuleCard({
       {/* ── Harga (jika sudah diset di SaaS) ── */}
       {price !== undefined && !isReady && !isPending && (
         <div className="mt-4 pt-4 border-t border-slate-100 flex items-baseline gap-1.5">
-          <span className="text-lg font-black text-slate-900">{formatRp(price)}</span>
+          <span className="text-lg font-semibold text-slate-900">{formatRp(price)}</span>
           <span className="text-xs text-slate-400 font-medium">/ bulan</span>
         </div>
       )}
@@ -295,7 +295,7 @@ function OperationalModuleCard({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <span className="text-xs font-black text-emerald-700">Modul Aktif</span>
+              <span className="text-xs font-semibold text-emerald-700">Modul Aktif</span>
             </div>
             {readyAt && (
               <span className="text-[10px] text-slate-400 font-medium">
@@ -354,12 +354,12 @@ function OperationalModuleCard({
             </div>
           )}
           {isPending && (
-            <a href={`/marketplace/setup/${mod.key}`} className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-amber-100 hover:bg-amber-600 transition-all">
+            <a href={`/marketplace/setup/${mod.key}`} className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-amber-100 hover:bg-amber-600 transition-all">
               Selesaikan Setup <ArrowRight className="h-4 w-4" />
             </a>
           )}
           {isReady && (
-            <a href={mod.href} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">
+            <a href={mod.href} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">
               Buka Modul <ArrowRight className="h-4 w-4" />
             </a>
           )}
@@ -392,7 +392,7 @@ function StatusPill({
     emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   }
   return (
-    <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest border px-2 py-1 rounded-full ${colors[color]}`}>
+    <span className={`inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide border px-2 py-1 rounded-full ${colors[color]}`}>
       {icon} {label}
     </span>
   )

@@ -16,7 +16,7 @@ function Toast({ toast }: { toast: { message: string; type: 'success' | 'error' 
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 50 }}
-          className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-2xl px-6 py-4 shadow-xl ${
+          className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-xl px-6 py-4 shadow-xl ${
             toast.type === 'success'
               ? 'bg-emerald-50 border border-emerald-100 text-emerald-800'
               : 'bg-rose-50 border border-rose-100 text-rose-800'
@@ -70,7 +70,7 @@ export function InstallCoaButton({
       <button
         onClick={handleInstall}
         disabled={isPending}
-        className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-70"
+        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-70"
       >
         {isPending ? (
           <><Loader2 className="h-4 w-4 animate-spin" /> Menginstal...</>
@@ -165,7 +165,7 @@ export function SimpleSettingsForm({
         <button
           type="submit"
           disabled={isPending}
-          className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-70"
+          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-70"
         >
           {isPending ? (
             <><Loader2 className="h-4 w-4 animate-spin" /> Menyimpan...</>
@@ -204,7 +204,7 @@ export function CompleteOnboardingButton({
     <button
       onClick={handleComplete}
       disabled={isPending}
-      className="w-full rounded-3xl bg-emerald-600 p-5 text-lg font-semibold text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+      className="w-full rounded-xl bg-emerald-600 p-5 text-lg font-semibold text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 disabled:opacity-70"
     >
       {isPending ? (
         <><Loader2 className="h-5 w-5 animate-spin" /> Menyiapkan...</>

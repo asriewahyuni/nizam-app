@@ -69,7 +69,7 @@ export default function BatchStructureBuilder() {
       <input type="hidden" name="price" value={totalFee} />
 
       {/* ── ANGGARAN (Cost Structure) ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
           <div>
             <div className="text-sm font-bold text-slate-900">Anggaran Batch</div>
@@ -86,7 +86,7 @@ export default function BatchStructureBuilder() {
 
         {/* Column headers */}
         {costStructure.length > 0 && (
-          <div className="grid grid-cols-[1fr_100px_80px_90px_32px] gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+          <div className="grid grid-cols-[1fr_100px_80px_90px_32px] gap-2 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400 border-b border-slate-100">
             <span>Komponen</span>
             <span>Jumlah (Rp)</span>
             <span>Pajak</span>
@@ -160,7 +160,7 @@ export default function BatchStructureBuilder() {
               <span>Total Pajak Masukan (PPN)</span>
               <span>+ {formatRp(totalTax)}</span>
             </div>
-            <div className="flex justify-between text-sm font-black text-slate-900 pt-1.5 border-t border-slate-200">
+            <div className="flex justify-between text-sm font-semibold text-slate-900 pt-1.5 border-t border-slate-200">
               <span>Total Anggaran (incl. Tax)</span>
               <span>{formatRp(totalCostWithTax)}</span>
             </div>
@@ -169,7 +169,7 @@ export default function BatchStructureBuilder() {
       </div>
 
       {/* ── SIMULASI & SUGGEST HARGA ── */}
-      <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+      <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
         <div className="text-sm font-bold text-blue-900 mb-3">Simulasi &amp; Suggestion Harga Jual</div>
         <div className="flex flex-col sm:flex-row sm:items-end gap-4">
           <div className="space-y-2 flex-1">
@@ -191,7 +191,7 @@ export default function BatchStructureBuilder() {
                 <span>+ Margin ({targetMarginPct}%):</span>
                 <span>+ {formatRp(suggestedMargin)}</span>
               </div>
-              <div className="flex justify-between text-slate-900 font-black border-t border-blue-100 pt-1">
+              <div className="flex justify-between text-slate-900 font-semibold border-t border-blue-100 pt-1">
                 <span>Suggested Price:</span>
                 <span>{formatRp(suggestedPrice)}</span>
               </div>
@@ -208,7 +208,7 @@ export default function BatchStructureBuilder() {
       </div>
 
       {/* ── FEE PESERTA ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
           <div>
             <div className="text-sm font-bold text-slate-900">Biaya Peserta (Fee Structure)</div>
@@ -260,13 +260,13 @@ export default function BatchStructureBuilder() {
         {feeStructure.length > 0 && (
           <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 flex justify-between items-center">
             <div className="text-xs font-bold text-slate-500">Total Tagihan Peserta</div>
-            <div className="text-base font-black text-slate-900">{formatRp(totalFee)}</div>
+            <div className="text-base font-semibold text-slate-900">{formatRp(totalFee)}</div>
           </div>
         )}
       </div>
 
       {/* ── PAJAK PENJUALAN ── */}
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <div className="text-sm font-bold text-slate-900 mb-3">Pajak Penjualan (Tax Keluar ke Peserta)</div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <label className="flex items-center gap-2 text-xs text-slate-700">

@@ -28,7 +28,7 @@ export function AbsTrialBanner({ subscriptionEnd }: AbsTrialBannerProps) {
         {/* ABS BADGE */}
         <div className="flex items-center gap-2 px-3 py-1 bg-white/10 border border-white/20 rounded-full">
           <GraduationCap size={12} className="text-amber-300 fill-amber-300/20" />
-          <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest leading-none">
+          <span className="text-[10px] font-semibold text-amber-300 uppercase tracking-wide leading-none">
             ABS Trial — 30 Hari
           </span>
         </div>
@@ -37,7 +37,7 @@ export function AbsTrialBanner({ subscriptionEnd }: AbsTrialBannerProps) {
         {daysLeft !== null && (
           <div className="flex items-center gap-2 text-white/60">
             <Clock size={12} />
-            <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline leading-none">
+            <span className="text-[10px] font-bold uppercase tracking-wide hidden sm:inline leading-none">
               {daysLeft > 0
                 ? `${daysLeft} hari tersisa — Paket Plus aktif`
                 : 'Trial berakhir — Upgrade untuk melanjutkan'}
@@ -48,7 +48,7 @@ export function AbsTrialBanner({ subscriptionEnd }: AbsTrialBannerProps) {
 
       <Link
         href="/pricing"
-        className="flex items-center gap-2 px-4 py-1.5 bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-lg transition-all border border-white/20 active:scale-95 group"
+        className="flex items-center gap-2 px-4 py-1.5 bg-white/10 hover:bg-white/20 text-white text-[10px] font-semibold uppercase tracking-wide rounded-lg transition-all border border-white/20 active:scale-95 group"
       >
         Upgrade Plan
         <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />

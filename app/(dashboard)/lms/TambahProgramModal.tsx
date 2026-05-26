@@ -103,7 +103,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 20 }}
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-            className="w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden"
+            className="w-full max-w-lg bg-white rounded-[32px] shadow-md overflow-hidden"
           >
             {/* ── Header ── */}
             <div className="relative bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-7 pt-7 pb-8">
@@ -115,12 +115,12 @@ export function TambahProgramModal({ open, onClose }: Props) {
                 <X size={16} />
               </button>
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center">
                   <GraduationCap size={24} className="text-blue-300" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-400">Program Baru</p>
-                  <h2 className="text-xl font-black text-white">Tambah Program Pelatihan</h2>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-400">Program Baru</p>
+                  <h2 className="text-xl font-semibold text-white">Tambah Program Pelatihan</h2>
                 </div>
               </div>
 
@@ -128,7 +128,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
               <div className="mt-5 flex items-center gap-2">
                 {[1, 2].map(s => (
                   <div key={s} className="flex items-center gap-2">
-                    <div className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-black transition-all ${
+                    <div className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold transition-all ${
                       done ? 'bg-emerald-500 text-white' :
                       s < step ? 'bg-emerald-500 text-white' :
                       s === step ? 'bg-blue-500 text-white ring-2 ring-blue-300/40' :
@@ -136,7 +136,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
                     }`}>
                       {done || s < step ? <CheckCircle2 size={13} /> : s}
                     </div>
-                    <span className={`text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    <span className={`text-[10px] font-bold uppercase tracking-wide transition-all ${
                       s === step && !done ? 'text-white' : 'text-white/40'
                     }`}>
                       {s === 1 ? 'Info Program' : 'Konfirmasi'}
@@ -161,12 +161,12 @@ export function TambahProgramModal({ open, onClose }: Props) {
                       <CheckCircle2 size={32} className="text-emerald-500" />
                     </div>
                     <div>
-                      <p className="text-lg font-black text-slate-900">Program Berhasil Dibuat!</p>
+                      <p className="text-lg font-semibold text-slate-900">Program Berhasil Dibuat!</p>
                       <p className="text-sm text-slate-500 mt-1">
                         <span className="font-bold text-blue-600">{title}</span> sudah masuk katalog LMS.
                       </p>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide">
                       <Loader2 size={12} className="animate-spin" /> Menutup...
                     </div>
                   </motion.div>
@@ -181,7 +181,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
                   >
                     {/* Judul */}
                     <div>
-                      <label className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                      <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
                         <BookOpen size={13} /> Judul Program <span className="text-rose-400">*</span>
                       </label>
                       <input
@@ -190,13 +190,13 @@ export function TambahProgramModal({ open, onClose }: Props) {
                         onChange={e => { setTitle(e.target.value); setError(null) }}
                         onKeyDown={e => e.key === 'Enter' && handleNext()}
                         placeholder="cth. Pelatihan Akuntansi Dasar"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 placeholder-slate-300 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 placeholder-slate-300 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all"
                       />
                     </div>
 
                     {/* Deskripsi */}
                     <div>
-                      <label className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                      <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
                         <AlignLeft size={13} /> Deskripsi <span className="text-slate-300 font-medium normal-case">(opsional)</span>
                       </label>
                       <textarea
@@ -204,13 +204,13 @@ export function TambahProgramModal({ open, onClose }: Props) {
                         onChange={e => setDescription(e.target.value)}
                         placeholder="Jelaskan isi program, manfaat, dan target peserta..."
                         rows={3}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 placeholder-slate-300 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all resize-none"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 placeholder-slate-300 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all resize-none"
                       />
                     </div>
 
                     {/* Level */}
                     <div>
-                      <label className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                      <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
                         <Tag size={13} /> Level Peserta
                       </label>
                       <div className="grid grid-cols-2 gap-2">
@@ -219,7 +219,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
                             key={opt.value}
                             type="button"
                             onClick={() => setLevelCode(opt.value)}
-                            className={`flex items-start gap-3 p-3.5 rounded-2xl border text-left transition-all ${
+                            className={`flex items-start gap-3 p-3.5 rounded-xl border text-left transition-all ${
                               levelCode === opt.value
                                 ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-100'
                                 : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'
@@ -227,7 +227,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
                           >
                             <span className="text-xl leading-none mt-0.5">{opt.emoji}</span>
                             <div>
-                              <p className={`text-xs font-black ${levelCode === opt.value ? 'text-blue-700' : 'text-slate-700'}`}>
+                              <p className={`text-xs font-semibold ${levelCode === opt.value ? 'text-blue-700' : 'text-slate-700'}`}>
                                 {opt.label}
                               </p>
                               <p className="text-[10px] text-slate-400 font-medium mt-0.5">{opt.desc}</p>
@@ -246,14 +246,14 @@ export function TambahProgramModal({ open, onClose }: Props) {
                     <div className="flex gap-3 pt-1">
                       <button
                         onClick={onClose}
-                        className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+                        className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
                       >
                         Batal
                       </button>
                       <button
                         onClick={handleNext}
                         disabled={!title.trim()}
-                        className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3 text-sm font-bold text-white hover:bg-blue-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-slate-200"
+                        className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-bold text-white hover:bg-blue-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-slate-200"
                       >
                         Lanjut <ChevronRight size={16} />
                       </button>
@@ -269,15 +269,15 @@ export function TambahProgramModal({ open, onClose }: Props) {
                     className="px-7 py-6 space-y-5"
                   >
                     {/* Preview card */}
-                    <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200 p-5 space-y-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Ringkasan Program</p>
+                    <div className="rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200 p-5 space-y-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ringkasan Program</p>
 
                       <div className="flex items-start gap-4">
                         <div className="w-12 h-12 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center shrink-0">
                           <span className="text-2xl">{selectedLevel.emoji}</span>
                         </div>
                         <div className="min-w-0">
-                          <p className="font-black text-slate-900 text-base leading-tight">{title}</p>
+                          <p className="font-semibold text-slate-900 text-base leading-tight">{title}</p>
                           {description && (
                             <p className="text-xs text-slate-500 mt-1 line-clamp-2">{description}</p>
                           )}
@@ -285,10 +285,10 @@ export function TambahProgramModal({ open, onClose }: Props) {
                       </div>
 
                       <div className="flex gap-2 flex-wrap">
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-blue-700">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
                           <Tag size={10} /> {selectedLevel.label}
                         </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
                           <Sparkles size={10} /> Aktif setelah disimpan
                         </span>
                       </div>
@@ -308,14 +308,14 @@ export function TambahProgramModal({ open, onClose }: Props) {
                       <button
                         onClick={() => setStep(1)}
                         disabled={isPending}
-                        className="flex items-center gap-1.5 rounded-2xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-40"
+                        className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-40"
                       >
                         <ArrowLeft size={14} /> Edit
                       </button>
                       <button
                         onClick={handleSubmit}
                         disabled={isPending}
-                        className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 shadow-lg shadow-blue-200"
+                        className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 shadow-lg shadow-blue-200"
                       >
                         {isPending ? (
                           <><Loader2 size={16} className="animate-spin" /> Menyimpan...</>

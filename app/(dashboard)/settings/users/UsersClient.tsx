@@ -218,7 +218,7 @@ export default function UsersClient({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="col-span-1 border border-slate-100 bg-white rounded-3xl p-6 shadow-sm h-fit">
+        <div className="col-span-1 border border-slate-100 bg-white rounded-xl p-6 shadow-sm h-fit">
           <h3 className="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
             <Plus size={18} className="text-blue-500" />
             Buat Link Aktivasi
@@ -280,7 +280,7 @@ export default function UsersClient({
           </form>
 
           {latestInviteUrl && (
-            <div className="mt-5 p-4 rounded-2xl border border-blue-100 bg-blue-50 space-y-3">
+            <div className="mt-5 p-4 rounded-xl border border-blue-100 bg-blue-50 space-y-3">
               <div className="flex items-center gap-2 text-blue-700 font-bold text-sm">
                 <LinkIcon size={16} />
                 Link Aktivasi Terbaru
@@ -304,14 +304,14 @@ export default function UsersClient({
         </div>
 
         <div className="col-span-1 lg:col-span-2 space-y-6">
-          <div className="border border-slate-100 bg-white rounded-3xl overflow-hidden shadow-sm">
+          <div className="border border-slate-100 bg-white rounded-xl overflow-hidden shadow-sm">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">User ID & Info</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Peran (Role)</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Akses Unit</th>
-                  <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-widest">Aksi</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wide">User ID & Info</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wide">Peran (Role)</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wide">Akses Unit</th>
+                  <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-wide">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -332,13 +332,13 @@ export default function UsersClient({
                       {member.custom_role?.name ? (
                         <div className="flex flex-col gap-1">
                           <span className="text-xs font-bold text-slate-900">{member.custom_role.name}</span>
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
                             base: {member.role}
                           </span>
                         </div>
                       ) : (
                       <span
-                        className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border ${
+                        className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-full border ${
                           member.role === 'owner'
                             ? 'bg-blue-50 text-blue-600 border-blue-100'
                             : member.role === 'hr'
@@ -362,7 +362,7 @@ export default function UsersClient({
                             return (
                               <span
                                 key={branchId}
-                                className="px-2.5 py-1 rounded-full bg-slate-100 text-[10px] font-bold uppercase tracking-widest text-slate-600"
+                                className="px-2.5 py-1 rounded-full bg-slate-100 text-[10px] font-bold uppercase tracking-wide text-slate-600"
                               >
                                 {branch?.code || branch?.name || 'Unit'}
                               </span>
@@ -411,7 +411,7 @@ export default function UsersClient({
             </table>
           </div>
 
-          <div className="border border-slate-100 bg-white rounded-3xl p-6 shadow-sm">
+          <div className="border border-slate-100 bg-white rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4 mb-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Link Aktivasi Aktif</h3>
@@ -421,13 +421,13 @@ export default function UsersClient({
 
             <div className="space-y-3">
               {invitations.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-slate-200 p-5 text-sm text-slate-400">
+                <div className="rounded-xl border border-dashed border-slate-200 p-5 text-sm text-slate-400">
                   Belum ada link aktivasi yang aktif.
                 </div>
               )}
 
               {invitations.map((invite: any) => (
-                <div key={invite.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div key={invite.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-1">
                     <p className="font-bold text-slate-900">{invite.label}</p>
                     <p className="text-xs text-slate-500">
@@ -466,7 +466,7 @@ export default function UsersClient({
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
             onClick={() => setMemberUnitsModal(null)}
           />
-          <div className="relative w-full max-w-xl rounded-[32px] border border-slate-100 bg-white p-6 shadow-2xl">
+          <div className="relative w-full max-w-xl rounded-[32px] border border-slate-100 bg-white p-6 shadow-md">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-xl font-bold text-slate-900">Atur Akses Unit</h3>
@@ -487,7 +487,7 @@ export default function UsersClient({
                 return (
                   <label
                     key={branch.id}
-                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
+                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition ${
                       checked ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white'
                     }`}
                   >
@@ -499,7 +499,7 @@ export default function UsersClient({
                     />
                     <div className="min-w-0">
                       <div className="text-sm font-bold text-slate-900">{branch.name}</div>
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{branch.code}</div>
+                      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{branch.code}</div>
                     </div>
                   </label>
                 )
@@ -507,7 +507,7 @@ export default function UsersClient({
             </div>
 
             {branches.length === 0 && (
-              <div className="mt-6 rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-400">
+              <div className="mt-6 rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-400">
                 Belum ada unit aktif yang bisa ditugaskan.
               </div>
             )}
@@ -516,7 +516,7 @@ export default function UsersClient({
               <button
                 type="button"
                 onClick={() => setMemberUnitsModal(null)}
-                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600"
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600"
               >
                 Batal
               </button>
@@ -524,7 +524,7 @@ export default function UsersClient({
                 type="button"
                 disabled={loading}
                 onClick={handleSaveMemberUnits}
-                className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-100 disabled:opacity-50"
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-100 disabled:opacity-50"
               >
                 Simpan Akses Unit
               </button>

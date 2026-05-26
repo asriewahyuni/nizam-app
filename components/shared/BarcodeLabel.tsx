@@ -25,7 +25,7 @@ export const BarcodeLabel = ({ name, sku, barcode, price, quantity = 1 }: Barcod
             className="barcode-card border border-slate-200 p-4 rounded-lg flex flex-col items-center justify-center bg-white print:border-0 print:m-0 print:p-2 print:w-[50mm] print:h-[30mm] overflow-hidden"
             style={{ pageBreakInside: 'avoid' }}
           >
-            <div className="text-[10px] font-black text-slate-900 uppercase truncate w-full text-center mb-1">
+            <div className="text-[10px] font-semibold text-slate-900 uppercase truncate w-full text-center mb-1">
               {name}
             </div>
             
@@ -39,7 +39,7 @@ export const BarcodeLabel = ({ name, sku, barcode, price, quantity = 1 }: Barcod
             
             <div className="flex justify-between items-center w-full mt-1 px-2">
                <span className="text-[8px] font-mono text-slate-500">{sku}</span>
-               {price && <span className="text-[9px] font-black text-slate-900">{formatRupiah(price)}</span>}
+               {price && <span className="text-[9px] font-semibold text-slate-900">{formatRupiah(price)}</span>}
             </div>
           </div>
         ))}

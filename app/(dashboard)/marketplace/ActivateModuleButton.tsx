@@ -70,7 +70,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
         <button
           onClick={() => setShowPayment(true)}
           disabled={disabled || isPending}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-slate-200 hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-slate-200 hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending ? (
             <>
@@ -96,7 +96,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden"
+              className="bg-white rounded-xl shadow-md border border-slate-100 max-w-md w-full overflow-hidden"
             >
               {/* Header */}
               <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 px-6 pt-6 pb-8 text-white">
@@ -109,12 +109,12 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
                 </button>
 
                 <div className="relative flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-2xl ${moduleColor || 'bg-blue-600'} flex items-center justify-center text-2xl shadow-lg`}>
+                  <div className={`w-14 h-14 rounded-xl ${moduleColor || 'bg-blue-600'} flex items-center justify-center text-2xl shadow-lg`}>
                     {moduleIcon || '📦'}
                   </div>
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-0.5">Aktivasi Modul</p>
-                    <h2 className="text-lg font-black leading-tight">{moduleName || moduleKey}</h2>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-white/50 mb-0.5">Aktivasi Modul</p>
+                    <h2 className="text-lg font-semibold leading-tight">{moduleName || moduleKey}</h2>
                   </div>
                 </div>
               </div>
@@ -122,11 +122,11 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
               <div className="px-6 py-5 space-y-5">
                 {/* Pricing */}
                 {price !== undefined ? (
-                  <div className="bg-slate-50 rounded-2xl border border-slate-100 p-4">
+                  <div className="bg-slate-50 rounded-xl border border-slate-100 p-4">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-bold text-slate-500">Biaya Berlangganan</span>
                       {voucherApplied && (
-                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
                           Diskon {discountPct}%
                         </span>
                       )}
@@ -135,7 +135,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
                       {voucherApplied && discountPct > 0 && (
                         <span className="text-sm text-slate-400 line-through">{formatRp(price)}</span>
                       )}
-                      <span className="text-2xl font-black text-slate-900">
+                      <span className="text-2xl font-semibold text-slate-900">
                         {finalPrice === 0 ? 'Gratis' : formatRp(finalPrice ?? price)}
                       </span>
                       <span className="text-xs text-slate-400 font-medium">/ bulan</span>
@@ -145,10 +145,10 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
                     </p>
                   </div>
                 ) : (
-                  <div className="bg-blue-50 rounded-2xl border border-blue-100 p-4">
+                  <div className="bg-blue-50 rounded-xl border border-blue-100 p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <Shield className="h-4 w-4 text-blue-600" />
-                      <span className="text-xs font-black text-blue-700">Sudah Termasuk Paket</span>
+                      <span className="text-xs font-semibold text-blue-700">Sudah Termasuk Paket</span>
                     </div>
                     <p className="text-xs text-blue-600">Modul ini sudah termasuk dalam paket berlangganan Anda tanpa biaya tambahan.</p>
                   </div>
@@ -156,7 +156,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
 
                 {/* Voucher */}
                 <div>
-                  <label className="block text-xs font-black text-slate-700 mb-2">
+                  <label className="block text-xs font-semibold text-slate-700 mb-2">
                     <Tag className="h-3.5 w-3.5 inline mr-1.5 text-slate-400" />
                     Kode Voucher (opsional)
                   </label>
@@ -211,14 +211,14 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
                   <button
                     onClick={() => { setShowPayment(false); setError(null) }}
                     disabled={isPending}
-                    className="flex-1 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
                   >
                     Batal
                   </button>
                   <button
                     onClick={handleActivate}
                     disabled={isPending}
-                    className="flex-1 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25"
+                    className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25"
                   >
                     {isPending ? (
                       <><Loader2 className="h-4 w-4 animate-spin" /> Memproses...</>

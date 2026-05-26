@@ -36,7 +36,7 @@ function StatCard({ title, value, icon: Icon, color, trend }: {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all"
+      className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all"
     >
       <div className="flex items-start justify-between">
         <div className="space-y-2">
@@ -53,7 +53,7 @@ function StatCard({ title, value, icon: Icon, color, trend }: {
             </div>
           )}
         </div>
-        <div className={`p-3 rounded-2xl ${color} bg-opacity-10`}>
+        <div className={`p-3 rounded-xl ${color} bg-opacity-10`}>
           <Icon className={`w-5 h-5 ${color.replace('bg-', 'text-')}`} />
         </div>
       </div>
@@ -63,7 +63,7 @@ function StatCard({ title, value, icon: Icon, color, trend }: {
 
 function MonthlyBarChart({ data }: { data: MonthlySnapshot[] }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">Revenue vs Expense</h3>
@@ -91,7 +91,7 @@ function MonthlyBarChart({ data }: { data: MonthlySnapshot[] }) {
 
 function ProfitLineChart({ data }: { data: MonthlySnapshot[] }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">Trend Laba Bersih</h3>
@@ -119,7 +119,7 @@ function ProfitLineChart({ data }: { data: MonthlySnapshot[] }) {
 function ExpensePieChart({ data }: { data: ExpenseCategory[] }) {
   const top6 = data.slice(0, 6)
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">Komposisi Biaya</h3>
@@ -166,7 +166,7 @@ function CashFlowCard({ cf }: { cf: DashboardFinancialData['cashFlow'] }) {
     { label: 'Financing', amount: cf.financing, color: 'text-amber-600', bg: 'bg-amber-50' },
   ]
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">Arus Kas</h3>
@@ -202,7 +202,7 @@ export default function FinancialDashboardClient({ data, orgId }: Props) {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center gap-3 mb-1">
-          <div className="p-2.5 rounded-2xl bg-white shadow-sm border border-slate-100">
+          <div className="p-2.5 rounded-xl bg-white shadow-sm border border-slate-100">
             <DollarSign className="w-5 h-5 text-blue-600" />
           </div>
           <div>
@@ -254,7 +254,7 @@ export default function FinancialDashboardClient({ data, orgId }: Props) {
         <CashFlowCard cf={data.cashFlow} />
         
         {/* Quick Links */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-semibold text-slate-900">Laporan Lainnya</h3>

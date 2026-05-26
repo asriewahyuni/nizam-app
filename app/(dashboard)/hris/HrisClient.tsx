@@ -782,41 +782,41 @@ export default function HrisClient({
         }
         actions={
           <div className="flex flex-col items-stretch gap-3 md:items-end">
-            <div className="flex bg-slate-100 p-1.5 rounded-3xl border border-slate-200 shadow-inner overflow-x-auto scrollbar-hide max-w-[90vw] md:max-w-none">
+            <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner overflow-x-auto scrollbar-hide max-w-[90vw] md:max-w-none">
               {['EMPLOYEES', 'POSITIONS', 'ACTIVATION'].includes(activeTab) && (
                 <>
                   <button
                     onClick={() => setActiveTab('POSITIONS')}
-                    className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'POSITIONS' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 ${activeTab === 'POSITIONS' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     Positions & Roles
                   </button>
                   <button
                     onClick={() => setActiveTab('EMPLOYEES')}
-                    className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'EMPLOYEES' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                    className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 ${activeTab === 'EMPLOYEES' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     Employees
                   </button>
                   <button
                      onClick={() => setActiveTab('ACTIVATION')}
-                     className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'ACTIVATION' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                     className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 ${activeTab === 'ACTIVATION' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                      Activation Center
                   </button>
                 </>
               )}
               {activeTab === 'ATTENDANCE' && (
-                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
                   Mesin Absensi Terpusat
                 </button>
               )}
               {activeTab === 'PAYROLL' && (
-                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
                   Master Komponen Gaji
                 </button>
               )}
               {activeTab === 'RUNS' && (
-                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
                   Siklus Penggajian
                 </button>
               )}
@@ -917,8 +917,8 @@ export default function HrisClient({
 
               <div className="p-2">
                 <div className="mb-6 flex flex-wrap items-center gap-3 rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Scope</div>
-                  <div className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${activeBranchName ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Scope</div>
+                  <div className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${activeBranchName ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                     {employeeScopeLabel}
                   </div>
                   {!activeBranchId && (
@@ -938,7 +938,7 @@ export default function HrisClient({
                     <motion.div
                       whileHover={{ y: -5 }}
                       key={emp.id}
-                      className="bg-slate-50/50 p-8 rounded-[32px] border border-slate-100 hover:border-blue-200 hover:bg-white hover:shadow-2xl hover:shadow-blue-900/5 transition-all group flex flex-col gap-6"
+                      className="bg-slate-50/50 p-8 rounded-[32px] border border-slate-100 hover:border-blue-200 hover:bg-white hover:shadow-md hover:shadow-blue-900/5 transition-all group flex flex-col gap-6"
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-4">
@@ -946,13 +946,13 @@ export default function HrisClient({
                             {emp.avatar_url ? (
                               <img src={emp.avatar_url} alt={emp.first_name} className="w-full h-full object-cover" />
                             ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xl font-black text-white">
+                              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xl font-semibold text-white">
                                 {emp.first_name[0]}{emp.last_name?.[0]}
                               </div>
                             )}
                           </div>
                             <div className="space-y-0.5">
-                              <h4 className="font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight">{emp.first_name} {emp.last_name}</h4>
+                              <h4 className="font-semibold text-slate-900 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight">{emp.first_name} {emp.last_name}</h4>
                               <div className="flex items-center gap-2">
                                 <StatusBadge
                                   label={emp.employment_status.replace('_', ' ')}
@@ -964,9 +964,9 @@ export default function HrisClient({
                                         : 'warning'
                                   }
                                 />
-                                <span className="text-[10px] font-black font-mono text-slate-400 tracking-wider">#{emp.nik}</span>
+                                <span className="text-[10px] font-semibold font-mono text-slate-400 tracking-wider">#{emp.nik}</span>
                                 {emp.branch?.name && (
-                                  <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-[0.18em] border border-blue-100">
+                                  <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-[9px] font-semibold uppercase tracking-wide border border-blue-100">
                                     {emp.branch.name}
                                   </span>
                                 )}
@@ -976,14 +976,14 @@ export default function HrisClient({
                         <div className="flex flex-col gap-2 items-end">
                           <button
                             onClick={(e: any) => { e.stopPropagation(); handleOpenEdit(emp); }}
-                            className="p-3 bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition shadow-sm border border-slate-100"
+                            className="p-3 bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition shadow-sm border border-slate-100"
                           >
                             <Edit2 size={16} />
                           </button>
                           <button
                             onClick={(e: any) => { e.stopPropagation(); handleOpenTransfer(emp); }}
                             disabled={transferTargets.length === 0}
-                            className="p-3 bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition shadow-sm border border-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="p-3 bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition shadow-sm border border-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
                             title={transferTargets.length === 0 ? (transferDisabledReason || 'Belum ada entitas tujuan tersedia') : 'Mutasi ke entitas lain dalam holding'}
                           >
                             <ArrowRightLeft size={16} />
@@ -991,7 +991,7 @@ export default function HrisClient({
                           <button
                             onClick={(e: any) => { e.stopPropagation(); handleResignEmployee(emp); }}
                             disabled={String(emp.employment_status || '').toUpperCase() === 'RESIGNED'}
-                            className="p-3 bg-white text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-2xl transition shadow-sm border border-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="p-3 bg-white text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition shadow-sm border border-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
                             title={
                               String(emp.employment_status || '').toUpperCase() === 'RESIGNED'
                                 ? 'Karyawan sudah RESIGNED'
@@ -1002,7 +1002,7 @@ export default function HrisClient({
                           </button>
                           <button
                             onClick={(e: any) => { e.stopPropagation(); handleDeleteEmployee(emp); }}
-                            className="p-3 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition shadow-sm border border-slate-100"
+                            className="p-3 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition shadow-sm border border-slate-100"
                             title="Hapus karyawan"
                           >
                             <Trash2 size={16} />
@@ -1012,7 +1012,7 @@ export default function HrisClient({
                             <button
                               onClick={(e: any) => { e.stopPropagation(); handleResetPassword(emp); }}
                               disabled={resettingId === emp.id}
-                              className="p-3 bg-rose-500 text-white hover:bg-rose-600 rounded-2xl transition shadow-lg shadow-rose-200 animate-bounce"
+                              className="p-3 bg-rose-500 text-white hover:bg-rose-600 rounded-xl transition shadow-lg shadow-rose-200 animate-bounce"
                               title="Karyawan minta reset password"
                             >
                               <Key size={16} className={resettingId === emp.id ? 'animate-spin' : ''} />
@@ -1022,21 +1022,21 @@ export default function HrisClient({
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white p-4 rounded-2xl border border-slate-50 shadow-inner">
-                          <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest block mb-1">Position</span>
+                        <div className="bg-white p-4 rounded-xl border border-slate-50 shadow-inner">
+                          <span className="text-[9px] font-semibold text-slate-300 uppercase tracking-wide block mb-1">Position</span>
                           <p className="text-xs font-bold text-slate-600 truncate">{emp.job_title}</p>
                         </div>
-                        <div className="bg-white p-4 rounded-2xl border border-slate-50 shadow-inner">
-                          <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest block mb-1">Department</span>
+                        <div className="bg-white p-4 rounded-xl border border-slate-50 shadow-inner">
+                          <span className="text-[9px] font-semibold text-slate-300 uppercase tracking-wide block mb-1">Department</span>
                           <p className="text-xs font-bold text-slate-600 truncate">{emp.department || 'General'}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-4 bg-blue-600 rounded-2xl shadow-xl shadow-blue-100 text-white">
+                      <div className="flex items-center justify-between p-4 bg-blue-600 rounded-xl shadow-xl shadow-blue-100 text-white">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Base Salary</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">Base Salary</span>
                         </div>
-                        <span className="text-sm font-black font-mono">{formatRupiah(emp.basic_salary)}</span>
+                        <span className="text-sm font-semibold font-mono">{formatRupiah(emp.basic_salary)}</span>
                       </div>
                     </motion.div>
                   ))}
@@ -1061,20 +1061,20 @@ export default function HrisClient({
                 )}
 
                 {transferHistory.length > 0 && (
-                  <div className="mt-10 rounded-[28px] border border-indigo-100 bg-indigo-50/50 p-6">
+                  <div className="mt-10 rounded-xl border border-indigo-100 bg-indigo-50/50 p-6">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-2xl bg-white border border-indigo-100 text-indigo-600 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-white border border-indigo-100 text-indigo-600 flex items-center justify-center">
                         <ArrowRightLeft size={16} />
                       </div>
                       <div>
-                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-[0.16em]">Riwayat Mutasi Antar Entitas</h4>
+                        <h4 className="text-sm font-semibold text-slate-800 uppercase tracking-wide">Riwayat Mutasi Antar Entitas</h4>
                         <p className="text-[11px] font-bold text-slate-500">20 aktivitas terbaru perpindahan karyawan antar entitas holding.</p>
                       </div>
                     </div>
                     <div className="space-y-3">
                       {transferHistory.map((item: any) => (
-                        <div key={item.id} className="rounded-2xl border border-indigo-100 bg-white px-4 py-3">
-                          <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                        <div key={item.id} className="rounded-xl border border-indigo-100 bg-white px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                             <span>{new Date(item.created_at).toLocaleString('id-ID')}</span>
                             <span>•</span>
                             <span>By {item.actor_email || '-'}</span>
@@ -1086,7 +1086,7 @@ export default function HrisClient({
                             {item.from_org_name} ({item.from_branch_name || '-'}) → {item.to_org_name} ({item.to_branch_name || '-'})
                           </p>
                           {item.target_assigned_as_pic && (
-                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-600 mt-1">Target branch ditetapkan sebagai PIC</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 mt-1">Target branch ditetapkan sebagai PIC</p>
                           )}
                           {item.note && (
                             <p className="text-xs text-slate-500 mt-1 italic">Catatan: {item.note}</p>
@@ -1119,7 +1119,7 @@ export default function HrisClient({
                   {rolesList.map((role: any) => (
                     <div key={role.id} className="bg-slate-50 border border-slate-100 p-6 rounded-[32px] group hover:border-blue-200 transition-all">
                        <div className="flex justify-between items-start mb-4">
-                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-blue-600">
+                          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm text-blue-600">
                              <Briefcase size={20} />
                           </div>
                           {!role.is_system && (
@@ -1130,15 +1130,15 @@ export default function HrisClient({
                           )}
                           {role.is_system && <StatusBadge label="SYSTEM PROTECTED" variant="warning" />}
                        </div>
-                       <h4 className="font-black text-lg text-slate-900">{role.name}</h4>
+                       <h4 className="font-semibold text-lg text-slate-900">{role.name}</h4>
                        
                        <div className="mt-4 pt-4 border-t border-slate-200/50 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                              <ShieldCheck size={14} className="text-emerald-500" />
-                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{role.permissions?.length || 0} PERMISSIONS</span>
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{role.permissions?.length || 0} PERMISSIONS</span>
                           </div>
                           {role.priority !== undefined && (
-                             <span className="text-[10px] font-black font-mono text-slate-300">P-{role.priority}</span>
+                             <span className="text-[10px] font-semibold font-mono text-slate-300">P-{role.priority}</span>
                           )}
                        </div>
                     </div>
@@ -1179,8 +1179,8 @@ export default function HrisClient({
 
               <div className="p-2">
                 <div className="mb-6 flex flex-wrap items-center gap-3 rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Scope</div>
-                  <div className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${activeBranchName ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Scope</div>
+                  <div className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${activeBranchName ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                     {attendanceScopeLabel}
                   </div>
                   <div className="text-[11px] font-bold text-slate-500">
@@ -1192,18 +1192,18 @@ export default function HrisClient({
 
                 <div className="space-y-4">
                   {attendanceRecords.map((record: any) => (
-                    <div key={record.id} className="rounded-[28px] border border-slate-100 bg-slate-50/60 px-6 py-5 shadow-sm">
+                    <div key={record.id} className="rounded-xl border border-slate-100 bg-slate-50/60 px-6 py-5 shadow-sm">
                       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h4 className="text-sm font-black text-slate-900">
+                            <h4 className="text-sm font-semibold text-slate-900">
                               {record.employee?.first_name} {record.employee?.last_name}
                             </h4>
-                            <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 border border-slate-100">
+                            <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400 border border-slate-100">
                               {record.employee?.nik || 'Tanpa NIK'}
                             </span>
                             {record.branch?.name && (
-                              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-blue-600 border border-blue-100">
+                              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-blue-600 border border-blue-100">
                                 {record.branch.name}
                               </span>
                             )}
@@ -1223,16 +1223,16 @@ export default function HrisClient({
                                   ? 'error'
                                   : 'info'
                             } />
-                          <div className="rounded-2xl bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 border border-slate-100">
+                          <div className="rounded-xl bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 border border-slate-100">
                             IN {record.check_in ? new Date(record.check_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                           </div>
-                          <div className="rounded-2xl bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 border border-slate-100">
+                          <div className="rounded-xl bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 border border-slate-100">
                             OUT {record.check_out ? new Date(record.check_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                           </div>
                         </div>
                       </div>
                       {record.notes && (
-                        <div className="mt-4 rounded-2xl bg-white px-4 py-3 text-xs font-medium text-slate-500 border border-slate-100">
+                        <div className="mt-4 rounded-xl bg-white px-4 py-3 text-xs font-medium text-slate-500 border border-slate-100">
                           {record.notes}
                         </div>
                       )}
@@ -1282,11 +1282,11 @@ export default function HrisClient({
               <div className="p-2">
                 <div className="space-y-4">
                   {leaveRequests.map((request: any) => (
-                    <div key={request.id} className="rounded-[28px] border border-slate-100 bg-slate-50/60 px-6 py-5 shadow-sm">
+                    <div key={request.id} className="rounded-xl border border-slate-100 bg-slate-50/60 px-6 py-5 shadow-sm">
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h4 className="text-sm font-black text-slate-900">
+                            <h4 className="text-sm font-semibold text-slate-900">
                               {request.employee?.first_name} {request.employee?.last_name}
                             </h4>
                             <StatusBadge
@@ -1300,7 +1300,7 @@ export default function HrisClient({
                               }
                             />
                             {request.branch?.name && (
-                              <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-indigo-600 border border-indigo-100">
+                              <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-indigo-600 border border-indigo-100">
                                 {request.branch.name}
                               </span>
                             )}
@@ -1308,7 +1308,7 @@ export default function HrisClient({
                           <div className="text-[11px] font-bold text-slate-500">
                             {request.leave_type} • {formatDate(request.start_date)} sampai {formatDate(request.end_date)} • {request.days_taken} hari
                           </div>
-                          <div className="rounded-2xl bg-white px-4 py-3 text-xs font-medium text-slate-500 border border-slate-100">
+                          <div className="rounded-xl bg-white px-4 py-3 text-xs font-medium text-slate-500 border border-slate-100">
                             {request.reason}
                           </div>
                         </div>
@@ -1402,19 +1402,19 @@ export default function HrisClient({
                                   variant === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
                               <Icon size={16} />
                             </div>
-                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{title}</h4>
+                            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{title}</h4>
                           </div>
                         </div>
                         <div className="p-4 space-y-3">
                           {mapped.map((comp: any) => (
-                            <div key={comp.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-50 flex items-center justify-between group hover:border-blue-200 transition-all">
+                            <div key={comp.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-50 flex items-center justify-between group hover:border-blue-200 transition-all">
                               <div className="space-y-2">
-                                <h5 className="font-black text-slate-800 tracking-tight">{comp.name}</h5>
+                                <h5 className="font-semibold text-slate-800 tracking-tight">{comp.name}</h5>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className="px-3 py-1 bg-slate-50 text-slate-500 text-[10px] font-black font-mono rounded-lg border border-slate-100">
+                                  <span className="px-3 py-1 bg-slate-50 text-slate-500 text-[10px] font-semibold font-mono rounded-lg border border-slate-100">
                                     {comp.is_percentage ? `${comp.percentage_value}% of Base` : formatRupiah(comp.default_amount)}
                                   </span>
-                                  <span className={`px-3 py-1 text-[10px] font-black uppercase rounded-lg border flex items-center gap-1.5
+                                  <span className={`px-3 py-1 text-[10px] font-semibold uppercase rounded-lg border flex items-center gap-1.5
                                          ${comp.account ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
                                     <LinkIcon size={10} /> {comp.account ? `${comp.account.code}` : 'NO MAPPING'}
                                   </span>
@@ -1482,8 +1482,8 @@ export default function HrisClient({
 
               <div className="overflow-x-auto min-h-[400px]">
                 <div className="mb-6 flex flex-wrap items-center gap-3 rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Scope</div>
-                  <div className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${activeBranchName ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Scope</div>
+                  <div className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${activeBranchName ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                     {payrollScopeLabel}
                   </div>
                   {!activeBranchId && (
@@ -1496,24 +1496,24 @@ export default function HrisClient({
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50 border-b border-slate-100">
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Period</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Gross Total</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Deductions</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right whitespace-nowrap">Net Payable</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
+                      <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Period</th>
+                      <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Gross Total</th>
+                      <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Deductions</th>
+                      <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right whitespace-nowrap">Net Payable</th>
+                      <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-center">Status</th>
+                      <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {payrollRuns.map((run: any) => (
                       <tr key={run.id} className="group hover:bg-slate-50/50 transition-colors">
                         <td className="px-8 py-6">
-                          <div className="font-black text-slate-900 tracking-tight uppercase">{new Date(run.period_start).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</div>
+                          <div className="font-semibold text-slate-900 tracking-tight uppercase">{new Date(run.period_start).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</div>
                           <div className="text-[10px] text-slate-400 font-bold font-mono mt-1 tracking-wider italic flex items-center gap-2">
                             <Clock size={10} /> {run.period_start} - {run.period_end}
                           </div>
                           {run.branch?.name && (
-                            <div className="mt-2 inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-blue-600 border border-blue-100">
+                            <div className="mt-2 inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[9px] font-semibold uppercase tracking-wide text-blue-600 border border-blue-100">
                               {run.branch.name}
                             </div>
                           )}
@@ -1526,12 +1526,12 @@ export default function HrisClient({
                         </td>
                         <td className="px-8 py-6 text-right">
                           <div className="bg-blue-50 px-4 py-2 rounded-xl inline-block border border-blue-100 shadow-inner">
-                            <span className="text-sm font-black text-blue-600 font-mono italic">{formatRupiah(run.total_net)}</span>
+                            <span className="text-sm font-semibold text-blue-600 font-mono italic">{formatRupiah(run.total_net)}</span>
                           </div>
                         </td>
                         <td className="px-8 py-6 text-center">
                           <StatusBadge label={run.status} variant={run.status === 'PAID' ? 'success' : 'warning'} />
-                          {run.payment_date && <div className="text-[9px] text-slate-300 font-black mt-1 uppercase tracking-widest">{run.payment_date}</div>}
+                          {run.payment_date && <div className="text-[9px] text-slate-300 font-semibold mt-1 uppercase tracking-wide">{run.payment_date}</div>}
                         </td>
                         <td className="px-8 py-6">
                           <div className="flex items-center justify-end gap-2">
@@ -1608,10 +1608,10 @@ export default function HrisClient({
                   <table className="w-full text-left">
                      <thead>
                         <tr className="bg-slate-900 text-white">
-                           <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Label Undangan</th>
-                           <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Role & Masa Berlaku</th>
-                           <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-center">Token</th>
-                           <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-right">Aksi</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold uppercase tracking-wide">Label Undangan</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold uppercase tracking-wide">Role & Masa Berlaku</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold uppercase tracking-wide text-center">Token</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold uppercase tracking-wide text-right">Aksi</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-100">
@@ -1622,12 +1622,12 @@ export default function HrisClient({
                         ) : invitations.map((inv: any) => (
                            <tr key={inv.id} className="hover:bg-slate-50 transition-all group">
                               <td className="px-8 py-6">
-                                 <div className="font-black text-slate-900 text-[13px] tracking-tight">{inv.label}</div>
+                                 <div className="font-semibold text-slate-900 text-[13px] tracking-tight">{inv.label}</div>
                                  <div className="text-[9px] text-slate-400 font-bold uppercase mt-1">Dibuat: {new Date(inv.created_at).toLocaleDateString()}</div>
                               </td>
                               <td className="px-8 py-6">
                                  <div className="flex flex-col gap-2">
-                                    <div className="px-4 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded-lg inline-flex items-center gap-2 border border-slate-200 w-fit">
+                                    <div className="px-4 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-semibold rounded-lg inline-flex items-center gap-2 border border-slate-200 w-fit">
                                        <ShieldCheck size={12} className="text-slate-400" /> {inv.roles?.name || 'Staff Umum'}
                                     </div>
                                     <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5 ml-1">
@@ -1636,7 +1636,7 @@ export default function HrisClient({
                                  </div>
                               </td>
                               <td className="px-8 py-6 text-center">
-                                 <code className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl font-black text-sm border-2 border-blue-100 border-dashed">{inv.invitation_code}</code>
+                                 <code className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl font-semibold text-sm border-2 border-blue-100 border-dashed">{inv.invitation_code}</code>
                               </td>
                               <td className="px-8 py-6">
                                  <div className="flex items-center justify-end gap-3 translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all">
@@ -1684,16 +1684,16 @@ export default function HrisClient({
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="relative w-full max-w-4xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white"
+              className="relative w-full max-w-4xl bg-white rounded-xl shadow-md overflow-hidden border border-white"
             >
               <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-emerald-50/70">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-100">
+                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-xl shadow-emerald-100">
                     <ShieldCheck size={22} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight uppercase italic">HRIS Impersonation</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
+                    <h3 className="text-lg font-semibold text-slate-900 tracking-tight uppercase italic">HRIS Impersonation</h3>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">
                       Aktif karena admin platform sedang impersonate tenant {adminImpersonation?.email ? `• ${adminImpersonation.email}` : ''}
                     </p>
                   </div>
@@ -1708,16 +1708,16 @@ export default function HrisClient({
               </div>
 
               <div className="p-8 space-y-6 max-h-[75vh] overflow-y-auto">
-                <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/50 px-6 py-5">
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Kapan panel ini muncul?</div>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-6 py-5">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Kapan panel ini muncul?</div>
                   <p className="text-sm font-bold text-slate-700 leading-relaxed">
                     Panel ini hanya tampil saat platform admin sedang berada dalam mode impersonation tenant. Dari sini Anda bisa turun ke akun yang punya akses HR/HRIS untuk cek scope menu, branch, dan batas akses aslinya.
                   </p>
                 </div>
 
                 {hrisImpersonationTargets.length === 0 ? (
-                  <div className="rounded-[28px] border border-slate-100 bg-slate-50 px-6 py-8 text-center">
-                    <p className="text-sm font-black text-slate-700">Belum ada akun HR/HRIS yang siap dipakai.</p>
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 px-6 py-8 text-center">
+                    <p className="text-sm font-semibold text-slate-700">Belum ada akun HR/HRIS yang siap dipakai.</p>
                     <p className="text-xs font-semibold text-slate-500 mt-2">
                       Pastikan tenant punya user aktif dengan role HR, admin, owner, atau custom role yang memiliki permission HRIS.
                     </p>
@@ -1736,7 +1736,7 @@ export default function HrisClient({
                           <div className="flex items-start justify-between gap-4">
                             <div className="space-y-2 min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
-                                <h4 className="text-base font-black text-slate-900 truncate">{candidate.displayName || 'User Tenant'}</h4>
+                                <h4 className="text-base font-semibold text-slate-900 truncate">{candidate.displayName || 'User Tenant'}</h4>
                                 <StatusBadge
                                   label={isCurrentTarget ? 'SEDANG AKTIF' : String(candidate.roleLabel || 'HRIS').toUpperCase()}
                                   variant={isCurrentTarget ? 'success' : 'warning'}
@@ -1775,27 +1775,27 @@ export default function HrisClient({
           {isInviteModalOpen && (
               <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
                 <motion.div key="invite-modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsInviteModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-                <motion.div key="invite-modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
-                    <div className="p-10 space-y-8">
+                <motion.div key="invite-modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-md overflow-hidden border border-white">
+                    <div className="p-5 space-y-8">
                       <div className="flex items-center gap-4">
                           <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-[24px] flex items-center justify-center shadow-inner">
                             <LinkIcon size={28} />
                           </div>
                           <div>
-                            <h3 className="text-xl font-black text-slate-900 leading-none">BUAT LINK AKTIVASI</h3>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Token-based invitation system</p>
+                            <h3 className="text-xl font-semibold text-slate-900 leading-none">BUAT LINK AKTIVASI</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">Token-based invitation system</p>
                           </div>
                       </div>
 
                       <form onSubmit={handleCreateInvite} className="space-y-6">
                           <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Label / Nama Link</label>
-                            <input name="label" required placeholder="Cth: Rekrutmen Staff Gudang" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all" />
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Label / Nama Link</label>
+                            <input name="label" required placeholder="Cth: Rekrutmen Staff Gudang" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all" />
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Role Otomatis</label>
-                                <select name="role_id" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all">
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Role Otomatis</label>
+                                <select name="role_id" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all">
                                   <option value="">-- Staff Umum --</option>
                                   {rolesList.map((r: any) => (
                                       <option key={r.id} value={r.id}>{r.name.toUpperCase()}</option>
@@ -1803,8 +1803,8 @@ export default function HrisClient({
                                 </select>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Masa Berlaku</label>
-                                <select name="duration" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all">
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Masa Berlaku</label>
+                                <select name="duration" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all">
                                   <option value="0">∞ Selamanya</option>
                                   <option value="1">1 Hari</option>
                                   <option value="7">7 Hari</option>
@@ -1814,8 +1814,8 @@ export default function HrisClient({
                           </div>
                           
                           <div className="flex gap-4 pt-4 border-t border-slate-100">
-                            <button type="button" onClick={() => setIsInviteModalOpen(false)} className="flex-1 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 rounded-2xl transition-all">Batal</button>
-                            <button type="submit" disabled={loading} className="flex-1 py-4 bg-blue-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50">
+                            <button type="button" onClick={() => setIsInviteModalOpen(false)} className="flex-1 py-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide hover:bg-slate-50 rounded-xl transition-all">Batal</button>
+                            <button type="submit" disabled={loading} className="flex-1 py-4 bg-blue-600 text-white text-[11px] font-semibold uppercase tracking-wide rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50">
                                 {loading ? "Menyimpan..." : "Buat Link"}
                             </button>
                           </div>
@@ -1830,27 +1830,27 @@ export default function HrisClient({
           {isPositionModalOpen && (
               <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPositionModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
-                    <div className="p-10 space-y-8">
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-md overflow-hidden border border-white">
+                    <div className="p-5 space-y-8">
                       <div className="flex items-center gap-4">
                           <div className="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-[24px] flex items-center justify-center shadow-inner">
                             <Briefcase size={28} />
                           </div>
                           <div>
-                            <h3 className="text-xl font-black text-slate-900 leading-none">{editingPosition ? 'EDIT POSISI' : 'BUAT POSISI BARU'}</h3>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Struktur Organisasi NIZAM</p>
+                            <h3 className="text-xl font-semibold text-slate-900 leading-none">{editingPosition ? 'EDIT POSISI' : 'BUAT POSISI BARU'}</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">Struktur Organisasi NIZAM</p>
                           </div>
                       </div>
 
                       <form onSubmit={handleSavePosition} className="space-y-6">
                           <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Jabatan</label>
-                            <input name="name" defaultValue={editingPosition?.name} required placeholder="Cth: Kepala Mekanik / Sales" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 transition-all" />
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Nama Jabatan</label>
+                            <input name="name" defaultValue={editingPosition?.name} required placeholder="Cth: Kepala Mekanik / Sales" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 transition-all" />
                           </div>
                           
                           <div className="flex gap-4 pt-4 border-t border-slate-100">
-                            <button type="button" onClick={() => setIsPositionModalOpen(false)} className="flex-1 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 rounded-2xl transition-all">Batal</button>
-                            <button type="submit" disabled={loading} className="flex-1 py-4 bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50">
+                            <button type="button" onClick={() => setIsPositionModalOpen(false)} className="flex-1 py-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide hover:bg-slate-50 rounded-xl transition-all">Batal</button>
+                            <button type="submit" disabled={loading} className="flex-1 py-4 bg-indigo-600 text-white text-[11px] font-semibold uppercase tracking-wide rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50">
                                 {loading ? "Menyimpan..." : "Simpan Posisi"}
                             </button>
                           </div>
@@ -1866,15 +1866,15 @@ export default function HrisClient({
         {isPayrollModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPayrollModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-md bg-white rounded-xl shadow-md overflow-hidden border border-white">
               <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center shadow-inner">
+                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center shadow-inner">
                     <Banknote size={24} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase italic">Payroll Component</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Configuration & GL Mapping</p>
+                    <h3 className="text-xl font-semibold text-slate-900 tracking-tight uppercase italic">Payroll Component</h3>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">Configuration & GL Mapping</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => setIsPayrollModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
@@ -1885,10 +1885,10 @@ export default function HrisClient({
               <div className="p-8">
                 <form id="payroll-form" onSubmit={handleCreatePayrollComponent} className="space-y-8">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Component Template</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Component Template</label>
                     <select
                       value={componentNameOption} onChange={(e: any) => handleComponentSelect(e.target.value)}
-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition-all shadow-inner"
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition-all shadow-inner"
                     >
                       <option value="Tunjangan Makan">Tunjangan Makan (Pendapatan)</option>
                       <option value="Tunjangan Transport">Tunjangan Transport (Pendapatan)</option>
@@ -1905,7 +1905,7 @@ export default function HrisClient({
                         value={customComponentName} onChange={(e: any) => setCustomComponentName(e.target.value)}
                         required
                         placeholder="Enter component name..."
-                        className="w-full mt-3 px-6 py-4 bg-white border-2 border-blue-50 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:border-blue-500 transition-all shadow-sm"
+                        className="w-full mt-3 px-6 py-4 bg-white border-2 border-blue-50 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-blue-500 transition-all shadow-sm"
                       />
                     )}
                     {componentNameOption !== 'CUSTOM' && (
@@ -1914,8 +1914,8 @@ export default function HrisClient({
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Cash Flow Category</label>
-                    <select name="type" required value={componentType} onChange={(e: any) => setComponentType(e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition-all shadow-inner">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Cash Flow Category</label>
+                    <select name="type" required value={componentType} onChange={(e: any) => setComponentType(e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition-all shadow-inner">
                       <option value="EARNING">Earnings (Allowances / Bonuses)</option>
                       <option value="DEDUCTION">Deductions (Employee Pays)</option>
                       <option value="TAX">Tax Deduction (PPh 21 Specific)</option>
@@ -1939,7 +1939,7 @@ export default function HrisClient({
                         />
                         <span className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></span>
                       </span>
-                      <span className="text-[11px] font-black text-slate-700 uppercase tracking-tight">
+                      <span className="text-[11px] font-semibold text-slate-700 uppercase tracking-tight">
                         Calculate by Percentage (%)
                       </span>
                     </label>
@@ -1952,10 +1952,10 @@ export default function HrisClient({
                     ) : (
                       <div className="flex items-center gap-4">
                         <div className="flex-1 space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Percentage Rate (%)</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Percentage Rate (%)</label>
                           <div className="relative">
-                            <input type="number" step="0.01" value={payrollAmount} onChange={(e: any) => setPayrollAmount(Number(e.target.value))} required placeholder="2.00" className="w-full px-6 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-black text-slate-900 outline-none focus:border-blue-500 transition-all shadow-sm" />
-                            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 font-black">%</span>
+                            <input type="number" step="0.01" value={payrollAmount} onChange={(e: any) => setPayrollAmount(Number(e.target.value))} required placeholder="2.00" className="w-full px-6 py-4 bg-white border border-slate-100 rounded-xl text-sm font-semibold text-slate-900 outline-none focus:border-blue-500 transition-all shadow-sm" />
+                            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 font-semibold">%</span>
                           </div>
                         </div>
                         <div className="pt-8 text-[10px] font-bold text-slate-400 italic">of Basic Salary</div>
@@ -1964,10 +1964,10 @@ export default function HrisClient({
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1 flex items-center gap-2">
                       General Ledger Mapping
                     </label>
-                    <select name="account_id" required className="w-full px-6 py-4 bg-white border-2 border-indigo-50 shadow-[0_10px_20px_-5px_rgba(99,102,241,0.1)] rounded-2xl text-sm font-black text-indigo-700 outline-none focus:border-indigo-500 transition-all">
+                    <select name="account_id" required className="w-full px-6 py-4 bg-white border-2 border-indigo-50 shadow-[0_10px_20px_-5px_rgba(99,102,241,0.1)] rounded-xl text-sm font-semibold text-indigo-700 outline-none focus:border-indigo-500 transition-all">
                       <option value="">-- UNMAPPED (REQUIRED) --</option>
                       {accounts.map((acc: any) => (
                         <option key={acc.account_id} value={acc.account_id}>{acc.code} - {acc.name}</option>
@@ -1979,14 +1979,14 @@ export default function HrisClient({
                     <div className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" id="is_taxable" name="is_taxable" checked={isTaxable} onChange={(e: any) => setIsTaxable(e.target.checked)} className="sr-only peer" />
                       <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                      <label htmlFor="is_taxable" className="ml-3 text-[11px] font-black text-slate-800 uppercase tracking-tight cursor-pointer">Taxable Component (PPh 21 Effect)</label>
+                      <label htmlFor="is_taxable" className="ml-3 text-[11px] font-semibold text-slate-800 uppercase tracking-tight cursor-pointer">Taxable Component (PPh 21 Effect)</label>
                     </div>
                   </div>
                 </form>
               </div>
 
               <div className="px-8 py-6 border-t border-slate-50 bg-slate-50/30 flex justify-end gap-4">
-                <button type="button" onClick={() => setIsPayrollModalOpen(false)} className="px-8 py-3 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-widest">CANCEL</button>
+                <button type="button" onClick={() => setIsPayrollModalOpen(false)} className="px-8 py-3 rounded-xl text-[11px] font-semibold uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-wide">CANCEL</button>
                 <SafeButton
                   form="payroll-form"
                   type="submit"
@@ -2007,15 +2007,15 @@ export default function HrisClient({
         {isAttendanceModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAttendanceModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-xl shadow-md overflow-hidden border border-white">
               <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-blue-100">
+                  <div className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-xl shadow-blue-100">
                     <Clock size={24} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase italic">Attendance Register</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Catat kehadiran berdasarkan unit karyawan</p>
+                    <h3 className="text-xl font-semibold text-slate-900 tracking-tight uppercase italic">Attendance Register</h3>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">Catat kehadiran berdasarkan unit karyawan</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => setIsAttendanceModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
@@ -2023,10 +2023,10 @@ export default function HrisClient({
                 </button>
               </div>
 
-              <form onSubmit={handleSaveAttendance} className="p-10 space-y-8">
-                <div className="rounded-[28px] border px-6 py-5 border-blue-100 bg-blue-50/60">
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Konteks Unit</div>
-                  <div className="text-sm font-black text-slate-800">
+              <form onSubmit={handleSaveAttendance} className="p-5 space-y-8">
+                <div className="rounded-xl border px-6 py-5 border-blue-100 bg-blue-50/60">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Konteks Unit</div>
+                  <div className="text-sm font-semibold text-slate-800">
                     {activeBranchName
                       ? `Anda sedang bekerja di unit ${activeBranchName}.`
                       : allowAllBranchSelection
@@ -2036,8 +2036,8 @@ export default function HrisClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Karyawan</label>
-                  <select name="employee_id" required className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Karyawan</label>
+                  <select name="employee_id" required className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all">
                     <option value="">-- PILIH KARYAWAN --</option>
                     {employees.map((emp: any) => (
                       <option key={emp.id} value={emp.id}>
@@ -2049,12 +2049,12 @@ export default function HrisClient({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal</label>
-                    <input name="record_date" type="date" required defaultValue={defaultDateInput} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Tanggal</label>
+                    <input name="record_date" type="date" required defaultValue={defaultDateInput} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Status</label>
-                    <select name="status" defaultValue="PRESENT" className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Status</label>
+                    <select name="status" defaultValue="PRESENT" className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all">
                       <option value="PRESENT">PRESENT</option>
                       <option value="LATE">LATE</option>
                       <option value="HALFDAY">HALFDAY</option>
@@ -2067,22 +2067,22 @@ export default function HrisClient({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Jam Masuk</label>
-                    <input name="check_in" type="datetime-local" defaultValue={defaultDateTimeInput} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Jam Masuk</label>
+                    <input name="check_in" type="datetime-local" defaultValue={defaultDateTimeInput} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Jam Keluar</label>
-                    <input name="check_out" type="datetime-local" className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Jam Keluar</label>
+                    <input name="check_out" type="datetime-local" className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Catatan</label>
-                  <textarea name="notes" rows={4} placeholder="Catatan keterlambatan, izin, atau keterangan lain..." className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all resize-none" />
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Catatan</label>
+                  <textarea name="notes" rows={4} placeholder="Catatan keterlambatan, izin, atau keterangan lain..." className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all resize-none" />
                 </div>
 
                 <div className="flex items-center justify-end gap-4">
-                  <button type="button" onClick={() => setIsAttendanceModalOpen(false)} className="px-8 py-3 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-widest">CANCEL</button>
+                  <button type="button" onClick={() => setIsAttendanceModalOpen(false)} className="px-8 py-3 rounded-xl text-[11px] font-semibold uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-wide">CANCEL</button>
                   <SafeButton
                     type="submit"
                     variant="primary"
@@ -2103,15 +2103,15 @@ export default function HrisClient({
         {isLeaveModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsLeaveModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-xl shadow-md overflow-hidden border border-white">
               <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-100">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-xl shadow-indigo-100">
                     <CalendarDays size={24} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase italic">Leave Request</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Ajukan cuti sesuai unit karyawan</p>
+                    <h3 className="text-xl font-semibold text-slate-900 tracking-tight uppercase italic">Leave Request</h3>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">Ajukan cuti sesuai unit karyawan</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => setIsLeaveModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
@@ -2119,10 +2119,10 @@ export default function HrisClient({
                 </button>
               </div>
 
-              <form onSubmit={handleCreateLeave} className="p-10 space-y-8">
+              <form onSubmit={handleCreateLeave} className="p-5 space-y-8">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Karyawan</label>
-                  <select name="employee_id" required className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Karyawan</label>
+                  <select name="employee_id" required className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all">
                     <option value="">-- PILIH KARYAWAN --</option>
                     {employees.map((emp: any) => (
                       <option key={emp.id} value={emp.id}>
@@ -2134,38 +2134,38 @@ export default function HrisClient({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Jenis Cuti</label>
-                    <select name="leave_type" required defaultValue="Annual Leave" className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Jenis Cuti</label>
+                    <select name="leave_type" required defaultValue="Annual Leave" className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all">
                       <option value="Annual Leave">Annual Leave</option>
                       <option value="Sick Leave">Sick Leave</option>
                       <option value="Unpaid Leave">Unpaid Leave</option>
                       <option value="Special Leave">Special Leave</option>
                     </select>
                   </div>
-                  <div className="rounded-[28px] border px-6 py-5 border-indigo-100 bg-indigo-50/60">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Scope</div>
-                    <div className="text-sm font-black text-slate-800">{attendanceScopeLabel}</div>
+                  <div className="rounded-xl border px-6 py-5 border-indigo-100 bg-indigo-50/60">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Scope</div>
+                    <div className="text-sm font-semibold text-slate-800">{attendanceScopeLabel}</div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal Mulai</label>
-                    <input name="start_date" type="date" required defaultValue={defaultDateInput} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all" />
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Tanggal Mulai</label>
+                    <input name="start_date" type="date" required defaultValue={defaultDateInput} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal Selesai</label>
-                    <input name="end_date" type="date" required defaultValue={defaultDateInput} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all" />
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Tanggal Selesai</label>
+                    <input name="end_date" type="date" required defaultValue={defaultDateInput} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Alasan</label>
-                  <textarea name="reason" rows={4} required placeholder="Tuliskan alasan cuti..." className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all resize-none" />
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Alasan</label>
+                  <textarea name="reason" rows={4} required placeholder="Tuliskan alasan cuti..." className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all resize-none" />
                 </div>
 
                 <div className="flex items-center justify-end gap-4">
-                  <button type="button" onClick={() => setIsLeaveModalOpen(false)} className="px-8 py-3 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-widest">CANCEL</button>
+                  <button type="button" onClick={() => setIsLeaveModalOpen(false)} className="px-8 py-3 rounded-xl text-[11px] font-semibold uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-wide">CANCEL</button>
                   <SafeButton
                     type="submit"
                     variant="indigo"
@@ -2186,15 +2186,15 @@ export default function HrisClient({
         {isRunModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsRunModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-md overflow-hidden border border-white">
               <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-blue-600 text-white">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
+                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
                     <CalendarDays size={24} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black tracking-tight uppercase italic">Generate Payroll</h3>
-                    <p className="text-[10px] font-black opacity-70 uppercase tracking-widest mt-0.5">Bulk salary calculation</p>
+                    <h3 className="text-xl font-semibold tracking-tight uppercase italic">Generate Payroll</h3>
+                    <p className="text-[10px] font-semibold opacity-70 uppercase tracking-wide mt-0.5">Bulk salary calculation</p>
                   </div>
                 </div>
                 <button onClick={() => setIsRunModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-all">
@@ -2207,20 +2207,20 @@ export default function HrisClient({
                 const res = await generatePayrollRun(orgId, new FormData(e.currentTarget))
                 if (res.error) showToast(res.error, 'error')
                 else window.location.reload()
-              }} className="p-10 space-y-8">
+              }} className="p-5 space-y-8">
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Period Start</label>
-                    <input name="period_start" type="date" required className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 transition-all outline-none" />
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Period Start</label>
+                    <input name="period_start" type="date" required className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 transition-all outline-none" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Period End</label>
-                    <input name="period_end" type="date" required className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 transition-all outline-none" />
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Period End</label>
+                    <input name="period_end" type="date" required className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 transition-all outline-none" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Disbursement Date</label>
-                  <input name="payment_date" type="date" required className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 transition-all outline-none" />
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Disbursement Date</label>
+                  <input name="payment_date" type="date" required className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 transition-all outline-none" />
                 </div>
                 <div className="p-6 bg-blue-50/50 rounded-[32px] border border-blue-100/50">
                   <p className="text-[11px] text-blue-600 font-bold leading-relaxed text-center italic">
@@ -2250,15 +2250,15 @@ export default function HrisClient({
         {resetModalEmp && (
           <div key="reset-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setResetModalEmp(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-sm bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-sm bg-white rounded-xl shadow-md overflow-hidden border border-white">
               <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center shadow-inner">
+                  <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center shadow-inner">
                     <Key size={24} />
                   </div>
                   <div>
-                    <h3 className="text-[16px] font-black text-slate-900 tracking-tight uppercase italic">{resetModalEmp.first_name}</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Force Reset Password</p>
+                    <h3 className="text-[16px] font-semibold text-slate-900 tracking-tight uppercase italic">{resetModalEmp.first_name}</h3>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">Force Reset Password</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => setResetModalEmp(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
@@ -2268,12 +2268,12 @@ export default function HrisClient({
 
               <div className="p-8 space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">New Password</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">New Password</label>
                   <input 
                     type="text" 
                     value={resetModalPwd}
                     onChange={(e) => setResetModalPwd(e.target.value)}
-                    className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-amber-500 transition-all" 
+                    className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-amber-500 transition-all" 
                   />
                   <p className="text-[10px] text-amber-600 font-bold px-1 py-1 italic">
                     Karyawan harus mengganti password ini setelah berhasil login.
@@ -2296,7 +2296,7 @@ export default function HrisClient({
                     type="button"
                     onClick={() => submitPasswordReset(false)}
                     disabled={resettingId === resetModalEmp.id}
-                    className="w-full py-4 rounded-[20px] bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 font-bold tracking-widest uppercase text-[11px] flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    className="w-full py-4 rounded-[20px] bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 font-bold tracking-wide uppercase text-[11px] flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                   >
                     RESET SAJA (TANPA WA)
                   </button>
@@ -2311,26 +2311,26 @@ export default function HrisClient({
         {isPayModalOpen && (
           <div key="pay-modal" className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPayModalOpen(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
-              <div className="p-10 text-center space-y-8">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-md overflow-hidden border border-white">
+              <div className="p-5 text-center space-y-8">
                 <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-[32px] flex items-center justify-center mx-auto shadow-inner">
                   <Banknote size={48} />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Disburse Funds</h3>
-                  <p className="text-sm text-slate-500 font-medium">You are about to release <span className="text-emerald-600 font-black">{formatRupiah(isPayModalOpen.total_net)}</span> to employees.</p>
+                  <h3 className="text-3xl font-semibold text-slate-900 tracking-tighter uppercase italic">Disburse Funds</h3>
+                  <p className="text-sm text-slate-500 font-medium">You are about to release <span className="text-emerald-600 font-semibold">{formatRupiah(isPayModalOpen.total_net)}</span> to employees.</p>
                 </div>
 
                 <div className="space-y-2 text-left bg-slate-50/50 p-8 rounded-[32px] border border-slate-100">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Funding Account (Bank/Cash)</label>
-                  <select id="pay-account" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-800 outline-none focus:border-emerald-500 transition-all bg-white shadow-sm appearance-none">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Funding Account (Bank/Cash)</label>
+                  <select id="pay-account" className="w-full px-6 py-4 rounded-xl border border-slate-200 font-semibold text-slate-800 outline-none focus:border-emerald-500 transition-all bg-white shadow-sm appearance-none">
                     <option value="">-- SELECT SOURCE ACCOUNT --</option>
                     {accounts.filter((a: any) => a.code.startsWith('11')).map((acc: any) => (
                       <option key={acc.account_id} value={acc.account_id}>{acc.code} - {acc.name} ({formatRupiah(acc.balance)})</option>
                     ))}
                   </select>
-                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 mt-4">
-                    <p className="text-[9px] text-amber-700 leading-relaxed font-black uppercase tracking-widest text-center">Auto-Journaling: This will create a Bank Credit & Salary Expense entry.</p>
+                  <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 mt-4">
+                    <p className="text-[9px] text-amber-700 leading-relaxed font-semibold uppercase tracking-wide text-center">Auto-Journaling: This will create a Bank Credit & Salary Expense entry.</p>
                   </div>
                 </div>
 
@@ -2352,7 +2352,7 @@ export default function HrisClient({
                   >
                     CONFIRM & DISBURSE
                   </SafeButton>
-                  <button onClick={() => setIsPayModalOpen(null)} className="text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-slate-500 transition-all">ABORT OPERATION</button>
+                  <button onClick={() => setIsPayModalOpen(null)} className="text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:text-slate-500 transition-all">ABORT OPERATION</button>
                 </div>
               </div>
             </motion.div>
@@ -2366,16 +2366,16 @@ export default function HrisClient({
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAddModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-3xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white flex flex-col max-h-[90vh]"
+              className="relative w-full max-w-3xl bg-white rounded-xl shadow-md overflow-hidden border border-white flex flex-col max-h-[90vh]"
             >
               <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-blue-100">
+                  <div className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-xl shadow-blue-100">
                     <Users size={24} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase italic">{editingEmp ? 'Profile Revision' : 'Employee Registration'}</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{editingEmp ? 'Update personnel records' : 'Fill legal master data'}</p>
+                    <h3 className="text-xl font-semibold text-slate-900 tracking-tight uppercase italic">{editingEmp ? 'Profile Revision' : 'Employee Registration'}</h3>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">{editingEmp ? 'Update personnel records' : 'Fill legal master data'}</p>
                   </div>
                 </div>
                 <button onClick={() => setIsAddModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
@@ -2383,13 +2383,13 @@ export default function HrisClient({
                 </button>
               </div>
 
-              <div className="p-10 overflow-y-auto no-scrollbar flex-1">
+              <div className="p-5 overflow-y-auto no-scrollbar flex-1">
                 <form id="emp-form" onSubmit={handleCreateEmp} className="space-y-12">
-                  <div className={`rounded-[28px] border px-6 py-5 ${editingEmp ? 'border-blue-100 bg-blue-50/60' : activeBranchId ? 'border-emerald-100 bg-emerald-50/60' : 'border-amber-100 bg-amber-50/60'}`}>
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                  <div className={`rounded-xl border px-6 py-5 ${editingEmp ? 'border-blue-100 bg-blue-50/60' : activeBranchId ? 'border-emerald-100 bg-emerald-50/60' : 'border-amber-100 bg-amber-50/60'}`}>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
                       Konteks Unit
                     </div>
-                    <div className="text-sm font-black text-slate-800">
+                    <div className="text-sm font-semibold text-slate-800">
                       {editingEmp?.branch?.name
                         ? `Profil ini terdaftar di unit ${editingEmp.branch.name}.`
                         : activeBranchName
@@ -2401,7 +2401,7 @@ export default function HrisClient({
                   <div className="space-y-6">
                     <div className="flex items-center gap-3">
                       <div className="h-4 w-1 bg-blue-600 rounded-full" />
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Personal Identity</h4>
+                      <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Personal Identity</h4>
                     </div>
 
                     {/* Avatar upload */}
@@ -2411,7 +2411,7 @@ export default function HrisClient({
                           {avatarPreview ? (
                             <img src={avatarPreview} className="w-full h-full object-cover" alt="avatar" />
                           ) : (
-                            <span className="text-2xl font-black text-white">{(editingEmp?.first_name || 'K')[0]}</span>
+                            <span className="text-2xl font-semibold text-white">{(editingEmp?.first_name || 'K')[0]}</span>
                           )}
                         </div>
                         <div className="absolute inset-0 bg-black/40 rounded-[24px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
@@ -2420,7 +2420,7 @@ export default function HrisClient({
                       </button>
                       <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
                       <div>
-                        <p className="text-sm font-black text-slate-700">Foto Karyawan</p>
+                        <p className="text-sm font-semibold text-slate-700">Foto Karyawan</p>
                         <p className="text-[11px] text-slate-400 mt-0.5">Klik untuk upload gambar (JPG, PNG)</p>
                         {avatarPreview && (
                           <button type="button" onClick={() => { setAvatarFile(null); setAvatarPreview(null) }} className="text-[10px] text-rose-500 font-bold mt-1 hover:underline">Hapus Foto</button>
@@ -2429,36 +2429,36 @@ export default function HrisClient({
                     </div>
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">NIK / ID</label>
-                        <input name="nik" placeholder="K-0001" required defaultValue={editingEmp?.nik || getNextNik()} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">NIK / ID</label>
+                        <input name="nik" placeholder="K-0001" required defaultValue={editingEmp?.nik || getNextNik()} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Join Date</label>
-                        <input name="join_date" type="date" required defaultValue={editingEmp?.join_date || new Date().toISOString().split('T')[0]} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Join Date</label>
+                        <input name="join_date" type="date" required defaultValue={editingEmp?.join_date || new Date().toISOString().split('T')[0]} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-6">
-                      <input name="first_name" placeholder="First Name *" required defaultValue={editingEmp?.first_name || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
-                      <input name="last_name" placeholder="Last Name" defaultValue={editingEmp?.last_name || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                      <input name="first_name" placeholder="First Name *" required defaultValue={editingEmp?.first_name || ''} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                      <input name="last_name" placeholder="Last Name" defaultValue={editingEmp?.last_name || ''} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
                     </div>
                     <div className="grid grid-cols-2 gap-6">
-                      <input name="email" type="email" placeholder="Email Address" defaultValue={editingEmp?.email || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
-                      <select name="gender" defaultValue={editingEmp?.gender || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+                      <input name="email" type="email" placeholder="Email Address" defaultValue={editingEmp?.email || ''} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                      <select name="gender" defaultValue={editingEmp?.gender || ''} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
                         <option value="">GENDER</option>
                         <option value="M">MALE</option>
                         <option value="F">FEMALE</option>
                       </select>
                     </div>
                     <div className="relative">
-                      <span className="absolute left-6 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-sm">📱</span>
-                      <input name="whatsapp" type="tel" placeholder="Nomor WhatsApp (cth: 628123456789)" defaultValue={editingEmp?.whatsapp || ''} className="w-full pl-12 pr-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-emerald-500 outline-none transition-all" />
+                      <span className="absolute left-6 top-1/2 -translate-y-1/2 text-emerald-500 font-semibold text-sm">📱</span>
+                      <input name="whatsapp" type="tel" placeholder="Nomor WhatsApp (cth: 628123456789)" defaultValue={editingEmp?.whatsapp || ''} className="w-full pl-12 pr-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-emerald-500 outline-none transition-all" />
                     </div>
                   </div>
 
                   <div className="space-y-6">
                     <div className="flex items-center gap-3">
                       <div className="h-4 w-1 bg-indigo-600 rounded-full" />
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Occupation & Compensation</h4>
+                      <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Occupation & Compensation</h4>
                     </div>
                     <div className="grid grid-cols-2 gap-6">
                       {rolesList && rolesList.length > 0 ? (
@@ -2467,7 +2467,7 @@ export default function HrisClient({
                           required
                           value={selectedRole || editingEmp?.job_title || ''}
                           onChange={e => setSelectedRole(e.target.value)}
-                          className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none"
+                          className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 outline-none"
                         >
                           <option value="">Pilih Jabatan (Role) *</option>
                           {rolesList.map((r: any) => (
@@ -2475,7 +2475,7 @@ export default function HrisClient({
                           ))}
                         </select>
                       ) : (
-                        <input name="job_title" placeholder="Job Title *" required defaultValue={editingEmp?.job_title || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                        <input name="job_title" placeholder="Job Title *" required defaultValue={editingEmp?.job_title || ''} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
                       )}
                       {/* Department derived automatically from selected role — no manual input needed */}
                       <input
@@ -2496,7 +2496,7 @@ export default function HrisClient({
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-6">
-                      <select name="employment_status" defaultValue={editingEmp?.employment_status || 'FULL_TIME'} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+                      <select name="employment_status" defaultValue={editingEmp?.employment_status || 'FULL_TIME'} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
                         <option value="FULL_TIME">FULL TIME</option>
                         <option value="CONTRACT">CONTRACT (PKWT)</option>
                         <option value="PROBATION">PROBATION</option>
@@ -2514,15 +2514,15 @@ export default function HrisClient({
                   <div className="space-y-6">
                     <div className="flex items-center gap-3">
                       <div className="h-4 w-1 bg-amber-600 rounded-full" />
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Banking & Tax (PTKP)</h4>
+                      <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Banking & Tax (PTKP)</h4>
                     </div>
                     <div className="grid grid-cols-3 gap-6">
-                      <input name="bank_name" placeholder="Bank Name" defaultValue={editingEmp?.bank_name || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
-                      <input name="bank_account_number" placeholder="Account Number" defaultValue={editingEmp?.bank_account_number || ''} className="col-span-2 px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                      <input name="bank_name" placeholder="Bank Name" defaultValue={editingEmp?.bank_name || ''} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                      <input name="bank_account_number" placeholder="Account Number" defaultValue={editingEmp?.bank_account_number || ''} className="col-span-2 px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tax Status (PTKP PPh 21)</label>
-                      <select name="tax_status" required defaultValue={editingEmp?.tax_status || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Tax Status (PTKP PPh 21)</label>
+                      <select name="tax_status" required defaultValue={editingEmp?.tax_status || ''} className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
                         <option value="">-- SELECT STATUS --</option>
                         <option value="TK/0">TK/0 - Single, No Dependents</option>
                         <option value="TK/1">TK/1 - Single, 1 Dependent</option>
@@ -2539,13 +2539,13 @@ export default function HrisClient({
                   <div className="space-y-6">
                       <div className="flex items-center gap-3">
                         <div className="h-4 w-1 bg-emerald-600 rounded-full" />
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Penugasan PIC Unit (Opsional)</h4>
+                      <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Penugasan PIC Unit (Opsional)</h4>
                     </div>
                     <div className="space-y-2">
                        <p className="text-xs font-semibold text-slate-500 mb-3">
                           Pilih unit operasional yang akan dikelola oleh karyawan ini sebagai Manager (PIC).
                        </p>
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 border border-slate-100 rounded-2xl p-3 bg-slate-50/50">
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50">
                           {branchOptions?.map((b: any) => (
                              <label key={b.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selectedManagedBranches.includes(b.id) ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white hover:border-emerald-200'}`}>
                                 <input type="checkbox" checked={selectedManagedBranches.includes(b.id)} onChange={(e) => {
@@ -2554,7 +2554,7 @@ export default function HrisClient({
                                 }} className="mt-0.5 h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 shrink-0" />
                                 <div className="flex flex-col">
                                    <span className="text-sm font-bold text-slate-800 leading-none">{b.name}</span>
-                                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{b.code}</span>
+                                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">{b.code}</span>
                                 </div>
                              </label>
                           ))}
@@ -2569,13 +2569,13 @@ export default function HrisClient({
                     <div className="space-y-6">
                       <div className="flex items-center gap-3">
                         <div className="h-4 w-1 bg-indigo-600 rounded-full" />
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Penugasan PIC Anak Perusahaan (Opsional)</h4>
+                        <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Penugasan PIC Anak Perusahaan (Opsional)</h4>
                       </div>
                       <div className="space-y-2">
                         <p className="text-xs font-semibold text-slate-500 mb-3">
                           Pilih anak perusahaan yang akan dipimpin oleh karyawan ini sebagai PIC Direktur/Manager.
                         </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 border border-slate-100 rounded-2xl p-3 bg-slate-50/50">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50">
                           {childOrgOptions.map((childOrg: any) => (
                             <label key={childOrg.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selectedManagedChildOrgs.includes(childOrg.id) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 bg-white hover:border-indigo-200'}`}>
                               <input
@@ -2589,7 +2589,7 @@ export default function HrisClient({
                               />
                               <div className="flex flex-col">
                                 <span className="text-sm font-bold text-slate-800 leading-none">{childOrg.name}</span>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">ANAK PERUSAHAAN</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">ANAK PERUSAHAAN</span>
                               </div>
                             </label>
                           ))}
@@ -2600,8 +2600,8 @@ export default function HrisClient({
                 </form>
               </div>
 
-              <div className="p-10 border-t border-slate-50 bg-slate-50 flex justify-end gap-4">
-                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-8 py-3 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-widest">CANCEL</button>
+              <div className="p-5 border-t border-slate-50 bg-slate-50 flex justify-end gap-4">
+                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-8 py-3 rounded-xl text-[11px] font-semibold uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-wide">CANCEL</button>
                 <SafeButton
                   form="emp-form"
                   type="submit"
@@ -2624,16 +2624,16 @@ export default function HrisClient({
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsTransferModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white"
+              className="relative w-full max-w-xl bg-white rounded-xl shadow-md overflow-hidden border border-white"
             >
               <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50/70">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-100">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-xl shadow-indigo-100">
                     <ArrowRightLeft size={22} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight uppercase italic">Mutasi Antar Entitas</h3>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{transferingEmp.first_name} {transferingEmp.last_name || ''}</p>
+                    <h3 className="text-lg font-semibold text-slate-900 tracking-tight uppercase italic">Mutasi Antar Entitas</h3>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">{transferingEmp.first_name} {transferingEmp.last_name || ''}</p>
                   </div>
                 </div>
                 <button onClick={() => setIsTransferModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all border border-slate-100">
@@ -2642,21 +2642,21 @@ export default function HrisClient({
               </div>
 
               <form onSubmit={handleSubmitTransfer} className="p-8 space-y-6">
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Asal</p>
-                  <p className="text-sm font-black text-slate-800 mt-1">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Asal</p>
+                  <p className="text-sm font-semibold text-slate-800 mt-1">
                     {transferingEmp.branch?.name || '-'} • {transferingEmp.first_name} {transferingEmp.last_name || ''}
                   </p>
                   <p className="text-[11px] text-slate-500 font-semibold mt-1">NIK: {transferingEmp.nik || '-'}</p>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Entitas Tujuan</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Entitas Tujuan</label>
                   <select
                     required
                     value={transferTargetOrgId}
                     onChange={(e) => handleChangeTransferTargetOrg(e.target.value)}
-                    className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-700 outline-none focus:border-indigo-500"
+                    className="w-full px-5 py-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500"
                   >
                     <option value="">-- Pilih Entitas --</option>
                     {transferTargets.map((target: any) => (
@@ -2666,12 +2666,12 @@ export default function HrisClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Unit Tujuan</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Unit Tujuan</label>
                   <select
                     required
                     value={transferTargetBranchId}
                     onChange={(e) => setTransferTargetBranchId(e.target.value)}
-                    className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-700 outline-none focus:border-indigo-500"
+                    className="w-full px-5 py-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500"
                   >
                     <option value="">-- Pilih Unit --</option>
                     {selectedTransferBranches.map((branch: any) => (
@@ -2683,7 +2683,7 @@ export default function HrisClient({
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 flex items-start gap-3">
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 flex items-start gap-3">
                   <input
                     id="transfer-pic-target"
                     type="checkbox"
@@ -2697,22 +2697,22 @@ export default function HrisClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Catatan Mutasi (Opsional)</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Catatan Mutasi (Opsional)</label>
                   <textarea
                     value={transferNote}
                     onChange={(e) => setTransferNote(e.target.value)}
                     rows={3}
                     placeholder="Contoh: Mutasi operasional per 1 Mei 2026."
-                    className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500 resize-none"
+                    className="w-full px-5 py-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500 resize-none"
                   />
                 </div>
 
-                <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-[11px] font-semibold text-indigo-700">
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-[11px] font-semibold text-indigo-700">
                   Mutasi akan: memindahkan profil ke entitas tujuan, menghapus profil asal (atau fallback RESIGNED jika terikat histori transaksi), melepas PIC unit lama, dan menulis riwayat mutasi.
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => setIsTransferModalOpen(false)} className="px-6 py-3 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-widest">
+                  <button type="button" onClick={() => setIsTransferModalOpen(false)} className="px-6 py-3 rounded-xl text-[11px] font-semibold uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-wide">
                     Batal
                   </button>
                   <SafeButton
@@ -2740,18 +2740,18 @@ export default function HrisClient({
             <motion.div
               key="run-detail-content"
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              className="relative w-full max-w-2xl h-full md:h-auto md:max-h-[90vh] bg-white md:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+              className="relative w-full max-w-2xl h-full md:h-auto md:max-h-[90vh] bg-white md:rounded-xl shadow-md overflow-hidden flex flex-col"
             >
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
+                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
                     <CalendarDays size={24} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-800 tracking-tight">Detail Payroll: {new Date(viewingRun.period_start).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</h3>
+                    <h3 className="text-xl font-semibold text-slate-800 tracking-tight">Detail Payroll: {new Date(viewingRun.period_start).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</h3>
                     <p className="text-sm text-slate-500 font-medium">Periode {viewingRun.period_start} s/d {viewingRun.period_end}</p>
                     {viewingRun.branch?.name && (
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600 mt-1">{viewingRun.branch.name}</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 mt-1">{viewingRun.branch.name}</p>
                     )}
                   </div>
                 </div>
@@ -2762,32 +2762,32 @@ export default function HrisClient({
 
               <div className="overflow-y-auto flex-1 p-8 space-y-8">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Gross</p>
-                    <p className="text-sm font-black text-slate-800">{formatRupiah(viewingRun.total_gross)}</p>
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Total Gross</p>
+                    <p className="text-sm font-semibold text-slate-800">{formatRupiah(viewingRun.total_gross)}</p>
                   </div>
-                  <div className="p-4 bg-red-50 rounded-2xl border border-red-100">
-                    <p className="text-[10px] font-bold text-red-300 uppercase tracking-widest mb-1">Total Potongan</p>
-                    <p className="text-sm font-black text-red-600">{formatRupiah(viewingRun.total_deductions)}</p>
+                  <div className="p-4 bg-red-50 rounded-xl border border-red-100">
+                    <p className="text-[10px] font-bold text-red-300 uppercase tracking-wide mb-1">Total Potongan</p>
+                    <p className="text-sm font-semibold text-red-600">{formatRupiah(viewingRun.total_deductions)}</p>
                   </div>
-                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 col-span-2 md:col-span-1">
-                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Total Netto Transfer</p>
-                    <p className="text-sm font-black text-emerald-600">{formatRupiah(viewingRun.total_net)}</p>
+                  <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 col-span-2 md:col-span-1">
+                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide mb-1">Total Netto Transfer</p>
+                    <p className="text-sm font-semibold text-emerald-600">{formatRupiah(viewingRun.total_net)}</p>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                  <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                     <Users size={16} /> Rincian Gaji Karyawan ({viewingRunData.length})
                   </h4>
 
                   <div className="space-y-3 pb-20">
                     {viewingRunData.map((slip: any) => (
-                      <div key={slip.id} className="p-5 border border-slate-100 rounded-2xl bg-white hover:border-blue-200 transition">
+                      <div key={slip.id} className="p-5 border border-slate-100 rounded-xl bg-white hover:border-blue-200 transition">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div>
                             <div className="font-bold text-slate-900">{slip.employee?.first_name} {slip.employee?.last_name}</div>
-                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{slip.employee?.nik} • {slip.employee?.job_title}</div>
+                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">{slip.employee?.nik} • {slip.employee?.job_title}</div>
                           </div>
                           <div className="text-right flex flex-col items-end gap-2">
                             <div className="flex items-center gap-2">
@@ -2866,7 +2866,7 @@ export default function HrisClient({
                               >
                                 <Printer size={12} /> <span className="text-[9px] font-bold uppercase tracking-tight">Cetak Slip</span>
                               </button>
-                              <div className="text-sm font-black text-emerald-600">{formatRupiah(slip.net_salary)}</div>
+                              <div className="text-sm font-semibold text-emerald-600">{formatRupiah(slip.net_salary)}</div>
                             </div>
                             <div className="text-[10px] text-slate-400 font-medium">Net Income</div>
                           </div>
@@ -2911,7 +2911,7 @@ export default function HrisClient({
             initial={{ opacity: 0, y: 50, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            className={`fixed bottom-8 right-8 z-[9000] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${
+            className={`fixed bottom-8 right-8 z-[9000] flex items-center gap-3 px-6 py-4 rounded-xl shadow-md border ${
               toast.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-800 shadow-emerald-200/50' :
               toast.type === 'error' ? 'bg-rose-50 border-rose-100 text-rose-800 shadow-rose-200/50' :
               'bg-blue-50 border-blue-100 text-blue-800 shadow-blue-200/50'

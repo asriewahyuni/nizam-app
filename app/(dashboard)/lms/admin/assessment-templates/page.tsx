@@ -70,24 +70,24 @@ export default async function AssessmentTemplatesPage() {
       </div>
 
       {/* ── Course Table ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/50">
-                <th className="text-left text-[11px] font-bold uppercase tracking-widest text-slate-500 px-6 py-4">
+                <th className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 px-6 py-4">
                   Course
                 </th>
-                <th className="text-left text-[11px] font-bold uppercase tracking-widest text-slate-500 px-6 py-4">
+                <th className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 px-6 py-4">
                   Dokumen Asesmen
                 </th>
-                <th className="text-left text-[11px] font-bold uppercase tracking-widest text-slate-500 px-6 py-4">
+                <th className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 px-6 py-4">
                   Versi
                 </th>
-                <th className="text-left text-[11px] font-bold uppercase tracking-widest text-slate-500 px-6 py-4">
+                <th className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 px-6 py-4">
                   Sumber
                 </th>
-                <th className="text-right text-[11px] font-bold uppercase tracking-widest text-slate-500 px-6 py-4">
+                <th className="text-right text-[11px] font-bold uppercase tracking-wide text-slate-500 px-6 py-4">
                   Aksi
                 </th>
               </tr>

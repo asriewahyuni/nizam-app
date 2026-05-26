@@ -24,7 +24,7 @@ export default async function InventoryPage() {
   ])
 
   return (
-    <Suspense fallback={<div className="p-10 text-center font-black animate-pulse">Loading Inventory Data...</div>}>
+    <Suspense fallback={<div className="p-5 text-center font-semibold animate-pulse">Loading Inventory Data...</div>}>
       <InventoryClient 
         orgId={orgData.org.id} 
         activeBranchId={activeBranch?.id ?? null}

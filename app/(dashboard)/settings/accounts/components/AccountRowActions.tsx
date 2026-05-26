@@ -61,25 +61,25 @@ export default function AccountRowActions({ accountId, orgId, accountCode, accou
               initial={{ scale: 0.95, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 overflow-hidden"
+              className="relative w-full max-w-sm bg-white rounded-xl shadow-md p-8 overflow-hidden"
             >
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center">
+                <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-xl flex items-center justify-center">
                   <AlertTriangle size={32} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Hapus Akun?</h3>
+                  <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Hapus Akun?</h3>
                   <p className="text-sm text-slate-500 font-medium mt-1">
                      Anda akan menghapus <strong className="text-slate-800">[{accountCode}] {accountName}</strong>. 
                   </p>
-                  <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest mt-2">Tindakan ini tidak bisa dibatalkan.</p>
+                  <p className="text-[10px] text-rose-500 font-bold uppercase tracking-wide mt-2">Tindakan ini tidak bisa dibatalkan.</p>
                 </div>
 
                 <div className="flex flex-col w-full gap-2 pt-4">
                   <button 
                     disabled={loading}
                     onClick={handleDelete}
-                    className="w-full py-3.5 bg-rose-600 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-rose-700 transition shadow-xl shadow-rose-200/50 disabled:opacity-50"
+                    className="w-full py-3.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-rose-700 transition shadow-xl shadow-rose-200/50 disabled:opacity-50"
                   >
                     {loading ? <Loader2 className="animate-spin" size={20}/> : 'Ya, Hapus Permanen'}
                   </button>

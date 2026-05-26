@@ -51,7 +51,7 @@ function InlineBatchForm({ courseId, onSuccess }: { courseId: string; onSuccess?
   }, [state])
 
   return (
-    <form ref={formRef} action={action} className="mt-4 grid gap-4 rounded-2xl border border-blue-100 bg-blue-50/40 p-5">
+    <form ref={formRef} action={action} className="mt-4 grid gap-4 rounded-xl border border-blue-100 bg-blue-50/40 p-5">
       <input type="hidden" name="courseId" value={courseId} />
 
       {state?.error && (
@@ -131,7 +131,7 @@ function InlineSessionForm({ batchId }: { batchId: string }) {
   }, [state])
 
   return (
-    <form ref={formRef} action={action} className="mt-4 grid gap-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
+    <form ref={formRef} action={action} className="mt-4 grid gap-4 rounded-xl border border-emerald-100 bg-emerald-50/40 p-5">
       <input type="hidden" name="batchId" value={batchId} />
 
       {state?.error && (
@@ -191,7 +191,7 @@ function BatchSection({ batch, sessions }: { batch: Batch; sessions: Session[] }
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
               {batch.status}
             </span>
             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
@@ -240,7 +240,7 @@ function BatchSection({ batch, sessions }: { batch: Batch; sessions: Session[] }
       {showSessions && (
         <div className="mt-4 border-t border-slate-100 pt-4">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Jadwal Sesi</span>
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Jadwal Sesi</span>
             <button
               onClick={() => setShowAddSession(!showAddSession)}
               className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors"
@@ -297,7 +297,7 @@ function CourseSection({
   const courseBatches = batches.filter((b) => b.course_id === course.id)
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       {/* Course Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -342,7 +342,7 @@ function CourseSection({
       {showBatches && (
         <div className="mt-5 border-t border-slate-100 pt-5">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Batch / Angkatan</span>
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Batch / Angkatan</span>
             <button
               onClick={() => setShowAddBatch(!showAddBatch)}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition-colors"
@@ -389,17 +389,17 @@ export default function LmsAdminHierarchy({
   return (
     <div className="space-y-4">
       {/* ── Buat Program Baru ── */}
-      <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+      <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-base font-black text-slate-900">Buat Program / Course Baru</h2>
+            <h2 className="text-base font-semibold text-slate-900">Buat Program / Course Baru</h2>
             <p className="mt-0.5 text-sm font-medium text-slate-400">
               Tambahkan materi baru ke katalog training organisasi.
             </p>
           </div>
           <button
             onClick={() => setShowCreateCourse(!showCreateCourse)}
-            className="inline-flex items-center gap-2 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-2xl hover:bg-blue-100 transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-xl hover:bg-blue-100 transition-colors"
           >
             {showCreateCourse ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             {showCreateCourse ? 'Tutup' : 'Buat Program'}
@@ -415,7 +415,7 @@ export default function LmsAdminHierarchy({
 
       {/* ── Daftar Program ── */}
       {courses.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-slate-200 p-14 text-center">
+        <div className="rounded-xl border border-dashed border-slate-200 p-14 text-center">
           <GraduationCap className="h-10 w-10 text-slate-300 mx-auto" />
           <p className="mt-3 text-sm font-bold text-slate-400">
             Belum ada program. Klik "Buat Program" di atas untuk memulai.

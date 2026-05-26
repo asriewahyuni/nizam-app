@@ -24,21 +24,21 @@ function statusBadgeClass(status: string) {
 export default function TicketingDocUpdateClient({ updates }: TicketingDocUpdateClientProps) {
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-16">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black tracking-[0.12em] text-slate-600">
+            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold tracking-[0.12em] text-slate-600">
               <FileStack size={14} />
               Dokumen Update Support Ticket
             </div>
-            <h1 className="mt-3 text-2xl font-black text-slate-900 md:text-3xl">Progress Perbaikan Support Ticket</h1>
+            <h1 className="mt-3 text-2xl font-semibold text-slate-900 md:text-3xl">Progress Perbaikan Support Ticket</h1>
             <p className="mt-2 text-sm font-medium text-slate-600">
               Halaman ini menampilkan update resmi dari tim terkait investigasi dan penyelesaian support ticket yang Anda laporkan.
             </p>
           </div>
           <Link
             href="/settings/ticketing"
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black tracking-[0.08em] text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold tracking-[0.08em] text-slate-700 hover:bg-slate-50"
           >
             <ArrowLeft size={14} />
             Kembali ke Support Ticket
@@ -46,29 +46,29 @@ export default function TicketingDocUpdateClient({ updates }: TicketingDocUpdate
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
         {updates.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm font-semibold text-slate-500">
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm font-semibold text-slate-500">
             Belum ada doc update publik untuk support ticket. Update akan muncul setelah tim support mempublikasikan progres.
           </div>
         ) : (
           <div className="space-y-4">
             {updates.map((update) => (
-              <article key={update.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <article key={update.id} className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">
+                  <span className="rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
                     {update.ticket?.ticket_no || 'TICKET'}
                   </span>
-                  <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${statusBadgeClass(update.status_after)}`}>
+                  <span className={`rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${statusBadgeClass(update.status_after)}`}>
                     {update.status_after}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                     <ShieldCheck size={11} />
                     Publik
                   </span>
                 </div>
 
-                <h2 className="mt-3 text-sm font-black text-slate-900">{update.update_title}</h2>
+                <h2 className="mt-3 text-sm font-semibold text-slate-900">{update.update_title}</h2>
                 <p className="mt-1 text-sm font-medium text-slate-600">{update.update_body || '-'}</p>
 
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-bold text-slate-500">

@@ -32,11 +32,11 @@ export default function SessionQRClient({
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
-          <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-md overflow-hidden rounded-xl bg-white shadow-md animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
               <div>
-                <h3 className="text-lg font-black text-slate-900">Docking Presensi</h3>
-                <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest">{sessionTitle}</p>
+                <h3 className="text-lg font-semibold text-slate-900">Docking Presensi</h3>
+                <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-wide">{sessionTitle}</p>
               </div>
               <button
                 onClick={() => setIsOpen(false)}

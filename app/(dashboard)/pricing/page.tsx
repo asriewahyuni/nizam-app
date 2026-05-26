@@ -80,11 +80,11 @@ export default function PricingPage() {
     <div className="max-w-6xl mx-auto py-8 space-y-12">
       {/* Header Ala Hormozi */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-6">
-        <div className="inline-flex items-center gap-2 px-6 py-2 bg-amber-500 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-amber-500/20">
+        <div className="inline-flex items-center gap-2 px-6 py-2 bg-amber-500 text-white rounded-full text-[10px] font-semibold uppercase tracking-wide shadow-xl shadow-amber-500/20">
           <Zap size={14} className="fill-white" />
           The NIZAM Grand Slam Offer: Solusi Bisnis Tanpa Drama
         </div>
-        <h1 className="text-6xl md:text-7xl font-black text-slate-900 tracking-tighter leading-none">
+        <h1 className="text-6xl md:text-7xl font-semibold text-slate-900 tracking-tighter leading-none">
           Hentikan Kebocoran Kas, <br />
           <span className="bg-gradient-to-r from-[#003366] to-blue-600 bg-clip-text text-transparent">Kuasai Operasional Anda.</span>
         </h1>
@@ -116,7 +116,7 @@ export default function PricingPage() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className={`relative flex flex-col rounded-[32px] border overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl
+              className={`relative flex flex-col rounded-[32px] border overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-md
                 ${isEnterprise ? 'border-[#003366]/30 shadow-xl shadow-[#003366]/10' : 'border-slate-200 shadow-md'}
                 ${isCurrentPlan ? 'ring-2 ring-[#003366] ring-offset-2' : ''}
               `}
@@ -124,16 +124,16 @@ export default function PricingPage() {
               {/* Top Gradient Header */}
               <div className={`bg-gradient-to-br ${gradient} p-6 text-white`}>
                 {isCurrentPlan && (
-                  <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-white/20">
+                  <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm text-white text-[9px] font-semibold uppercase tracking-wide px-3 py-1 rounded-full border border-white/20">
                     Paket Aktif
                   </div>
                 )}
-                <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mb-4">
+                <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center mb-4">
                   <Icon size={24} className={isEnterprise ? 'text-amber-300' : 'text-white'} />
                 </div>
-                <h3 className="text-2xl font-black tracking-tight">{pkg.name}</h3>
+                <h3 className="text-2xl font-semibold tracking-tight">{pkg.name}</h3>
                 <div className="mt-3 flex items-baseline gap-1">
-                  <span className="text-3xl font-black font-mono">
+                  <span className="text-3xl font-semibold font-mono">
                     {pkg.price === 0 ? 'Gratis' : `Rp ${pkg.price.toLocaleString('id-ID')}`}
                   </span>
                   {pkg.price > 0 && <span className="text-white/60 text-sm font-bold">/{pkg.billing}</span>}
@@ -150,29 +150,29 @@ export default function PricingPage() {
                 {/* Section: Limits */}
                 <div className="grid grid-cols-2 gap-3 pb-5 border-b border-dashed border-slate-200">
                   <div className="flex flex-col gap-1">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Entitas</p>
+                    <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-1">Entitas</p>
                     <div className="flex items-center gap-1.5 text-slate-900">
                       <div className="w-5 h-5 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100">
                         <Building2 size={12} className="text-emerald-600" />
                       </div>
-                      <span className="text-xs font-black italic tracking-tight leading-none">Maks. {pkg.max_orgs}</span>
+                      <span className="text-xs font-semibold italic tracking-tight leading-none">Maks. {pkg.max_orgs}</span>
                     </div>
                   </div>
                   <div className="flex flex-col gap-1 border-l border-slate-100 pl-3">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Gudang/WMS</p>
+                    <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-1">Gudang/WMS</p>
                     <div className="flex items-center gap-1.5 text-slate-900">
                       <div className="w-5 h-5 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100">
                         <Warehouse size={12} className="text-emerald-600" />
                       </div>
-                      <span className="text-xs font-black italic tracking-tight leading-none">Maks. {pkg.max_warehouses}</span>
+                      <span className="text-xs font-semibold italic tracking-tight leading-none">Maks. {pkg.max_warehouses}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600">Arsitektur Paket</p>
-                    <p className="mt-1 text-sm font-black text-slate-900">{architecture.bundleLabel}</p>
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-600">Arsitektur Paket</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">{architecture.bundleLabel}</p>
                     <p className="mt-1 text-[11px] font-semibold text-slate-600">
                       Platform Core selalu ikut. Paket ini membawa {totalCoreItems} core item
                       {architecture.fullCoreExtensions.length > 0 ? ` + ${architecture.fullCoreExtensions.length} full core extension` : ''}
@@ -181,11 +181,11 @@ export default function PricingPage() {
                   </div>
 
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 px-1">Paket Fitur Lengkap:</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-4 px-1">Paket Fitur Lengkap:</p>
                     <div className="space-y-4">
                       {architectureSections.map((section) => (
                         <div key={`${pkg.id}-${section.title}`}>
-                          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{section.title}</p>
+                          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{section.title}</p>
                           <div className="grid grid-cols-2 gap-y-3 gap-x-2">
                             {section.items.map((item) => (
                               <div key={`${pkg.id}-${section.title}-${item}`} className="flex items-center gap-2 group">
@@ -211,14 +211,14 @@ export default function PricingPage() {
                 {isCurrentPlan ? (
                   <Link 
                     href="/billing"
-                    className="group flex items-center justify-center w-full py-4 text-center text-sm font-black text-[#003366] bg-[#003366]/5 rounded-2xl border border-[#003366]/20 hover:bg-[#003366] hover:text-white transition-all shadow-sm"
+                    className="group flex items-center justify-center w-full py-4 text-center text-sm font-semibold text-[#003366] bg-[#003366]/5 rounded-xl border border-[#003366]/20 hover:bg-[#003366] hover:text-white transition-all shadow-sm"
                   >
                     <CheckCircle2 size={16} className="mr-2" /> Kelola Plan Aktif →
                   </Link>
                 ) : (
                   <Link
                     href={`/billing?pkg=${pkg.id}`}
-                    className={`group flex items-center justify-center text-center px-4 py-4 rounded-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
+                    className={`group flex items-center justify-center text-center px-4 py-4 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
                       ${isEnterprise
                         ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/20 hover:shadow-orange-500/40'
                         : pkg.name === 'Trial' 
@@ -227,7 +227,7 @@ export default function PricingPage() {
                       }
                     `}
                   >
-                    <span className="text-xs font-black leading-tight tracking-tight">
+                    <span className="text-xs font-semibold leading-tight tracking-tight">
                       {pkg.name === 'Trial' ? 'Mulai Langkah Berkah Sekarang →' : 
                        pkg.name === 'Lite' ? 'Mulai Transaksi Paling Sederhana →' :
                        pkg.name === 'Basic' ? 'Dapatkan Akses Operasional →' :
@@ -247,16 +247,16 @@ export default function PricingPage() {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
-        className="bg-slate-900 rounded-[40px] p-8 md:p-12 text-white relative overflow-hidden"
+        className="bg-slate-900 rounded-xl p-8 md:p-6 text-white relative overflow-hidden"
       >
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-[100px]" />
         
         <div className="relative z-10 flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 space-y-6 text-center md:text-left">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-500/30">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-semibold uppercase tracking-wide border border-blue-500/30">
               Module Marketplace & Add-on Marketplace
             </div>
-            <h2 className="text-4xl font-black tracking-tighter">Butuh Lapisan Tambahan? <br />Aktifkan Sesuai Kebutuhan.</h2>
+            <h2 className="text-4xl font-semibold tracking-tighter">Butuh Lapisan Tambahan? <br />Aktifkan Sesuai Kebutuhan.</h2>
             <p className="text-slate-400 font-bold max-w-lg">
               Core Family tetap stabil. Tinggal tambahkan Module atau Add-on saat bisnis butuh perluasan proses, channel, atau kapasitas.
             </p>
@@ -268,26 +268,26 @@ export default function PricingPage() {
               { title: 'Add-on Marketplace', items: OPERATOR_GROWTH_ADDON_OPTIONS },
             ].map((section) => (
               <div key={section.title} className="space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-300">{section.title}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-300">{section.title}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {section.items.map((addon) => {
                     const meta = GROWTH_LAYER_META[addon.id] || { icon: Building2, detail: addon.billing.toLowerCase() }
                     const Icon = meta.icon
                     return (
-                      <div key={addon.id} className="bg-white/5 border border-white/10 p-5 rounded-3xl space-y-3 hover:bg-white/10 transition-colors">
+                      <div key={addon.id} className="bg-white/5 border border-white/10 p-5 rounded-xl space-y-3 hover:bg-white/10 transition-colors">
                         <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
                           <Icon size={20} className="text-blue-400" />
                         </div>
                         <div>
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{addon.name}</p>
+                          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{addon.name}</p>
                           {addon.anchorPrice && addon.anchorPrice > addon.price && (
                             <p className="text-[10px] font-bold text-slate-500 line-through">
                               {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.anchorPrice)}
                             </p>
                           )}
-                          <p className="text-xl font-black text-white">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.price)}</p>
+                          <p className="text-xl font-semibold text-white">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.price)}</p>
                           <p className="text-[10px] text-slate-500 font-bold">{getOperatorMarketplaceLabel(addon)} • {meta.detail}</p>
-                          <p className="text-[10px] text-blue-200 font-black uppercase tracking-[0.16em]">
+                          <p className="text-[10px] text-blue-200 font-semibold uppercase tracking-wide">
                             Min. {getSaasCoreFamilyLabel(getOperatorMarketplaceMinCoreFamily(addon))}
                           </p>
                           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">
@@ -308,7 +308,7 @@ export default function PricingPage() {
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} className="text-center">
         <p className="text-slate-400 text-sm font-medium">
           Butuh paket khusus atau enterprise custom?{' '}
-          <Link href="/settings/business" className="text-[#003366] font-black hover:underline">
+          <Link href="/settings/business" className="text-[#003366] font-semibold hover:underline">
             Konsultasikan Kebutuhan Anda Sekarang →
           </Link>
         </p>

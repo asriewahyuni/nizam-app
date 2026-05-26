@@ -62,7 +62,7 @@ export function SyirkahAdendumHutang({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
@@ -72,7 +72,7 @@ export function SyirkahAdendumHutang({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-800">Adendum: Alokasi &amp; Eksposur Hutang</h3>
-              <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wide rounded-full border border-amber-200 bg-amber-50 text-amber-700">
+              <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded-full border border-amber-200 bg-amber-50 text-amber-700">
                 Adendum
               </span>
             </div>

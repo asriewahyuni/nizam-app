@@ -135,9 +135,9 @@ function PaymentModal({ reg, onClose }: { reg: Reg; onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-md">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-black text-slate-900">Konfirmasi Pembayaran</h3>
+          <h3 className="text-base font-semibold text-slate-900">Konfirmasi Pembayaran</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X className="h-5 w-5" />
           </button>

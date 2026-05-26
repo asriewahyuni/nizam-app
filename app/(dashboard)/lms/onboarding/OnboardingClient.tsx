@@ -32,7 +32,7 @@ export function InstallCoaButton({ moduleKey }: { moduleKey: string }) {
       <button
         onClick={handleInstall}
         disabled={isPending}
-        className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-70"
+        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-70"
       >
         {isPending ? (
           <>
@@ -52,7 +52,7 @@ export function InstallCoaButton({ moduleKey }: { moduleKey: string }) {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-2xl px-6 py-4 shadow-xl ${
+            className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-xl px-6 py-4 shadow-xl ${
               toast.type === 'success' ? 'bg-emerald-50 border border-emerald-100 text-emerald-800' : 'bg-rose-50 border border-rose-100 text-rose-800'
             }`}
           >
@@ -115,7 +115,7 @@ export function SettingsForm({
             defaultValue={currentSettings?.institutionName ?? defaultInstitutionName}
             required
             placeholder="Contoh: Balai Pelatihan Nizam"
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 bg-slate-50 disabled:opacity-50"
+            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 bg-slate-50 disabled:opacity-50"
             disabled={isPending}
           />
         </label>
@@ -125,7 +125,7 @@ export function SettingsForm({
             <select
               name="defaultCurrency"
               defaultValue={currentSettings?.defaultCurrency ?? 'IDR'}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 bg-slate-50 disabled:opacity-50"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 bg-slate-50 disabled:opacity-50"
               disabled={isPending}
             >
               <option value="IDR">IDR (Rupiah)</option>
@@ -149,7 +149,7 @@ export function SettingsForm({
         <button
           type="submit"
           disabled={isPending}
-          className="w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-blue-600 transition-all shadow-xl shadow-slate-100 disabled:opacity-70 flex items-center justify-center gap-2"
+          className="w-full rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-blue-600 transition-all shadow-xl shadow-slate-100 disabled:opacity-70 flex items-center justify-center gap-2"
         >
           {isPending ? (
             <>
@@ -168,7 +168,7 @@ export function SettingsForm({
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-2xl px-6 py-4 shadow-xl ${
+            className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-xl px-6 py-4 shadow-xl ${
               toast.type === 'success' ? 'bg-emerald-50 border border-emerald-100 text-emerald-800' : 'bg-rose-50 border border-rose-100 text-rose-800'
             }`}
           >

@@ -692,25 +692,25 @@ export function ConstructionDetailClient({
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/construction"
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white/90 transition hover:bg-white/15"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/15"
             >
               <ArrowLeft size={16} />
               Kembali
             </Link>
-            <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${projectStatusStyles[project.projectStatus] || projectStatusStyles.PLANNING}`}>
+            <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${projectStatusStyles[project.projectStatus] || projectStatusStyles.PLANNING}`}>
               {project.projectStatus}
             </span>
-            <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/80">
+            <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/80">
               {projectTypeLabels[project.projectType] || project.projectType}
             </span>
-            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
               {project.projectCode}
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.9fr]">
             <div>
-              <h1 className="text-3xl font-black tracking-tight md:text-4xl">{project.projectName}</h1>
+              <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{project.projectName}</h1>
               <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-white/80">
                 {project.clientName || 'Belum ada kontak klien terhubung'}.
                 {' '}
@@ -720,12 +720,12 @@ export function ConstructionDetailClient({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-[24px] border border-white/15 bg-white/10 p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Progress Stage</div>
-                <div className="mt-2 text-3xl font-black tracking-tight">{totals.weightedProgress.toFixed(1)}%</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60">Progress Stage</div>
+                <div className="mt-2 text-3xl font-semibold tracking-tight">{totals.weightedProgress.toFixed(1)}%</div>
               </div>
               <div className="rounded-[24px] border border-white/15 bg-white/10 p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Termin Billing</div>
-                <div className="mt-2 text-3xl font-black tracking-tight">{billingTerms.length}</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/60">Termin Billing</div>
+                <div className="mt-2 text-3xl font-semibold tracking-tight">{billingTerms.length}</div>
               </div>
             </div>
           </div>
@@ -733,47 +733,47 @@ export function ConstructionDetailClient({
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Contract Value</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Contract Value</div>
             <Wallet size={18} className="text-[#e07a5f]" />
           </div>
-          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(project.contractValue)}</div>
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(project.contractValue)}</div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB Planned</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">RAB Planned</div>
             <ClipboardList size={18} className="text-[#254b63]" />
           </div>
-          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(totals.plannedTotal)}</div>
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(totals.plannedTotal)}</div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Actual Cost</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Actual Cost</div>
             <BarChart3 size={18} className="text-[#3b6b5a]" />
           </div>
-          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(totals.actualTotal)}</div>
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(totals.actualTotal)}</div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Billing Planned</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Billing Planned</div>
             <Wallet size={18} className="text-[#6a8d73]" />
           </div>
-          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(totals.totalBillingAmount)}</div>
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(totals.totalBillingAmount)}</div>
           <div className="mt-2 text-xs font-bold text-slate-500">
             Paid: {formatRupiah(totals.paidBillingAmount)}
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Approved CO</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Approved CO</div>
             <Pencil size={18} className="text-[#d97706]" />
           </div>
-          <div className={`mt-3 text-2xl font-black tracking-tight ${getCurrencyDeltaClass(totals.approvedChangeOrderContractDelta, 'text-emerald-700', 'text-rose-700')}`}>
+          <div className={`mt-3 text-2xl font-semibold tracking-tight ${getCurrencyDeltaClass(totals.approvedChangeOrderContractDelta, 'text-emerald-700', 'text-rose-700')}`}>
             {formatSignedCurrency(totals.approvedChangeOrderContractDelta)}
           </div>
           <div className="mt-2 text-xs font-bold text-slate-500">
@@ -787,13 +787,13 @@ export function ConstructionDetailClient({
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB / BoQ</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Budget & Actual Cost</h2>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">RAB / BoQ</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Budget & Actual Cost</h2>
               </div>
               <button
                 type="button"
                 onClick={openCreateBudgetModal}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#254b63] px-4 py-3 text-sm font-black text-white transition hover:bg-[#1e3d52]"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#254b63] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#1e3d52]"
               >
                 <Plus size={16} />
                 Tambah Item
@@ -803,7 +803,7 @@ export function ConstructionDetailClient({
             <div className="mt-6 overflow-x-auto">
               <table className="min-w-full border-separate border-spacing-y-3">
                 <thead>
-                  <tr className="text-left text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
+                  <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                     <th className="px-3">Item</th>
                     <th className="px-3">Tahap</th>
                     <th className="px-3">Plan</th>
@@ -826,7 +826,7 @@ export function ConstructionDetailClient({
                       return (
                         <tr key={item.id} className="rounded-[24px] bg-slate-50">
                           <td className="rounded-l-[24px] px-3 py-4 align-top">
-                            <div className="font-black text-slate-900">{item.description}</div>
+                            <div className="font-semibold text-slate-900">{item.description}</div>
                             <div className="mt-1 text-xs font-medium text-slate-500">
                               {budgetCategoryLabels[item.category]}{item.uom ? ` • ${item.uom}` : ''}{item.vendorName ? ` • ${item.vendorName}` : ''}
                             </div>
@@ -835,19 +835,19 @@ export function ConstructionDetailClient({
                             {item.stageName || 'Belum ditautkan'}
                           </td>
                           <td className="px-3 py-4 align-top">
-                            <div className="text-sm font-black text-slate-900">{formatRupiah(item.plannedTotal)}</div>
+                            <div className="text-sm font-semibold text-slate-900">{formatRupiah(item.plannedTotal)}</div>
                             <div className="mt-1 text-xs font-medium text-slate-500">
                               {item.plannedQuantity} x {formatRupiah(item.plannedUnitCost)}
                             </div>
                           </td>
                           <td className="px-3 py-4 align-top">
-                            <div className="text-sm font-black text-slate-900">{formatRupiah(item.actualTotal)}</div>
+                            <div className="text-sm font-semibold text-slate-900">{formatRupiah(item.actualTotal)}</div>
                             <div className="mt-1 text-xs font-medium text-slate-500">
                               {item.actualQuantity} x {formatRupiah(item.actualUnitCost)}
                             </div>
                           </td>
                           <td className="px-3 py-4 align-top">
-                            <div className={`text-sm font-black ${variance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            <div className={`text-sm font-semibold ${variance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                               {formatRupiah(variance)}
                             </div>
                           </td>
@@ -856,7 +856,7 @@ export function ConstructionDetailClient({
                               <button
                                 type="button"
                                 onClick={() => openEditBudgetModal(item)}
-                                className="rounded-2xl bg-white p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                                className="rounded-xl bg-white p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
                                 aria-label="Edit item budget"
                               >
                                 <Pencil size={16} />
@@ -864,7 +864,7 @@ export function ConstructionDetailClient({
                               <button
                                 type="button"
                                 onClick={() => handleDeleteBudgetItem(item.id)}
-                                className="rounded-2xl bg-white p-2 text-rose-500 transition hover:bg-rose-50"
+                                className="rounded-xl bg-white p-2 text-rose-500 transition hover:bg-rose-50"
                                 aria-label="Hapus item budget"
                               >
                                 <Trash2 size={16} />
@@ -883,13 +883,13 @@ export function ConstructionDetailClient({
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Progress Log</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Catatan Lapangan Harian</h2>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Progress Log</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Catatan Lapangan Harian</h2>
               </div>
               <button
                 type="button"
                 onClick={openCreateProgressModal}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#e07a5f] px-4 py-3 text-sm font-black text-white transition hover:bg-[#cf694c]"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#e07a5f] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#cf694c]"
               >
                 <Plus size={16} />
                 Tambah Log
@@ -907,19 +907,19 @@ export function ConstructionDetailClient({
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                             {log.entryDate ? formatDate(log.entryDate, 'short') : 'Tanpa tanggal'}
                           </span>
-                          <span className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-700">
+                          <span className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
                             {log.progressPercent}%
                           </span>
                           {log.stageName ? (
-                            <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
+                            <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
                               {log.stageName}
                             </span>
                           ) : null}
                         </div>
-                        <h3 className="text-lg font-black tracking-tight text-slate-900">{log.summary}</h3>
+                        <h3 className="text-lg font-semibold tracking-tight text-slate-900">{log.summary}</h3>
                         {log.weather ? (
                           <div className="text-sm font-bold text-slate-500">Cuaca: {log.weather}</div>
                         ) : null}
@@ -934,7 +934,7 @@ export function ConstructionDetailClient({
                                 href={url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600 transition hover:bg-slate-200"
+                                className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-200"
                               >
                                 Bukti
                               </a>
@@ -947,7 +947,7 @@ export function ConstructionDetailClient({
                         <button
                           type="button"
                           onClick={() => openEditProgressModal(log)}
-                          className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
+                          className="rounded-xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
                           aria-label="Edit progress log"
                         >
                           <Pencil size={16} />
@@ -955,7 +955,7 @@ export function ConstructionDetailClient({
                         <button
                           type="button"
                           onClick={() => handleDeleteProgressLog(log.id)}
-                          className="rounded-2xl bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
+                          className="rounded-xl bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
                           aria-label="Hapus progress log"
                         >
                           <Trash2 size={16} />
@@ -971,13 +971,13 @@ export function ConstructionDetailClient({
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Change Order</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Register Perubahan Scope</h2>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Change Order</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Register Perubahan Scope</h2>
               </div>
               <button
                 type="button"
                 onClick={openCreateChangeOrderModal}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#d97706] px-4 py-3 text-sm font-black text-white transition hover:bg-[#b86105]"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#d97706] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#b86105]"
               >
                 <Plus size={16} />
                 Tambah CO
@@ -1002,29 +1002,29 @@ export function ConstructionDetailClient({
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                             {changeOrder.referenceNo || 'Tanpa Ref'}
                           </span>
-                          <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${changeOrderStatusStyles[changeOrder.status] || changeOrderStatusStyles.PROPOSED}`}>
+                          <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${changeOrderStatusStyles[changeOrder.status] || changeOrderStatusStyles.PROPOSED}`}>
                             {changeOrder.status}
                           </span>
-                          <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">
+                          <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
                             {changeOrderTypeLabels[changeOrder.changeType] || changeOrder.changeType}
                           </span>
                           {changeOrder.stageName ? (
-                            <span className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-700">
+                            <span className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
                               {changeOrder.stageName}
                             </span>
                           ) : null}
                           {changeOrder.approvalStatus ? (
-                            <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${approvalStatusStyles[changeOrder.approvalStatus] || approvalStatusStyles.CANCELLED}`}>
+                            <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${approvalStatusStyles[changeOrder.approvalStatus] || approvalStatusStyles.CANCELLED}`}>
                               Approval {changeOrder.approvalStatus}
                             </span>
                           ) : null}
                         </div>
 
                         <div>
-                          <h3 className="text-lg font-black tracking-tight text-slate-900">{changeOrder.title}</h3>
+                          <h3 className="text-lg font-semibold tracking-tight text-slate-900">{changeOrder.title}</h3>
                           <div className="mt-1 text-sm font-medium text-slate-500">
                             Request: {changeOrder.requestedDate ? formatDate(changeOrder.requestedDate, 'short') : 'Belum diisi'}
                             {changeOrder.effectiveDate ? ` • Berlaku: ${formatDate(changeOrder.effectiveDate, 'short')}` : ''}
@@ -1035,20 +1035,20 @@ export function ConstructionDetailClient({
 
                         <div className="grid grid-cols-1 gap-3 text-sm font-medium text-slate-600 md:grid-cols-3">
                           <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Delta Kontrak</div>
-                            <div className={`mt-1 font-black ${getCurrencyDeltaClass(changeOrder.contractValueDelta, 'text-emerald-700', 'text-rose-700')}`}>
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Delta Kontrak</div>
+                            <div className={`mt-1 font-semibold ${getCurrencyDeltaClass(changeOrder.contractValueDelta, 'text-emerald-700', 'text-rose-700')}`}>
                               {formatSignedCurrency(changeOrder.contractValueDelta)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Delta Cost</div>
-                            <div className={`mt-1 font-black ${getCurrencyDeltaClass(changeOrder.estimatedCostDelta, 'text-rose-700', 'text-emerald-700')}`}>
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Delta Cost</div>
+                            <div className={`mt-1 font-semibold ${getCurrencyDeltaClass(changeOrder.estimatedCostDelta, 'text-rose-700', 'text-emerald-700')}`}>
                               {formatSignedCurrency(changeOrder.estimatedCostDelta)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Delta Waktu</div>
-                            <div className={`mt-1 font-black ${getCurrencyDeltaClass(changeOrder.scheduleDeltaDays, 'text-amber-700', 'text-emerald-700')}`}>
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Delta Waktu</div>
+                            <div className={`mt-1 font-semibold ${getCurrencyDeltaClass(changeOrder.scheduleDeltaDays, 'text-amber-700', 'text-emerald-700')}`}>
                               {formatSignedDays(changeOrder.scheduleDeltaDays)}
                             </div>
                           </div>
@@ -1068,7 +1068,7 @@ export function ConstructionDetailClient({
                             type="button"
                             onClick={() => handleSubmitChangeOrderApproval(changeOrder.id)}
                             disabled={submittingApprovalId === changeOrder.id}
-                            className="rounded-2xl bg-[#003366] px-4 py-2 text-xs font-black text-white transition hover:bg-[#00284f] disabled:cursor-not-allowed disabled:opacity-60"
+                            className="rounded-xl bg-[#003366] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#00284f] disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {submittingApprovalId === changeOrder.id ? 'Mengirim...' : 'Kirim Approval'}
                           </button>
@@ -1076,7 +1076,7 @@ export function ConstructionDetailClient({
                         <button
                           type="button"
                           onClick={() => openEditChangeOrderModal(changeOrder)}
-                          className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
+                          className="rounded-xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
                           aria-label="Edit change order"
                         >
                           <Pencil size={16} />
@@ -1084,7 +1084,7 @@ export function ConstructionDetailClient({
                         <button
                           type="button"
                           onClick={() => handleDeleteChangeOrder(changeOrder.id)}
-                          className="rounded-2xl bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
+                          className="rounded-xl bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
                           aria-label="Hapus change order"
                         >
                           <Trash2 size={16} />
@@ -1098,30 +1098,30 @@ export function ConstructionDetailClient({
           </div>
 
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Stage Breakdown</div>
-            <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Tahap Pekerjaan</h2>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Stage Breakdown</div>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Tahap Pekerjaan</h2>
 
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
               {stages.map((stage) => (
                 <article key={stage.id} className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{stage.stageCode}</div>
-                      <h3 className="mt-2 text-lg font-black tracking-tight text-slate-900">{stage.stageName}</h3>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{stage.stageCode}</div>
+                      <h3 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">{stage.stageName}</h3>
                     </div>
-                    <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${stageStatusStyles[stage.status] || stageStatusStyles.NOT_STARTED}`}>
+                    <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${stageStatusStyles[stage.status] || stageStatusStyles.NOT_STARTED}`}>
                       {stage.status}
                     </span>
                   </div>
 
                   <div className="mt-5 flex items-end justify-between">
                     <div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Bobot</div>
-                      <div className="mt-2 text-2xl font-black tracking-tight text-slate-900">{stage.weightPercent}%</div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Bobot</div>
+                      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{stage.weightPercent}%</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Progress</div>
-                      <div className="mt-2 text-2xl font-black tracking-tight text-slate-900">{stage.progressPercent}%</div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Progress</div>
+                      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{stage.progressPercent}%</div>
                     </div>
                   </div>
 
@@ -1146,14 +1146,14 @@ export function ConstructionDetailClient({
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Snapshot Project</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Update Ringkasan</h2>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Snapshot Project</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Update Ringkasan</h2>
               </div>
               <button
                 type="button"
                 onClick={handleProjectSave}
                 disabled={isSavingProject}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#e07a5f] px-4 py-3 text-sm font-black text-white transition hover:bg-[#cf694c] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#e07a5f] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#cf694c] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Save size={16} />
                 {isSavingProject ? 'Menyimpan...' : 'Simpan'}
@@ -1162,21 +1162,21 @@ export function ConstructionDetailClient({
 
             <div className="mt-5 space-y-4">
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Nama Project</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nama Project</span>
                 <input
                   value={projectForm.projectName}
                   onChange={(event) => setProjectForm((prev) => ({ ...prev, projectName: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               <div className="grid grid-cols-2 gap-3">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Status</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</span>
                   <select
                     value={projectForm.projectStatus}
                     onChange={(event) => setProjectForm((prev) => ({ ...prev, projectStatus: event.target.value as ConstructionProjectSnapshotInput['projectStatus'] }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     <option value="PLANNING">Planning</option>
                     <option value="TENDER">Tender</option>
@@ -1190,11 +1190,11 @@ export function ConstructionDetailClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tipe</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tipe</span>
                   <select
                     value={projectForm.projectType}
                     onChange={(event) => setProjectForm((prev) => ({ ...prev, projectType: event.target.value as ConstructionProjectSnapshotInput['projectType'] }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     <option value="ARCHITECT">Arsitek</option>
                     <option value="CONTRACTOR">Kontraktor</option>
@@ -1206,11 +1206,11 @@ export function ConstructionDetailClient({
               </div>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Klien</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Klien</span>
                 <select
                   value={projectForm.clientContactId || ''}
                   onChange={(event) => setProjectForm((prev) => ({ ...prev, clientContactId: event.target.value || null }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 >
                   <option value="">Belum ditautkan</option>
                   {contacts.map((contact) => (
@@ -1222,17 +1222,17 @@ export function ConstructionDetailClient({
               </label>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Alamat Site</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Alamat Site</span>
                 <textarea
                   value={projectForm.siteAddress}
                   onChange={(event) => setProjectForm((prev) => ({ ...prev, siteAddress: event.target.value }))}
-                  className="h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               <div className="grid grid-cols-2 gap-3">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Progress</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Progress</span>
                   <input
                     type="number"
                     min="0"
@@ -1240,78 +1240,78 @@ export function ConstructionDetailClient({
                     step="0.01"
                     value={projectForm.progressPercent}
                     onChange={(event) => setProjectForm((prev) => ({ ...prev, progressPercent: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Nilai Kontrak</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nilai Kontrak</span>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={projectForm.contractValue}
                     onChange={(event) => setProjectForm((prev) => ({ ...prev, contractValue: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Estimasi Cost</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Estimasi Cost</span>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={projectForm.estimatedCost}
                   onChange={(event) => setProjectForm((prev) => ({ ...prev, estimatedCost: Number(event.target.value) || 0 }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               <div className="grid grid-cols-1 gap-3">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Mulai</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Mulai</span>
                   <input
                     type="date"
                     value={projectForm.startDate || ''}
                     onChange={(event) => setProjectForm((prev) => ({ ...prev, startDate: event.target.value || null }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Target Selesai</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Target Selesai</span>
                   <input
                     type="date"
                     value={projectForm.targetEndDate || ''}
                     onChange={(event) => setProjectForm((prev) => ({ ...prev, targetEndDate: event.target.value || null }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Actual Finish</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Actual Finish</span>
                   <input
                     type="date"
                     value={projectForm.actualEndDate || ''}
                     onChange={(event) => setProjectForm((prev) => ({ ...prev, actualEndDate: event.target.value || null }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Catatan</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Catatan</span>
                 <textarea
                   value={projectForm.notes}
                   onChange={(event) => setProjectForm((prev) => ({ ...prev, notes: event.target.value }))}
-                  className="h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               {projectError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
                   {projectError}
                 </div>
               ) : null}
@@ -1321,13 +1321,13 @@ export function ConstructionDetailClient({
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Termin Billing</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Jadwal Penagihan</h2>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Termin Billing</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Jadwal Penagihan</h2>
               </div>
               <button
                 type="button"
                 onClick={openCreateBillingModal}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#254b63] px-4 py-3 text-sm font-black text-white transition hover:bg-[#1e3d52]"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#254b63] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#1e3d52]"
               >
                 <Plus size={16} />
                 Tambah Termin
@@ -1345,30 +1345,30 @@ export function ConstructionDetailClient({
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                             Termin {term.sequenceNo}
                           </span>
-                          <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${billingStatusStyles[term.status] || billingStatusStyles.PLANNED}`}>
+                          <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${billingStatusStyles[term.status] || billingStatusStyles.PLANNED}`}>
                             {term.status}
                           </span>
-                          <span className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-700">
+                          <span className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
                             {billingBasisLabels[term.basisType] || term.basisType}
                           </span>
                         </div>
 
-                        <h3 className="text-lg font-black tracking-tight text-slate-900">{term.termLabel}</h3>
+                        <h3 className="text-lg font-semibold tracking-tight text-slate-900">{term.termLabel}</h3>
                         <div className="grid grid-cols-2 gap-3 text-sm font-medium text-slate-600 md:grid-cols-3">
                           <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Amount</div>
-                            <div className="mt-1 font-black text-slate-900">{formatRupiah(term.billingAmount)}</div>
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Amount</div>
+                            <div className="mt-1 font-semibold text-slate-900">{formatRupiah(term.billingAmount)}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Billing %</div>
-                            <div className="mt-1 font-black text-slate-900">{term.billingPercent}%</div>
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Billing %</div>
+                            <div className="mt-1 font-semibold text-slate-900">{term.billingPercent}%</div>
                           </div>
                           <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Target Progress</div>
-                            <div className="mt-1 font-black text-slate-900">{term.progressTargetPercent}%</div>
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Target Progress</div>
+                            <div className="mt-1 font-semibold text-slate-900">{term.progressTargetPercent}%</div>
                           </div>
                         </div>
                         <div className="text-sm font-medium text-slate-500">
@@ -1384,7 +1384,7 @@ export function ConstructionDetailClient({
                         <button
                           type="button"
                           onClick={() => openEditBillingModal(term)}
-                          className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
+                          className="rounded-xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
                           aria-label="Edit termin billing"
                         >
                           <Pencil size={16} />
@@ -1392,7 +1392,7 @@ export function ConstructionDetailClient({
                         <button
                           type="button"
                           onClick={() => handleDeleteBillingTerm(term.id)}
-                          className="rounded-2xl bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
+                          className="rounded-xl bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
                           aria-label="Hapus termin billing"
                         >
                           <Trash2 size={16} />
@@ -1406,26 +1406,26 @@ export function ConstructionDetailClient({
           </div>
 
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Timeline</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Timeline</div>
             <div className="mt-4 space-y-4">
               <div className="flex items-start gap-3">
                 <Calendar size={18} className="mt-0.5 text-slate-400" />
                 <div>
-                  <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Mulai</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Mulai</div>
                   <div className="mt-1 text-sm font-bold text-slate-900">{project.startDate ? formatDate(project.startDate) : 'Belum diisi'}</div>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Calendar size={18} className="mt-0.5 text-slate-400" />
                 <div>
-                  <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Target</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Target</div>
                   <div className="mt-1 text-sm font-bold text-slate-900">{project.targetEndDate ? formatDate(project.targetEndDate) : 'Belum diisi'}</div>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Calendar size={18} className="mt-0.5 text-slate-400" />
                 <div>
-                  <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Actual Finish</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Actual Finish</div>
                   <div className="mt-1 text-sm font-bold text-slate-900">{project.actualEndDate ? formatDate(project.actualEndDate) : 'Belum diisi'}</div>
                 </div>
               </div>
@@ -1443,18 +1443,18 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-md">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB / BoQ</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">RAB / BoQ</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                   {budgetForm.id ? 'Edit Item Budget' : 'Tambah Item Budget'}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setShowBudgetModal(false)}
-                className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
+                className="rounded-xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
                 aria-label="Tutup"
               >
                 <X size={18} />
@@ -1464,11 +1464,11 @@ export function ConstructionDetailClient({
             <form onSubmit={handleBudgetSave} className="space-y-5 px-6 py-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tahap</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tahap</span>
                   <select
                     value={budgetForm.stageId}
                     onChange={(event) => setBudgetForm((prev) => ({ ...prev, stageId: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     <option value="">Belum ditautkan</option>
                     {stages.map((stage) => (
@@ -1480,11 +1480,11 @@ export function ConstructionDetailClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Kategori</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Kategori</span>
                   <select
                     value={budgetForm.category}
                     onChange={(event) => setBudgetForm((prev) => ({ ...prev, category: event.target.value as ConstructionBudgetCategory }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     {Object.entries(budgetCategoryLabels).map(([value, label]) => (
                       <option key={value} value={value}>
@@ -1497,80 +1497,80 @@ export function ConstructionDetailClient({
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.2fr_0.45fr]">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Deskripsi</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Deskripsi</span>
                   <input
                     value={budgetForm.description}
                     onChange={(event) => setBudgetForm((prev) => ({ ...prev, description: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">UoM</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">UoM</span>
                   <input
                     value={budgetForm.uom}
                     onChange={(event) => setBudgetForm((prev) => ({ ...prev, uom: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Qty Plan</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Qty Plan</span>
                   <input
                     type="number"
                     min="0"
                     step="0.001"
                     value={budgetForm.plannedQuantity}
                     onChange={(event) => setBudgetForm((prev) => ({ ...prev, plannedQuantity: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Harga Plan</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Harga Plan</span>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={budgetForm.plannedUnitCost}
                     onChange={(event) => setBudgetForm((prev) => ({ ...prev, plannedUnitCost: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Qty Actual</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Qty Actual</span>
                   <input
                     type="number"
                     min="0"
                     step="0.001"
                     value={budgetForm.actualQuantity}
                     onChange={(event) => setBudgetForm((prev) => ({ ...prev, actualQuantity: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Harga Actual</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Harga Actual</span>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={budgetForm.actualUnitCost}
                     onChange={(event) => setBudgetForm((prev) => ({ ...prev, actualUnitCost: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Vendor / Subkon</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Vendor / Subkon</span>
                 <select
                   value={budgetForm.vendorContactId}
                   onChange={(event) => setBudgetForm((prev) => ({ ...prev, vendorContactId: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 >
                   <option value="">Belum ditautkan</option>
                   {contacts.map((contact) => (
@@ -1582,16 +1582,16 @@ export function ConstructionDetailClient({
               </label>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Catatan</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Catatan</span>
                 <textarea
                   value={budgetForm.notes}
                   onChange={(event) => setBudgetForm((prev) => ({ ...prev, notes: event.target.value }))}
-                  className="h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               {budgetError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
                   {budgetError}
                 </div>
               ) : null}
@@ -1600,14 +1600,14 @@ export function ConstructionDetailClient({
                 <button
                   type="button"
                   onClick={() => setShowBudgetModal(false)}
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingBudget}
-                  className="rounded-2xl bg-[#254b63] px-5 py-3 text-sm font-black text-white shadow-lg shadow-[#254b63]/20 transition hover:bg-[#1e3d52] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-[#254b63] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#254b63]/20 transition hover:bg-[#1e3d52] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSavingBudget ? 'Menyimpan...' : 'Simpan Item'}
                 </button>
@@ -1626,18 +1626,18 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-md">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Progress Log</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Progress Log</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                   {progressForm.id ? 'Edit Progress Log' : 'Tambah Progress Log'}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setShowProgressModal(false)}
-                className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
+                className="rounded-xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
                 aria-label="Tutup"
               >
                 <X size={18} />
@@ -1647,11 +1647,11 @@ export function ConstructionDetailClient({
             <form onSubmit={handleProgressSave} className="space-y-5 px-6 py-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <label className="space-y-2 md:col-span-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tahap</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tahap</span>
                   <select
                     value={progressForm.stageId}
                     onChange={(event) => setProgressForm((prev) => ({ ...prev, stageId: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     <option value="">Belum ditautkan</option>
                     {stages.map((stage) => (
@@ -1663,19 +1663,19 @@ export function ConstructionDetailClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tanggal</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tanggal</span>
                   <input
                     type="date"
                     value={progressForm.entryDate}
                     onChange={(event) => setProgressForm((prev) => ({ ...prev, entryDate: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Progress %</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Progress %</span>
                   <input
                     type="number"
                     min="0"
@@ -1683,51 +1683,51 @@ export function ConstructionDetailClient({
                     step="0.01"
                     value={progressForm.progressPercent}
                     onChange={(event) => setProgressForm((prev) => ({ ...prev, progressPercent: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Cuaca</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Cuaca</span>
                   <input
                     value={progressForm.weather}
                     onChange={(event) => setProgressForm((prev) => ({ ...prev, weather: event.target.value }))}
                     placeholder="Cerah / Hujan / Mendung"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Ringkasan</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Ringkasan</span>
                 <textarea
                   value={progressForm.summary}
                   onChange={(event) => setProgressForm((prev) => ({ ...prev, summary: event.target.value }))}
-                  className="h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Issue / Kendala</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Issue / Kendala</span>
                 <textarea
                   value={progressForm.issueNotes}
                   onChange={(event) => setProgressForm((prev) => ({ ...prev, issueNotes: event.target.value }))}
-                  className="h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Evidence URLs</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Evidence URLs</span>
                 <textarea
                   value={progressForm.evidenceUrlsText}
                   onChange={(event) => setProgressForm((prev) => ({ ...prev, evidenceUrlsText: event.target.value }))}
                   placeholder="Satu URL per baris"
-                  className="h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               {progressError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
                   {progressError}
                 </div>
               ) : null}
@@ -1736,14 +1736,14 @@ export function ConstructionDetailClient({
                 <button
                   type="button"
                   onClick={() => setShowProgressModal(false)}
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingProgress}
-                  className="rounded-2xl bg-[#e07a5f] px-5 py-3 text-sm font-black text-white shadow-lg shadow-[#e07a5f]/20 transition hover:bg-[#cf694c] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-[#e07a5f] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#e07a5f]/20 transition hover:bg-[#cf694c] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSavingProgress ? 'Menyimpan...' : 'Simpan Log'}
                 </button>
@@ -1762,18 +1762,18 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-3xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-3xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-md">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Change Order</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Change Order</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                   {changeOrderForm.id ? 'Edit Change Order' : 'Tambah Change Order'}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setShowChangeOrderModal(false)}
-                className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
+                className="rounded-xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
                 aria-label="Tutup"
               >
                 <X size={18} />
@@ -1783,30 +1783,30 @@ export function ConstructionDetailClient({
             <form onSubmit={handleChangeOrderSave} className="space-y-5 px-6 py-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-[0.7fr_1.3fr_1fr]">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Ref No</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Ref No</span>
                   <input
                     value={changeOrderForm.referenceNo}
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, referenceNo: event.target.value }))}
                     placeholder="CO-001"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Judul Perubahan</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Judul Perubahan</span>
                   <input
                     value={changeOrderForm.title}
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, title: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tahap</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tahap</span>
                   <select
                     value={changeOrderForm.stageId}
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, stageId: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     <option value="">Semua tahap</option>
                     {stages.map((stage) => (
@@ -1820,11 +1820,11 @@ export function ConstructionDetailClient({
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tipe</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tipe</span>
                   <select
                     value={changeOrderForm.changeType}
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, changeType: event.target.value as ConstructionChangeOrderType }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     {Object.entries(changeOrderTypeLabels).map(([value, label]) => (
                       <option key={value} value={value}>
@@ -1835,11 +1835,11 @@ export function ConstructionDetailClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Status</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</span>
                   <select
                     value={changeOrderForm.status}
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, status: event.target.value as ConstructionChangeOrderStatus }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     <option value="PROPOSED">Proposed</option>
                     <option value="IN_REVIEW">In Review</option>
@@ -1852,91 +1852,91 @@ export function ConstructionDetailClient({
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Requested Date</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Requested Date</span>
                   <input
                     type="date"
                     value={changeOrderForm.requestedDate}
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, requestedDate: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Approved Date</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Approved Date</span>
                   <input
                     type="date"
                     value={changeOrderForm.approvedDate}
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, approvedDate: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Effective Date</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Effective Date</span>
                   <input
                     type="date"
                     value={changeOrderForm.effectiveDate}
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, effectiveDate: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Delta Kontrak</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Delta Kontrak</span>
                   <input
                     type="number"
                     step="0.01"
                     value={changeOrderForm.contractValueDelta}
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, contractValueDelta: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Delta Cost</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Delta Cost</span>
                   <input
                     type="number"
                     step="0.01"
                     value={changeOrderForm.estimatedCostDelta}
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, estimatedCostDelta: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Delta Waktu (hari)</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Delta Waktu (hari)</span>
                   <input
                     type="number"
                     step="1"
                     value={changeOrderForm.scheduleDeltaDays}
                     onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, scheduleDeltaDays: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Alasan / Scope Perubahan</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Alasan / Scope Perubahan</span>
                 <textarea
                   value={changeOrderForm.reason}
                   onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, reason: event.target.value }))}
-                  className="h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Catatan</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Catatan</span>
                 <textarea
                   value={changeOrderForm.notes}
                   onChange={(event) => setChangeOrderForm((prev) => ({ ...prev, notes: event.target.value }))}
-                  className="h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               {changeOrderError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
                   {changeOrderError}
                 </div>
               ) : null}
@@ -1945,14 +1945,14 @@ export function ConstructionDetailClient({
                 <button
                   type="button"
                   onClick={() => setShowChangeOrderModal(false)}
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingChangeOrder}
-                  className="rounded-2xl bg-[#d97706] px-5 py-3 text-sm font-black text-white shadow-lg shadow-[#d97706]/20 transition hover:bg-[#b86105] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-[#d97706] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#d97706]/20 transition hover:bg-[#b86105] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSavingChangeOrder ? 'Menyimpan...' : 'Simpan Change Order'}
                 </button>
@@ -1971,18 +1971,18 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-md">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Termin Billing</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Termin Billing</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                   {billingForm.id ? 'Edit Termin Billing' : 'Tambah Termin Billing'}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setShowBillingModal(false)}
-                className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
+                className="rounded-xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
                 aria-label="Tutup"
               >
                 <X size={18} />
@@ -1992,34 +1992,34 @@ export function ConstructionDetailClient({
             <form onSubmit={handleBillingSave} className="space-y-5 px-6 py-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.2fr_0.45fr]">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Label Termin</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Label Termin</span>
                   <input
                     value={billingForm.termLabel}
                     onChange={(event) => setBillingForm((prev) => ({ ...prev, termLabel: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Urutan</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Urutan</span>
                   <input
                     type="number"
                     min="1"
                     step="1"
                     value={billingForm.sequenceNo}
                     onChange={(event) => setBillingForm((prev) => ({ ...prev, sequenceNo: Number(event.target.value) || 1 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Basis</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Basis</span>
                   <select
                     value={billingForm.basisType}
                     onChange={(event) => setBillingForm((prev) => ({ ...prev, basisType: event.target.value as ConstructionBillingBasisType }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     {Object.entries(billingBasisLabels).map(([value, label]) => (
                       <option key={value} value={value}>
@@ -2030,11 +2030,11 @@ export function ConstructionDetailClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Status</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</span>
                   <select
                     value={billingForm.status}
                     onChange={(event) => setBillingForm((prev) => ({ ...prev, status: event.target.value as ConstructionBillingStatus }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     <option value="PLANNED">Planned</option>
                     <option value="READY_TO_BILL">Ready to Bill</option>
@@ -2046,7 +2046,7 @@ export function ConstructionDetailClient({
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Target Progress %</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Target Progress %</span>
                   <input
                     type="number"
                     min="0"
@@ -2054,12 +2054,12 @@ export function ConstructionDetailClient({
                     step="0.01"
                     value={billingForm.progressTargetPercent}
                     onChange={(event) => setBillingForm((prev) => ({ ...prev, progressTargetPercent: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Billing %</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Billing %</span>
                   <input
                     type="number"
                     min="0"
@@ -2067,65 +2067,65 @@ export function ConstructionDetailClient({
                     step="0.01"
                     value={billingForm.billingPercent}
                     onChange={(event) => setBillingForm((prev) => ({ ...prev, billingPercent: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Nominal</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nominal</span>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={billingForm.billingAmount}
                     onChange={(event) => setBillingForm((prev) => ({ ...prev, billingAmount: Number(event.target.value) || 0 }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Due Date</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Due Date</span>
                   <input
                     type="date"
                     value={billingForm.dueDate}
                     onChange={(event) => setBillingForm((prev) => ({ ...prev, dueDate: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Paid Date</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Paid Date</span>
                   <input
                     type="date"
                     value={billingForm.paidDate}
                     onChange={(event) => setBillingForm((prev) => ({ ...prev, paidDate: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Invoice Reference</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Invoice Reference</span>
                 <input
                   value={billingForm.invoiceReference}
                   onChange={(event) => setBillingForm((prev) => ({ ...prev, invoiceReference: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Catatan</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Catatan</span>
                 <textarea
                   value={billingForm.notes}
                   onChange={(event) => setBillingForm((prev) => ({ ...prev, notes: event.target.value }))}
-                  className="h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               {billingError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
                   {billingError}
                 </div>
               ) : null}
@@ -2134,14 +2134,14 @@ export function ConstructionDetailClient({
                 <button
                   type="button"
                   onClick={() => setShowBillingModal(false)}
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingBilling}
-                  className="rounded-2xl bg-[#254b63] px-5 py-3 text-sm font-black text-white shadow-lg shadow-[#254b63]/20 transition hover:bg-[#1e3d52] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-[#254b63] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#254b63]/20 transition hover:bg-[#1e3d52] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSavingBilling ? 'Menyimpan...' : 'Simpan Termin'}
                 </button>

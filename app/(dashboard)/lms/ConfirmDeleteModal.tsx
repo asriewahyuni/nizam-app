@@ -41,11 +41,11 @@ export function ConfirmDeleteModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.15 }}
-            className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+            className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-md"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between">
-              <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
                 <AlertTriangle className="h-6 w-6 text-red-500" />
               </div>
               <button onClick={onClose} disabled={isPending} className="p-1 hover:bg-slate-100 rounded-xl transition-colors">

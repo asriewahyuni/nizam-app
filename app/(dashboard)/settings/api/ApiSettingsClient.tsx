@@ -173,7 +173,7 @@ function ScopeBadge({ scope }: { scope: string }) {
   }
   const color = colorMap[def?.color ?? 'blue'] ?? 'bg-slate-100 text-slate-600'
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${color}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider ${color}`}>
       {def?.label ?? scope}
     </span>
   )
@@ -2310,7 +2310,7 @@ export function ApiSettingsClient({
 
       {/* ── Header ── */}
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+        <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
           <Code className="text-violet-600" size={32} />
           OPEN API & INTEGRASI
         </h1>
@@ -2320,21 +2320,21 @@ export function ApiSettingsClient({
       </div>
 
       {/* ── Base URL info card ── */}
-      <div className="rounded-[28px] border border-violet-100 bg-gradient-to-r from-violet-50 via-white to-slate-50 p-5 shadow-sm">
+      <div className="rounded-xl border border-violet-100 bg-gradient-to-r from-violet-50 via-white to-slate-50 p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-600 mb-1">Base URL API</p>
-            <code className="text-sm font-black text-slate-800">{resolvedBaseUrl}/api/v1/</code>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600 mb-1">Base URL API</p>
+            <code className="text-sm font-semibold text-slate-800">{resolvedBaseUrl}/api/v1/</code>
             <p className="mt-2 text-xs text-slate-500 font-medium">
               Dokumentasi mesin-baca tersedia di{' '}
-              <a href={`${resolvedBaseUrl}/api/openapi`} target="_blank" rel="noreferrer" className="font-black text-violet-700 hover:text-violet-800">
+              <a href={`${resolvedBaseUrl}/api/openapi`} target="_blank" rel="noreferrer" className="font-semibold text-violet-700 hover:text-violet-800">
                 {resolvedBaseUrl}/api/openapi
               </a>
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
             {['/cash', '/sales', '/inventory', '/inventory/movements', '/inventory/reconciliation', '/general-ledger', '/contacts'].map(ep => (
-              <span key={ep} className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[11px] font-black text-slate-600 shadow-sm">
+              <span key={ep} className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[11px] font-semibold text-slate-600 shadow-sm">
                 {ep}
               </span>
             ))}
@@ -2345,13 +2345,13 @@ export function ApiSettingsClient({
       <div className="rounded-[32px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-6 shadow-sm space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">Onboarding Checklist</p>
-            <h2 className="text-xl font-black text-slate-900">Kesiapan Integrasi Open API</h2>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Onboarding Checklist</p>
+            <h2 className="text-xl font-semibold text-slate-900">Kesiapan Integrasi Open API</h2>
             <p className="text-sm text-slate-600 font-medium">
               Checklist ini memastikan endpoint write tidak macet karena key, rekening, atau mapping default belum siap.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 self-start rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-slate-700">
+          <div className="inline-flex items-center gap-2 self-start rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">
             <CheckCircle2 size={16} className="text-emerald-600" />
             {onboardingReadyCount}/{onboardingItems.length} siap
           </div>
@@ -2372,7 +2372,7 @@ export function ApiSettingsClient({
                   {item.ready ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-black text-slate-900">{item.label}</p>
+                  <p className="text-sm font-semibold text-slate-900">{item.label}</p>
                   <p className="text-xs leading-relaxed text-slate-600">{item.detail}</p>
                 </div>
               </div>
@@ -2383,8 +2383,8 @@ export function ApiSettingsClient({
 
       <div className="rounded-[32px] border border-slate-100 bg-white p-6 shadow-sm space-y-5">
         <div className="flex flex-col gap-2">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">OpenAPI 3.1 Documentation</p>
-          <h2 className="text-xl font-black text-slate-900">International-Standard API Reference</h2>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">OpenAPI 3.1 Documentation</p>
+          <h2 className="text-xl font-semibold text-slate-900">International-Standard API Reference</h2>
           <p className="text-sm text-slate-500 font-medium">
             Referensi ini mengikuti struktur OpenAPI: operation summary, operationId, security scheme, parameters, request body, responses, dan contoh payload.
           </p>
@@ -2396,7 +2396,7 @@ export function ApiSettingsClient({
               key={doc.id}
               type="button"
               onClick={() => setActiveDoc(doc.id)}
-              className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+              className={`px-4 py-2 rounded-xl border text-[11px] font-semibold uppercase tracking-wide transition-all ${
                 activeDoc === doc.id
                   ? 'bg-slate-900 text-white border-slate-900 shadow-md'
                   : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
@@ -2409,49 +2409,49 @@ export function ApiSettingsClient({
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-5">
-          <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-5 space-y-4">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-5 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="px-3 py-1 rounded-xl bg-white border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-700">
+              <div className="px-3 py-1 rounded-xl bg-white border border-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
                 {activeEndpointDoc.method}
               </div>
-              <code className="text-sm font-black text-slate-900">{activeEndpointDoc.path}</code>
+              <code className="text-sm font-semibold text-slate-900">{activeEndpointDoc.path}</code>
             </div>
 
             <div className="space-y-1">
-              <p className="text-sm font-black text-slate-900">{activeEndpointDoc.summary}</p>
+              <p className="text-sm font-semibold text-slate-900">{activeEndpointDoc.summary}</p>
               <p className="text-sm text-slate-600 leading-relaxed">{activeEndpointDoc.description}</p>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-100 text-violet-700 text-[10px] font-black uppercase tracking-widest">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-100 text-violet-700 text-[10px] font-semibold uppercase tracking-wide">
                 <Shield size={12} /> Scope: {activeEndpointDoc.scope}
               </span>
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 text-[10px] font-black uppercase tracking-widest">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 text-[10px] font-semibold uppercase tracking-wide">
                 <Lock size={12} /> Security: {activeEndpointDoc.auth.join(' / ')}
               </span>
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Operation Metadata</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Operation Metadata</p>
               <div className="space-y-2">
-                <div className="rounded-2xl bg-white border border-slate-100 px-4 py-3 text-sm text-slate-600">
-                  <span className="font-black text-slate-800">operationId:</span> {activeEndpointDoc.operationId}
+                <div className="rounded-xl bg-white border border-slate-100 px-4 py-3 text-sm text-slate-600">
+                  <span className="font-semibold text-slate-800">operationId:</span> {activeEndpointDoc.operationId}
                 </div>
-                <div className="rounded-2xl bg-white border border-slate-100 px-4 py-3 text-sm text-slate-600">
-                  <span className="font-black text-slate-800">Security schemes:</span> {activeEndpointDoc.auth.join(', ')}
+                <div className="rounded-xl bg-white border border-slate-100 px-4 py-3 text-sm text-slate-600">
+                  <span className="font-semibold text-slate-800">Security schemes:</span> {activeEndpointDoc.auth.join(', ')}
                 </div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Parameters</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Parameters</p>
               <div className="space-y-2">
                 {activeEndpointDoc.parameters.map((item: EndpointParameter) => (
-                  <div key={`${item.in}-${item.name}`} className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
+                  <div key={`${item.in}-${item.name}`} className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-black text-slate-900">{item.name}</span>
-                      <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">{item.in}</span>
-                      <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">{item.required ? 'required' : 'optional'}</span>
+                      <span className="font-semibold text-slate-900">{item.name}</span>
+                      <span className="text-[10px] uppercase font-semibold tracking-wide text-slate-400">{item.in}</span>
+                      <span className="text-[10px] uppercase font-semibold tracking-wide text-slate-400">{item.required ? 'required' : 'optional'}</span>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">Schema: {item.schema}</p>
                     <p className="mt-1">{item.description}</p>
@@ -2462,10 +2462,10 @@ export function ApiSettingsClient({
 
             {activeEndpointDoc.requestBody && (
               <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Request Body</p>
-                <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
-                  <p><span className="font-black text-slate-900">Required:</span> {activeEndpointDoc.requestBody.required ? 'yes' : 'no'}</p>
-                  <p className="mt-1"><span className="font-black text-slate-900">Content-Type:</span> {activeEndpointDoc.requestBody.contentType}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Request Body</p>
+                <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
+                  <p><span className="font-semibold text-slate-900">Required:</span> {activeEndpointDoc.requestBody.required ? 'yes' : 'no'}</p>
+                  <p className="mt-1"><span className="font-semibold text-slate-900">Content-Type:</span> {activeEndpointDoc.requestBody.contentType}</p>
                   <div className="mt-2 space-y-1">
                     {activeEndpointDoc.requestBody.fields.map((field: string) => (
                       <div key={field} className="text-sm text-slate-600">{field}</div>
@@ -2476,21 +2476,21 @@ export function ApiSettingsClient({
             )}
 
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Responses</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Responses</p>
               <div className="space-y-2">
                 {activeEndpointDoc.responses.map((item: EndpointResponse) => (
-                  <div key={item.status} className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
-                    <span className="font-black text-slate-900">{item.status}</span> {item.description}
+                  <div key={item.status} className="rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
+                    <span className="font-semibold text-slate-900">{item.status}</span> {item.description}
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Implementation Notes</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Implementation Notes</p>
               <div className="space-y-2">
                 {activeEndpointDoc.notes.map((note) => (
-                  <div key={note} className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900/80">
+                  <div key={note} className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900/80">
                     {note}
                   </div>
                 ))}
@@ -2499,9 +2499,9 @@ export function ApiSettingsClient({
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-[28px] border border-slate-100 bg-white p-5 space-y-3">
+            <div className="rounded-xl border border-slate-100 bg-white p-5 space-y-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Example Templates</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Example Templates</p>
                 <p className="text-sm text-slate-500 mt-1">
                   Pilih contoh yang akan dipakai untuk dokumentasi visual dan prefill di tab Try API.
                 </p>
@@ -2512,7 +2512,7 @@ export function ApiSettingsClient({
                     key={example.id}
                     type="button"
                     onClick={() => setActiveExampleId(example.id)}
-                    className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    className={`px-4 py-2 rounded-xl border text-[11px] font-semibold uppercase tracking-wide transition-all ${
                       activeEndpointExample.id === example.id
                         ? 'bg-violet-600 text-white border-violet-600 shadow-md'
                         : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-violet-300'
@@ -2522,25 +2522,25 @@ export function ApiSettingsClient({
                   </button>
                 ))}
               </div>
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                <span className="font-black text-slate-900">Template aktif:</span> {activeEndpointExample.description}
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <span className="font-semibold text-slate-900">Template aktif:</span> {activeEndpointExample.description}
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-100 bg-slate-950 p-5">
+            <div className="rounded-xl border border-slate-100 bg-slate-950 p-5">
               <div className="flex items-center gap-2 mb-3 text-slate-300">
                 <Globe size={14} />
-                <p className="text-[10px] font-black uppercase tracking-widest">Contoh Request</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide">Contoh Request</p>
               </div>
               <pre className="text-[11px] text-emerald-300 font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap">
 {activeEndpointExample.curl}
               </pre>
             </div>
 
-            <div className="rounded-[28px] border border-slate-100 bg-white p-5">
+            <div className="rounded-xl border border-slate-100 bg-white p-5">
               <div className="flex items-center gap-2 mb-3 text-slate-500">
                 <Code size={14} />
-                <p className="text-[10px] font-black uppercase tracking-widest">Contoh Response</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide">Contoh Response</p>
               </div>
               <pre className="text-[11px] text-slate-700 font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap">
 {activeEndpointExample.response}
@@ -2551,7 +2551,7 @@ export function ApiSettingsClient({
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl w-fit flex-wrap">
+      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit flex-wrap">
         {[
           { id: 'keys', label: 'API Keys', icon: Key },
           { id: 'tryout', label: 'Try API', icon: Globe },
@@ -2565,7 +2565,7 @@ export function ApiSettingsClient({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-semibold uppercase tracking-wide transition-all ${
                 activeTab === tab.id
                   ? 'bg-white text-slate-900 shadow-md'
                   : 'text-slate-400 hover:text-slate-600'
@@ -2589,7 +2589,7 @@ export function ApiSettingsClient({
               <p className="text-sm text-slate-500 font-medium">{apiKeys.length} API key terdaftar</p>
               <button
                 onClick={() => setShowGenModal(true)}
-                className="flex items-center gap-2 px-5 py-3 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 active:scale-95"
+                className="flex items-center gap-2 px-5 py-3 bg-violet-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 active:scale-95"
               >
                 <Plus size={14} /> Buat API Key Baru
               </button>
@@ -2599,7 +2599,7 @@ export function ApiSettingsClient({
           {/* Keys list */}
           <div className="space-y-3">
             {apiKeys.length === 0 && (
-              <div className="rounded-[28px] border border-dashed border-slate-200 py-16 flex flex-col items-center gap-3 text-slate-400">
+              <div className="rounded-xl border border-dashed border-slate-200 py-16 flex flex-col items-center gap-3 text-slate-400">
                 <Key size={32} strokeWidth={1} />
                 <p className="text-sm font-bold">Belum ada API key</p>
                 <p className="text-xs">Buat key baru untuk mulai integrasi</p>
@@ -2615,16 +2615,16 @@ export function ApiSettingsClient({
                 }`}
               >
                 <div className="flex items-start gap-4 flex-1 min-w-0">
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                     key.is_active ? 'bg-violet-100 text-violet-600' : 'bg-slate-200 text-slate-400'
                   }`}>
                     <Key size={18} />
                   </div>
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-black text-slate-900">{key.name}</p>
+                      <p className="text-sm font-semibold text-slate-900">{key.name}</p>
                       {!key.is_active && (
-                        <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-600 text-[9px] font-black uppercase tracking-widest">Dinonaktifkan</span>
+                        <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-600 text-[9px] font-semibold uppercase tracking-wide">Dinonaktifkan</span>
                       )}
                     </div>
                     <code className="text-[11px] text-slate-400 font-mono">{key.key_prefix}{'•'.repeat(16)}</code>
@@ -2664,7 +2664,7 @@ export function ApiSettingsClient({
                     <button
                       onClick={() => handleOpenEditKey(key)}
                       disabled={loading}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-[10px] font-semibold uppercase tracking-wide hover:bg-slate-200 transition-all disabled:opacity-50"
                     >
                       <Pencil size={13} /> Edit
                     </button>
@@ -2672,7 +2672,7 @@ export function ApiSettingsClient({
                       <button
                         onClick={() => handleRevoke(key.id, key.name)}
                         disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-[10px] font-semibold uppercase tracking-wide hover:bg-red-100 transition-all disabled:opacity-50"
                       >
                         <Trash2 size={13} /> Revoke
                       </button>
@@ -2685,7 +2685,7 @@ export function ApiSettingsClient({
 
           {/* Docs hint */}
           <div className="rounded-[20px] border border-slate-100 bg-slate-50 p-5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Cara Menggunakan</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Cara Menggunakan</p>
             <pre className="text-[11px] text-slate-600 font-mono leading-relaxed overflow-x-auto">
 {`curl ${baseUrl}/api/v1/cash \\
   -H "x-api-key: nzm_live_<your-key>" \\
@@ -2702,22 +2702,22 @@ export function ApiSettingsClient({
         <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-5">
           <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-6 space-y-5">
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Interactive Console</p>
-              <h3 className="text-xl font-black text-slate-900">Try API with Real Key</h3>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Interactive Console</p>
+              <h3 className="text-xl font-semibold text-slate-900">Try API with Real Key</h3>
               <p className="text-sm text-slate-500 font-medium">
                 Gunakan API key yang baru dibuat untuk menguji endpoint langsung dari browser pada origin saat ini.
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Endpoint</label>
+              <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Endpoint</label>
               <div className="flex flex-wrap gap-2">
                 {endpointDocs.map((doc) => (
                   <button
                     key={`try-${doc.id}`}
                     type="button"
                     onClick={() => setActiveDoc(doc.id)}
-                    className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    className={`px-4 py-2 rounded-xl border text-[11px] font-semibold uppercase tracking-wide transition-all ${
                       activeDoc === doc.id
                         ? 'bg-slate-900 text-white border-slate-900 shadow-md'
                         : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
@@ -2730,14 +2730,14 @@ export function ApiSettingsClient({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Template</label>
+              <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Template</label>
               <div className="flex flex-wrap gap-2">
                 {activeEndpointDoc.examples.map((example) => (
                   <button
                     key={`try-example-${example.id}`}
                     type="button"
                     onClick={() => setActiveExampleId(example.id)}
-                    className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    className={`px-4 py-2 rounded-xl border text-[11px] font-semibold uppercase tracking-wide transition-all ${
                       activeEndpointExample.id === example.id
                         ? 'bg-violet-600 text-white border-violet-600 shadow-md'
                         : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'
@@ -2754,14 +2754,14 @@ export function ApiSettingsClient({
 
             <div className="grid grid-cols-1 md:grid-cols-[0.75fr_1.25fr] gap-4">
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Auth Header</label>
+                <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Auth Header</label>
                 <div className="grid grid-cols-2 gap-2">
                   {(['x-api-key', 'bearer'] as const).map((mode) => (
                     <button
                       key={mode}
                       type="button"
                       onClick={() => setTryAuthMode(mode)}
-                      className={`px-4 py-3 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                      className={`px-4 py-3 rounded-xl border text-[11px] font-semibold uppercase tracking-wide transition-all ${
                         tryAuthMode === mode
                           ? 'bg-violet-600 text-white border-violet-600'
                           : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'
@@ -2774,14 +2774,14 @@ export function ApiSettingsClient({
               </div>
 
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">API Key</label>
+                <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">API Key</label>
                 <input
                   type="password"
                   value={tryApiKey}
                   onChange={(e) => setTryApiKey(e.target.value.replace(/[\r\n\t]/g, ''))}
                   onBlur={() => setTryApiKey((prev) => normalizeTryApiKeyValue(prev))}
                   placeholder="nzm_live_xxxxxxxxxxxxxxxxx"
-                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
                 />
                 <p className="text-[11px] text-slate-400 font-medium">
                   Tempel API key plain-text saja. Karakter tersembunyi dari copy-paste akan dibersihkan otomatis.
@@ -2790,46 +2790,46 @@ export function ApiSettingsClient({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Request URL</label>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-mono text-slate-600">
+              <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Request URL</label>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-mono text-slate-600">
                 {activeEndpointDoc.method} {resolvedBaseUrl}{tryPath}{tryQuery.trim() ? `?${tryQuery.trim().replace(/^\?/, '')}` : ''}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Path</label>
+                <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Path</label>
                 <input
                   value={tryPath}
                   onChange={(e) => setTryPath(e.target.value)}
-                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Query String</label>
+                <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Query String</label>
                 <input
                   value={tryQuery}
                   onChange={(e) => setTryQuery(e.target.value)}
                   placeholder="limit=50&search=beras"
-                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
                 />
               </div>
             </div>
 
             {activeEndpointDoc.method !== 'GET' && (
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">JSON Body</label>
+                <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">JSON Body</label>
                 <textarea
                   value={tryBody}
                   onChange={(e) => setTryBody(e.target.value)}
                   rows={12}
-                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
                 />
               </div>
             )}
 
             {tryError && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                 {tryError}
               </div>
             )}
@@ -2842,7 +2842,7 @@ export function ApiSettingsClient({
                 type="button"
                 onClick={handleRunTryout}
                 disabled={tryLoading}
-                className="px-6 py-3 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50"
+                className="px-6 py-3 bg-violet-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50"
               >
                 {tryLoading ? 'Menjalankan...' : 'Run Request'}
               </button>
@@ -2853,10 +2853,10 @@ export function ApiSettingsClient({
             <div className="bg-slate-950 rounded-[32px] border border-slate-800 p-6 space-y-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Response</p>
-                  <h3 className="text-lg font-black text-white">Live Result</h3>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Response</p>
+                  <h3 className="text-lg font-semibold text-white">Live Result</h3>
                 </div>
-                <div className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest ${
+                <div className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold uppercase tracking-wide ${
                   tryStatus === null
                     ? 'bg-slate-800 text-slate-300'
                     : tryStatus < 300
@@ -2866,30 +2866,30 @@ export function ApiSettingsClient({
                   {tryStatus === null ? 'Not Run' : `HTTP ${tryStatus}`}
                 </div>
               </div>
-              <pre className="min-h-[420px] whitespace-pre-wrap break-words rounded-2xl bg-black/30 p-4 text-[11px] leading-relaxed text-emerald-300 overflow-auto">
+              <pre className="min-h-[420px] whitespace-pre-wrap break-words rounded-xl bg-black/30 p-4 text-[11px] leading-relaxed text-emerald-300 overflow-auto">
                 {tryResponse || 'Response akan muncul di sini setelah request dijalankan.'}
               </pre>
             </div>
 
             <div className="bg-white rounded-[32px] border border-slate-100 p-6 space-y-3 shadow-sm">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Current Operation</p>
-              <h4 className="text-lg font-black text-slate-900">{activeEndpointDoc.summary}</h4>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Current Operation</p>
+              <h4 className="text-lg font-semibold text-slate-900">{activeEndpointDoc.summary}</h4>
               <p className="text-sm text-slate-500">{activeEndpointDoc.description}</p>
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                <span className="font-black text-slate-900">Template aktif:</span> {activeEndpointExample.label}
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <span className="font-semibold text-slate-900">Template aktif:</span> {activeEndpointExample.label}
                 <p className="mt-1 text-slate-500">{activeEndpointExample.description}</p>
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
-                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-100 text-violet-700 text-[10px] font-black uppercase tracking-widest">
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-100 text-violet-700 text-[10px] font-semibold uppercase tracking-wide">
                   <Shield size={12} /> Scope: {activeEndpointDoc.scope}
                 </span>
-                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-widest">
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-[10px] font-semibold uppercase tracking-wide">
                   <Code size={12} /> operationId: {activeEndpointDoc.operationId}
                 </span>
               </div>
               <div className="space-y-2 pt-1">
                 {activeEndpointDoc.notes.map((note) => (
-                  <div key={`try-note-${note}`} className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900/80">
+                  <div key={`try-note-${note}`} className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900/80">
                     {note}
                   </div>
                 ))}
@@ -2903,25 +2903,25 @@ export function ApiSettingsClient({
       {/* TAB: CASH IN CONFIG                           */}
       {/* ══════════════════════════════════════════════ */}
       {activeTab === 'cashin' && (
-        <div className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-8">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-200/50 p-5 space-y-8">
           <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
               <ArrowDownCircle size={20} className="text-emerald-600" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Konfigurasi Cash In</h3>
+              <h3 className="text-lg font-semibold text-slate-900 uppercase tracking-tight">Konfigurasi Cash In</h3>
               <p className="text-xs text-slate-400 font-medium mt-0.5">Akun tujuan & parameter saat POST /api/v1/cash {"{ type: 'in' }"}</p>
             </div>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Akun Kas / Bank Penerima (Cash In Account)</label>
+              <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide ml-1">Akun Kas / Bank Penerima (Cash In Account)</label>
               <p className="text-xs text-slate-400 ml-1 mb-2">Debet default saat transaksi kas masuk via API diterima.</p>
               <select
                 value={config.cash_in_account_id ?? ''}
                 onChange={e => setConfig(c => ({ ...c, cash_in_account_id: e.target.value || null }))}
-                className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-bold bg-white"
+                className="w-full px-5 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-bold bg-white"
               >
                 <option value="">— Pilih Akun Kas/Bank 11xx —</option>
                 {cashAccounts.map(a => (
@@ -2932,21 +2932,21 @@ export function ApiSettingsClient({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Deskripsi Default</label>
+                <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide ml-1">Deskripsi Default</label>
                 <input
                   value={String(config.cash_in_params?.default_description ?? '')}
                   onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, default_description: e.target.value } }))}
                   placeholder="Penerimaan via API"
-                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-bold"
+                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-bold"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Akun Lawan Default (Kredit)</label>
+                <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide ml-1">Akun Lawan Default (Kredit)</label>
                 <p className="text-xs text-slate-400 ml-1 mb-2">Dipakai saat request tidak mengirim `category_id` / `counter_account_id`. Bisa berupa pendapatan, piutang, hutang, pajak, diskon, atau biaya lain.</p>
                 <select
                   value={String(config.cash_in_params?.counter_account_id ?? config.cash_in_params?.revenue_account_id ?? '')}
                   onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, counter_account_id: e.target.value || undefined } }))}
-                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-bold bg-white"
+                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-bold bg-white"
                 >
                   <option value="">— Pilih Akun Lawan —</option>
                   {counterAccounts.map(a => (
@@ -2956,19 +2956,19 @@ export function ApiSettingsClient({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/60 p-5 space-y-4">
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-5 space-y-4">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">Mapping Settlement Lanjutan</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Mapping Settlement Lanjutan</p>
                 <p className="text-xs text-emerald-900/70 font-medium mt-1">Digunakan ketika request mengirim `settlement_type` agar kas masuk otomatis diarahkan ke akun piutang, hutang, pajak, diskon, atau biaya lain.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-emerald-700 tracking-[0.2em] ml-1">Piutang / Receivable</label>
+                  <label className="text-[9px] uppercase font-semibold text-emerald-700 tracking-wide ml-1">Piutang / Receivable</label>
                   <select
                     value={String(config.cash_in_params?.receivable_account_id ?? '')}
                     onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, receivable_account_id: e.target.value || undefined } }))}
-                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
+                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
                   >
                     <option value="">— Opsional —</option>
                     {counterAccounts.map(a => (
@@ -2978,11 +2978,11 @@ export function ApiSettingsClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-emerald-700 tracking-[0.2em] ml-1">Hutang / Payable</label>
+                  <label className="text-[9px] uppercase font-semibold text-emerald-700 tracking-wide ml-1">Hutang / Payable</label>
                   <select
                     value={String(config.cash_in_params?.payable_account_id ?? '')}
                     onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, payable_account_id: e.target.value || undefined } }))}
-                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
+                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
                   >
                     <option value="">— Opsional —</option>
                     {counterAccounts.map(a => (
@@ -2992,11 +2992,11 @@ export function ApiSettingsClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-emerald-700 tracking-[0.2em] ml-1">Pajak</label>
+                  <label className="text-[9px] uppercase font-semibold text-emerald-700 tracking-wide ml-1">Pajak</label>
                   <select
                     value={String(config.cash_in_params?.tax_account_id ?? '')}
                     onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, tax_account_id: e.target.value || undefined } }))}
-                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
+                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
                   >
                     <option value="">— Opsional —</option>
                     {counterAccounts.map(a => (
@@ -3006,11 +3006,11 @@ export function ApiSettingsClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-emerald-700 tracking-[0.2em] ml-1">Diskon / Potongan</label>
+                  <label className="text-[9px] uppercase font-semibold text-emerald-700 tracking-wide ml-1">Diskon / Potongan</label>
                   <select
                     value={String(config.cash_in_params?.discount_account_id ?? '')}
                     onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, discount_account_id: e.target.value || undefined } }))}
-                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
+                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
                   >
                     <option value="">— Opsional —</option>
                     {counterAccounts.map(a => (
@@ -3020,11 +3020,11 @@ export function ApiSettingsClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-emerald-700 tracking-[0.2em] ml-1">Biaya Lain-lain</label>
+                  <label className="text-[9px] uppercase font-semibold text-emerald-700 tracking-wide ml-1">Biaya Lain-lain</label>
                   <select
                     value={String(config.cash_in_params?.other_charge_account_id ?? '')}
                     onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, other_charge_account_id: e.target.value || undefined } }))}
-                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
+                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
                   >
                     <option value="">— Opsional —</option>
                     {counterAccounts.map(a => (
@@ -3035,7 +3035,7 @@ export function ApiSettingsClient({
               </div>
             </div>
 
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
               <label className="flex items-center gap-3 cursor-pointer">
                 <div
                   onClick={() => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, auto_post: !c.cash_in_params?.auto_post } }))}
@@ -3044,7 +3044,7 @@ export function ApiSettingsClient({
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${config.cash_in_params?.auto_post ? 'left-5' : 'left-1'}`} />
                 </div>
                 <div>
-                  <p className="text-sm font-black text-slate-800">Auto-Post Jurnal</p>
+                  <p className="text-sm font-semibold text-slate-800">Auto-Post Jurnal</p>
                   <p className="text-xs text-slate-400">Jika aktif, transaksi langsung POSTED ke modul kas/bank dan jurnal akuntansi. Jika nonaktif, transaksi disimpan sebagai DRAFT.</p>
                 </div>
               </label>
@@ -3055,7 +3055,7 @@ export function ApiSettingsClient({
             <button
               onClick={handleSaveConfig}
               disabled={loading}
-              className="flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 active:scale-95"
+              className="flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 active:scale-95"
             >
               <Check size={15} /> {loading ? 'Menyimpan...' : 'Simpan Konfigurasi Cash In'}
             </button>
@@ -3067,25 +3067,25 @@ export function ApiSettingsClient({
       {/* TAB: CASH OUT CONFIG                          */}
       {/* ══════════════════════════════════════════════ */}
       {activeTab === 'cashout' && (
-        <div className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-8">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-200/50 p-5 space-y-8">
           <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
-            <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center">
               <ArrowUpCircle size={20} className="text-rose-500" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Konfigurasi Cash Out</h3>
+              <h3 className="text-lg font-semibold text-slate-900 uppercase tracking-tight">Konfigurasi Cash Out</h3>
               <p className="text-xs text-slate-400 font-medium mt-0.5">Akun sumber & parameter saat POST /api/v1/cash {"{ type: 'out' }"}</p>
             </div>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Akun Kas / Bank Sumber (Cash Out Account)</label>
+              <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide ml-1">Akun Kas / Bank Sumber (Cash Out Account)</label>
               <p className="text-xs text-slate-400 ml-1 mb-2">Kredit default saat transaksi kas keluar via API dilakukan.</p>
               <select
                 value={config.cash_out_account_id ?? ''}
                 onChange={e => setConfig(c => ({ ...c, cash_out_account_id: e.target.value || null }))}
-                className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-50 focus:border-rose-400 font-bold bg-white"
+                className="w-full px-5 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-rose-50 focus:border-rose-400 font-bold bg-white"
               >
                 <option value="">— Pilih Akun Kas/Bank 11xx —</option>
                 {cashAccounts.map(a => (
@@ -3096,21 +3096,21 @@ export function ApiSettingsClient({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Deskripsi Default</label>
+                <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide ml-1">Deskripsi Default</label>
                 <input
                   value={String(config.cash_out_params?.default_description ?? '')}
                   onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, default_description: e.target.value } }))}
                   placeholder="Pembayaran via API"
-                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-50 focus:border-rose-400 font-bold"
+                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-rose-50 focus:border-rose-400 font-bold"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Akun Lawan Default (Debit)</label>
+                <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide ml-1">Akun Lawan Default (Debit)</label>
                 <p className="text-xs text-slate-400 ml-1 mb-2">Dipakai saat request tidak mengirim `category_id` / `counter_account_id`. Bisa berupa beban, piutang, hutang, pajak, diskon, atau biaya lain.</p>
                 <select
                   value={String(config.cash_out_params?.counter_account_id ?? config.cash_out_params?.expense_account_id ?? '')}
                   onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, counter_account_id: e.target.value || undefined } }))}
-                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-50 focus:border-rose-400 font-bold bg-white"
+                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-rose-50 focus:border-rose-400 font-bold bg-white"
                 >
                   <option value="">— Pilih Akun Lawan —</option>
                   {counterAccounts.map(a => (
@@ -3120,19 +3120,19 @@ export function ApiSettingsClient({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-rose-100 bg-rose-50/60 p-5 space-y-4">
+            <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-5 space-y-4">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-700">Mapping Settlement Lanjutan</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-700">Mapping Settlement Lanjutan</p>
                 <p className="text-xs text-rose-900/70 font-medium mt-1">Digunakan ketika request mengirim `settlement_type` agar kas keluar otomatis diarahkan ke akun piutang, hutang, pajak, diskon, atau biaya lain.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-rose-700 tracking-[0.2em] ml-1">Piutang / Receivable</label>
+                  <label className="text-[9px] uppercase font-semibold text-rose-700 tracking-wide ml-1">Piutang / Receivable</label>
                   <select
                     value={String(config.cash_out_params?.receivable_account_id ?? '')}
                     onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, receivable_account_id: e.target.value || undefined } }))}
-                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
+                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
                   >
                     <option value="">— Opsional —</option>
                     {counterAccounts.map(a => (
@@ -3142,11 +3142,11 @@ export function ApiSettingsClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-rose-700 tracking-[0.2em] ml-1">Hutang / Payable</label>
+                  <label className="text-[9px] uppercase font-semibold text-rose-700 tracking-wide ml-1">Hutang / Payable</label>
                   <select
                     value={String(config.cash_out_params?.payable_account_id ?? '')}
                     onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, payable_account_id: e.target.value || undefined } }))}
-                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
+                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
                   >
                     <option value="">— Opsional —</option>
                     {counterAccounts.map(a => (
@@ -3156,11 +3156,11 @@ export function ApiSettingsClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-rose-700 tracking-[0.2em] ml-1">Pajak</label>
+                  <label className="text-[9px] uppercase font-semibold text-rose-700 tracking-wide ml-1">Pajak</label>
                   <select
                     value={String(config.cash_out_params?.tax_account_id ?? '')}
                     onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, tax_account_id: e.target.value || undefined } }))}
-                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
+                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
                   >
                     <option value="">— Opsional —</option>
                     {counterAccounts.map(a => (
@@ -3170,11 +3170,11 @@ export function ApiSettingsClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-rose-700 tracking-[0.2em] ml-1">Diskon / Potongan</label>
+                  <label className="text-[9px] uppercase font-semibold text-rose-700 tracking-wide ml-1">Diskon / Potongan</label>
                   <select
                     value={String(config.cash_out_params?.discount_account_id ?? '')}
                     onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, discount_account_id: e.target.value || undefined } }))}
-                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
+                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
                   >
                     <option value="">— Opsional —</option>
                     {counterAccounts.map(a => (
@@ -3184,11 +3184,11 @@ export function ApiSettingsClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-rose-700 tracking-[0.2em] ml-1">Biaya Lain-lain</label>
+                  <label className="text-[9px] uppercase font-semibold text-rose-700 tracking-wide ml-1">Biaya Lain-lain</label>
                   <select
                     value={String(config.cash_out_params?.other_charge_account_id ?? '')}
                     onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, other_charge_account_id: e.target.value || undefined } }))}
-                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
+                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
                   >
                     <option value="">— Opsional —</option>
                     {counterAccounts.map(a => (
@@ -3199,7 +3199,7 @@ export function ApiSettingsClient({
               </div>
             </div>
 
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
               <label className="flex items-center gap-3 cursor-pointer">
                 <div
                   onClick={() => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, auto_post: !c.cash_out_params?.auto_post } }))}
@@ -3208,7 +3208,7 @@ export function ApiSettingsClient({
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${config.cash_out_params?.auto_post ? 'left-5' : 'left-1'}`} />
                 </div>
                 <div>
-                  <p className="text-sm font-black text-slate-800">Auto-Post Jurnal</p>
+                  <p className="text-sm font-semibold text-slate-800">Auto-Post Jurnal</p>
                   <p className="text-xs text-slate-400">Jika aktif, transaksi langsung POSTED ke modul kas/bank dan jurnal akuntansi. Jika nonaktif, transaksi disimpan sebagai DRAFT.</p>
                 </div>
               </label>
@@ -3219,7 +3219,7 @@ export function ApiSettingsClient({
             <button
               onClick={handleSaveConfig}
               disabled={loading}
-              className="flex items-center gap-2 px-8 py-4 bg-rose-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 disabled:opacity-50 active:scale-95"
+              className="flex items-center gap-2 px-8 py-4 bg-rose-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 disabled:opacity-50 active:scale-95"
             >
               <Check size={15} /> {loading ? 'Menyimpan...' : 'Simpan Konfigurasi Cash Out'}
             </button>
@@ -3232,20 +3232,20 @@ export function ApiSettingsClient({
       {/* ══════════════════════════════════════════════ */}
       {activeTab === 'webhook' && (
         <div className="space-y-5">
-          <div className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-8">
+          <div className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-200/50 p-5 space-y-8">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
-              <div className="w-10 h-10 rounded-2xl bg-violet-100 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
                 <Webhook size={20} className="text-violet-600" />
               </div>
               <div>
-                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Konfigurasi Webhook</h3>
+                <h3 className="text-lg font-semibold text-slate-900 uppercase tracking-tight">Konfigurasi Webhook</h3>
                 <p className="text-xs text-slate-400 font-medium mt-0.5">Nizam push notifikasi ke URL Anda saat ada event transaksi.</p>
               </div>
             </div>
 
             <div className="space-y-6">
               {/* Toggle */}
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
                 <div
                   onClick={() => setConfig(c => ({ ...c, webhook_is_active: !c.webhook_is_active }))}
                   className={`w-12 h-7 rounded-full transition-all relative cursor-pointer shrink-0 ${config.webhook_is_active ? 'bg-violet-500' : 'bg-slate-200'}`}
@@ -3253,7 +3253,7 @@ export function ApiSettingsClient({
                   <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all ${config.webhook_is_active ? 'left-6' : 'left-1'}`} />
                 </div>
                 <div>
-                  <p className="text-sm font-black text-slate-800">Aktifkan Webhook</p>
+                  <p className="text-sm font-semibold text-slate-800">Aktifkan Webhook</p>
                   <p className="text-xs text-slate-400">Nizam akan mengirim HTTP POST ke URL berikut saat event dipicu.</p>
                 </div>
               </div>
@@ -3261,23 +3261,23 @@ export function ApiSettingsClient({
               {/* URL + Secret */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Webhook Endpoint URL</label>
+                  <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide ml-1">Webhook Endpoint URL</label>
                   <input
                     value={config.webhook_url ?? ''}
                     onChange={e => setConfig(c => ({ ...c, webhook_url: e.target.value || null }))}
                     placeholder="https://yourapp.com/webhook/nizam"
-                    className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                    className="w-full px-5 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Webhook Secret (HMAC-SHA256)</label>
+                  <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide ml-1">Webhook Secret (HMAC-SHA256)</label>
                   <div className="relative">
                     <input
                       type={showWebhookSecret ? 'text' : 'password'}
                       value={config.webhook_secret ?? ''}
                       onChange={e => setConfig(c => ({ ...c, webhook_secret: e.target.value || null }))}
                       placeholder="secret_key untuk verifikasi signature"
-                      className="w-full px-5 py-3 pr-12 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                      className="w-full px-5 py-3 pr-12 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
                     />
                     <button
                       type="button"
@@ -3292,7 +3292,7 @@ export function ApiSettingsClient({
 
               {/* Events */}
               <div className="space-y-3">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Events yang Di-trigger</label>
+                <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide ml-1">Events yang Di-trigger</label>
                 <div className="flex flex-wrap gap-2">
                   {WEBHOOK_EVENT_OPTIONS.map((option) => {
                     const active = config.webhook_events.includes(option.value)
@@ -3307,7 +3307,7 @@ export function ApiSettingsClient({
                             ? c.webhook_events.filter(e => e !== option.value)
                             : [...c.webhook_events, option.value],
                         }))}
-                        className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
+                        className={`px-4 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all border ${
                           active
                             ? 'bg-violet-600 text-white border-violet-600 shadow-md'
                             : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'
@@ -3321,9 +3321,9 @@ export function ApiSettingsClient({
               </div>
 
               {config.webhook_events.includes('inventory_movement') && (
-                <div className="rounded-[28px] border border-violet-100 bg-violet-50/50 p-5 space-y-5">
+                <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-5 space-y-5">
                   <div>
-                    <p className="text-[10px] font-black text-violet-700 uppercase tracking-widest">Filter Inventory Movement</p>
+                    <p className="text-[10px] font-semibold text-violet-700 uppercase tracking-wide">Filter Inventory Movement</p>
                     <p className="text-xs text-violet-700/80 mt-1">
                       Deteksi stok masuk atau keluar dihitung dari tanda `quantity` pada `stock_movements`, bukan dari akun buku besar.
                       Kosongkan filter jika webhook harus dikirim untuk semua mutasi inventory.
@@ -3331,7 +3331,7 @@ export function ApiSettingsClient({
                   </div>
 
                   <div className="space-y-3">
-                    <label className="text-[9px] uppercase font-black text-violet-700 tracking-[0.2em] ml-1">Arah Mutasi</label>
+                    <label className="text-[9px] uppercase font-semibold text-violet-700 tracking-wide ml-1">Arah Mutasi</label>
                     <div className="flex flex-wrap gap-2">
                       {INVENTORY_WEBHOOK_DIRECTION_OPTIONS.map((option) => {
                         const active = config.webhook_inventory_directions.includes(option.value)
@@ -3346,7 +3346,7 @@ export function ApiSettingsClient({
                                 ? current.webhook_inventory_directions.filter((value) => value !== option.value)
                                 : [...current.webhook_inventory_directions, option.value],
                             }))}
-                            className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
+                            className={`px-4 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all border ${
                               active
                                 ? 'bg-violet-600 text-white border-violet-600 shadow-md'
                                 : 'bg-white text-slate-500 border-violet-200 hover:border-violet-400'
@@ -3360,7 +3360,7 @@ export function ApiSettingsClient({
                   </div>
 
                   <div className="space-y-3">
-                    <label className="text-[9px] uppercase font-black text-violet-700 tracking-[0.2em] ml-1">Reference Type</label>
+                    <label className="text-[9px] uppercase font-semibold text-violet-700 tracking-wide ml-1">Reference Type</label>
                     <div className="flex flex-wrap gap-2">
                       {INVENTORY_WEBHOOK_REFERENCE_TYPE_OPTIONS.map((option) => {
                         const active = config.webhook_inventory_reference_types.includes(option.value)
@@ -3375,7 +3375,7 @@ export function ApiSettingsClient({
                                 ? current.webhook_inventory_reference_types.filter((value) => value !== option.value)
                                 : [...current.webhook_inventory_reference_types, option.value],
                             }))}
-                            className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
+                            className={`px-4 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all border ${
                               active
                                 ? 'bg-white text-violet-700 border-violet-400 shadow-sm'
                                 : 'bg-white/80 text-slate-500 border-violet-100 hover:border-violet-300'
@@ -3394,8 +3394,8 @@ export function ApiSettingsClient({
               )}
 
               {/* Signature hint */}
-              <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
-                <p className="text-[10px] font-black text-violet-700 uppercase tracking-widest mb-2">Verifikasi Signature di Server Anda</p>
+              <div className="rounded-xl border border-violet-100 bg-violet-50 p-4">
+                <p className="text-[10px] font-semibold text-violet-700 uppercase tracking-wide mb-2">Verifikasi Signature di Server Anda</p>
                 <pre className="text-[11px] text-violet-800 font-mono leading-relaxed overflow-x-auto">
 {`// Node.js / TypeScript
 const crypto = require('crypto')
@@ -3418,13 +3418,13 @@ if (signature !== expected) {
               <div className="rounded-[30px] border border-slate-100 bg-slate-50/80 p-6 space-y-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Payload Reference</p>
-                    <h4 className="mt-2 text-base font-black text-slate-900 uppercase tracking-tight">Dokumentasi Webhook untuk Implementor</h4>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Payload Reference</p>
+                    <h4 className="mt-2 text-base font-semibold text-slate-900 uppercase tracking-tight">Dokumentasi Webhook untuk Implementor</h4>
                     <p className="mt-1 text-sm text-slate-500 leading-relaxed">
                       Bagian ini menampilkan contoh header dan payload yang bisa langsung dipakai integrator untuk membangun endpoint penerima webhook.
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-[11px] text-violet-800 leading-relaxed lg:max-w-sm">
+                  <div className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-[11px] text-violet-800 leading-relaxed lg:max-w-sm">
                     Gunakan raw request body saat memverifikasi `X-Nizam-Webhook-Signature`.
                     Nilai UUID, timestamp, nominal, dan reference pada payload runtime akan berubah mengikuti transaksi nyata.
                   </div>
@@ -3443,8 +3443,8 @@ if (signature !== expected) {
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h5 className="text-sm font-black text-slate-900 uppercase tracking-wide">{card.label}</h5>
-                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${runtimeStatusClass}`}>
+                              <h5 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">{card.label}</h5>
+                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${runtimeStatusClass}`}>
                                 {card.runtimeStatus === 'active' ? 'Live Runtime' : 'Reserved'}
                               </span>
                             </div>
@@ -3453,8 +3453,8 @@ if (signature !== expected) {
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.18em]">Kapan Event Dikirim</p>
+                          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3">
+                            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Kapan Event Dikirim</p>
                             <div className="space-y-2">
                               {card.when.map((line) => (
                                 <p key={line} className="text-sm text-slate-600 leading-relaxed">
@@ -3464,13 +3464,13 @@ if (signature !== expected) {
                             </div>
                           </div>
 
-                          <div className="rounded-2xl border border-slate-100 bg-slate-950 p-4 space-y-3">
+                          <div className="rounded-xl border border-slate-100 bg-slate-950 p-4 space-y-3">
                             <div className="flex items-center justify-between gap-3">
-                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.18em]">Header</p>
+                              <p className="text-[10px] font-semibold text-slate-300 uppercase tracking-wide">Header</p>
                               <button
                                 type="button"
                                 onClick={() => handleCopySnippet(`headers-${card.event}`, headerSnippet)}
-                                className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-white transition-all hover:bg-slate-700"
+                                className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white transition-all hover:bg-slate-700"
                               >
                                 {copiedSnippetId === `headers-${card.event}` ? <Check size={12} /> : <Copy size={12} />}
                                 {copiedSnippetId === `headers-${card.event}` ? 'Copied' : 'Copy'}
@@ -3487,16 +3487,16 @@ if (signature !== expected) {
                             {card.payloads.map((payload) => {
                               const payloadSnippet = formatJson(payload.payload)
                               return (
-                                <div key={payload.id} className="rounded-2xl border border-slate-100 bg-slate-950 p-4 space-y-3">
+                                <div key={payload.id} className="rounded-xl border border-slate-100 bg-slate-950 p-4 space-y-3">
                                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                     <div>
-                                      <p className="text-sm font-black text-white">{payload.label}</p>
+                                      <p className="text-sm font-semibold text-white">{payload.label}</p>
                                       <p className="mt-1 text-xs text-slate-300 leading-relaxed">{payload.description}</p>
                                     </div>
                                     <button
                                       type="button"
                                       onClick={() => handleCopySnippet(`payload-${payload.id}`, payloadSnippet)}
-                                      className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-white transition-all hover:bg-slate-700"
+                                      className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white transition-all hover:bg-slate-700"
                                     >
                                       {copiedSnippetId === `payload-${payload.id}` ? <Check size={12} /> : <Copy size={12} />}
                                       {copiedSnippetId === `payload-${payload.id}` ? 'Copied' : 'Copy JSON'}
@@ -3510,13 +3510,13 @@ if (signature !== expected) {
                             })}
                           </div>
                         ) : (
-                          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 leading-relaxed">
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 leading-relaxed">
                             Event ini belum memiliki emitter otomatis di runtime aktif. Dokumentasi payload final baru aman dibagikan setelah event tersebut benar-benar dipancarkan oleh backend.
                           </div>
                         )}
 
-                        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-2">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.18em]">Catatan Integrasi</p>
+                        <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-2">
+                          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Catatan Integrasi</p>
                           {card.notes.map((note) => (
                             <p key={note} className="text-sm text-slate-600 leading-relaxed">
                               • {note}
@@ -3534,7 +3534,7 @@ if (signature !== expected) {
               <button
                 onClick={handleSaveConfig}
                 disabled={loading}
-                className="flex items-center gap-2 px-8 py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
+                className="flex items-center gap-2 px-8 py-4 bg-violet-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
               >
                 <Check size={15} /> {loading ? 'Menyimpan...' : 'Simpan Webhook Config'}
               </button>
@@ -3544,21 +3544,21 @@ if (signature !== expected) {
           {/* Delivery log */}
           {webhookDeliveries.length > 0 && (
             <div className="bg-white rounded-[32px] border border-slate-100 p-6 space-y-4">
-              <h4 className="text-sm font-black text-slate-700 uppercase tracking-wide flex items-center gap-2">
+              <h4 className="text-sm font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-2">
                 <Activity size={16} className="text-slate-400" /> Log Pengiriman Terakhir
               </h4>
               <div className="space-y-2">
                 {webhookDeliveries.map(d => (
-                  <div key={d.id} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                  <div key={d.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
                     <div className={`w-2 h-2 rounded-full shrink-0 ${
                       d.status === 'delivered' ? 'bg-emerald-500' :
                       d.status === 'failed' ? 'bg-red-500' : 'bg-amber-400'
                     }`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-black text-slate-800 uppercase">{d.event_type}</span>
+                        <span className="text-xs font-semibold text-slate-800 uppercase">{d.event_type}</span>
                         {d.http_status && (
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${
                             d.http_status < 300 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
                           }`}>
                             HTTP {d.http_status}
@@ -3583,13 +3583,13 @@ if (signature !== expected) {
       {/* ══════════════════════════════════════════════ */}
       {activeTab === 'history' && (
         <div className="space-y-5">
-          <div className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-6">
+          <div className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-200/50 p-5 space-y-6">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
-              <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
                 <History size={20} className="text-slate-600" />
               </div>
               <div>
-                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Call History</h3>
+                <h3 className="text-lg font-semibold text-slate-900 uppercase tracking-tight">Call History</h3>
                 <p className="text-xs text-slate-400 font-medium mt-0.5">
                   Log setiap request ke Open API v1 — 50 request terakhir.
                 </p>
@@ -3619,19 +3619,19 @@ if (signature !== expected) {
                   return (
                     <div
                       key={log.id}
-                      className="flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-all"
+                      className="flex items-center gap-3 px-5 py-3.5 rounded-xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-all"
                     >
                       {isSuccess
                         ? <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />
                         : <XCircle size={15} className="text-red-400 shrink-0" />
                       }
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg uppercase ${methodColor}`}>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg uppercase ${methodColor}`}>
                         {log.method}
                       </span>
                       <span className="text-xs font-mono text-slate-700 flex-1 min-w-0 truncate">
                         {log.endpoint}
                       </span>
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${statusColor}`}>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${statusColor}`}>
                         {log.status_code}
                       </span>
                       {log.duration_ms != null && (
@@ -3666,16 +3666,16 @@ if (signature !== expected) {
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
-              className="relative w-full max-w-5xl max-h-[calc(100vh-2rem)] rounded-[40px] bg-white shadow-2xl overflow-hidden"
+              className="relative w-full max-w-5xl max-h-[calc(100vh-2rem)] rounded-xl bg-white shadow-md overflow-hidden"
             >
               <div className="p-5 md:p-8 space-y-6 overflow-y-auto max-h-[calc(100vh-2rem)]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 text-violet-700 text-[10px] font-black uppercase tracking-[0.18em] mb-3">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 text-violet-700 text-[10px] font-semibold uppercase tracking-wide mb-3">
                       <Shield size={12} />
                       API Key Security
                     </div>
-                    <h3 className="text-xl md:text-2xl font-black text-slate-900">
+                    <h3 className="text-xl md:text-2xl font-semibold text-slate-900">
                       {generatedKey ? 'Simpan API Key Ini' : 'Buat API Key Baru'}
                     </h3>
                     <p className="text-xs md:text-sm text-slate-500 mt-2 font-medium max-w-2xl">
@@ -3695,10 +3695,10 @@ if (signature !== expected) {
                   /* ── Show generated key ── */
                   <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-5">
                     <div className="space-y-4">
-                      <div className="rounded-[28px] bg-slate-950 p-5 relative">
+                      <div className="rounded-xl bg-slate-950 p-5 relative">
                         <div className="flex items-center gap-2 mb-3 text-slate-300">
                           <Key size={14} />
-                          <p className="text-[10px] font-black uppercase tracking-widest">Plaintext Key</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide">Plaintext Key</p>
                         </div>
                         <code className="text-emerald-400 text-xs md:text-sm font-mono break-all leading-relaxed">{generatedKey}</code>
                         <button
@@ -3717,10 +3717,10 @@ if (signature !== expected) {
                       </div>
                     </div>
 
-                    <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-5 space-y-4">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-5 space-y-4">
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Next Step</p>
-                        <h4 className="text-lg font-black text-slate-900 mt-2">Sebelum Menutup Modal</h4>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Next Step</p>
+                        <h4 className="text-lg font-semibold text-slate-900 mt-2">Sebelum Menutup Modal</h4>
                       </div>
 
                       <div className="space-y-3">
@@ -3729,7 +3729,7 @@ if (signature !== expected) {
                           'Pastikan header request memakai x-api-key atau Authorization Bearer.',
                           'Jika memakai whitelist IP, cocokkan dengan IP publik integrator.',
                         ].map((item) => (
-                          <div key={item} className="flex items-start gap-3 rounded-2xl bg-white border border-slate-200 px-4 py-3">
+                          <div key={item} className="flex items-start gap-3 rounded-xl bg-white border border-slate-200 px-4 py-3">
                             <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
                             <p className="text-xs font-medium text-slate-600 leading-relaxed">{item}</p>
                           </div>
@@ -3738,7 +3738,7 @@ if (signature !== expected) {
 
                       <button
                         onClick={() => { setGeneratedKey(null); setShowGenModal(false) }}
-                        className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all"
+                        className="w-full py-4 bg-slate-900 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-black transition-all"
                       >
                         Sudah Disimpan, Tutup
                       </button>
@@ -3748,24 +3748,24 @@ if (signature !== expected) {
                   /* ── Form generate ── */
                   <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-5">
                     <div className="space-y-5">
-                      <div className="rounded-[28px] border border-slate-100 bg-white p-5 md:p-6 space-y-5">
+                      <div className="rounded-xl border border-slate-100 bg-white p-5 md:p-6 space-y-5">
                         <div className="flex items-center justify-between gap-3 flex-wrap">
                           <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 1</p>
-                            <h4 className="text-lg font-black text-slate-900 mt-1">Identitas & Akses</h4>
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Step 1</p>
+                            <h4 className="text-lg font-semibold text-slate-900 mt-1">Identitas & Akses</h4>
                           </div>
-                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold uppercase tracking-wide">
                             {selectedGenScopeDefs.length} scope dipilih
                           </div>
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Nama Key</label>
+                          <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Nama Key</label>
                           <input
                             value={genName}
                             onChange={e => setGenName(e.target.value)}
                             placeholder="Contoh: Integrasi Tokopedia, Webhook POS"
-                            className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                            className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
                           />
                           <p className="text-[10px] text-slate-400 font-medium">
                             Gunakan nama yang mudah dikenali tim support, misalnya nama partner atau use case.
@@ -3773,7 +3773,7 @@ if (signature !== expected) {
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Scope Akses</label>
+                          <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Scope Akses</label>
                           {selectedGenScopeDefs.length > 0 && (
                             <div className="flex flex-wrap gap-1.5">
                               {selectedGenScopeDefs.map((scope) => (
@@ -3783,7 +3783,7 @@ if (signature !== expected) {
                           )}
                           <div className="grid grid-cols-1 gap-2">
                             {SCOPES.map(s => (
-                              <label key={s.value} className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${
+                              <label key={s.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
                                 genScopes.includes(s.value)
                                   ? 'border-violet-400 bg-violet-50 shadow-sm'
                                   : 'border-slate-200 bg-white hover:border-slate-300'
@@ -3797,7 +3797,7 @@ if (signature !== expected) {
                                   className="rounded"
                                 />
                                 <div className="flex-1">
-                                  <p className="text-xs font-black text-slate-800">{s.label}</p>
+                                  <p className="text-xs font-semibold text-slate-800">{s.label}</p>
                                   <p className="text-[10px] text-slate-400">{s.desc}</p>
                                 </div>
                               </label>
@@ -3806,40 +3806,40 @@ if (signature !== expected) {
                         </div>
                       </div>
 
-                      <div className="rounded-[28px] border border-slate-100 bg-white p-5 md:p-6 space-y-5">
+                      <div className="rounded-xl border border-slate-100 bg-white p-5 md:p-6 space-y-5">
                         <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 2</p>
-                          <h4 className="text-lg font-black text-slate-900 mt-1">Limit & Boundary</h4>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Step 2</p>
+                          <h4 className="text-lg font-semibold text-slate-900 mt-1">Limit & Boundary</h4>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-1.5">
-                            <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Rate Limit (req/menit)</label>
+                            <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Rate Limit (req/menit)</label>
                             <input
                               type="number" min={1} max={1000}
                               value={genRpm}
                               onChange={e => setGenRpm(Number(e.target.value))}
-                              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Berlaku Sampai (opsional)</label>
+                            <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Berlaku Sampai (opsional)</label>
                             <input
                               type="date"
                               value={genExpiry}
                               onChange={e => setGenExpiry(e.target.value)}
-                              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
                             />
                           </div>
                         </div>
 
                         {branches.length > 0 && (
                           <div className="space-y-1.5">
-                            <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Scope Cabang (opsional)</label>
+                            <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Scope Cabang (opsional)</label>
                             <select
                               value={genBranchId}
                               onChange={e => setGenBranchId(e.target.value)}
-                              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold bg-white"
+                              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold bg-white"
                             >
                               <option value="">— Semua Cabang —</option>
                               {branches.map(b => (
@@ -3850,15 +3850,15 @@ if (signature !== expected) {
                         )}
 
                         <div className="space-y-1.5">
-                          <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Whitelist IP / CIDR (opsional)</label>
+                          <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Whitelist IP / CIDR (opsional)</label>
                           <textarea
                             value={genIpAllowlist}
                             onChange={e => setGenIpAllowlist(e.target.value)}
                             rows={4}
                             placeholder={'203.0.113.10\n203.0.113.0/24\n2001:db8::/64'}
-                            className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                            className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
                           />
-                          <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3">
+                          <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
                             <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
                               Satu IP atau CIDR per baris. Kosongkan jika key boleh dipakai dari semua IP. Whitelist aktif akan dicek sebelum rate limit.
                             </p>
@@ -3869,14 +3869,14 @@ if (signature !== expected) {
                       <div className="flex flex-col sm:flex-row gap-3">
                         <button
                           onClick={() => setShowGenModal(false)}
-                          className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                          className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-slate-200 transition-all"
                         >
                           Batal
                         </button>
                         <button
                           onClick={handleGenerate}
                           disabled={loading || !genName.trim() || genScopes.length === 0}
-                          className="flex-1 py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
+                          className="flex-1 py-4 bg-violet-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
                         >
                           {loading ? 'Membuat Key...' : 'Generate API Key'}
                         </button>
@@ -3884,45 +3884,45 @@ if (signature !== expected) {
                     </div>
 
                     <div className="space-y-5">
-                      <div className="rounded-[28px] border border-slate-100 bg-slate-950 p-5 md:p-6 text-white space-y-4">
+                      <div className="rounded-xl border border-slate-100 bg-slate-950 p-5 md:p-6 text-white space-y-4">
                         <div className="flex items-center gap-2 text-slate-300">
                           <Lock size={14} />
-                          <p className="text-[10px] font-black uppercase tracking-widest">Preview Policy</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide">Preview Policy</p>
                         </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                          <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">Key Label</p>
-                          <p className="mt-2 text-sm font-black text-white">
+                        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                          <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Key Label</p>
+                          <p className="mt-2 text-sm font-semibold text-white">
                             {genName.trim() || 'Belum diberi nama'}
                           </p>
                           <p className="mt-1 text-[11px] font-mono text-slate-400">nzm_live_••••••••••••••••••••••••</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
-                          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">Scope</p>
-                            <p className="mt-2 text-lg font-black">{selectedGenScopeDefs.length}</p>
+                          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                            <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Scope</p>
+                            <p className="mt-2 text-lg font-semibold">{selectedGenScopeDefs.length}</p>
                             <p className="text-[10px] text-slate-400">scope aktif</p>
                           </div>
-                          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">Rate Limit</p>
-                            <p className="mt-2 text-lg font-black">{genRpm}</p>
+                          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                            <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Rate Limit</p>
+                            <p className="mt-2 text-lg font-semibold">{genRpm}</p>
                             <p className="text-[10px] text-slate-400">req/menit</p>
                           </div>
                         </div>
 
                         <div className="space-y-3 text-[11px]">
                           <div className="flex items-start justify-between gap-4">
-                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Cabang</span>
+                            <span className="text-slate-400 font-bold uppercase tracking-wide text-[10px]">Cabang</span>
                             <span className="text-right font-medium text-slate-100">
                               {selectedGenBranch ? `${selectedGenBranch.name}${selectedGenBranch.code ? ` (${selectedGenBranch.code})` : ''}` : 'Semua Cabang'}
                             </span>
                           </div>
                           <div className="flex items-start justify-between gap-4">
-                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Expiry</span>
+                            <span className="text-slate-400 font-bold uppercase tracking-wide text-[10px]">Expiry</span>
                             <span className="text-right font-medium text-slate-100">{formatOptionalDateLabel(genExpiry)}</span>
                           </div>
                           <div className="flex items-start justify-between gap-4">
-                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Whitelist</span>
+                            <span className="text-slate-400 font-bold uppercase tracking-wide text-[10px]">Whitelist</span>
                             <span className="text-right font-medium text-slate-100">
                               {genAllowlistEntries.length > 0 ? `${genAllowlistEntries.length} IP/range` : 'Semua IP'}
                             </span>
@@ -3938,14 +3938,14 @@ if (signature !== expected) {
                         )}
                       </div>
 
-                      <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-5 md:p-6 space-y-4">
+                      <div className="rounded-xl border border-slate-100 bg-slate-50 p-5 md:p-6 space-y-4">
                         <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Readiness</p>
-                          <h4 className="text-lg font-black text-slate-900 mt-1">Sebelum Generate</h4>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Readiness</p>
+                          <h4 className="text-lg font-semibold text-slate-900 mt-1">Sebelum Generate</h4>
                         </div>
                         <div className="space-y-3">
                           {generateChecklist.map((item) => (
-                            <div key={item.id} className="flex items-center gap-3 rounded-2xl bg-white border border-slate-200 px-4 py-3">
+                            <div key={item.id} className="flex items-center gap-3 rounded-xl bg-white border border-slate-200 px-4 py-3">
                               {item.ready
                                 ? <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
                                 : <AlertCircle size={16} className="text-amber-500 shrink-0" />
@@ -3955,8 +3955,8 @@ if (signature !== expected) {
                           ))}
                         </div>
 
-                        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Catatan Security</p>
+                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Catatan Security</p>
                           <div className="space-y-2">
                             <p className="text-xs text-slate-600 font-medium leading-relaxed">
                               Plaintext key hanya muncul sekali setelah generate.
@@ -3989,12 +3989,12 @@ if (signature !== expected) {
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
-              className="relative w-full max-w-2xl rounded-[40px] bg-white shadow-2xl overflow-hidden"
+              className="relative w-full max-w-2xl rounded-xl bg-white shadow-md overflow-hidden"
             >
               <div className="p-8 space-y-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-xl font-black text-slate-900">Edit API Key</h3>
+                    <h3 className="text-xl font-semibold text-slate-900">Edit API Key</h3>
                     <p className="text-xs text-slate-400 mt-1">
                       Perbarui scope, rate limit, expiry, cabang, dan whitelist IP tanpa revoke key.
                     </p>
@@ -4006,20 +4006,20 @@ if (signature !== expected) {
 
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Nama Key</label>
+                    <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Nama Key</label>
                     <input
                       value={editName}
                       onChange={e => setEditName(e.target.value)}
                       placeholder="Contoh: Integrasi Tokopedia, Webhook POS"
-                      className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                      className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Scope Akses</label>
+                    <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Scope Akses</label>
                     <div className="grid grid-cols-1 gap-2">
                       {SCOPES.map(s => (
-                        <label key={`edit-${s.value}`} className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${
+                        <label key={`edit-${s.value}`} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
                           editScopes.includes(s.value)
                             ? 'border-violet-400 bg-violet-50'
                             : 'border-slate-200 bg-white hover:border-slate-300'
@@ -4033,7 +4033,7 @@ if (signature !== expected) {
                             className="rounded"
                           />
                           <div className="flex-1">
-                            <p className="text-xs font-black text-slate-800">{s.label}</p>
+                            <p className="text-xs font-semibold text-slate-800">{s.label}</p>
                             <p className="text-[10px] text-slate-400">{s.desc}</p>
                           </div>
                         </label>
@@ -4043,32 +4043,32 @@ if (signature !== expected) {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Rate Limit (req/menit)</label>
+                      <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Rate Limit (req/menit)</label>
                       <input
                         type="number" min={1} max={1000}
                         value={editRpm}
                         onChange={e => setEditRpm(Number(e.target.value))}
-                        className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                        className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Berlaku Sampai (opsional)</label>
+                      <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Berlaku Sampai (opsional)</label>
                       <input
                         type="date"
                         value={editExpiry}
                         onChange={e => setEditExpiry(e.target.value)}
-                        className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                        className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
                       />
                     </div>
                   </div>
 
                   {branches.length > 0 && (
                     <div className="space-y-1.5">
-                      <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Scope Cabang (opsional)</label>
+                      <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Scope Cabang (opsional)</label>
                       <select
                         value={editBranchId}
                         onChange={e => setEditBranchId(e.target.value)}
-                        className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold bg-white"
+                        className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold bg-white"
                       >
                         <option value="">— Semua Cabang —</option>
                         {branches.map(b => (
@@ -4079,13 +4079,13 @@ if (signature !== expected) {
                   )}
 
                   <div className="space-y-1.5">
-                    <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Whitelist IP / CIDR (opsional)</label>
+                    <label className="text-[9px] uppercase font-semibold text-slate-400 tracking-wide">Whitelist IP / CIDR (opsional)</label>
                     <textarea
                       value={editIpAllowlist}
                       onChange={e => setEditIpAllowlist(e.target.value)}
                       rows={4}
                       placeholder={'203.0.113.10\n203.0.113.0/24\n2001:db8::/64'}
-                      className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                      className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
                     />
                     <p className="text-[10px] text-slate-400 font-medium">
                       Satu IP atau CIDR per baris. Jika diisi, request dari IP lain akan ditolak sebelum rate limit dihitung.
@@ -4095,14 +4095,14 @@ if (signature !== expected) {
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={() => setShowEditModal(false)}
-                      className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                      className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-slate-200 transition-all"
                     >
                       Batal
                     </button>
                     <button
                       onClick={handleUpdateKey}
                       disabled={loading || !editName.trim() || editScopes.length === 0}
-                      className="flex-1 py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
+                      className="flex-1 py-4 bg-violet-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
                     >
                       {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
                     </button>

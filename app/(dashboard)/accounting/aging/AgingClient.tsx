@@ -137,19 +137,19 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
       {/* Header & Quick Summary */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div className="space-y-2">
-          <div className="flex items-center gap-3 text-indigo-600 font-black tracking-widest text-[10px] uppercase bg-indigo-50 w-fit px-4 py-2 rounded-full border border-indigo-100 mb-2">
+          <div className="flex items-center gap-3 text-indigo-600 font-semibold tracking-wide text-[10px] uppercase bg-indigo-50 w-fit px-4 py-2 rounded-full border border-indigo-100 mb-2">
              <Clock size={14} />
              Liquidity Forensic
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight tracking-tighter">Account Aging Dashboard</h1>
+          <h1 className="text-4xl font-semibold text-slate-900 tracking-tight tracking-tighter">Account Aging Dashboard</h1>
           <p className="text-slate-500 font-medium">Monitoring perputaran kas dari sisi Piutang (AR) dan Hutang (AP).</p>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 flex items-center gap-8">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 flex items-center gap-8">
            <div className="flex flex-col">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Flow Position</span>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Net Flow Position</span>
               <div className="flex items-center gap-2">
-                 <h4 className={`text-2xl font-black ${netPosition >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                 <h4 className={`text-2xl font-semibold ${netPosition >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                    {formatRupiah(netPosition)}
                  </h4>
                  {netPosition >= 0 ? <TrendingUp size={18} className="text-emerald-500" /> : <TrendingDown size={18} className="text-rose-500" />}
@@ -157,8 +157,8 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
            </div>
            <div className="w-px h-10 bg-slate-100" />
            <div className="flex flex-col">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Exposure Ratio</span>
-              <span className="text-sm font-black text-slate-900">{(initialData.totalAR / (initialData.totalAP || 1)).toFixed(2)}x</span>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Exposure Ratio</span>
+              <span className="text-sm font-semibold text-slate-900">{(initialData.totalAR / (initialData.totalAP || 1)).toFixed(2)}x</span>
            </div>
         </div>
       </div>
@@ -166,10 +166,10 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
       {/* Main Stats (AR vs AP) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
          {/* AR Card */}
-         <div className={`p-10 rounded-[40px] border-2 transition-all shadow-sm bg-white ${activeView === 'AR' ? 'border-emerald-500 shadow-emerald-50' : 'border-slate-100'}`} onClick={() => setActiveView('AR')}>
+         <div className={`p-5 rounded-xl border-2 transition-all shadow-sm bg-white ${activeView === 'AR' ? 'border-emerald-500 shadow-emerald-50' : 'border-slate-100'}`} onClick={() => setActiveView('AR')}>
             <div className="flex items-center justify-between mb-8 cursor-pointer">
-               <h3 className="text-xl font-black text-slate-900 flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${activeView === 'AR' ? 'bg-emerald-500 text-white' : 'bg-slate-50 text-slate-400'}`}>
+               <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${activeView === 'AR' ? 'bg-emerald-500 text-white' : 'bg-slate-50 text-slate-400'}`}>
                      <CreditCard size={24} />
                   </div>
                   Piutang Pelanggan (AR)
@@ -179,7 +179,7 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
             <div className="space-y-4">
                {initialData.arSummary.map((s) => (
                   <div key={s.bucket} className="flex items-center gap-4 group">
-                     <div className="w-24 text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.bucket}</div>
+                     <div className="w-24 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{s.bucket}</div>
                      <div className="flex-1 h-3 bg-slate-50 rounded-full overflow-hidden">
                         <motion.div 
                           className={`h-full ${s.bucket === 'Current' ? 'bg-emerald-400' : s.bucket === '> 90 Days' ? 'bg-rose-500' : 'bg-amber-400'}`}
@@ -188,29 +188,29 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
                           transition={{ duration: 1, ease: "easeOut" }}
                         />
                      </div>
-                     <div className="w-32 text-right text-xs font-black text-slate-900 group-hover:text-emerald-600 transition-colors uppercase">{formatRupiah(s.amount)}</div>
+                     <div className="w-32 text-right text-xs font-semibold text-slate-900 group-hover:text-emerald-600 transition-colors uppercase">{formatRupiah(s.amount)}</div>
                   </div>
                ))}
-               <div className="pt-6 mt-4 border-t border-slate-50 flex justify-between items-center font-black">
-                  <span className="text-sm text-slate-400 uppercase tracking-widest">Total Outstanding AR</span>
+               <div className="pt-6 mt-4 border-t border-slate-50 flex justify-between items-center font-semibold">
+                  <span className="text-sm text-slate-400 uppercase tracking-wide">Total Outstanding AR</span>
                   <span className="text-2xl text-slate-900">{formatRupiah(initialData.totalAR)}</span>
                </div>
                <div className="pt-3 flex justify-between items-center">
-                  <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Piutang Salam (1404)</span>
-                  <span className="text-sm font-black text-indigo-600">{formatRupiah(arSalamReceivable)}</span>
+                  <span className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide">Piutang Salam (1404)</span>
+                  <span className="text-sm font-semibold text-indigo-600">{formatRupiah(arSalamReceivable)}</span>
                </div>
                <div className="pt-1 flex justify-between items-center opacity-80">
-                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Piutang Istishna (1205)</span>
-                  <span className="text-sm font-black text-indigo-500">{formatRupiah(arIstishnaReceivable)}</span>
+                  <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wide">Piutang Istishna (1205)</span>
+                  <span className="text-sm font-semibold text-indigo-500">{formatRupiah(arIstishnaReceivable)}</span>
                </div>
             </div>
          </div>
 
          {/* AP Card */}
-         <div className={`p-10 rounded-[40px] border-2 transition-all shadow-sm bg-white ${activeView === 'AP' ? 'border-rose-500 shadow-rose-50' : 'border-slate-100'}`} onClick={() => setActiveView('AP')}>
+         <div className={`p-5 rounded-xl border-2 transition-all shadow-sm bg-white ${activeView === 'AP' ? 'border-rose-500 shadow-rose-50' : 'border-slate-100'}`} onClick={() => setActiveView('AP')}>
             <div className="flex items-center justify-between mb-8 cursor-pointer">
-               <h3 className="text-xl font-black text-slate-900 flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${activeView === 'AP' ? 'bg-rose-500 text-white' : 'bg-slate-50 text-slate-400'}`}>
+               <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${activeView === 'AP' ? 'bg-rose-500 text-white' : 'bg-slate-50 text-slate-400'}`}>
                      <Wallet size={24} />
                   </div>
                   Hutang Vendor (AP)
@@ -220,7 +220,7 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
             <div className="space-y-4">
                {initialData.apSummary.map((s) => (
                   <div key={s.bucket} className="flex items-center gap-4 group">
-                     <div className="w-24 text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.bucket}</div>
+                     <div className="w-24 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{s.bucket}</div>
                      <div className="flex-1 h-3 bg-slate-50 rounded-full overflow-hidden">
                         <motion.div 
                           className={`h-full ${s.bucket === 'Current' ? 'bg-indigo-400' : s.bucket === '> 90 Days' ? 'bg-rose-600' : 'bg-rose-400'}`}
@@ -229,30 +229,30 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
                           transition={{ duration: 1, ease: "easeOut" }}
                         />
                      </div>
-                     <div className="w-32 text-right text-xs font-black text-slate-900 group-hover:text-rose-600 transition-colors uppercase">{formatRupiah(s.amount)}</div>
+                     <div className="w-32 text-right text-xs font-semibold text-slate-900 group-hover:text-rose-600 transition-colors uppercase">{formatRupiah(s.amount)}</div>
                   </div>
                ))}
-               <div className="pt-6 mt-4 border-t border-slate-50 flex justify-between items-center font-black">
-                  <span className="text-sm text-slate-400 uppercase tracking-widest">Total Outstanding AP</span>
+               <div className="pt-6 mt-4 border-t border-slate-50 flex justify-between items-center font-semibold">
+                  <span className="text-sm text-slate-400 uppercase tracking-wide">Total Outstanding AP</span>
                   <span className="text-2xl text-slate-900">{formatRupiah(initialData.totalAP)}</span>
                </div>
                <div className="pt-3 flex justify-between items-center">
-                  <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Hutang Salam (2602)</span>
-                  <span className="text-sm font-black text-indigo-600">{formatRupiah(apSalamLiability)}</span>
+                  <span className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide">Hutang Salam (2602)</span>
+                  <span className="text-sm font-semibold text-indigo-600">{formatRupiah(apSalamLiability)}</span>
                </div>
                <div className="pt-1 flex justify-between items-center opacity-80">
-                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Hutang Istishna (2603)</span>
-                  <span className="text-sm font-black text-indigo-500">{formatRupiah(apIstishnaLiability)}</span>
+                  <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wide">Hutang Istishna (2603)</span>
+                  <span className="text-sm font-semibold text-indigo-500">{formatRupiah(apIstishnaLiability)}</span>
                </div>
             </div>
          </div>
       </div>
 
       {activeView === 'AR' && (
-        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-2">
-              <h3 className="font-black text-slate-900 text-xl flex items-center gap-3">
+              <h3 className="font-semibold text-slate-900 text-xl flex items-center gap-3">
                 <FileText size={18} className="text-emerald-500" />
                 Quick Bill Penagihan
               </h3>
@@ -260,7 +260,7 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
                 Satu dokumen penagihan ringkas per customer dengan lampiran rincian invoice AR yang masih terbuka.
               </p>
             </div>
-            <div className="inline-flex w-fit items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-emerald-700">
+            <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-5 py-3 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
               <History size={14} />
               Customer siap ditagih: {quickBillCustomers.length}
             </div>
@@ -268,13 +268,13 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
 
           {quickBillCustomers.length === 0 ? (
             <div className="px-8 py-12 text-center">
-              <p className="text-sm font-black text-slate-700">Belum ada customer trade AR yang bisa dibuatkan Quick Bill.</p>
+              <p className="text-sm font-semibold text-slate-700">Belum ada customer trade AR yang bisa dibuatkan Quick Bill.</p>
               <p className="mt-2 text-xs font-medium text-slate-400">Quick Bill hanya dibuat dari invoice sales yang masih outstanding dan punya customer yang terdaftar.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-50/50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-100">
+                <thead className="bg-slate-50/50 text-[10px] uppercase font-semibold tracking-wide text-slate-400 border-b border-slate-100">
                   <tr>
                     <th className="px-10 py-5">Pelanggan</th>
                     <th className="px-6 py-5 text-right">Invoice Terbuka</th>
@@ -288,23 +288,23 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
                   {quickBillCustomers.map((customer) => (
                     <tr key={customer.contact_id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-10 py-6">
-                        <p className="text-xs font-black text-slate-900">{customer.contact_name}</p>
-                        <p className="mt-1 text-[10px] uppercase tracking-widest text-slate-400">
+                        <p className="text-xs font-semibold text-slate-900">{customer.contact_name}</p>
+                        <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-400">
                           {customer.overdue_invoice_count} invoice overdue dari {customer.invoice_count} invoice
                         </p>
                       </td>
-                      <td className="px-6 py-6 text-right text-sm font-black text-slate-700">{customer.invoice_count}</td>
+                      <td className="px-6 py-6 text-right text-sm font-semibold text-slate-700">{customer.invoice_count}</td>
                       <td className="px-6 py-6 text-right">
-                        <p className="text-xs font-black text-slate-900">{customer.oldest_due_date ? formatDate(customer.oldest_due_date) : '-'}</p>
-                        <p className="mt-1 text-[10px] uppercase tracking-widest text-slate-400">
+                        <p className="text-xs font-semibold text-slate-900">{customer.oldest_due_date ? formatDate(customer.oldest_due_date) : '-'}</p>
+                        <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-400">
                           {customer.max_days_overdue > 0 ? `${customer.max_days_overdue} hari` : 'Belum jatuh tempo'}
                         </p>
                       </td>
-                      <td className="px-6 py-6 text-right text-lg font-black tracking-tighter text-slate-900">
+                      <td className="px-6 py-6 text-right text-lg font-semibold tracking-tighter text-slate-900">
                         {formatRupiah(customer.total_outstanding)}
                       </td>
                       <td className="px-6 py-6 text-center">
-                        <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase shadow-sm ${highlightClass(customer.worst_bucket)}`}>
+                        <span className={`px-4 py-2 rounded-full text-[10px] font-semibold uppercase shadow-sm ${highlightClass(customer.worst_bucket)}`}>
                           {customer.worst_bucket}
                         </span>
                       </td>
@@ -312,7 +312,7 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
                         <Link
                           href={`/accounting/aging/quick-bill/${customer.contact_id}`}
                           target="_blank"
-                          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-[10px] font-black uppercase text-white shadow-sm transition-all hover:bg-emerald-600"
+                          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-[10px] font-semibold uppercase text-white shadow-sm transition-all hover:bg-emerald-600"
                         >
                           Buka Quick Bill
                           <ArrowRight size={14} />
@@ -328,21 +328,21 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
       )}
 
       {/* Detailed List */}
-      <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
          <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
-            <h3 className="font-black text-slate-900 text-xl flex items-center gap-3">
+            <h3 className="font-semibold text-slate-900 text-xl flex items-center gap-3">
                <Filter size={18} className="text-indigo-500" />
                Rincian {activeView === 'AR' ? 'Piutang' : 'Hutang'} Terbuka
             </h3>
             <div className="flex gap-4">
-               <div className="px-5 py-2.5 bg-white border border-slate-200 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase text-slate-400">
+               <div className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl flex items-center gap-2 text-[10px] font-semibold uppercase text-slate-400">
                   <ArrowUpRight size={14} /> Total Items: {activeView === 'AR' ? initialData.ar.length : initialData.ap.length}
                </div>
             </div>
          </div>
          <div className="overflow-x-auto min-h-[300px]">
             <table className="w-full text-left">
-               <thead className="bg-slate-50/50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-100">
+               <thead className="bg-slate-50/50 text-[10px] uppercase font-semibold tracking-wide text-slate-400 border-b border-slate-100">
                   <tr>
                      <th className="px-10 py-5">{activeView === 'AR' ? 'Pelanggan' : 'Vendor'}</th>
                      <th className="px-6 py-5">No. Dokumen</th>
@@ -358,7 +358,7 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
                <tbody className="divide-y divide-slate-50 font-medium">
                   {(activeView === 'AR' ? initialData.ar : initialData.ap).map((row, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                       <td className="px-10 py-6 font-black text-slate-900 text-xs">
+                       <td className="px-10 py-6 font-semibold text-slate-900 text-xs">
                           {row.contact_name}
                        </td>
                        <td className="px-6 py-6 font-bold text-indigo-600 text-xs uppercase">
@@ -372,9 +372,9 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
                           <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase italic">Due {formatDate(row.due_date)}</p>
                        </td>
                        <td className="px-6 py-6">
-                          <p className="text-[11px] font-black text-slate-700 uppercase">{row.source_label || row.source_type}</p>
+                          <p className="text-[11px] font-semibold text-slate-700 uppercase">{row.source_label || row.source_type}</p>
                           {row.source_account_code && (
-                            <span className="inline-flex mt-1 px-2 py-1 rounded-lg text-[10px] font-black bg-slate-100 text-slate-500">
+                            <span className="inline-flex mt-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-slate-100 text-slate-500">
                               CoA {row.source_account_code}
                             </span>
                           )}
@@ -382,16 +382,16 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
                        <td className="px-6 py-6 text-right font-bold text-slate-600 text-xs">{formatRupiah(row.grand_total)}</td>
                        <td className="px-6 py-6 text-right font-bold text-emerald-500 text-xs">{formatRupiah(row.paid_amount)}</td>
                        <td className="px-6 py-6 text-right font-bold text-rose-400 text-xs">{formatRupiah(row.returned_amount || 0)}</td>
-                       <td className="px-6 py-6 text-right font-black text-slate-900 text-lg tracking-tighter">{formatRupiah(row.outstanding)}</td>
+                       <td className="px-6 py-6 text-right font-semibold text-slate-900 text-lg tracking-tighter">{formatRupiah(row.outstanding)}</td>
                         <td className="px-6 py-6 text-center">
-                           <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase shadow-sm ${highlightClass(row.aging_bucket)}`}>
+                           <span className={`px-4 py-2 rounded-full text-[10px] font-semibold uppercase shadow-sm ${highlightClass(row.aging_bucket)}`}>
                               {row.aging_bucket}
                            </span>
                         </td>
                         <td className="px-10 py-6 text-right">
                            <button 
                              onClick={() => openRowAction(row)}
-                             className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${
+                             className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-semibold uppercase transition-all shadow-sm ${
                                activeView === 'AR' 
                                ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-100' 
                                : row.source_type === 'TAX' ? 'bg-amber-600 text-white hover:bg-amber-700 shadow-amber-100'

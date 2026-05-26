@@ -275,7 +275,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
     }
 
     return (
-      <span className="font-black text-blue-700">
+      <span className="font-semibold text-blue-700">
         {formatRupiah((netProfit * Number(member.profit_share_percentage || 0)) / 100)}
       </span>
     )
@@ -289,7 +289,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-black text-slate-900 border-b-4 border-blue-600 inline-block pb-1">
+            <h1 className="text-2xl font-semibold text-slate-900 border-b-4 border-blue-600 inline-block pb-1">
               {contract.title}
             </h1>
           </div>
@@ -315,7 +315,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* CONTRACT DETAIL CARD */}
         <div className="col-span-1 flex flex-col gap-6">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-slate-800">Detail Akad</h3>
               {!isEditingContract ? (
@@ -374,7 +374,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
               <div className="space-y-4 text-sm">
                 <div>
                   <span className="block text-xs font-bold text-slate-400">Jenis Syirkah</span>
-                  <span className="mt-1 px-3 py-1 text-xs font-black rounded-lg bg-indigo-50 text-indigo-700 inline-block tracking-wide">{contractData.contract_type || '-'}</span>
+                  <span className="mt-1 px-3 py-1 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 inline-block tracking-wide">{contractData.contract_type || '-'}</span>
                 </div>
                 <div>
                   <span className="block text-xs font-bold text-slate-400">Status</span>
@@ -413,7 +413,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
             )}
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-slate-800">Pencatatan Core</h3>
               {!isEditingContract && (
@@ -443,7 +443,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                     placeholder="Pilih rekening kas/bank Core..."
                   />
                 ) : (
-                  <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
                     Belum ada akun kas/bank aktif (11xx) yang bisa dipakai sebagai penerima modal.
                   </p>
                 )}
@@ -457,12 +457,12 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                     placeholder="Pilih akun modal syirkah..."
                   />
                 ) : (
-                  <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
                     Belum ada akun ekuitas aktif (3xxx) yang bisa dipakai untuk modal syirkah.
                   </p>
                 )}
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
                   Jurnal Core akan dibuat otomatis dari total modal syirkah:
                   <span className="mt-1 block font-semibold text-slate-800">
                     Debit {suggestedCashAccount ? `${suggestedCashAccount.code} - ${suggestedCashAccount.name}` : 'rekening penerima modal'}
@@ -523,7 +523,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                     </span>
                   )}
                 </div>
-                <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
                   {canPostCoreCapital
                     ? 'Total setoran modal dari akad syirkah ini akan masuk ke jurnal Core agar terbaca di buku besar utama.'
                     : 'Pencatatan modal ke Core baru dilakukan setelah akad efektif dan berstatus ACTIVE.'}
@@ -532,7 +532,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
             )}
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-slate-800">Posting Bagi Hasil</h3>
               {!isEditingContract && (
@@ -562,12 +562,12 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                     placeholder="Pilih rekening kas/bank untuk payout..."
                   />
                 ) : (
-                  <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
                     Belum ada akun kas/bank aktif (11xx) yang bisa dipakai untuk pembayaran bagi hasil.
                   </p>
                 )}
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
                   Posting otomatis akan menggunakan jurnal:
                   <span className="mt-1 block font-semibold text-slate-800">
                     Debit 3130 - Bagi Hasil Syirkah
@@ -635,7 +635,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                     </span>
                   )}
                 </div>
-                <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
                   {canPostProfitSharing
                     ? 'Saat tombol dijalankan, sistem akan membuat jurnal otomatis untuk pembagian laba syirkah dan menghindari jurnal dobel bila nominalnya belum berubah.'
                     : 'Sistem hanya akan memposting bagi hasil jika akad sudah ACTIVE/COMPLETED dan nominal dasar pembagian bernilai positif.'}
@@ -647,7 +647,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
 
         {/* MEMBERS LIST */}
         <div className="col-span-1 lg:col-span-2">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm mb-6">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-6">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">Pihak Bersyirkah</h3>
               <button onClick={openNewMemberForm} className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 font-bold text-xs rounded-lg hover:bg-blue-100 transition">
@@ -656,7 +656,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
             </div>
 
             {profitDistribution?.message && (
-              <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm font-medium ${
+              <div className={`mb-6 rounded-xl border px-4 py-3 text-sm font-medium ${
                 canEstimateProfit
                   ? 'border-blue-200 bg-blue-50 text-blue-800'
                   : 'border-amber-200 bg-amber-50 text-amber-800'
@@ -675,25 +675,25 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
             <div className="space-y-6">
 	              {/* PEMODAL SECTION */}
 	              <div>
-                <h4 className="text-xs font-black uppercase text-slate-400 mb-3 tracking-widest">Lingkaran Pemodal (Shahibul Maal)</h4>
+                <h4 className="text-xs font-semibold uppercase text-slate-400 mb-3 tracking-wide">Lingkaran Pemodal (Shahibul Maal)</h4>
                 {pemodalList.length === 0 ? (
                   <p className="text-sm text-slate-400 italic mb-4">Belum ada Pemodal terdaftar.</p>
                 ) : (
                   <div className="space-y-3">
                     {pemodalList.map((m: any) => (
-                      <div key={m.id} className="flex flex-col md:flex-row justify-between p-4 border border-slate-100 rounded-2xl bg-white hover:border-blue-200 group">
+                      <div key={m.id} className="flex flex-col md:flex-row justify-between p-4 border border-slate-100 rounded-xl bg-white hover:border-blue-200 group">
                         <div className="flex-1">
                           <h5 className="font-bold text-slate-800">{m.member_name}</h5>
                           <p className="text-xs text-slate-500 mt-1">{m.responsibility || '-'}</p>
                         </div>
                         <div className="flex flex-row md:flex-col items-center md:items-end justify-between mt-3 md:mt-0 gap-2 md:gap-0">
                           <div className="text-right">
-                            <span className="block text-[10px] uppercase font-black tracking-wider text-emerald-600 mb-1">Setoran Modal / Porsi</span>
+                            <span className="block text-[10px] uppercase font-semibold tracking-wider text-emerald-600 mb-1">Setoran Modal / Porsi</span>
                             <span className="font-bold text-slate-800">{formatRupiah(m.capital_contribution)}</span>
-                            <span className="ml-2 font-black text-rose-500">[{m.profit_share_percentage}%]</span>
+                            <span className="ml-2 font-semibold text-rose-500">[{m.profit_share_percentage}%]</span>
                           </div>
                           <div className="mt-2 text-right">
-                             <span className="block text-[10px] uppercase font-black tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
+                             <span className="block text-[10px] uppercase font-semibold tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
                              {renderEstimatedProfit(m)}
                           </div>
                           <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -709,28 +709,28 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
 
 	              {/* DUAL ROLE SECTION */}
 	              <div>
-	                <h4 className="text-xs font-black uppercase text-slate-400 mb-3 tracking-widest mt-6">Pemodal & Pengelola Sekaligus</h4>
+	                <h4 className="text-xs font-semibold uppercase text-slate-400 mb-3 tracking-wide mt-6">Pemodal & Pengelola Sekaligus</h4>
 	                {dualRoleList.length === 0 ? (
 	                  <p className="text-sm text-slate-400 italic mb-4">Belum ada anggota dengan peran gabungan.</p>
 	                ) : (
 	                  <div className="space-y-3">
 	                    {dualRoleList.map((m: any) => (
-	                      <div key={m.id} className="flex flex-col md:flex-row justify-between p-4 border border-slate-100 rounded-2xl bg-white hover:border-emerald-200 group">
+	                      <div key={m.id} className="flex flex-col md:flex-row justify-between p-4 border border-slate-100 rounded-xl bg-white hover:border-emerald-200 group">
 	                        <div className="flex-1">
 	                          <h5 className="font-bold text-slate-800">{m.member_name}</h5>
-	                          <p className="mt-1 inline-flex rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-black tracking-wide text-emerald-700">
+	                          <p className="mt-1 inline-flex rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-semibold tracking-wide text-emerald-700">
 	                            PEMODAL_PENGELOLA
 	                          </p>
 	                          <p className="text-xs text-slate-500 mt-2">{m.responsibility || '-'}</p>
 	                        </div>
 	                        <div className="flex flex-row md:flex-col items-center md:items-end justify-between mt-3 md:mt-0 gap-2 md:gap-0">
 	                          <div className="text-right">
-	                            <span className="block text-[10px] uppercase font-black tracking-wider text-emerald-600 mb-1">Setoran Modal / Porsi</span>
+	                            <span className="block text-[10px] uppercase font-semibold tracking-wider text-emerald-600 mb-1">Setoran Modal / Porsi</span>
 	                            <span className="font-bold text-slate-800">{formatRupiah(m.capital_contribution)}</span>
-	                            <span className="ml-2 font-black text-rose-500">[{m.profit_share_percentage}%]</span>
+	                            <span className="ml-2 font-semibold text-rose-500">[{m.profit_share_percentage}%]</span>
 	                          </div>
 	                          <div className="mt-2 text-right">
-	                             <span className="block text-[10px] uppercase font-black tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
+	                             <span className="block text-[10px] uppercase font-semibold tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
 	                             {renderEstimatedProfit(m)}
 	                          </div>
 	                          <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -746,24 +746,24 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
 
 	              {/* PENGELOLA SECTION */}
 	              <div>
-                <h4 className="text-xs font-black uppercase text-slate-400 mb-3 tracking-widest mt-6">Lingkaran Pengelola (Mudharib)</h4>
+                <h4 className="text-xs font-semibold uppercase text-slate-400 mb-3 tracking-wide mt-6">Lingkaran Pengelola (Mudharib)</h4>
                 {pengelolaList.length === 0 ? (
                   <p className="text-sm text-slate-400 italic mb-4">Belum ada Pengelola terdaftar.</p>
                 ) : (
                   <div className="space-y-3">
                     {pengelolaList.map((m: any) => (
-                      <div key={m.id} className="flex flex-col md:flex-row justify-between p-4 border border-slate-100 rounded-2xl bg-white hover:border-amber-200 group">
+                      <div key={m.id} className="flex flex-col md:flex-row justify-between p-4 border border-slate-100 rounded-xl bg-white hover:border-amber-200 group">
                         <div className="flex-1">
                           <h5 className="font-bold text-slate-800">{m.member_name}</h5>
                           <p className="text-xs text-slate-500 mt-1">{m.responsibility || '-'}</p>
                         </div>
                         <div className="flex flex-row md:flex-col items-center md:items-end justify-between mt-3 md:mt-0 gap-2 md:gap-0">
                           <div className="text-right">
-                            <span className="block text-[10px] uppercase font-black tracking-wider text-amber-600 mb-1">Porsi Bagi Hasil</span>
-                            <span className="font-black text-rose-500 text-lg">{m.profit_share_percentage}%</span>
+                            <span className="block text-[10px] uppercase font-semibold tracking-wider text-amber-600 mb-1">Porsi Bagi Hasil</span>
+                            <span className="font-semibold text-rose-500 text-lg">{m.profit_share_percentage}%</span>
                           </div>
                           <div className="mt-2 text-right">
-                             <span className="block text-[10px] uppercase font-black tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
+                             <span className="block text-[10px] uppercase font-semibold tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
                              {renderEstimatedProfit(m)}
                           </div>
                           <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -784,7 +784,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
       {/* MEMBER FORM MODAL */}
       {isMemberFormOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[99] flex justify-center items-center p-4 py-16 overflow-y-auto">
-          <div className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl my-auto">
+          <div className="bg-white w-full max-w-lg rounded-xl p-6 shadow-md my-auto">
             <h3 className="font-bold text-xl mb-4">{editingMemberId ? 'Edit Anggota' : 'Tambah Anggota'}</h3>
             <div className="space-y-4">
               <div>
@@ -827,14 +827,14 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
       {/* QR MODAL */}
       {showQR && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex justify-center items-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl relative">
+          <div className="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-md relative">
             <button onClick={() => setShowQR(false)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 hover:bg-slate-200">X</button>
             <div className="text-center mb-6">
               <Handshake size={48} className="mx-auto text-blue-600 mb-3" />
-              <h3 className="font-black text-2xl tracking-tight text-slate-900">Validasi Digital</h3>
+              <h3 className="font-semibold text-2xl tracking-tight text-slate-900">Validasi Digital</h3>
               <p className="text-sm text-slate-500 font-medium">Scan QR di bawah ini untuk melihat dokumen syirkah resmi.</p>
             </div>
-            <div className="flex justify-center p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+            <div className="flex justify-center p-6 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
               <QRCodeSVG value={qrUrl} size={200} level="H" includeMargin={true} />
             </div>
             <div className="mt-6 text-center">

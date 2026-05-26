@@ -89,13 +89,13 @@ export function EditProgramModal({ open, onClose, course }: Props) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+            className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-md"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-100 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
                   <span className="text-lg">✏️</span>
                 </div>
                 <div>

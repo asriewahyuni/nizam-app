@@ -171,29 +171,29 @@ export function BudgetVariancePanel({
   return (
     <div className="space-y-6">
       {/* Overall Summary Card */}
-      <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+      <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 p-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
           {/* Planned */}
           <div className="space-y-1">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Direncanakan</div>
-            <div className="text-2xl font-black tracking-tight text-slate-900">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Direncanakan</div>
+            <div className="text-2xl font-semibold tracking-tight text-slate-900">
               {formatRupiah(overallSummary.plannedTotal)}
             </div>
           </div>
 
           {/* Actual */}
           <div className="space-y-1">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Realisasi</div>
-            <div className="text-2xl font-black tracking-tight text-slate-900">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Realisasi</div>
+            <div className="text-2xl font-semibold tracking-tight text-slate-900">
               {formatRupiah(overallSummary.actualTotal)}
             </div>
           </div>
 
           {/* Variance */}
           <div className="space-y-1">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Varian</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Varian</div>
             <div
-              className={`text-2xl font-black tracking-tight ${
+              className={`text-2xl font-semibold tracking-tight ${
                 overallSummary.varianceTotal >= 0 ? 'text-rose-600' : 'text-emerald-600'
               }`}
             >
@@ -207,8 +207,8 @@ export function BudgetVariancePanel({
 
           {/* Utilization */}
           <div className="space-y-1">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Utilisasi</div>
-            <div className="text-2xl font-black tracking-tight text-slate-900">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Utilisasi</div>
+            <div className="text-2xl font-semibold tracking-tight text-slate-900">
               {overallSummary.utilization.toFixed(0)}%
             </div>
             <div className="mt-2 h-2 rounded-full bg-slate-200 overflow-hidden">
@@ -223,8 +223,8 @@ export function BudgetVariancePanel({
 
           {/* Status */}
           <div className="space-y-1">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Terlampaui</div>
-            <div className="text-2xl font-black tracking-tight text-rose-600">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Terlampaui</div>
+            <div className="text-2xl font-semibold tracking-tight text-rose-600">
               {overallSummary.overBudgetCount}
             </div>
             <div className="text-xs font-semibold text-slate-500">
@@ -237,7 +237,7 @@ export function BudgetVariancePanel({
       {/* Category Breakdown */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-2">
-          <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-400">Per Kategori</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Per Kategori</h3>
         </div>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
           {categorySummaries.map((cat) => (
@@ -246,14 +246,14 @@ export function BudgetVariancePanel({
               onClick={() =>
                 setExpandedCategory(expandedCategory === cat.category ? 'ALL' : (cat.category as FilterCategory))
               }
-              className={`rounded-2xl border-2 p-4 text-left transition-all ${
+              className={`rounded-xl border-2 p-4 text-left transition-all ${
                 expandedCategory === cat.category
                   ? 'border-[#254b63] bg-[#254b63]/5'
                   : 'border-slate-200 bg-slate-50 hover:border-slate-300'
               } ${cat.itemCount === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               disabled={cat.itemCount === 0}
             >
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 {cat.label}
               </div>
               <div className="mt-2 space-y-1">
@@ -276,7 +276,7 @@ export function BudgetVariancePanel({
       </div>
 
       {/* Filter & Sort Controls */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2">
           <Filter size={16} className="text-slate-400" />
           <span className="text-sm font-bold text-slate-600">Filter & Sort</span>
@@ -320,7 +320,7 @@ export function BudgetVariancePanel({
           sortedItems.map((item) => (
             <div
               key={item.id}
-              className={`rounded-2xl border-2 p-4 transition-all ${getStatusColor(item.status)}`}
+              className={`rounded-xl border-2 p-4 transition-all ${getStatusColor(item.status)}`}
             >
               <div className="flex items-start justify-between gap-4">
                 {/* Left: Item Info */}
@@ -329,10 +329,10 @@ export function BudgetVariancePanel({
                     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-current/10">
                       {getStatusIcon(item.status)}
                     </span>
-                    <span className="text-xs font-black uppercase tracking-[0.18em]">
+                    <span className="text-xs font-semibold uppercase tracking-wide">
                       {item.stageName || 'Tanpa Tahap'}
                     </span>
-                    <span className="rounded-full bg-slate-300/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em]">
+                    <span className="rounded-full bg-slate-300/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
                       {item.category}
                     </span>
                   </div>
@@ -346,14 +346,14 @@ export function BudgetVariancePanel({
                 <div className="flex flex-col items-end gap-3">
                   {/* Planned vs Actual */}
                   <div className="text-right space-y-0.5">
-                    <div className="text-[10px] font-semibold text-current/60 uppercase tracking-[0.18em]">
+                    <div className="text-[10px] font-semibold text-current/60 uppercase tracking-wide">
                       Rencana → Realisasi
                     </div>
                     <div className="flex items-baseline gap-2">
                       <span className="text-xs font-bold text-current/70 line-through">
                         {formatRupiah(item.plannedTotal)}
                       </span>
-                      <span className="text-sm font-black text-current">
+                      <span className="text-sm font-semibold text-current">
                         {formatRupiah(item.actualTotal)}
                       </span>
                     </div>
@@ -361,11 +361,11 @@ export function BudgetVariancePanel({
 
                   {/* Variance */}
                   <div className="text-right space-y-0.5">
-                    <div className="text-[10px] font-semibold text-current/60 uppercase tracking-[0.18em]">
+                    <div className="text-[10px] font-semibold text-current/60 uppercase tracking-wide">
                       Varian
                     </div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-sm font-black text-current">
+                      <span className="text-sm font-semibold text-current">
                         {item.variance >= 0 ? '+' : ''}
                         {formatRupiah(item.variance)}
                       </span>

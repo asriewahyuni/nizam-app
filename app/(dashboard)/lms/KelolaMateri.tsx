@@ -143,7 +143,7 @@ export function KelolaMateri({ courseSlug, courseId, lessons: initialLessons }: 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className={`fixed top-4 right-4 z-[60] px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold ${
+            className={`fixed top-4 right-4 z-[60] px-5 py-3 rounded-xl shadow-xl text-sm font-semibold ${
               toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
             }`}
           >
@@ -168,7 +168,7 @@ export function KelolaMateri({ courseSlug, courseId, lessons: initialLessons }: 
 
       {/* Add/Edit form */}
       {(isAdding || editingId) && (
-        <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50/40 p-5 space-y-4">
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50/40 p-5 space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-slate-900">
               {isAdding ? 'Materi Baru' : 'Edit Materi'}
@@ -261,7 +261,7 @@ export function KelolaMateri({ courseSlug, courseId, lessons: initialLessons }: 
 
       {/* Lesson list */}
       {lessons.length === 0 && !isAdding ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center">
+        <div className="rounded-xl border border-dashed border-slate-300 p-5 text-center">
           <BookOpen className="h-10 w-10 text-slate-300 mx-auto" />
           <p className="mt-3 text-sm font-semibold text-slate-500">Belum ada materi</p>
           <p className="text-xs text-slate-400">Klik "Tambah Materi" untuk mulai.</p>

@@ -29,8 +29,8 @@ export default async function SalesPage() {
   ])
 
   return (
-    <div className="p-10 space-y-10">
-      <Suspense fallback={<div className="p-10 text-center font-black animate-pulse">Loading Sales Dashboard...</div>}>
+    <div className="p-5 space-y-10">
+      <Suspense fallback={<div className="p-5 text-center font-semibold animate-pulse">Loading Sales Dashboard...</div>}>
         <SalesClient 
           orgId={orgId}
           orgName={orgName}

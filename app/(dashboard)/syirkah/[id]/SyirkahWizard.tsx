@@ -402,14 +402,14 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                     key={type.value}
                     type="button"
                     onClick={() => setContractType(type.value)}
-                    className={`text-left p-4 rounded-2xl border-2 transition-all ${
+                    className={`text-left p-4 rounded-xl border-2 transition-all ${
                       contractType === type.value
                         ? 'border-blue-500 bg-blue-50 shadow-sm'
                         : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`font-black text-sm ${contractType === type.value ? 'text-blue-700' : 'text-slate-800'}`}>
+                      <span className={`font-semibold text-sm ${contractType === type.value ? 'text-blue-700' : 'text-slate-800'}`}>
                         {type.label}
                       </span>
                       {contractType === type.value && <Check size={16} className="text-blue-600 shrink-0" />}
@@ -438,7 +438,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
             </div>
             {startDate && durationMonths && (
               <div className="px-4 py-3 bg-blue-50 rounded-xl text-sm text-blue-700 font-medium">
-                Akad berakhir pada: <span className="font-black">
+                Akad berakhir pada: <span className="font-semibold">
                   {new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() + durationMonths)).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </span>
               </div>
@@ -474,13 +474,13 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
 
               <div className="space-y-6">
                 {members.map((member, index) => (
-                  <div key={index} className="bg-white border border-slate-200 rounded-2xl p-5 relative">
+                  <div key={index} className="bg-white border border-slate-200 rounded-xl p-5 relative">
                     <div className="flex items-center justify-between mb-4">
-                      <h4 className="font-black text-slate-800">Pihak {index + 1}</h4>
+                      <h4 className="font-semibold text-slate-800">Pihak {index + 1}</h4>
                       <div className="flex items-center gap-2">
                         {/* Role badge — locked jika bukan Mudharabah */}
                         {!isMudharabah(contractType) ? (
-                          <span className={`px-2 py-1 text-xs font-black rounded-lg ${
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-lg ${
                             lockedRole === 'PEMODAL_PENGELOLA' ? 'bg-emerald-100 text-emerald-700' :
                             lockedRole === 'PEMODAL' ? 'bg-blue-100 text-blue-700' :
                             'bg-amber-100 text-amber-700'
@@ -491,7 +491,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                           <select
                             value={member.role}
                             onChange={e => updateMember(index, 'role', e.target.value as any)}
-                            className="px-2 py-1 text-xs font-black rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            className="px-2 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
                           >
                             <option value="PEMODAL">PEMODAL (Shahibul Maal)</option>
                             <option value="PENGELOLA">PENGELOLA (Mudharib)</option>
@@ -537,7 +537,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                 ))}
               </div>
 
-              <button onClick={addMember} className="flex items-center gap-2 w-full py-3 border-2 border-dashed border-slate-300 rounded-2xl text-slate-500 hover:border-blue-400 hover:text-blue-600 transition text-sm font-bold justify-center">
+              <button onClick={addMember} className="flex items-center gap-2 w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-blue-400 hover:text-blue-600 transition text-sm font-bold justify-center">
                 <Plus size={16} /> Tambah Pihak Lain
               </button>
             </StepCard>
@@ -549,13 +549,13 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
           <StepCard title="Tugas & Tanggung Jawab" desc="Uraikan tugas, wewenang, dan tanggung jawab masing-masing pihak." icon={ListTodo}>
             <div className="space-y-5">
               {members.filter(m => m.member_name).map((member, index) => (
-                <div key={index} className="bg-white border border-slate-200 rounded-2xl p-5">
+                <div key={index} className="bg-white border border-slate-200 rounded-xl p-5">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-sm shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm shrink-0">
                       {member.member_name.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <h4 className="font-black text-slate-800">{member.member_name}</h4>
+                      <h4 className="font-semibold text-slate-800">{member.member_name}</h4>
                       <span className={`text-xs font-bold ${isAbdan(contractType) ? 'text-amber-600' : member.role === 'PEMODAL' ? 'text-emerald-600' : 'text-amber-600'}`}>
                         {isAbdan(contractType) ? 'PENGELOLA (Abdan)' : member.role}
                       </span>
@@ -592,11 +592,11 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
 
             <div className="space-y-4">
               {witnesses.map((witness, index) => (
-                <div key={index} className="bg-white border border-slate-200 rounded-2xl p-5">
+                <div key={index} className="bg-white border border-slate-200 rounded-xl p-5">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-black text-slate-800">Saksi {index + 1}</h4>
+                    <h4 className="font-semibold text-slate-800">Saksi {index + 1}</h4>
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 text-xs font-black rounded-lg ${
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-lg ${
                         witness.gender === 'LAKI-LAKI' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'
                       }`}>
                         {witness.gender === 'LAKI-LAKI' ? '♂ L (×1)' : '♀ P (×½)'}
@@ -635,7 +635,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               ))}
             </div>
 
-            <button onClick={addWitness} className="flex items-center gap-2 w-full py-3 border-2 border-dashed border-slate-300 rounded-2xl text-slate-500 hover:border-blue-400 hover:text-blue-600 transition text-sm font-bold justify-center">
+            <button onClick={addWitness} className="flex items-center gap-2 w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-blue-400 hover:text-blue-600 transition text-sm font-bold justify-center">
               <Plus size={16} /> Tambah Saksi
             </button>
 
@@ -663,18 +663,18 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
 
             <div className="space-y-4">
               {members.filter(m => m.member_name).map((member, index) => (
-                <div key={index} className="bg-white border border-slate-200 rounded-2xl p-5">
+                <div key={index} className="bg-white border border-slate-200 rounded-xl p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-xs">
+                      <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-xs">
                         {member.member_name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-black text-slate-800 text-sm">{member.member_name}</p>
+                        <p className="font-semibold text-slate-800 text-sm">{member.member_name}</p>
                         <p className="text-xs text-slate-500">{isAbdan(contractType) ? 'Pengelola' : member.role}</p>
                       </div>
                     </div>
-                    <span className="text-2xl font-black text-blue-600">{member.profit_share_percentage}%</span>
+                    <span className="text-2xl font-semibold text-blue-600">{member.profit_share_percentage}%</span>
                   </div>
                   <input
                     type="range"
@@ -691,7 +691,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               ))}
             </div>
 
-            <div className={`px-5 py-4 rounded-2xl flex items-center justify-between font-black text-lg ${
+            <div className={`px-5 py-4 rounded-xl flex items-center justify-between font-semibold text-lg ${
               totalNisbah === 100 ? 'bg-emerald-50 text-emerald-700' :
               totalNisbah > 100 ? 'bg-rose-50 text-rose-700' :
               'bg-amber-50 text-amber-700'
@@ -710,15 +710,15 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
             )}
 
             {profitSharingAllocation > 0 && members.filter(m => m.member_name).length > 0 && (
-              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h4 className="font-black text-blue-900">Preview Alokasi Nominal</h4>
+                    <h4 className="font-semibold text-blue-900">Preview Alokasi Nominal</h4>
                     <p className="text-sm text-blue-700">
                       Dengan alokasi {formatRupiah(profitSharingAllocation)}, estimasi nominal per syarik menjadi:
                     </p>
                   </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700">
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-700">
                     Basis {formatRupiah(profitSharingAllocation)}
                   </span>
                 </div>
@@ -729,7 +729,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                         <p className="font-bold text-slate-800">{member.member_name}</p>
                         <p className="text-xs font-medium text-slate-500">{member.profit_share_percentage}% nisbah</p>
                       </div>
-                      <span className="font-black text-blue-700">
+                      <span className="font-semibold text-blue-700">
                         {formatRupiah((profitSharingAllocation * Number(member.profit_share_percentage || 0)) / 100)}
                       </span>
                     </div>
@@ -764,7 +764,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               <p className="text-xs text-slate-500 mt-1">{formatRupiah(currentDebt)}</p>
             </Field>
             {debtAllocation > 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-5">
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
                 <div className="flex justify-between text-sm font-bold mb-2">
                   <span className="text-slate-600">Kapasitas Digunakan</span>
                   <span className={Number(currentDebt) / Number(debtAllocation) > 0.8 ? 'text-rose-600' : 'text-slate-700'}>
@@ -786,7 +786,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
         {step === 8 && (
           <StepCard title="Drafting Akad" desc="Review dan edit pasal-pasal akad yang telah digenerate secara otomatis." icon={FileText}>
             {clauses.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl">
+              <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl">
                 <FileText size={48} className="mx-auto text-slate-300 mb-4" />
                 <h4 className="font-bold text-slate-700 mb-2">Pasal belum digenerate</h4>
                 <p className="text-sm text-slate-500 mb-6">Klik tombol di bawah untuk generate pasal-pasal akad berdasarkan data yang telah Anda masukkan.</p>
@@ -804,9 +804,9 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                   <button onClick={handleGenerateClauses} className="text-xs text-blue-600 hover:underline font-bold">Regenerate</button>
                 </div>
                 {clauses.map((clause, idx) => (
-                  <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-5">
+                  <div key={idx} className="bg-white border border-slate-200 rounded-xl p-5">
                     <div className="flex items-center gap-3 mb-3">
-                      <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-black flex items-center justify-center shrink-0">{clause.number}</span>
+                      <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-semibold flex items-center justify-center shrink-0">{clause.number}</span>
                       <input
                         value={clause.title}
                         onChange={e => {
@@ -814,7 +814,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                           next[idx] = { ...clause, title: e.target.value }
                           setClauses(next)
                         }}
-                        className="font-black text-slate-800 text-sm border-b border-transparent hover:border-slate-300 focus:border-blue-400 outline-none flex-1 bg-transparent"
+                        className="font-semibold text-slate-800 text-sm border-b border-transparent hover:border-slate-300 focus:border-blue-400 outline-none flex-1 bg-transparent"
                       />
                     </div>
                     <textarea
@@ -837,23 +837,23 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
         {/* ── STEP 9: Tanda Tangan (was 8) ── */}
         {step === 9 && (
           <StepCard title="Tanda Tangan Digital" desc="Masing-masing pihak dan saksi melakukan tanda tangan digital dengan scan QR Code." icon={QrCode}>
-            <h3 className="font-black text-slate-700 text-sm uppercase tracking-wider">Para Pihak Bersyirkah</h3>
+            <h3 className="font-semibold text-slate-700 text-sm uppercase tracking-wider">Para Pihak Bersyirkah</h3>
             <div className="space-y-4">
               {members.filter(m => m.member_name && m.sign_token).map((member, index) => {
                 const signUrl = `${origin}/syirkah-sign/${member.sign_token}`
                 return (
-                  <div key={index} className={`bg-white border-2 rounded-2xl p-6 text-center ${member.signed_at ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`}>
+                  <div key={index} className={`bg-white border-2 rounded-xl p-6 text-center ${member.signed_at ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`}>
                     <div className="flex items-center justify-between mb-4">
                       <div className="text-left">
-                        <h4 className="font-black text-slate-800">{member.member_name}</h4>
+                        <h4 className="font-semibold text-slate-800">{member.member_name}</h4>
                         <p className="text-xs text-slate-500">{isAbdan(contractType) ? 'Pengelola' : member.role}</p>
                       </div>
                       {member.signed_at ? (
-                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 text-xs font-black rounded-full">
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">
                           <Check size={12} /> Sudah Tandatangan
                         </span>
                       ) : (
-                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-700 text-xs font-black rounded-full">
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
                           Menunggu TTD
                         </span>
                       )}
@@ -876,7 +876,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               })}
             </div>
 
-            <div className="px-5 py-4 bg-blue-50 rounded-2xl text-sm text-blue-700">
+            <div className="px-5 py-4 bg-blue-50 rounded-xl text-sm text-blue-700">
               <p className="font-bold mb-1">Instruksi:</p>
               <ol className="list-decimal list-inside space-y-1 text-xs">
                 <li>Bagikan QR Code kepada masing-masing pihak</li>
@@ -938,10 +938,10 @@ function StepCard({ title, desc, icon: Icon, children }: {
     <div className="flex flex-col gap-6">
       <div>
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-md">
+          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
             <Icon size={20} className="text-white" />
           </div>
-          <h2 className="text-2xl font-black text-slate-900">{title}</h2>
+          <h2 className="text-2xl font-semibold text-slate-900">{title}</h2>
         </div>
         <p className="text-sm text-slate-500 ml-[52px]">{desc}</p>
       </div>
@@ -955,7 +955,7 @@ function Field({ label, children, required, hint }: {
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-black text-slate-600 uppercase tracking-wider">
+      <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
         {label} {required && <span className="text-rose-500">*</span>}
       </label>
       {hint && <p className="text-xs text-slate-400 -mt-0.5 mb-1">{hint}</p>}

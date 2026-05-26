@@ -280,7 +280,7 @@ const STARS = [
 
 
 // ─── Input style helper ───────────────────────────────────────────────────────
-const inputCls = 'w-full rounded-2xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-blue-400 dark:focus:border-blue-500'
+const inputCls = 'w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-blue-400 dark:focus:border-blue-500'
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -598,19 +598,19 @@ export function KaryawanClient({
     if (gps.status === 'loading') return (
       <div className="flex items-center gap-1.5 bg-amber-500/20 border border-amber-400/30 px-2.5 py-1 rounded-full">
         <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-        <span className="text-[10px] font-black text-amber-200 uppercase tracking-wider">Cari GPS…</span>
+        <span className="text-[10px] font-semibold text-amber-200 uppercase tracking-wider">Cari GPS…</span>
       </div>
     )
     if (gps.status === 'ok') return (
       <div className="flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-400/30 px-2.5 py-1 rounded-full">
         <LocateFixed size={10} className="text-emerald-300" />
-        <span className="text-[10px] font-black text-emerald-200 uppercase tracking-wider">GPS Aktif</span>
+        <span className="text-[10px] font-semibold text-emerald-200 uppercase tracking-wider">GPS Aktif</span>
       </div>
     )
     return (
       <div className="flex items-center gap-1.5 bg-rose-500/20 border border-rose-400/30 px-2.5 py-1 rounded-full">
         <AlertTriangle size={10} className="text-rose-300" />
-        <span className="text-[10px] font-black text-rose-200 uppercase tracking-wider">GPS Off</span>
+        <span className="text-[10px] font-semibold text-rose-200 uppercase tracking-wider">GPS Off</span>
       </div>
     )
   }
@@ -749,20 +749,20 @@ export function KaryawanClient({
                         <div className="flex items-center gap-2">
                           {employee?.job_title && (
                             <div className="bg-white/10 backdrop-blur-sm border border-white/20 px-2.5 py-1 rounded-xl">
-                              <span className="text-[10px] font-black text-white/85 uppercase tracking-widest">{employee.job_title}</span>
+                              <span className="text-[10px] font-semibold text-white/85 uppercase tracking-wide">{employee.job_title}</span>
                             </div>
                           )}
                           <GpsBadge />
                         </div>
                         <div className="flex items-center gap-2">
                           {weather ? (
-                            <div className="flex items-center gap-1.5 bg-black/25 backdrop-blur-sm border border-white/15 px-3 py-1.5 rounded-2xl">
+                            <div className="flex items-center gap-1.5 bg-black/25 backdrop-blur-sm border border-white/15 px-3 py-1.5 rounded-xl">
                               <weather.Icon size={13} className="text-white" />
-                              <span className="text-[13px] font-black text-white tabular-nums">{weather.temp}°C</span>
+                              <span className="text-[13px] font-semibold text-white tabular-nums">{weather.temp}°C</span>
                               <span className="text-[10px] font-bold text-white/70">{weather.label}</span>
                             </div>
                           ) : (
-                            <div className="w-24 h-7 bg-white/10 rounded-2xl animate-pulse" />
+                            <div className="w-24 h-7 bg-white/10 rounded-xl animate-pulse" />
                           )}
                           <button type="button" onClick={() => setSheet('settings')}
                             className="w-8 h-8 rounded-full bg-black/25 border border-white/15 flex items-center justify-center cursor-pointer hover:bg-black/40 active:scale-95 transition-all">
@@ -773,11 +773,11 @@ export function KaryawanClient({
 
                       {/* Row 2: Jam + Tanggal + Greeting */}
                       <div>
-                        <p suppressHydrationWarning className="text-[44px] leading-none font-black text-white tracking-tight font-mono tabular-nums drop-shadow-lg">
+                        <p suppressHydrationWarning className="text-[44px] leading-none font-semibold text-white tracking-tight font-mono tabular-nums drop-shadow-lg">
                           {clockStr}
                         </p>
                         <p suppressHydrationWarning className="text-[11px] text-white/65 font-bold mt-1 tracking-wider capitalize">{dateStr}</p>
-                        <p suppressHydrationWarning className="text-[14px] font-black text-white mt-3 drop-shadow">
+                        <p suppressHydrationWarning className="text-[14px] font-semibold text-white mt-3 drop-shadow">
                           {greeting}, {firstName} 👋
                         </p>
                         {weather && (
@@ -792,7 +792,7 @@ export function KaryawanClient({
 
                     {/* Avatar — di luar inner clip, tidak terpotong */}
                     <div className="absolute right-5 bottom-0 translate-y-1/2 z-40">
-                      <div className="w-20 h-20 rounded-full ring-4 ring-slate-50 dark:ring-slate-900 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-xl overflow-hidden">
+                      <div className="w-20 h-20 rounded-full ring-4 ring-slate-50 dark:ring-slate-900 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-2xl shadow-xl overflow-hidden">
                         {currentAvatarUrl
                           ? <img src={currentAvatarUrl} alt={name} className="w-full h-full object-cover" />
                           : initials}
@@ -804,7 +804,7 @@ export function KaryawanClient({
                   <div className="px-5 pt-5 pb-4 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
                     <div className="flex items-end justify-between gap-3">
                       <div className="min-w-0">
-                        <h1 className="text-xl font-black text-slate-900 dark:text-white leading-tight truncate">{name}</h1>
+                        <h1 className="text-xl font-semibold text-slate-900 dark:text-white leading-tight truncate">{name}</h1>
                         <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate">
                           {employee?.job_title || 'Karyawan'}
                           {employee?.branch?.name && <span className="text-slate-400 dark:text-slate-500"> · {employee.branch.name}</span>}
@@ -825,7 +825,7 @@ export function KaryawanClient({
                     <button
                       type="button"
                       onClick={() => setTab('presensi')}
-                      className="w-full text-left bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-md overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+                      className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-md overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
                     >
                       <div className={`px-5 py-3 flex items-center justify-between ${
                         todayAtt?.check_in && todayAtt?.check_out
@@ -839,9 +839,9 @@ export function KaryawanClient({
                             todayAtt?.check_in && todayAtt?.check_out ? 'text-emerald-600'
                             : todayAtt?.check_in ? 'text-sky-600' : 'text-slate-400'
                           } />
-                          <span className="text-[11px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">Presensi Hari Ini</span>
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Presensi Hari Ini</span>
                         </div>
-                        <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${todayAtt ? statusBadge(todayAtt.status) : 'bg-slate-100 dark:bg-slate-700 text-slate-500'}`}>
+                        <span className={`text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${todayAtt ? statusBadge(todayAtt.status) : 'bg-slate-100 dark:bg-slate-700 text-slate-500'}`}>
                           {todayAtt?.status || 'Belum Absen'}
                         </span>
                       </div>
@@ -852,8 +852,8 @@ export function KaryawanClient({
                           { label: 'Keluar', value: todayAtt?.check_out ? fmt(todayAtt.check_out) : '--:--', color: 'text-sky-600' },
                         ].map(({ label, value, color }) => (
                           <div key={label} className="py-4 text-center">
-                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">{label}</p>
-                            <p className={`text-2xl font-black tabular-nums ${value === '--:--' ? 'text-slate-300 dark:text-slate-600' : color}`}>{value}</p>
+                            <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 mb-1">{label}</p>
+                            <p className={`text-2xl font-semibold tabular-nums ${value === '--:--' ? 'text-slate-300 dark:text-slate-600' : color}`}>{value}</p>
                           </div>
                         ))}
                       </div>
@@ -864,21 +864,21 @@ export function KaryawanClient({
                         : 'bg-gradient-to-r from-blue-600 to-indigo-600'
                       }`}>
                         {todayAtt?.check_in && todayAtt?.check_out ? (
-                          <><CheckCircle2 size={16} className="text-white" strokeWidth={2.5} /><span className="text-[12px] font-black uppercase tracking-widest text-white">Absensi Selesai</span></>
+                          <><CheckCircle2 size={16} className="text-white" strokeWidth={2.5} /><span className="text-[12px] font-semibold uppercase tracking-wide text-white">Absensi Selesai</span></>
                         ) : todayAtt?.check_in ? (
-                          <><LogOut size={16} className="text-white" strokeWidth={2.5} /><span className="text-[12px] font-black uppercase tracking-widest text-white">Absen Keluar →</span></>
+                          <><LogOut size={16} className="text-white" strokeWidth={2.5} /><span className="text-[12px] font-semibold uppercase tracking-wide text-white">Absen Keluar →</span></>
                         ) : (
-                          <><Fingerprint size={16} className="text-white" strokeWidth={2.5} /><span className="text-[12px] font-black uppercase tracking-widest text-white">Absen Sekarang →</span></>
+                          <><Fingerprint size={16} className="text-white" strokeWidth={2.5} /><span className="text-[12px] font-semibold uppercase tracking-wide text-white">Absen Sekarang →</span></>
                         )}
                       </div>
                     </button>
 
                     {/* ── Jadwal Sholat ── */}
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
                       <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-slate-50 dark:border-slate-700">
                         <div className="flex items-center gap-2">
                           <Moon size={15} className="text-indigo-500" />
-                          <p className="text-[11px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">Jadwal Sholat</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Jadwal Sholat</p>
                         </div>
                         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
                           {gps.status === 'ok' ? `${gps.lat.toFixed(2)}°, ${gps.lng.toFixed(2)}°` : 'Jakarta · WIB'}
@@ -915,12 +915,12 @@ export function KaryawanClient({
                                     {p.name}
                                   </span>
                                   {isNext && (
-                                    <span className="text-[9px] font-black bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                    <span className="text-[9px] font-semibold bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
                                       Berikutnya
                                     </span>
                                   )}
                                 </div>
-                                <span className={`text-sm font-black tabular-nums ${isNext ? 'text-indigo-700 dark:text-indigo-300' : isPast ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300'}`}>
+                                <span className={`text-sm font-semibold tabular-nums ${isNext ? 'text-indigo-700 dark:text-indigo-300' : isPast ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300'}`}>
                                   {p.time}
                                 </span>
                               </div>
@@ -938,11 +938,11 @@ export function KaryawanClient({
                         { label: 'Slip Gaji',      tab: 'gaji'      as Tab, Icon: Wallet,       color: 'text-violet-600 bg-violet-50 dark:bg-violet-900/40' },
                       ].map(({ label, tab: t, Icon, color }) => (
                         <button key={t} type="button" onClick={() => handleTabChange(t)}
-                          className="relative bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all">
+                          className="relative bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 flex flex-col items-center gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all">
                           <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center ${!hasActiveSession ? 'opacity-35' : ''}`}>
                             <Icon size={18} />
                           </div>
-                          <span className={`text-[10px] font-black text-center leading-tight ${!hasActiveSession ? 'text-slate-300 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300'}`}>{label}</span>
+                          <span className={`text-[10px] font-semibold text-center leading-tight ${!hasActiveSession ? 'text-slate-300 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300'}`}>{label}</span>
                           {!hasActiveSession && (
                             <div className="absolute top-1.5 right-1.5">
                               <Lock size={10} className="text-slate-300 dark:text-slate-600" />
@@ -960,29 +960,29 @@ export function KaryawanClient({
               {tab === 'presensi' && (
                 <motion.div key="presensi" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4 px-4 pt-5">
 
-                  <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Hari Ini</p>
+                  <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3">Hari Ini</p>
                     <div className="grid grid-cols-3 gap-3 mb-4">
                       {[
                         { label: 'Status', value: todayAtt?.status || '—' },
                         { label: 'Masuk',  value: todayAtt?.check_in  ? fmt(todayAtt.check_in)  : '--:--' },
                         { label: 'Keluar', value: todayAtt?.check_out ? fmt(todayAtt.check_out) : '--:--' },
                       ].map(({ label, value }) => (
-                        <div key={label} className="rounded-2xl bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 px-3 py-3 text-center">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">{label}</p>
-                          <p className="text-sm font-black text-slate-900 dark:text-white leading-tight">{value}</p>
+                        <div key={label} className="rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 px-3 py-3 text-center">
+                          <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">{label}</p>
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">{value}</p>
                         </div>
                       ))}
                     </div>
 
                     {gps.status === 'error' && (
-                      <div className="flex items-center gap-2 bg-rose-50 dark:bg-rose-900/30 border border-rose-100 dark:border-rose-800 rounded-2xl px-4 py-2.5 mb-3">
+                      <div className="flex items-center gap-2 bg-rose-50 dark:bg-rose-900/30 border border-rose-100 dark:border-rose-800 rounded-xl px-4 py-2.5 mb-3">
                         <AlertTriangle size={14} className="text-rose-500 shrink-0" />
                         <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400">{gps.msg}</p>
                       </div>
                     )}
                     {gps.status === 'ok' && (
-                      <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800 rounded-2xl px-4 py-2 mb-3">
+                      <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800 rounded-xl px-4 py-2 mb-3">
                         <LocateFixed size={13} className="text-emerald-500 shrink-0" />
                         <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
                           GPS · {gps.lat.toFixed(4)}, {gps.lng.toFixed(4)}
@@ -1001,23 +1001,23 @@ export function KaryawanClient({
                       <button type="button"
                         disabled={clockLoading || (!!todayAtt?.check_in && !todayAtt?.check_out) || gps.status !== 'ok'}
                         onClick={() => handleClock('IN')}
-                        className="flex flex-col items-center justify-center gap-1.5 py-5 rounded-2xl bg-emerald-500 text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-emerald-600 shadow-lg shadow-emerald-200 dark:shadow-none"
+                        className="flex flex-col items-center justify-center gap-1.5 py-5 rounded-xl bg-emerald-500 text-white font-semibold text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-emerald-600 shadow-lg shadow-emerald-200 dark:shadow-none"
                       >
                         {clockLoading ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <LogIn size={22} strokeWidth={2.5} />}
-                        <span className="text-[12px] font-black uppercase tracking-widest">Clock In</span>
+                        <span className="text-[12px] font-semibold uppercase tracking-wide">Clock In</span>
                       </button>
                       <button type="button"
                         disabled={clockLoading || !todayAtt?.check_in || !!todayAtt?.check_out || gps.status !== 'ok'}
                         onClick={() => handleClock('OUT')}
-                        className="flex flex-col items-center justify-center gap-1.5 py-5 rounded-2xl bg-sky-500 text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-sky-600 shadow-lg shadow-sky-200 dark:shadow-none"
+                        className="flex flex-col items-center justify-center gap-1.5 py-5 rounded-xl bg-sky-500 text-white font-semibold text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-sky-600 shadow-lg shadow-sky-200 dark:shadow-none"
                       >
                         {clockLoading ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <LogOut size={22} strokeWidth={2.5} />}
-                        <span className="text-[12px] font-black uppercase tracking-widest">Clock Out</span>
+                        <span className="text-[12px] font-semibold uppercase tracking-wide">Clock Out</span>
                       </button>
                     </div>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm">
+                  <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm">
                     {/* Ringkasan bulan berjalan */}
                     {(() => {
                       const nowM = new Date().getMonth()
@@ -1029,11 +1029,11 @@ export function KaryawanClient({
                       return (
                         <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-50 dark:border-slate-700">
                           <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Riwayat Presensi</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Riwayat Presensi</p>
                             <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">{bulanLabel}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">{thisMonthRecords.length}</p>
+                            <p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{thisMonthRecords.length}</p>
                             <p className="text-[10px] font-bold text-slate-400">hari hadir</p>
                           </div>
                         </div>
@@ -1056,7 +1056,7 @@ export function KaryawanClient({
                                 </p>
                               )}
                             </div>
-                            <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg ${statusBadge(r.status)}`}>{r.status}</span>
+                            <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-lg ${statusBadge(r.status)}`}>{r.status}</span>
                           </div>
                         ))}
                       </div>
@@ -1069,44 +1069,44 @@ export function KaryawanClient({
               {/* ═══ CUTI ═══ */}
               {tab === 'cuti' && (
                 <motion.div key="cuti" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4 px-4 pt-5">
-                  <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm space-y-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Ajukan Cuti</p>
+                  <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm space-y-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Ajukan Cuti</p>
                     <select value={leaveType} onChange={e => setLeaveType(e.target.value)} className={inputCls}>
                       {['Annual Leave','Sick Leave','Emergency Leave','Unpaid Leave','Maternity Leave'].map(t => <option key={t}>{t}</option>)}
                     </select>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Mulai</label>
+                        <label className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Mulai</label>
                         <input type="date" value={leaveStart} onChange={e => setLeaveStart(e.target.value)} className={inputCls} />
                       </div>
                       <div>
-                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Selesai</label>
+                        <label className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Selesai</label>
                         <input type="date" value={leaveEnd} onChange={e => setLeaveEnd(e.target.value)} className={inputCls} />
                       </div>
                     </div>
                     <textarea value={leaveReason} onChange={e => setLeaveReason(e.target.value)} placeholder="Alasan pengajuan cuti…" rows={3} className={`${inputCls} resize-none`} />
                     <button type="button" disabled={leaveLoading || !leaveReason.trim()} onClick={handleLeave}
-                      className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-blue-600 text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-blue-700">
+                      className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-blue-600 text-white font-semibold text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-blue-700">
                       {leaveLoading ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <CalendarDays size={16} />}
                       Kirim Pengajuan
                     </button>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Riwayat Cuti</p>
+                  <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3">Riwayat Cuti</p>
                     {leaves.length === 0
                       ? <p className="text-sm text-slate-400 text-center py-4">Belum ada pengajuan.</p>
                       : <div className="space-y-2">{leaves.map((l: any) => (
                         <div key={l.id} className="py-3 border-b border-slate-50 dark:border-slate-700 last:border-0">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <p className="text-xs font-black text-slate-800 dark:text-slate-200">{l.leave_type}</p>
+                              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{l.leave_type}</p>
                               <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{fmtDate(l.start_date)} – {fmtDate(l.end_date)}</p>
                               {l.reason && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 line-clamp-1">{l.reason}</p>}
                             </div>
                             <div className="flex flex-col items-end gap-1.5 shrink-0">
-                              <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg ${approvalBadge(l.status)}`}>{l.status}</span>
+                              <span className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-1 rounded-lg ${approvalBadge(l.status)}`}>{l.status}</span>
                               {l.status === 'PENDING' && (
-                                <button type="button" onClick={() => handleCancelLeave(l.id)} className="text-[9px] font-black text-slate-400 hover:text-rose-500 cursor-pointer transition-colors">Batalkan</button>
+                                <button type="button" onClick={() => handleCancelLeave(l.id)} className="text-[9px] font-semibold text-slate-400 hover:text-rose-500 cursor-pointer transition-colors">Batalkan</button>
                               )}
                             </div>
                           </div>
@@ -1120,15 +1120,15 @@ export function KaryawanClient({
               {/* ═══ REIMBURSE ═══ */}
               {tab === 'reimburse' && (
                 <motion.div key="reimburse" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4 px-4 pt-5">
-                  <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm space-y-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Klaim Reimburse</p>
+                  <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm space-y-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Klaim Reimburse</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Tanggal</label>
+                        <label className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Tanggal</label>
                         <input type="date" value={claimDate} onChange={e => setClaimDate(e.target.value)} className={inputCls} />
                       </div>
                       <div>
-                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Kategori</label>
+                        <label className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Kategori</label>
                         <select value={claimCategory} onChange={e => setClaimCategory(e.target.value)} className={inputCls}>
                           {['Transport','Meal','Accommodation','Medical','Communication','Others'].map(c => <option key={c}>{c}</option>)}
                         </select>
@@ -1138,31 +1138,31 @@ export function KaryawanClient({
                     <textarea value={claimDesc} onChange={e => setClaimDesc(e.target.value)} placeholder="Deskripsi pengeluaran…" rows={2} className={`${inputCls} resize-none`} />
                     <input ref={receiptInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadReceipt(f) }} />
                     <button type="button" onClick={() => receiptInputRef.current?.click()}
-                      className="w-full py-3 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-colors cursor-pointer">
+                      className="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-600 flex items-center justify-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-colors cursor-pointer">
                       {receiptUploading ? <div className="w-4 h-4 border-2 border-slate-400/40 border-t-slate-400 rounded-full animate-spin" /> : <ImageIcon size={16} />}
                       {claimReceiptUrl ? 'Ganti Nota' : receiptUploading ? 'Mengupload…' : 'Upload Nota'}
                     </button>
-                    {claimReceiptPreview && <img src={claimReceiptPreview} alt="nota" className="w-full h-28 object-cover rounded-2xl border border-slate-100 dark:border-slate-700" />}
+                    {claimReceiptPreview && <img src={claimReceiptPreview} alt="nota" className="w-full h-28 object-cover rounded-xl border border-slate-100 dark:border-slate-700" />}
                     <button type="button" disabled={claimLoading || !claimAmount || !claimDesc} onClick={handleClaim}
-                      className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-emerald-600 text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-emerald-700">
+                      className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-emerald-600 text-white font-semibold text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-emerald-700">
                       {claimLoading ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <ReceiptText size={16} />}
                       Kirim Klaim
                     </button>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Riwayat Klaim</p>
+                  <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-5 shadow-sm">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-3">Riwayat Klaim</p>
                     {claims.length === 0
                       ? <p className="text-sm text-slate-400 text-center py-4">Belum ada klaim.</p>
                       : <div className="space-y-2">{claims.map((c: any) => (
                         <div key={c.id} className="py-3 border-b border-slate-50 dark:border-slate-700 last:border-0">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <p className="text-xs font-black text-slate-800 dark:text-slate-200">{c.category} — {formatRupiah(c.amount)}</p>
+                              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{c.category} — {formatRupiah(c.amount)}</p>
                               <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{fmtDate(c.claim_date)}</p>
                               {c.description && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 line-clamp-1">{c.description}</p>}
                             </div>
                             <div className="flex flex-col items-end gap-1.5 shrink-0">
-                              <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg ${approvalBadge(c.status)}`}>{c.status}</span>
+                              <span className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-1 rounded-lg ${approvalBadge(c.status)}`}>{c.status}</span>
                               {['PENDING','REJECTED'].includes(c.status) && (
                                 <button type="button" onClick={() => handleDeleteClaim(c.id)} className="text-rose-400 hover:text-rose-600 cursor-pointer transition-colors">
                                   <Trash2 size={12} />
@@ -1181,7 +1181,7 @@ export function KaryawanClient({
               {tab === 'gaji' && (
                 <motion.div key="gaji" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4 px-4 pt-5">
                   {payslips.length === 0 ? (
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 p-10 text-center shadow-sm">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-5 text-center shadow-sm">
                       <Wallet size={32} className="text-slate-300 dark:text-slate-600 mx-auto mb-3" />
                       <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Belum ada slip gaji.</p>
                     </div>
@@ -1196,15 +1196,15 @@ export function KaryawanClient({
                         ? new Date(run.period_start).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
                         : fmtDate(slip.created_at)
                       return (
-                        <div key={slip.id} className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                        <div key={slip.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
                           <button type="button" onClick={() => setExpandedSlip(isOpen ? null : slip.id)}
                             className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                             <div className="text-left">
-                              <p className="text-sm font-black text-slate-900 dark:text-white">{period}</p>
+                              <p className="text-sm font-semibold text-slate-900 dark:text-white">{period}</p>
                               <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-0.5">Take Home: {formatRupiah(slip.net_salary)}</p>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg ${slip.payment_status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{slip.payment_status}</span>
+                              <span className={`text-[9px] font-semibold uppercase px-2 py-1 rounded-lg ${slip.payment_status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{slip.payment_status}</span>
                               {isOpen ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
                             </div>
                           </button>
@@ -1217,37 +1217,37 @@ export function KaryawanClient({
                                   { label: 'Potongan',    value: formatRupiah(slip.total_deductions), color: 'text-rose-600' },
                                   { label: 'Take Home',   value: formatRupiah(slip.net_salary),       color: 'text-emerald-600' },
                                 ].map(({ label, value, color }) => (
-                                  <div key={label} className="bg-slate-50 dark:bg-slate-700 rounded-2xl p-3">
-                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">{label}</p>
-                                    <p className={`text-sm font-black ${color}`}>{value}</p>
+                                  <div key={label} className="bg-slate-50 dark:bg-slate-700 rounded-xl p-3">
+                                    <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">{label}</p>
+                                    <p className={`text-sm font-semibold ${color}`}>{value}</p>
                                   </div>
                                 ))}
                               </div>
                               {earnings.length > 0 && (
                                 <div>
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1.5">Pendapatan</p>
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 mb-1.5">Pendapatan</p>
                                   {earnings.map((l: any) => (
                                     <div key={l.id} className="flex justify-between py-1.5 border-b border-slate-50 dark:border-slate-700 last:border-0">
                                       <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{l.component_name}</p>
-                                      <p className="text-xs font-black text-emerald-600">+{formatRupiah(l.amount)}</p>
+                                      <p className="text-xs font-semibold text-emerald-600">+{formatRupiah(l.amount)}</p>
                                     </div>
                                   ))}
                                 </div>
                               )}
                               {deductions.length > 0 && (
                                 <div>
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-600 mb-1.5">Potongan</p>
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-600 mb-1.5">Potongan</p>
                                   {deductions.map((l: any) => (
                                     <div key={l.id} className="flex justify-between py-1.5 border-b border-slate-50 dark:border-slate-700 last:border-0">
                                       <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">{l.component_name}</p>
-                                      <p className="text-xs font-black text-rose-600">-{formatRupiah(l.amount)}</p>
+                                      <p className="text-xs font-semibold text-rose-600">-{formatRupiah(l.amount)}</p>
                                     </div>
                                   ))}
                                 </div>
                               )}
                               <div className="flex justify-between items-center pt-2 border-t-2 border-slate-200 dark:border-slate-600">
-                                <p className="text-sm font-black text-slate-900 dark:text-white">Take Home Pay</p>
-                                <p className="text-base font-black text-emerald-600">{formatRupiah(slip.net_salary)}</p>
+                                <p className="text-sm font-semibold text-slate-900 dark:text-white">Take Home Pay</p>
+                                <p className="text-base font-semibold text-emerald-600">{formatRupiah(slip.net_salary)}</p>
                               </div>
                             </div>
                           )}
@@ -1296,14 +1296,14 @@ export function KaryawanClient({
                             </div>
                           )}
                         </div>
-                        <span className="text-[9px] font-black uppercase tracking-wide">{label}</span>
+                        <span className="text-[9px] font-semibold uppercase tracking-wide">{label}</span>
                         {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />}
                       </button>
                     )
                   })}
 
                   <div className="flex-1 flex flex-col items-center justify-end pb-1.5">
-                    <span className={`text-[9px] font-black uppercase tracking-wide ${tab === 'presensi' ? 'text-blue-600' : 'text-slate-400 dark:text-slate-500'}`}>
+                    <span className={`text-[9px] font-semibold uppercase tracking-wide ${tab === 'presensi' ? 'text-blue-600' : 'text-slate-400 dark:text-slate-500'}`}>
                       Presensi
                     </span>
                   </div>
@@ -1322,7 +1322,7 @@ export function KaryawanClient({
                             </div>
                           )}
                         </div>
-                        <span className="text-[9px] font-black uppercase tracking-wide">{label}</span>
+                        <span className="text-[9px] font-semibold uppercase tracking-wide">{label}</span>
                         {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />}
                       </button>
                     )
@@ -1358,7 +1358,7 @@ export function KaryawanClient({
                     transition={{ type: 'spring', damping: 30, stiffness: 300 }}
                     className="fixed bottom-0 left-0 right-0 z-[210] max-w-md mx-auto"
                   >
-                    <div className="bg-white dark:bg-slate-800 rounded-t-3xl shadow-2xl pb-safe">
+                    <div className="bg-white dark:bg-slate-800 rounded-t-3xl shadow-md pb-safe">
                       {/* Handle */}
                       <div className="flex justify-center pt-3 pb-1">
                         <div className="w-10 h-1 bg-slate-200 dark:bg-slate-600 rounded-full" />
@@ -1366,7 +1366,7 @@ export function KaryawanClient({
 
                       <div className="px-5 pb-8 pt-2">
                         <div className="flex items-center justify-between mb-5">
-                          <h2 className="text-lg font-black text-slate-900 dark:text-white">Pengaturan</h2>
+                          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Pengaturan</h2>
                           <button type="button" onClick={() => setSheet(null)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
                             <X size={16} className="text-slate-600 dark:text-slate-300" />
                           </button>
@@ -1374,7 +1374,7 @@ export function KaryawanClient({
 
                         <div className="space-y-2">
                           {/* Dark mode toggle */}
-                          <div className="flex items-center justify-between px-4 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-700">
+                          <div className="flex items-center justify-between px-4 py-3.5 rounded-xl bg-slate-50 dark:bg-slate-700">
                             <div className="flex items-center gap-3">
                               {darkMode
                                 ? <Moon size={18} className="text-indigo-500" />
@@ -1395,7 +1395,7 @@ export function KaryawanClient({
 
                           {/* Edit Profil */}
                           <button type="button" onClick={() => setSheet('edit-profile')}
-                            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors cursor-pointer">
+                            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors cursor-pointer">
                             <User size={18} className="text-blue-500" />
                             <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Edit Profil</span>
                             <ChevronDown size={16} className="text-slate-400 ml-auto -rotate-90" />
@@ -1403,7 +1403,7 @@ export function KaryawanClient({
 
                           {/* Ganti Password */}
                           <button type="button" onClick={() => setSheet('change-password')}
-                            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors cursor-pointer">
+                            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors cursor-pointer">
                             <Lock size={18} className="text-emerald-500" />
                             <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Ganti Password</span>
                             <ChevronDown size={16} className="text-slate-400 ml-auto -rotate-90" />
@@ -1411,7 +1411,7 @@ export function KaryawanClient({
 
                           {/* Logout */}
                           <button type="button" onClick={handleLogout} disabled={logoutLoading}
-                            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors cursor-pointer disabled:opacity-60">
+                            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors cursor-pointer disabled:opacity-60">
                             {logoutLoading
                               ? <div className="w-[18px] h-[18px] border-2 border-rose-400/40 border-t-rose-500 rounded-full animate-spin" />
                               : <LogOut size={18} className="text-rose-500" />
@@ -1434,7 +1434,7 @@ export function KaryawanClient({
                     transition={{ type: 'spring', damping: 30, stiffness: 300 }}
                     className="fixed bottom-0 left-0 right-0 z-[210] max-w-md mx-auto"
                   >
-                    <div className="bg-white dark:bg-slate-800 rounded-t-3xl shadow-2xl pb-safe">
+                    <div className="bg-white dark:bg-slate-800 rounded-t-3xl shadow-md pb-safe">
                       <div className="flex justify-center pt-3 pb-1">
                         <div className="w-10 h-1 bg-slate-200 dark:bg-slate-600 rounded-full" />
                       </div>
@@ -1444,13 +1444,13 @@ export function KaryawanClient({
                           <button type="button" onClick={() => setSheet('settings')} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
                             <ChevronDown size={16} className="text-slate-600 dark:text-slate-300 rotate-90" />
                           </button>
-                          <h2 className="text-lg font-black text-slate-900 dark:text-white">Edit Profil</h2>
+                          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Edit Profil</h2>
                         </div>
 
                         {/* Avatar picker */}
                         <div className="flex flex-col items-center mb-6">
                           <div className="relative">
-                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-2xl overflow-hidden ring-4 ring-slate-100 dark:ring-slate-700">
+                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-2xl overflow-hidden ring-4 ring-slate-100 dark:ring-slate-700">
                               {(editAvatarPreview || editAvatarUrl)
                                 ? <img src={editAvatarPreview || editAvatarUrl!} alt="avatar" className="w-full h-full object-cover" />
                                 : initials
@@ -1470,15 +1470,15 @@ export function KaryawanClient({
 
                         <div className="space-y-3">
                           <div>
-                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Nama Depan</label>
+                            <label className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Nama Depan</label>
                             <input value={editFirstName} onChange={e => setEditFirstName(e.target.value)} placeholder="Nama depan" className={inputCls} />
                           </div>
                           <div>
-                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Nama Belakang</label>
+                            <label className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Nama Belakang</label>
                             <input value={editLastName} onChange={e => setEditLastName(e.target.value)} placeholder="Nama belakang (opsional)" className={inputCls} />
                           </div>
                           <button type="button" disabled={editLoading || !editFirstName.trim()} onClick={handleUpdateProfile}
-                            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-blue-600 text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-blue-700 mt-2">
+                            className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-blue-600 text-white font-semibold text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-blue-700 mt-2">
                             {editLoading ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <User size={16} />}
                             Simpan Profil
                           </button>
@@ -1498,7 +1498,7 @@ export function KaryawanClient({
                     transition={{ type: 'spring', damping: 30, stiffness: 300 }}
                     className="fixed bottom-0 left-0 right-0 z-[210] max-w-md mx-auto"
                   >
-                    <div className="bg-white dark:bg-slate-800 rounded-t-3xl shadow-2xl pb-safe">
+                    <div className="bg-white dark:bg-slate-800 rounded-t-3xl shadow-md pb-safe">
                       <div className="flex justify-center pt-3 pb-1">
                         <div className="w-10 h-1 bg-slate-200 dark:bg-slate-600 rounded-full" />
                       </div>
@@ -1508,12 +1508,12 @@ export function KaryawanClient({
                           <button type="button" onClick={() => setSheet('settings')} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
                             <ChevronDown size={16} className="text-slate-600 dark:text-slate-300 rotate-90" />
                           </button>
-                          <h2 className="text-lg font-black text-slate-900 dark:text-white">Ganti Password</h2>
+                          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Ganti Password</h2>
                         </div>
 
                         <div className="space-y-3">
                           <div>
-                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Password Baru</label>
+                            <label className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Password Baru</label>
                             <div className="relative">
                               <input
                                 type={showNewPwd ? 'text' : 'password'}
@@ -1529,7 +1529,7 @@ export function KaryawanClient({
                             </div>
                           </div>
                           <div>
-                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Konfirmasi Password</label>
+                            <label className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 block mb-1.5 ml-1">Konfirmasi Password</label>
                             <div className="relative">
                               <input
                                 type={showConPwd ? 'text' : 'password'}
@@ -1550,7 +1550,7 @@ export function KaryawanClient({
                           <button type="button"
                             disabled={pwdLoading || newPwd.length < 8 || newPwd !== confirmPwd}
                             onClick={handleChangePassword}
-                            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-emerald-600 text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-emerald-700 mt-2">
+                            className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-emerald-600 text-white font-semibold text-sm disabled:opacity-40 active:scale-95 transition-all cursor-pointer hover:bg-emerald-700 mt-2">
                             {pwdLoading ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Lock size={16} />}
                             Simpan Password
                           </button>
@@ -1570,7 +1570,7 @@ export function KaryawanClient({
                 initial={{ opacity: 0, y: 20, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] flex items-center gap-2 px-5 py-3 rounded-2xl shadow-xl text-white text-sm font-black max-w-xs w-auto ${toast.ok ? 'bg-emerald-600' : 'bg-rose-600'}`}
+                className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[300] flex items-center gap-2 px-5 py-3 rounded-xl shadow-xl text-white text-sm font-semibold max-w-xs w-auto ${toast.ok ? 'bg-emerald-600' : 'bg-rose-600'}`}
               >
                 {toast.ok ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
                 {toast.msg}

@@ -167,7 +167,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
           <button
             onClick={handleSaveSettings}
             disabled={loading}
-            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all text-sm disabled:opacity-40"
+            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all text-sm disabled:opacity-40"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             Simpan
@@ -177,7 +177,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-2">
             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Base Currency</label>
-            <div className="bg-slate-50 rounded-2xl px-5 py-4 font-black text-slate-900 text-lg">
+            <div className="bg-slate-50 rounded-xl px-5 py-4 font-semibold text-slate-900 text-lg">
               {settings.base_currency}
             </div>
           </div>
@@ -186,7 +186,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
             <select
               value={settings.decimal_places}
               onChange={e => setSettings({ ...settings, decimal_places: parseInt(e.target.value) })}
-              className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-slate-900 border border-slate-100 outline-none"
+              className="w-full bg-slate-50 rounded-xl px-5 py-4 font-bold text-slate-900 border border-slate-100 outline-none"
             >
               <option value={0}>0 (IDR)</option>
               <option value={2}>2 (USD, EUR, GBP)</option>
@@ -217,7 +217,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
           </div>
           <button
             onClick={() => setShowAddCurrency(!showAddCurrency)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition-all text-sm"
+            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all text-sm"
           >
             <Plus size={14} />
             Tambah Mata Uang
@@ -225,7 +225,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
         </div>
 
         {showAddCurrency && (
-          <div className="grid grid-cols-3 md:grid-cols-5 gap-2 p-4 bg-slate-50 rounded-2xl">
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-2 p-4 bg-slate-50 rounded-xl">
             {unselectedCurrencies.map(c => (
               <button
                 key={c.code}
@@ -247,10 +247,10 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
           {allowedCurrencies.map(c => {
             const info = popularCurrencies.find(p => p.code === c.currency_code)
             return (
-              <div key={c.currency_code} className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100">
+              <div key={c.currency_code} className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-xl border border-slate-100">
                 <span className="text-lg">{info?.symbol || '💱'}</span>
                 <div>
-                  <p className="font-black text-sm text-slate-900">{c.currency_code}</p>
+                  <p className="font-semibold text-sm text-slate-900">{c.currency_code}</p>
                   <p className="text-[10px] font-medium text-slate-400">{info?.name || ''}</p>
                 </div>
                 <button
@@ -277,7 +277,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
           </div>
           <button
             onClick={() => setShowAddRate(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all text-sm"
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all text-sm"
           >
             <Plus size={14} />
             Tambah Kurs
@@ -293,9 +293,9 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+              <div className="p-6 bg-slate-50 rounded-xl border border-slate-100 space-y-4">
                 <div className="flex items-center justify-between">
-                  <p className="font-black text-sm text-slate-700">Input Kurs Baru</p>
+                  <p className="font-semibold text-sm text-slate-700">Input Kurs Baru</p>
                   <button onClick={() => setShowAddRate(false)} className="text-slate-400 hover:text-slate-600">
                     <X size={16} />
                   </button>
@@ -337,7 +337,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
                 <button
                   onClick={handleAddRate}
                   disabled={loading || !rateValue}
-                  className="flex items-center gap-2 px-5 py-3 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all text-sm disabled:opacity-40"
+                  className="flex items-center gap-2 px-5 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all text-sm disabled:opacity-40"
                 >
                   {loading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                   Simpan Kurs
@@ -359,7 +359,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
             const isExpanded = expandedCurrency === currency
 
             return (
-              <div key={currency} className="border border-slate-100 rounded-2xl overflow-hidden">
+              <div key={currency} className="border border-slate-100 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setExpandedCurrency(isExpanded ? null : currency)}
                   className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all"
@@ -367,13 +367,13 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
                   <div className="flex items-center gap-4">
                     <span className="text-2xl">{info?.symbol || '💱'}</span>
                     <div className="text-left">
-                      <p className="font-black text-slate-900">{currency}</p>
+                      <p className="font-semibold text-slate-900">{currency}</p>
                       <p className="text-xs text-slate-400 font-medium">{info?.name || ''}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-6">
                     <div className="text-right">
-                      <p className="font-black text-lg text-slate-900 font-mono">Rp {latest.rate.toLocaleString('id-ID')}</p>
+                      <p className="font-semibold text-lg text-slate-900 font-mono">Rp {latest.rate.toLocaleString('id-ID')}</p>
                       <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1 justify-end">
                         <Calendar size={10} />
                         {latest.rate_date}
@@ -407,7 +407,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
                                   {rate.source}
                                 </span>
                               </div>
-                              <span className="font-black text-slate-900 font-mono">Rp {rate.rate.toLocaleString('id-ID')}</span>
+                              <span className="font-semibold text-slate-900 font-mono">Rp {rate.rate.toLocaleString('id-ID')}</span>
                             </div>
                           ))}
                         </div>
@@ -430,7 +430,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
       {/* Toast */}
       {message && (
         <div className="fixed bottom-8 right-8 z-[9999] animate-in slide-in-from-bottom-2 fade-in">
-          <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${
+          <div className={`flex items-center gap-3 px-6 py-4 rounded-xl shadow-md border ${
             message.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
           }`}>
             {message.type === 'success' ? <CheckCircle size={20} className="text-emerald-500" /> : <AlertCircle size={20} className="text-red-500" />}

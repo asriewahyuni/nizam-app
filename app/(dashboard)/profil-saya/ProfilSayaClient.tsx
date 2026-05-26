@@ -243,29 +243,29 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
 
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Profil Saya</h1>
+        <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">Profil Saya</h1>
         <p className="text-sm font-medium text-slate-400 mt-1">Kelola foto profil, kontak, dan keamanan akun Anda</p>
       </div>
 
       {/* === IDENTITY CARD === */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
         <div className="h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
-        <div className="p-10 space-y-8">
+        <div className="p-5 space-y-8">
           <div className="flex items-center gap-4">
-            <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
+            <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
               <User size={18} />
             </div>
-            <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Identitas & Kontak</h2>
+            <h2 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Identitas & Kontak</h2>
           </div>
 
           {/* Avatar */}
           <div className="flex flex-col items-center gap-4">
             <button type="button" onClick={() => avatarInputRef.current?.click()} className="relative group">
-              <div className="w-28 h-28 rounded-[32px] overflow-hidden shadow-2xl shadow-blue-100 border-4 border-white">
+              <div className="w-28 h-28 rounded-[32px] overflow-hidden shadow-md shadow-blue-100 border-4 border-white">
                 {avatarPreview ? (
                   <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-4xl font-black text-white">
+                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-4xl font-semibold text-white">
                     {initials}
                   </div>
                 )}
@@ -276,30 +276,30 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
             </button>
             <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
             <div className="text-center">
-              <p className="font-black text-lg text-slate-900 tracking-tight">
+              <p className="font-semibold text-lg text-slate-900 tracking-tight">
                 {employee ? `${employee.first_name} ${employee.last_name || ''}` : userName}
               </p>
-              <p className="text-sm font-bold text-blue-600 uppercase tracking-widest mt-0.5">{employee?.job_title || 'Karyawan'}</p>
-              {employee?.nik && <p className="text-[11px] font-black text-slate-300 font-mono tracking-widest mt-1">#{employee.nik}</p>}
-              {employee?.branch?.name && <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-2">{employee.branch.name}</p>}
+              <p className="text-sm font-bold text-blue-600 uppercase tracking-wide mt-0.5">{employee?.job_title || 'Karyawan'}</p>
+              {employee?.nik && <p className="text-[11px] font-semibold text-slate-300 font-mono tracking-wide mt-1">#{employee.nik}</p>}
+              {employee?.branch?.name && <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide mt-2">{employee.branch.name}</p>}
             </div>
           </div>
 
           {/* Employee info display (read-only) */}
           {employee && (
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Departemen</p>
-                <p className="text-sm font-black text-slate-700">{employee.department || 'Umum'}</p>
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-wide mb-1">Departemen</p>
+                <p className="text-sm font-semibold text-slate-700">{employee.department || 'Umum'}</p>
               </div>
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Status</p>
-                <p className="text-sm font-black text-slate-700">{(employee.employment_status || 'FULL_TIME').replace('_', ' ')}</p>
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-wide mb-1">Status</p>
+                <p className="text-sm font-semibold text-slate-700">{(employee.employment_status || 'FULL_TIME').replace('_', ' ')}</p>
               </div>
               {employee.email && (
-                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2">
-                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Email</p>
-                  <p className="text-sm font-black text-slate-700">{employee.email}</p>
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 col-span-2">
+                  <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-wide mb-1">Email</p>
+                  <p className="text-sm font-semibold text-slate-700">{employee.email}</p>
                 </div>
               )}
             </div>
@@ -307,7 +307,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
 
           {/* WhatsApp editable */}
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1 flex items-center gap-2">
               <Phone size={12} className="text-emerald-500" /> Nomor WhatsApp
             </label>
             <div className="relative">
@@ -317,7 +317,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                 value={whatsapp}
                 onChange={e => setWhatsapp(e.target.value)}
                 placeholder="628123456789 (awali dengan kode negara)"
-                className="w-full pl-12 pr-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-emerald-500 outline-none transition-all"
+                className="w-full pl-12 pr-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-emerald-500 outline-none transition-all"
               />
             </div>
           </div>
@@ -325,7 +325,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
           <button
             onClick={handleSaveProfile}
             disabled={saving}
-            className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-200 active:scale-[0.98]"
+            className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-200 active:scale-[0.98]"
           >
             {saving ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -338,39 +338,39 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
       </motion.div>
 
       {/* === SELF SERVICE ATTENDANCE === */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
         <div className="h-2 bg-gradient-to-r from-emerald-400 via-sky-400 to-blue-500" />
-        <div className="p-10 space-y-8">
+        <div className="p-5 space-y-8">
           <div className="flex items-center gap-4">
-            <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center">
+            <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
               <Clock size={18} />
             </div>
-            <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Absensi Mandiri</h2>
+            <h2 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Absensi Mandiri</h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Status Hari Ini</p>
-              <p className="text-sm font-black text-slate-700">{todayAttendance?.status || 'BELUM CLOCK-IN'}</p>
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+              <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-wide mb-1">Status Hari Ini</p>
+              <p className="text-sm font-semibold text-slate-700">{todayAttendance?.status || 'BELUM CLOCK-IN'}</p>
             </div>
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Jam Masuk</p>
-              <p className="text-sm font-black text-slate-700">{todayAttendance?.check_in ? new Date(todayAttendance.check_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+              <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-wide mb-1">Jam Masuk</p>
+              <p className="text-sm font-semibold text-slate-700">{todayAttendance?.check_in ? new Date(todayAttendance.check_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
             </div>
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Jam Keluar</p>
-              <p className="text-sm font-black text-slate-700">{todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+              <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-wide mb-1">Jam Keluar</p>
+              <p className="text-sm font-semibold text-slate-700">{todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Catatan Absensi</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Catatan Absensi</label>
             <textarea
               value={attendanceNotes}
               onChange={(e) => setAttendanceNotes(e.target.value)}
               rows={3}
               placeholder="Catatan opsional untuk clock-in atau clock-out..."
-              className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 focus:bg-white focus:border-emerald-500 outline-none transition-all resize-none"
+              className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 focus:bg-white focus:border-emerald-500 outline-none transition-all resize-none"
             />
           </div>
 
@@ -378,7 +378,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
             <button
               onClick={() => handleClockAttendance('IN')}
               disabled={attendanceSaving || Boolean(todayAttendance)}
-              className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-200 active:scale-[0.98]"
+              className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-200 active:scale-[0.98]"
             >
               {attendanceSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle size={16} />}
               CLOCK IN
@@ -386,7 +386,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
             <button
               onClick={() => handleClockAttendance('OUT')}
               disabled={attendanceSaving || !todayAttendance || Boolean(todayAttendance?.check_out)}
-              className="w-full py-4 rounded-2xl bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-sky-200 active:scale-[0.98]"
+              className="w-full py-4 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-sky-200 active:scale-[0.98]"
             >
               {attendanceSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Clock size={16} />}
               CLOCK OUT
@@ -394,20 +394,20 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
           </div>
 
           <div className="space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Riwayat 14 Hari Terakhir</p>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Riwayat 14 Hari Terakhir</p>
             {attendanceRecords.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-5 text-sm font-bold text-slate-400">
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-5 text-sm font-bold text-slate-400">
                 Belum ada riwayat absensi.
               </div>
             ) : (
               attendanceRecords.map((record: any) => (
-                <div key={record.id} className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 flex items-center justify-between gap-4">
+                <div key={record.id} className="rounded-xl border border-slate-100 bg-slate-50 px-5 py-4 flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-black text-slate-800">{formatDate(record.record_date)}</p>
+                    <p className="text-sm font-semibold text-slate-800">{formatDate(record.record_date)}</p>
                     <p className="text-[11px] font-bold text-slate-500">{record.branch?.name || employee?.branch?.name || 'Unit tidak diketahui'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">{record.status}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600">{record.status}</p>
                     <p className="text-[11px] font-bold text-slate-500">
                       {record.check_in ? new Date(record.check_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                       {' · '}
@@ -422,32 +422,32 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
       </motion.div>
 
       {/* === SELF SERVICE EXPENSE CLAIM === */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
         <div className="h-2 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500" />
-        <div className="p-10 space-y-8">
+        <div className="p-5 space-y-8">
           <div className="flex items-center gap-4">
-            <div className="w-8 h-8 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
+            <div className="w-8 h-8 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
               <ReceiptText size={18} />
             </div>
-            <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Klaim Biaya Mandiri</h2>
+            <h2 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Klaim Biaya Mandiri</h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal Klaim</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Tanggal Klaim</label>
               <input
                 type="date"
                 value={expenseDate}
                 onChange={(e) => setExpenseDate(e.target.value)}
-                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all"
+                className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Kategori</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Kategori</label>
               <select
                 value={expenseCategory}
                 onChange={(e) => setExpenseCategory(e.target.value)}
-                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all"
+                className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all"
               >
                 <option value="Transport">Transport</option>
                 <option value="Meal">Meal</option>
@@ -461,18 +461,18 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Nominal</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Nominal</label>
               <input
                 type="number"
                 min="0"
                 value={expenseAmount}
                 onChange={(e) => setExpenseAmount(e.target.value)}
                 placeholder="150000"
-                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all"
+                className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Foto Nota</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Foto Nota</label>
               <div className="flex items-center gap-4">
                 <input
                   ref={expenseReceiptInputRef}
@@ -488,13 +488,13 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                 <button
                   type="button"
                   onClick={() => expenseReceiptInputRef.current?.click()}
-                  className="px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-amber-300 text-sm font-black text-slate-700 transition-all flex items-center gap-2"
+                  className="px-5 py-4 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-amber-300 text-sm font-semibold text-slate-700 transition-all flex items-center gap-2"
                 >
                   <ImageIcon size={16} />
                   {receiptUploading ? 'Uploading...' : expenseReceiptUrl ? 'Ganti Nota' : 'Upload Nota'}
                 </button>
                 {expenseReceiptPreview && (
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden border border-slate-100 shadow-sm">
+                  <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-100 shadow-sm">
                     <img src={expenseReceiptPreview} alt="Nota" className="w-full h-full object-cover" />
                   </div>
                 )}
@@ -503,46 +503,46 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Deskripsi</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Deskripsi</label>
             <textarea
               value={expenseDescription}
               onChange={(e) => setExpenseDescription(e.target.value)}
               rows={4}
               placeholder="Contoh: Ongkos taksi meeting klien, pembelian ATK, makan dinas."
-              className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all resize-none"
+              className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all resize-none"
             />
           </div>
 
           <button
             onClick={handleSubmitExpenseClaim}
             disabled={expenseSaving || receiptUploading || !employee}
-            className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-200 active:scale-[0.98]"
+            className="w-full py-4 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-200 active:scale-[0.98]"
           >
             {expenseSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ReceiptText size={16} />}
             KIRIM KLAIM BIAYA
           </button>
 
           <div className="space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Klaim Terbaru</p>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Klaim Terbaru</p>
             {expenseClaims.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-5 text-sm font-bold text-slate-400">
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-5 text-sm font-bold text-slate-400">
                 Belum ada klaim biaya.
               </div>
             ) : (
               expenseClaims.map((claim: any) => (
-                <div key={claim.id} className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 flex items-start justify-between gap-4">
+                <div key={claim.id} className="rounded-xl border border-slate-100 bg-slate-50 px-5 py-4 flex items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <p className="text-sm font-black text-slate-800">{claim.category} • {claim.amount?.toLocaleString('id-ID')}</p>
+                    <p className="text-sm font-semibold text-slate-800">{claim.category} • {claim.amount?.toLocaleString('id-ID')}</p>
                     <p className="text-[11px] font-bold text-slate-500">{formatDate(claim.claim_date)} • {claim.branch?.name || employee?.branch?.name || 'Unit tidak diketahui'}</p>
                     <p className="text-[11px] font-medium text-slate-500">{claim.description}</p>
                     {claim.receipt_url && (
-                      <a href={claim.receipt_url} target="_blank" rel="noreferrer" className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700">
+                      <a href={claim.receipt_url} target="_blank" rel="noreferrer" className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 hover:text-blue-700">
                         Lihat Nota
                       </a>
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-[0.18em] border ${
+                    <span className={`px-3 py-1 rounded-xl text-[9px] font-semibold uppercase tracking-wide border ${
                       claim.status === 'APPROVED'
                         ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                         : claim.status === 'REJECTED'
@@ -555,7 +555,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                       <button
                         onClick={() => handleDeleteExpenseClaim(claim.id)}
                         disabled={expenseSaving}
-                        className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 disabled:opacity-40 flex items-center gap-1"
+                        className="text-[10px] font-semibold uppercase tracking-wide text-rose-500 hover:text-rose-600 disabled:opacity-40 flex items-center gap-1"
                       >
                         <Trash2 size={12} />
                         Hapus
@@ -570,23 +570,23 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
       </motion.div>
 
       {/* === SELF SERVICE LEAVE === */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
         <div className="h-2 bg-gradient-to-r from-indigo-400 via-violet-400 to-fuchsia-500" />
-        <div className="p-10 space-y-8">
+        <div className="p-5 space-y-8">
           <div className="flex items-center gap-4">
-            <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center">
+            <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
               <CalendarDays size={18} />
             </div>
-            <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Pengajuan Cuti</h2>
+            <h2 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Pengajuan Cuti</h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Jenis Cuti</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Jenis Cuti</label>
               <select
                 value={leaveType}
                 onChange={(e) => setLeaveType(e.target.value)}
-                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all"
               >
                 <option value="Annual Leave">Annual Leave</option>
                 <option value="Sick Leave">Sick Leave</option>
@@ -594,69 +594,69 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                 <option value="Special Leave">Special Leave</option>
               </select>
             </div>
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Unit Pengajuan</p>
-              <p className="text-sm font-black text-slate-700">{employee?.branch?.name || 'Belum terhubung ke unit'}</p>
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+              <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-wide mb-1">Unit Pengajuan</p>
+              <p className="text-sm font-semibold text-slate-700">{employee?.branch?.name || 'Belum terhubung ke unit'}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal Mulai</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Tanggal Mulai</label>
               <input
                 type="date"
                 value={leaveStartDate}
                 onChange={(e) => setLeaveStartDate(e.target.value)}
-                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal Selesai</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Tanggal Selesai</label>
               <input
                 type="date"
                 value={leaveEndDate}
                 onChange={(e) => setLeaveEndDate(e.target.value)}
-                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Alasan</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Alasan</label>
             <textarea
               value={leaveReason}
               onChange={(e) => setLeaveReason(e.target.value)}
               rows={4}
               placeholder="Tuliskan alasan cuti Anda..."
-              className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all resize-none"
+              className="w-full px-6 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all resize-none"
             />
           </div>
 
           <button
             onClick={handleSubmitLeave}
             disabled={leaveSaving || !employee}
-            className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-200 active:scale-[0.98]"
+            className="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-200 active:scale-[0.98]"
           >
             {leaveSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CalendarDays size={16} />}
             KIRIM PENGAJUAN CUTI
           </button>
 
           <div className="space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Pengajuan Terbaru</p>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Pengajuan Terbaru</p>
             {leaveRequests.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-5 text-sm font-bold text-slate-400">
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-5 text-sm font-bold text-slate-400">
                 Belum ada pengajuan cuti.
               </div>
             ) : (
               leaveRequests.map((request: any) => (
-                <div key={request.id} className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 flex items-start justify-between gap-4">
+                <div key={request.id} className="rounded-xl border border-slate-100 bg-slate-50 px-5 py-4 flex items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <p className="text-sm font-black text-slate-800">{request.leave_type}</p>
+                    <p className="text-sm font-semibold text-slate-800">{request.leave_type}</p>
                     <p className="text-[11px] font-bold text-slate-500">{formatDate(request.start_date)} sampai {formatDate(request.end_date)} • {request.days_taken} hari</p>
                     <p className="text-[11px] font-medium text-slate-500">{request.reason}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-[0.18em] border ${
+                    <span className={`px-3 py-1 rounded-xl text-[9px] font-semibold uppercase tracking-wide border ${
                       request.status === 'APPROVED'
                         ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                         : request.status === 'REJECTED'
@@ -671,7 +671,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                       <button
                         onClick={() => handleCancelLeave(request.id)}
                         disabled={leaveSaving}
-                        className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 disabled:opacity-40"
+                        className="text-[10px] font-semibold uppercase tracking-wide text-rose-500 hover:text-rose-600 disabled:opacity-40"
                       >
                         Batalkan
                       </button>
@@ -685,14 +685,14 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
       </motion.div>
 
       {/* === SECURITY CARD === */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
         <div className="h-2 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500" />
-        <div className="p-10 space-y-8">
+        <div className="p-5 space-y-8">
           <div className="flex items-center gap-4">
-            <div className="w-8 h-8 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
+            <div className="w-8 h-8 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
               <Shield size={18} />
             </div>
-            <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Keamanan Akun</h2>
+            <h2 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Keamanan Akun</h2>
           </div>
 
           <div className="space-y-4">
@@ -701,7 +701,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
               { label: 'Konfirmasi Password', value: confirmPwd, setter: setConfirmPwd, show: showConfirmPwd, toggle: () => setShowConfirmPwd(v => !v) },
             ].map((field) => (
               <div key={field.label} className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{field.label}</label>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">{field.label}</label>
                 <div className="relative">
                   <Lock size={16} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" />
                   <input
@@ -709,7 +709,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                     value={field.value}
                     onChange={e => field.setter(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-12 pr-12 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-amber-400 outline-none transition-all"
+                    className="w-full pl-12 pr-12 py-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-700 focus:bg-white focus:border-amber-400 outline-none transition-all"
                   />
                   <button type="button" onClick={field.toggle} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600">
                     {field.show ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -733,7 +733,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
           <button
             onClick={handleChangePassword}
             disabled={pwdSaving || !newPwd || !confirmPwd}
-            className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-200 active:scale-[0.98]"
+            className="w-full py-4 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-200 active:scale-[0.98]"
           >
             {pwdSaving ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -751,7 +751,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-8 right-8 z-[9000] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${
+        <div className={`fixed bottom-8 right-8 z-[9000] flex items-center gap-3 px-6 py-4 rounded-xl shadow-md border ${
           toast.type === 'success'
             ? 'bg-emerald-50 border-emerald-100 text-emerald-800 shadow-emerald-200/50'
             : 'bg-rose-50 border-rose-100 text-rose-800 shadow-rose-200/50'

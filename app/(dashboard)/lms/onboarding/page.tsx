@@ -33,16 +33,16 @@ export default async function LmsOnboardingPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-8 py-4">
       {/* ── Greeting Header ── */}
-      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white shadow-2xl">
+      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white shadow-md">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full blur-3xl opacity-10 -mr-20 -mt-20" />
         <div className="relative">
-          <div className="w-16 h-16 rounded-2xl bg-white/20 border border-white/30 flex items-center justify-center text-3xl mb-5">
+          <div className="w-16 h-16 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center text-3xl mb-5">
             🎓
           </div>
-          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-200 mb-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-200 mb-2">
             Modul Baru
           </div>
-          <h1 className="text-2xl font-black tracking-tight">Selamat datang di LMS</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Selamat datang di LMS</h1>
           <p className="mt-2 text-sm text-blue-100 leading-relaxed">
             Platform pelatihan komersial Anda. Mari selesaikan pengaturan awal agar modul ini siap digunakan.
           </p>
@@ -50,8 +50,8 @@ export default async function LmsOnboardingPage() {
       </div>
 
       {/* ── Progress Steps ── */}
-      <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 mb-5">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-5">
           Langkah Pengaturan
         </div>
 
@@ -103,7 +103,7 @@ export default async function LmsOnboardingPage() {
         <form action={async () => { 'use server'; await completeModuleOnboarding(MODULE_KEY); redirect('/lms') }}>
           <button
             type="submit"
-            className="w-full rounded-3xl bg-emerald-600 p-5 text-lg font-black text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3"
+            className="w-full rounded-xl bg-emerald-600 p-5 text-lg font-semibold text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3"
           >
             <GraduationCap className="h-6 w-6" />
             Mulai Gunakan LMS
@@ -132,16 +132,16 @@ function StepRow({
   children?: React.ReactNode
 }) {
   return (
-    <div className={`flex gap-4 rounded-2xl border p-5 transition-colors ${done ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-slate-50'}`}>
+    <div className={`flex gap-4 rounded-xl border p-5 transition-colors ${done ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-slate-50'}`}>
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
         {done ? <CheckCircle2 className="h-5 w-5" /> : icon}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <div className="text-xs font-black uppercase tracking-widest text-slate-400">Step {number}</div>
-          {done && <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">Selesai</span>}
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Step {number}</div>
+          {done && <span className="text-[9px] font-semibold uppercase tracking-wide text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">Selesai</span>}
         </div>
-        <h3 className="text-base font-black text-slate-900 mt-1">{title}</h3>
+        <h3 className="text-base font-semibold text-slate-900 mt-1">{title}</h3>
         <p className="text-sm text-slate-500 mt-1 leading-relaxed">{description}</p>
         {!done && children && <div className="mt-4">{children}</div>}
       </div>

@@ -437,12 +437,12 @@ export default function JournalClient({
         tag="Ledger Module"
         actions={
           <>
-            <div className="flex bg-slate-100/60 p-1 rounded-2xl border border-slate-100 mr-2 shadow-inner">
+            <div className="flex bg-slate-100/60 p-1 rounded-xl border border-slate-100 mr-2 shadow-inner">
               {(['POSTED', 'VOIDED', 'DRAFT'] as const).map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
-                  className={`cursor-pointer px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${filterStatus === s ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`cursor-pointer px-4 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${filterStatus === s ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   {s}
                 </button>
@@ -468,18 +468,18 @@ export default function JournalClient({
       />
 
 	      {!canCreateManualJournal ? (
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
           Pilih unit aktif terlebih dahulu untuk membuat jurnal manual. Buku besar saat ini masih menampilkan data level organisasi.
         </div>
 	      ) : (
-	        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-900 shadow-sm">
-	          Jurnal manual baru akan dicatat ke unit aktif: <span className="font-black">{activeBranchName}</span>.
+	        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-900 shadow-sm">
+	          Jurnal manual baru akan dicatat ke unit aktif: <span className="font-semibold">{activeBranchName}</span>.
 	        </div>
 	      )}
 
         {selectedClosedPeriod && (
-          <div className="rounded-3xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-semibold text-rose-900 shadow-sm">
-            Periode fiskal <span className="font-black">{selectedClosedPeriod.name}</span> sudah ditutup. Jurnal manual bertanggal <span className="font-black">{entryDate}</span> tidak dapat disimpan.
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-semibold text-rose-900 shadow-sm">
+            Periode fiskal <span className="font-semibold">{selectedClosedPeriod.name}</span> sudah ditutup. Jurnal manual bertanggal <span className="font-semibold">{entryDate}</span> tidak dapat disimpan.
           </div>
         )}
 
@@ -541,7 +541,7 @@ export default function JournalClient({
               <button
                 type="submit"
                 disabled={isLoadingEntries}
-                className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 text-[10px] font-black uppercase tracking-widest text-blue-600 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 text-[10px] font-semibold uppercase tracking-wide text-blue-600 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isLoadingEntries ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
                 Cari
@@ -551,7 +551,7 @@ export default function JournalClient({
                   type="button"
                   onClick={handleResetSearch}
                   disabled={isLoadingEntries}
-                  className="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Reset
                 </button>
@@ -563,7 +563,7 @@ export default function JournalClient({
         <div className="border-b border-slate-100 bg-white px-10 py-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="relative flex-1">
-              <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 Mutasi Per Akun
               </label>
               <div className="relative">
@@ -576,11 +576,11 @@ export default function JournalClient({
                     setAccountLedger(EMPTY_ACCOUNT_LEDGER)
                   }}
                   placeholder="Cari akun, contoh: 1502 Kendaraan"
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-bold text-slate-800 outline-none transition-all placeholder:text-slate-300 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-bold text-slate-800 outline-none transition-all placeholder:text-slate-300 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
                 />
               </div>
               {accountOptions.length > 0 && !selectedAccountId && (
-                <div className="absolute left-0 right-0 top-[74px] z-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/70">
+                <div className="absolute left-0 right-0 top-[74px] z-20 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md shadow-slate-200/70">
                   {accountOptions.map((account: any) => (
                     <button
                       key={account.id}
@@ -589,8 +589,8 @@ export default function JournalClient({
                       className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-4 border-b border-slate-50 px-4 py-3 text-left transition-colors last:border-0 hover:bg-blue-50"
                     >
                       <span>
-                        <span className="block text-sm font-black text-slate-800">{account.code} - {account.name}</span>
-                        <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                        <span className="block text-sm font-semibold text-slate-800">{account.code} - {account.name}</span>
+                        <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
                           {account.type || 'ACCOUNT'} / Normal {account.normal_balance || '-'}
                         </span>
                       </span>
@@ -602,13 +602,13 @@ export default function JournalClient({
             </div>
             {selectedAccount && (
               <div className="flex items-center gap-3">
-                <span className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-blue-700">
+                <span className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
                   {selectedAccount.code} - {selectedAccount.name}
                 </span>
                 <button
                   type="button"
                   onClick={resetAccountLedger}
-                  className="inline-flex h-11 cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all hover:bg-slate-50"
+                  className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition-all hover:bg-slate-50"
                 >
                   Kembali Umum
                 </button>
@@ -627,8 +627,8 @@ export default function JournalClient({
                 ['Saldo Akhir', accountLedger.summary.endingBalance],
               ].map(([label, value]) => (
                 <div key={String(label)} className="border-b border-slate-100 px-10 py-6 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</div>
-                  <div className="mt-2 font-mono text-xl font-black tracking-tight text-slate-900">{formatRupiah(Number(value))}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+                  <div className="mt-2 font-mono text-xl font-semibold tracking-tight text-slate-900">{formatRupiah(Number(value))}</div>
                 </div>
               ))}
             </div>
@@ -636,12 +636,12 @@ export default function JournalClient({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-100">
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tanggal & No</th>
-                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Keterangan</th>
-                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Lawan Akun</th>
-                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Debit</th>
-                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Kredit</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Saldo</th>
+                    <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Tanggal & No</th>
+                    <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Keterangan</th>
+                    <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Lawan Akun</th>
+                    <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Debit</th>
+                    <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Kredit</th>
+                    <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Saldo</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -653,23 +653,23 @@ export default function JournalClient({
                     accountLedger.rows.map((row) => (
                       <tr key={row.line_id} className="group hover:bg-slate-50 transition-colors">
                         <td className="px-8 py-6 align-top">
-                          <div className="text-sm font-black text-slate-900 tracking-tight">{row.entry_date ? format(new Date(row.entry_date), 'yyyy-MM-dd') : ''}</div>
+                          <div className="text-sm font-semibold text-slate-900 tracking-tight">{row.entry_date ? format(new Date(row.entry_date), 'yyyy-MM-dd') : ''}</div>
                           <div className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase tracking-tighter">{row.entry_number}</div>
                         </td>
                         <td className="px-6 py-6 align-top">
-                          <div className="text-sm font-black text-slate-800 leading-tight">{row.description || '-'}</div>
+                          <div className="text-sm font-semibold text-slate-800 leading-tight">{row.description || '-'}</div>
                           <div className="mt-2 text-[10px] font-medium italic text-slate-400">{row.memo || row.notes || row.reference_type || '-'}</div>
                         </td>
                         <td className="px-6 py-6 align-top text-xs font-bold text-slate-500">
                           {row.counterparty_accounts || '-'}
                         </td>
-                        <td className="px-6 py-6 align-top text-right font-mono text-xs font-black text-emerald-600">
+                        <td className="px-6 py-6 align-top text-right font-mono text-xs font-semibold text-emerald-600">
                           {row.debit > 0 ? formatRupiah(row.debit) : '-'}
                         </td>
-                        <td className="px-6 py-6 align-top text-right font-mono text-xs font-black text-rose-600">
+                        <td className="px-6 py-6 align-top text-right font-mono text-xs font-semibold text-rose-600">
                           {row.credit > 0 ? formatRupiah(row.credit) : '-'}
                         </td>
-                        <td className={`px-8 py-6 align-top text-right font-mono text-xs font-black ${row.running_balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                        <td className={`px-8 py-6 align-top text-right font-mono text-xs font-semibold ${row.running_balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
                           {formatRupiah(row.running_balance)}
                         </td>
                       </tr>
@@ -679,7 +679,7 @@ export default function JournalClient({
               </table>
             </div>
             <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/40 px-10 py-6 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 {accountLedger.rows.length} dari {accountLedger.summary.rowCount} mutasi posted sudah dimuat.
               </div>
               {accountLedger.hasMore && (
@@ -687,7 +687,7 @@ export default function JournalClient({
                   type="button"
                   onClick={() => loadAccountLedgerPage()}
                   disabled={isLoadingAccountLedger}
-                  className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-[10px] font-black uppercase tracking-widest text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isLoadingAccountLedger ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />}
                   Muat Lagi
@@ -701,11 +701,11 @@ export default function JournalClient({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tanggal & No</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Deskripsi & Ref</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Detail Transaksi</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Aksi</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Tanggal & No</th>
+                <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Deskripsi & Ref</th>
+                <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Detail Transaksi</th>
+                <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Status</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -723,60 +723,60 @@ export default function JournalClient({
                       return (
 	                  <tr key={entry.id} className="group hover:bg-slate-50 transition-colors">
 	                    <td className="px-8 py-6 align-top">
-	                       <div className="text-sm font-black text-slate-900 tracking-tight">{entry.entry_date ? format(new Date(entry.entry_date), 'yyyy-MM-dd') : ''}</div>
+	                       <div className="text-sm font-semibold text-slate-900 tracking-tight">{entry.entry_date ? format(new Date(entry.entry_date), 'yyyy-MM-dd') : ''}</div>
 	                       <div className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase tracking-tighter">{entry.entry_number}</div>
                     </td>
                     <td className="px-6 py-6 align-top">
-                       <div className="text-sm font-black text-slate-800 leading-tight">{entry.description}</div>
+                       <div className="text-sm font-semibold text-slate-800 leading-tight">{entry.description}</div>
                        <div className="flex items-center gap-2 mt-2">
-                         <span className="text-[9px] font-black text-slate-400 border border-slate-200 bg-white px-2 py-0.5 rounded uppercase tracking-widest">{entry.reference_type}</span>
+                         <span className="text-[9px] font-semibold text-slate-400 border border-slate-200 bg-white px-2 py-0.5 rounded uppercase tracking-wide">{entry.reference_type}</span>
                          {disclosureNote && <span className="text-[10px] font-medium text-slate-400 italic truncate max-w-[220px]">{disclosureNote}</span>}
                        </div>
                     </td>
                     <td className="px-6 py-6 align-top">
                        <div className="flex flex-col gap-1.5 w-full min-w-[340px] max-w-lg">
                         {purchaseTransparency && (
-                          <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 mb-2">
-                            <div className="text-[8px] font-black text-amber-700 uppercase tracking-[0.22em] mb-2">
+                          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 mb-2">
+                            <div className="text-[8px] font-semibold text-amber-700 uppercase tracking-[0.22em] mb-2">
                               Transparansi Diskon Pembelian
                             </div>
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Bruto Barang</span>
-                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotal || 0))}</span>
+                                <span className="font-mono font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotal || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Diskon Item</span>
-                                <span className="font-mono font-black text-rose-600">{formatRupiah(Number(purchaseTransparency.lineDiscount || 0))}</span>
+                                <span className="font-mono font-semibold text-rose-600">{formatRupiah(Number(purchaseTransparency.lineDiscount || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Diskon Header</span>
-                                <span className="font-mono font-black text-rose-600">{formatRupiah(Number(purchaseTransparency.headerDiscount || 0))}</span>
+                                <span className="font-mono font-semibold text-rose-600">{formatRupiah(Number(purchaseTransparency.headerDiscount || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Neto Barang</span>
-                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotalAfterDiscount || 0))}</span>
+                                <span className="font-mono font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotalAfterDiscount || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Landed Cost</span>
-                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.landedCost || 0))}</span>
+                                <span className="font-mono font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.landedCost || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Persediaan Tercatat</span>
-                                <span className="font-mono font-black text-emerald-700">{formatRupiah(Number(purchaseTransparency.inventoryValue || 0))}</span>
+                                <span className="font-mono font-semibold text-emerald-700">{formatRupiah(Number(purchaseTransparency.inventoryValue || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">PPN Masukan</span>
-                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.tax || 0))}</span>
+                                <span className="font-mono font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.tax || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Total Tagihan</span>
-                                <span className="font-mono font-black text-blue-700">{formatRupiah(Number(purchaseTransparency.grandTotal || 0))}</span>
+                                <span className="font-mono font-semibold text-blue-700">{formatRupiah(Number(purchaseTransparency.grandTotal || 0))}</span>
                               </div>
                             </div>
                           </div>
                         )}
-                        <div className="grid grid-cols-12 gap-2 text-[8px] font-black text-slate-300 uppercase tracking-widest mb-1 pb-2 border-b border-slate-100">
+                        <div className="grid grid-cols-12 gap-2 text-[8px] font-semibold text-slate-300 uppercase tracking-wide mb-1 pb-2 border-b border-slate-100">
                           <div className="col-span-6">Akun (CoA)</div>
                           <div className="col-span-3 text-right text-emerald-600/50">Debit</div>
                           <div className="col-span-3 text-right text-rose-600/50">Kredit</div>
@@ -789,10 +789,10 @@ export default function JournalClient({
                              <div className="col-span-6 font-bold text-slate-600 truncate" title={line.accounts?.name}>
                                {line.accounts?.code} - {line.accounts?.name}
                              </div>
-                             <div className={`col-span-3 text-right font-mono font-black tracking-tight ${debitAmount > 0 ? 'text-emerald-600' : 'text-slate-200'}`}>
+                             <div className={`col-span-3 text-right font-mono font-semibold tracking-tight ${debitAmount > 0 ? 'text-emerald-600' : 'text-slate-200'}`}>
                                 {debitAmount > 0 ? formatRupiah(debitAmount) : '-'}
                              </div>
-                             <div className={`col-span-3 text-right font-mono font-black tracking-tight ${creditAmount > 0 ? 'text-rose-600' : 'text-slate-200'}`}>
+                             <div className={`col-span-3 text-right font-mono font-semibold tracking-tight ${creditAmount > 0 ? 'text-rose-600' : 'text-slate-200'}`}>
                                 {creditAmount > 0 ? formatRupiah(creditAmount) : '-'}
                              </div>
                            </div>
@@ -809,7 +809,7 @@ export default function JournalClient({
 	                         }
 	                       />
                              {lockMessage && (
-                               <div className="text-[9px] font-black uppercase tracking-widest text-rose-500">
+                               <div className="text-[9px] font-semibold uppercase tracking-wide text-rose-500">
                                  Periode Terkunci
                                </div>
                              )}
@@ -837,7 +837,7 @@ export default function JournalClient({
 	                                  else window.location.reload()
 	                                }} 
                                     disabled={Boolean(lockedPeriod)}
-	                                className="text-[9px] font-black text-rose-400 hover:text-rose-600 px-2 py-1 uppercase tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-rose-400"
+	                                className="text-[9px] font-semibold text-rose-400 hover:text-rose-600 px-2 py-1 uppercase tracking-wide transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-rose-400"
                                     title={lockMessage || undefined}
 	                              >
 	                                Delete Draft
@@ -857,7 +857,7 @@ export default function JournalClient({
 	                            </SafeButton>
 	                          )}
                           {entry.status === 'VOIDED' && (
-                            <span className="text-[10px] font-black text-rose-300 uppercase italic tracking-[0.2em] px-3 py-1 border border-rose-100 rounded-lg">Voided</span>
+                            <span className="text-[10px] font-semibold text-rose-300 uppercase italic tracking-wide px-3 py-1 border border-rose-100 rounded-lg">Voided</span>
                           )}
 	                       </div>
 	                    </td>
@@ -868,7 +868,7 @@ export default function JournalClient({
           </table>
         </div>
         <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/40 px-10 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
             {visibleEntries.length} jurnal {filterStatus.toLowerCase()} sudah dimuat{activeSearch ? ' dari hasil pencarian' : ''}.
           </div>
           {canLoadMoreEntries && (
@@ -876,7 +876,7 @@ export default function JournalClient({
               type="button"
               onClick={() => loadJournalEntriesPage()}
               disabled={isLoadingEntries}
-              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-[10px] font-black uppercase tracking-widest text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isLoadingEntries ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />}
               Muat Lagi
@@ -891,39 +891,39 @@ export default function JournalClient({
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-xl shadow-md overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="px-10 py-8 bg-blue-600 text-white flex justify-between items-start shrink-0">
                     <div>
-                      <h3 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                      <h3 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
                         <FilePlus size={24} /> New Journal Entry
                       </h3>
                       <p className="text-xs text-blue-100 mt-1 font-medium italic">Manually create a draft journal entry into the ledger.</p>
                     </div>
-                    <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition">
+                    <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition">
                       <X size={20} />
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-10">
-                   <div className="grid grid-cols-2 gap-6 mb-10 bg-slate-50 p-6 rounded-[28px] border border-slate-100 shadow-inner">
+                <div className="flex-1 overflow-y-auto p-5">
+                   <div className="grid grid-cols-2 gap-6 mb-10 bg-slate-50 p-6 rounded-xl border border-slate-100 shadow-inner">
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jurnal Date</label>
-                          <input type="date" required value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Jurnal Date</label>
+                          <input type="date" required value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="w-full px-5 py-4 bg-white rounded-xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
                       </div>
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Main Description</label>
-                          <input required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Initial Capital Deposit" className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Main Description</label>
+                          <input required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Initial Capital Deposit" className="w-full px-5 py-4 bg-white rounded-xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
                       </div>
                       <div className="col-span-2 space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Additional Notes</label>
-                          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="External reference or specific explanation" className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-medium text-slate-600 outline-none focus:border-blue-500 transition-all shadow-sm" />
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Additional Notes</label>
+                          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="External reference or specific explanation" className="w-full px-5 py-4 bg-white rounded-xl border border-slate-200 font-medium text-slate-600 outline-none focus:border-blue-500 transition-all shadow-sm" />
                       </div>
                    </div>
 
                    <div className="space-y-4">
                       <div className="flex items-center justify-between px-2">
-                         <h4 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Transaction Lines</h4>
-                         <button type="button" onClick={addLine} className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-xl hover:bg-blue-100 transition-all">
+                         <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wide">Transaction Lines</h4>
+                         <button type="button" onClick={addLine} className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-600 text-[10px] font-semibold uppercase rounded-xl hover:bg-blue-100 transition-all">
                            <Plus size={14} /> Add Line
                          </button>
                       </div>
@@ -932,10 +932,10 @@ export default function JournalClient({
                          <table className="w-full text-left">
                             <thead className="bg-slate-50/50 border-b border-slate-100">
                                <tr>
-                                  <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Account</th>
-                                  <th className="px-4 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Debit (Rp)</th>
-                                  <th className="px-4 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Credit (Rp)</th>
-                                  <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Action</th>
+                                  <th className="px-6 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-wide">Account</th>
+                                  <th className="px-4 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-wide text-right">Debit (Rp)</th>
+                                  <th className="px-4 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-wide text-right">Credit (Rp)</th>
+                                  <th className="px-6 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-wide text-center">Action</th>
                                </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
@@ -951,14 +951,14 @@ export default function JournalClient({
                                        <CurrencyInput
                                          value={line.debit}
                                          onChange={(val) => handleLineChange(line.id, 'debit', val)}
-                                         className="!py-3 !rounded-xl !text-xs !font-black !text-emerald-600 !bg-emerald-50/30 !border-slate-100 focus:!bg-white focus:!border-blue-400 transition-all"
+                                         className="!py-3 !rounded-xl !text-xs !font-semibold !text-emerald-600 !bg-emerald-50/30 !border-slate-100 focus:!bg-white focus:!border-blue-400 transition-all"
                                        />
                                     </td>
                                     <td className="px-4 py-4">
                                        <CurrencyInput
                                          value={line.credit}
                                          onChange={(val) => handleLineChange(line.id, 'credit', val)}
-                                         className="!py-3 !rounded-xl !text-xs !font-black !text-rose-600 !bg-rose-50/30 !border-slate-100 focus:!bg-white focus:!border-blue-400 transition-all"
+                                         className="!py-3 !rounded-xl !text-xs !font-semibold !text-rose-600 !bg-rose-50/30 !border-slate-100 focus:!bg-white focus:!border-blue-400 transition-all"
                                        />
                                     </td>
                                     <td className="px-6 py-4 text-center">
@@ -971,14 +971,14 @@ export default function JournalClient({
                             </tbody>
                             <tfoot className="bg-slate-900 border-t border-slate-800 text-white font-mono">
                                <tr>
-                                  <td className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Consolidated Balance</td>
-                                  <td className="px-4 py-4 text-right text-xs font-black text-emerald-400">{formatRupiah(totalDebit)}</td>
-                                  <td className="px-4 py-4 text-right text-xs font-black text-rose-400">{formatRupiah(totalCredit)}</td>
+                                  <td className="px-6 py-4 text-[10px] font-semibold uppercase tracking-wide">Consolidated Balance</td>
+                                  <td className="px-4 py-4 text-right text-xs font-semibold text-emerald-400">{formatRupiah(totalDebit)}</td>
+                                  <td className="px-4 py-4 text-right text-xs font-semibold text-rose-400">{formatRupiah(totalCredit)}</td>
                                   <td className="px-6 py-4 text-center">
                                      {isBalanced ? (
-                                       <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-500/30 tracking-widest">BALANCED</span>
+                                       <span className="text-[9px] font-semibold bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-500/30 tracking-wide">BALANCED</span>
                                      ) : (
-                                       <span className="text-[9px] font-black bg-rose-500/20 text-rose-400 px-2.5 py-1 rounded-lg border border-rose-500/30 tracking-widest animate-pulse">UNBALANCED</span>
+                                       <span className="text-[9px] font-semibold bg-rose-500/20 text-rose-400 px-2.5 py-1 rounded-lg border border-rose-500/30 tracking-wide animate-pulse">UNBALANCED</span>
                                      )}
                                   </td>
                                </tr>

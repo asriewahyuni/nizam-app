@@ -94,7 +94,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2.5 rounded-2xl bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition shadow-sm"
+            className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition shadow-sm"
           >
             <ArrowLeft size={20} />
           </button>
@@ -111,14 +111,14 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden"
+            className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden"
           >
             <form onSubmit={handleSubmit} className="p-8 space-y-8">
               {/* Basic Info */}
               <div className="space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
                   <Tag size={16} className="text-blue-600" />
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Identitas Akun</h3>
+                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">Identitas Akun</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -130,7 +130,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
                       placeholder="Cth: 6001.05"
                       value={formData.code}
                       onChange={e => setFormData(p => ({ ...p, code: e.target.value }))}
-                      className="w-full px-5 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-semibold outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all font-mono"
+                      className="w-full px-5 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all font-mono"
                     />
                   </div>
                   <div className="space-y-2">
@@ -141,7 +141,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
                       placeholder="Cth: Biaya Lembur Lapangan"
                       value={formData.name}
                       onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
-                      className="w-full px-5 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-semibold outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all"
+                      className="w-full px-5 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all"
                     />
                   </div>
                 </div>
@@ -153,7 +153,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
                       <select
                         value={formData.type}
                         onChange={e => handleTypeChange(e.target.value as AccountType)}
-                        className="w-full px-5 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-bold text-slate-800 outline-none appearance-none focus:bg-white focus:border-blue-500 transition-all cursor-pointer"
+                        className="w-full px-5 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold text-slate-800 outline-none appearance-none focus:bg-white focus:border-blue-500 transition-all cursor-pointer"
                       >
                         {ACCOUNT_TYPES.map(t => (
                           <option key={t.value} value={t.value}>{t.label}</option>
@@ -164,7 +164,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 ml-1">Saldo Normal</label>
-                    <div className="flex p-1.5 bg-slate-100 rounded-2xl gap-1">
+                    <div className="flex p-1.5 bg-slate-100 rounded-xl gap-1">
                       <button
                         type="button"
                         onClick={() => setFormData(p => ({ ...p, normal_balance: 'DEBIT' }))}
@@ -188,7 +188,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
               <div className="space-y-6 pt-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
                   <Layers size={16} className="text-blue-600" />
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Hierarki & Struktur</h3>
+                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">Hierarki & Struktur</h3>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-700 ml-1">Akun Induk (Parent Account)</label>
@@ -196,7 +196,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
                     <select
                       value={formData.parent_id}
                       onChange={e => setFormData(p => ({ ...p, parent_id: e.target.value }))}
-                      className="w-full px-5 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 outline-none appearance-none focus:bg-white focus:border-blue-500 transition-all cursor-pointer"
+                      className="w-full px-5 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 outline-none appearance-none focus:bg-white focus:border-blue-500 transition-all cursor-pointer"
                     >
                       <option value="">-- Tidak Ada (Header Utama) --</option>
                       {existingAccounts.map(acc => (
@@ -213,13 +213,13 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
               <div className="space-y-2 pt-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
                   <FileText size={16} className="text-blue-600" />
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Keterangan Opsional</h3>
+                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">Keterangan Opsional</h3>
                 </div>
                 <textarea
                   placeholder="Berikan catatan detail tentang fungsi akun ini..."
                   value={formData.description}
                   onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
-                  className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 text-sm outline-none focus:bg-white focus:border-blue-500 transition-all h-32 resize-none"
+                  className="w-full px-5 py-4 rounded-xl bg-slate-50 border border-slate-200 text-sm outline-none focus:bg-white focus:border-blue-500 transition-all h-32 resize-none"
                 />
               </div>
 
@@ -230,7 +230,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className={`p-4 rounded-2xl flex items-center gap-3 overflow-hidden ${error ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}
+                    className={`p-4 rounded-xl flex items-center gap-3 overflow-hidden ${error ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}
                   >
                     {error ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
                     <p className="text-sm font-bold">{error || 'Akun berhasil ditambahkan! Mengalihkan...'}</p>
@@ -243,7 +243,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
                 <button
                   type="submit"
                   disabled={loading || success}
-                  className="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-200 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-200 transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {loading ? (
                     <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -258,7 +258,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
 
         {/* Sidebar Help */}
         <div className="space-y-6">
-          <div className="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden">
+          <div className="bg-slate-900 rounded-xl p-8 text-white relative overflow-hidden">
             <Activity className="absolute -right-4 -top-4 text-white/5" size={120} />
             <h4 className="text-lg font-bold mb-4 flex items-center gap-2">
               <Activity size={18} className="text-blue-400" />
@@ -282,7 +282,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
             </div>
           </div>
 
-          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+          <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
             <h4 className="text-sm font-bold text-slate-900 mb-4">Tips Cepat</h4>
             <ul className="space-y-3">
               {[

@@ -119,8 +119,8 @@ function StatCard({
 }) {
   return (
     <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{label}</div>
-      <div className="mt-3 text-3xl font-black tracking-tight text-slate-900">{value}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{value}</div>
       <p className="mt-2 text-sm text-slate-600">{hint}</p>
     </div>
   )
@@ -180,23 +180,23 @@ export default async function CompetencyTrainingDetailPage(props: {
           <div className="max-w-3xl">
             <Link
               href="/lms#daftar-pelatihan"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-700"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Kembali ke katalog
             </Link>
 
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/90 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
               <GraduationCap className="h-3.5 w-3.5" />
               Detail Pelatihan Internal
             </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">{training.title}</h1>
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">{training.title}</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
               Workspace ini dipakai HR untuk mengelola peserta, jadwal sesi, dan hasil evaluasi per pelatihan pada
               entitas aktif.
             </p>
 
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-600">
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide text-slate-600">
               <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
                 {formatTrainingStatusLabel(training.status)}
               </span>
@@ -215,25 +215,25 @@ export default async function CompetencyTrainingDetailPage(props: {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-[22px] border border-amber-200 bg-white/90 p-4">
-              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Skill</div>
-              <div className="mt-2 text-base font-black text-slate-900">{training.skillCategory}</div>
+            <div className="rounded-xl border border-amber-200 bg-white/90 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Skill</div>
+              <div className="mt-2 text-base font-semibold text-slate-900">{training.skillCategory}</div>
             </div>
-            <div className="rounded-[22px] border border-amber-200 bg-white/90 p-4">
-              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Target Role</div>
-              <div className="mt-2 text-base font-black text-slate-900">{training.targetRole || 'Semua role terkait'}</div>
+            <div className="rounded-xl border border-amber-200 bg-white/90 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Target Role</div>
+              <div className="mt-2 text-base font-semibold text-slate-900">{training.targetRole || 'Semua role terkait'}</div>
             </div>
           </div>
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Fasilitator</div>
-            <div className="mt-2 text-lg font-black text-slate-900">{training.facilitatorName || 'Belum diisi'}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Fasilitator</div>
+            <div className="mt-2 text-lg font-semibold text-slate-900">{training.facilitatorName || 'Belum diisi'}</div>
           </div>
           <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Periode</div>
-            <div className="mt-2 text-lg font-black text-slate-900">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Periode</div>
+            <div className="mt-2 text-lg font-semibold text-slate-900">
               {training.startDate ? formatDateLabel(training.startDate) : 'Fleksibel'}
             </div>
             <div className="mt-1 text-sm text-slate-600">
@@ -241,14 +241,14 @@ export default async function CompetencyTrainingDetailPage(props: {
             </div>
           </div>
           <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Durasi</div>
-            <div className="mt-2 text-lg font-black text-slate-900">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Durasi</div>
+            <div className="mt-2 text-lg font-semibold text-slate-900">
               {training.durationHours > 0 ? `${training.durationHours} jam` : 'Belum ditentukan'}
             </div>
           </div>
           <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Unit Target</div>
-            <div className="mt-2 text-lg font-black text-slate-900">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Unit Target</div>
+            <div className="mt-2 text-lg font-semibold text-slate-900">
               {training.scopeType === 'BRANCH'
                 ? (training.branchName || training.branchCode || 'Unit aktif')
                 : 'Seluruh entitas aktif'}
@@ -258,14 +258,14 @@ export default async function CompetencyTrainingDetailPage(props: {
 
         {training.objective ? (
           <div className="mt-5 rounded-[24px] border border-slate-200 bg-white/90 p-5">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Tujuan Pelatihan</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tujuan Pelatihan</div>
             <p className="mt-3 text-sm leading-6 text-slate-700">{training.objective}</p>
           </div>
         ) : null}
 
         {training.notes ? (
           <div className="mt-4 rounded-[24px] border border-slate-200 bg-white/90 p-5">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Catatan HR</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Catatan HR</div>
             <p className="mt-3 text-sm leading-6 text-slate-700">{training.notes}</p>
           </div>
         ) : null}
@@ -331,12 +331,12 @@ export default async function CompetencyTrainingDetailPage(props: {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <div id="peserta" className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <div id="peserta" className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <Users className="h-5 w-5 text-slate-700" />
             <div>
-              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Peserta</div>
-              <h2 className="mt-1 text-xl font-black text-slate-900">Assignment peserta pelatihan</h2>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Peserta</div>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900">Assignment peserta pelatihan</h2>
             </div>
           </div>
 
@@ -345,11 +345,11 @@ export default async function CompetencyTrainingDetailPage(props: {
               <input type="hidden" name="trainingId" value={training.id} />
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="text-sm">
-                  <div className="font-black text-slate-900">Pilih Karyawan</div>
+                  <div className="font-semibold text-slate-900">Pilih Karyawan</div>
                   <select
                     name="employeeId"
                     required
-                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                    className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                   >
                     <option value="">Pilih peserta</option>
                     {trainingDetail.assignableEmployees.map((employee) => (
@@ -367,11 +367,11 @@ export default async function CompetencyTrainingDetailPage(props: {
                 </label>
 
                 <label className="text-sm">
-                  <div className="font-black text-slate-900">Status Awal</div>
+                  <div className="font-semibold text-slate-900">Status Awal</div>
                   <select
                     name="participantStatus"
                     defaultValue="ASSIGNED"
-                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                    className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                   >
                     <option value="ASSIGNED">Assigned</option>
                     <option value="CONFIRMED">Confirmed</option>
@@ -383,7 +383,7 @@ export default async function CompetencyTrainingDetailPage(props: {
               </div>
 
               <label className="text-sm">
-                <div className="font-black text-slate-900">Catatan Assignment</div>
+                <div className="font-semibold text-slate-900">Catatan Assignment</div>
                 <textarea
                   name="note"
                   rows={3}
@@ -395,7 +395,7 @@ export default async function CompetencyTrainingDetailPage(props: {
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
                 >
                   Simpan Peserta
                 </button>
@@ -405,14 +405,14 @@ export default async function CompetencyTrainingDetailPage(props: {
               </div>
             </form>
           ) : (
-            <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+            <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
               Anda sedang di mode baca. Detail peserta tetap terlihat, tetapi perubahan assignment membutuhkan permission
               `learning:write`.
             </div>
           )}
 
           {trainingDetail.participants.length === 0 ? (
-            <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+            <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
               Belum ada peserta yang ditautkan ke pelatihan ini.
             </div>
           ) : (
@@ -422,16 +422,16 @@ export default async function CompetencyTrainingDetailPage(props: {
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="max-w-3xl">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                        <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
                           {formatParticipantStatusLabel(participant.status)}
                         </span>
                         {participant.branchCode || participant.branchName ? (
-                          <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">
+                          <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
                             {participant.branchCode || participant.branchName}
                           </span>
                         ) : null}
                       </div>
-                      <h3 className="mt-3 text-lg font-black text-slate-900">{participant.employeeName}</h3>
+                      <h3 className="mt-3 text-lg font-semibold text-slate-900">{participant.employeeName}</h3>
                       <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-600">
                         {participant.employeeNik ? <span>NIK: {participant.employeeNik}</span> : null}
                         {participant.employeeJobTitle ? <span>Posisi: {participant.employeeJobTitle}</span> : null}
@@ -461,11 +461,11 @@ export default async function CompetencyTrainingDetailPage(props: {
                       <form action={updateCompetencyTrainingParticipantStatus} className="w-full max-w-xs rounded-[20px] border border-slate-200 bg-white p-4">
                         <input type="hidden" name="trainingId" value={training.id} />
                         <input type="hidden" name="participantId" value={participant.id} />
-                        <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Update Status</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Update Status</div>
                         <select
                           name="status"
                           defaultValue={participant.status}
-                          className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                          className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                         >
                           <option value="ASSIGNED">Assigned</option>
                           <option value="CONFIRMED">Confirmed</option>
@@ -475,7 +475,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                         </select>
                         <button
                           type="submit"
-                          className="mt-3 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-black"
+                          className="mt-3 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-black"
                         >
                           Simpan Status Peserta
                         </button>
@@ -489,12 +489,12 @@ export default async function CompetencyTrainingDetailPage(props: {
         </div>
 
         <div className="space-y-6">
-          <section id="sesi" className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <section id="sesi" className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <CalendarDays className="h-5 w-5 text-slate-700" />
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Sesi</div>
-                <h2 className="mt-1 text-xl font-black text-slate-900">Jadwal pelatihan per batch</h2>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Sesi</div>
+                <h2 className="mt-1 text-xl font-semibold text-slate-900">Jadwal pelatihan per batch</h2>
               </div>
             </div>
 
@@ -503,49 +503,49 @@ export default async function CompetencyTrainingDetailPage(props: {
                 <input type="hidden" name="trainingId" value={training.id} />
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="text-sm">
-                    <div className="font-black text-slate-900">Judul Sesi</div>
+                    <div className="font-semibold text-slate-900">Judul Sesi</div>
                     <input
                       name="title"
                       required
                       placeholder="Contoh: Batch 1 - Coaching Supervisor"
-                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                      className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                     />
                   </label>
 
                   <label className="text-sm">
-                    <div className="font-black text-slate-900">Tanggal Sesi</div>
+                    <div className="font-semibold text-slate-900">Tanggal Sesi</div>
                     <input
                       type="date"
                       name="sessionDate"
-                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                      className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                     />
                   </label>
 
                   <label className="text-sm">
-                    <div className="font-black text-slate-900">Jam Mulai</div>
+                    <div className="font-semibold text-slate-900">Jam Mulai</div>
                     <input
                       type="time"
                       name="startTime"
-                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                      className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                     />
                   </label>
 
                   <label className="text-sm">
-                    <div className="font-black text-slate-900">Jam Selesai</div>
+                    <div className="font-semibold text-slate-900">Jam Selesai</div>
                     <input
                       type="time"
                       name="endTime"
-                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                      className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                     />
                   </label>
 
                   {training.scopeType === 'ORG' ? (
                     <label className="text-sm">
-                      <div className="font-black text-slate-900">Unit Pelaksana</div>
+                      <div className="font-semibold text-slate-900">Unit Pelaksana</div>
                       <select
                         name="branchId"
                         defaultValue=""
-                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                        className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                       >
                         <option value="">Tanpa unit khusus / lintas unit</option>
                         {branches.map((branch) => (
@@ -557,38 +557,38 @@ export default async function CompetencyTrainingDetailPage(props: {
                     </label>
                   ) : (
                     <div className="text-sm">
-                      <div className="font-black text-slate-900">Unit Pelaksana</div>
-                      <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                      <div className="font-semibold text-slate-900">Unit Pelaksana</div>
+                      <div className="mt-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                         {training.branchCode ? `${training.branchCode} • ` : ''}{training.branchName || 'Unit aktif'}
                       </div>
                     </div>
                   )}
 
                   <label className="text-sm">
-                    <div className="font-black text-slate-900">Fasilitator Sesi</div>
+                    <div className="font-semibold text-slate-900">Fasilitator Sesi</div>
                     <input
                       name="facilitatorName"
                       defaultValue={training.facilitatorName || ''}
                       placeholder="Nama trainer atau coach"
-                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                      className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                     />
                   </label>
 
                   <label className="text-sm">
-                    <div className="font-black text-slate-900">Lokasi</div>
+                    <div className="font-semibold text-slate-900">Lokasi</div>
                     <input
                       name="location"
                       placeholder="Ruang training, outlet, atau link meeting"
-                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                      className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                     />
                   </label>
 
                   <label className="text-sm">
-                    <div className="font-black text-slate-900">Status</div>
+                    <div className="font-semibold text-slate-900">Status</div>
                     <select
                       name="status"
                       defaultValue="SCHEDULED"
-                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                      className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                     >
                       <option value="SCHEDULED">Scheduled</option>
                       <option value="DONE">Done</option>
@@ -598,7 +598,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                 </div>
 
                 <label className="text-sm">
-                  <div className="font-black text-slate-900">Catatan Sesi</div>
+                  <div className="font-semibold text-slate-900">Catatan Sesi</div>
                   <textarea
                     name="note"
                     rows={3}
@@ -609,7 +609,7 @@ export default async function CompetencyTrainingDetailPage(props: {
 
                 <button
                   type="submit"
-                  className="inline-flex w-fit items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white transition hover:bg-black"
+                  className="inline-flex w-fit items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-black"
                 >
                   Simpan Sesi
                 </button>
@@ -617,7 +617,7 @@ export default async function CompetencyTrainingDetailPage(props: {
             ) : null}
 
             {trainingDetail.sessions.length === 0 ? (
-              <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+              <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
                 Belum ada sesi yang dijadwalkan untuk pelatihan ini.
               </div>
             ) : (
@@ -627,16 +627,16 @@ export default async function CompetencyTrainingDetailPage(props: {
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="max-w-3xl">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-sky-700">
+                          <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
                             {formatSessionStatusLabel(session.status)}
                           </span>
                           {session.branchCode || session.branchName ? (
-                            <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">
+                            <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
                               {session.branchCode || session.branchName}
                             </span>
                           ) : null}
                         </div>
-                        <h3 className="mt-3 text-lg font-black text-slate-900">{session.title}</h3>
+                        <h3 className="mt-3 text-lg font-semibold text-slate-900">{session.title}</h3>
                         <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-600">
                           {session.sessionDate ? (
                             <span className="inline-flex items-center gap-2">
@@ -671,11 +671,11 @@ export default async function CompetencyTrainingDetailPage(props: {
                         <form action={updateCompetencyTrainingSessionStatus} className="w-full max-w-xs rounded-[20px] border border-slate-200 bg-white p-4">
                           <input type="hidden" name="trainingId" value={training.id} />
                           <input type="hidden" name="sessionId" value={session.id} />
-                          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Update Status</div>
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Update Status</div>
                           <select
                             name="status"
                             defaultValue={session.status}
-                            className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                            className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                           >
                             <option value="SCHEDULED">Scheduled</option>
                             <option value="DONE">Done</option>
@@ -683,7 +683,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                           </select>
                           <button
                             type="submit"
-                            className="mt-3 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-black"
+                            className="mt-3 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-black"
                           >
                             Simpan Status Sesi
                           </button>
@@ -696,12 +696,12 @@ export default async function CompetencyTrainingDetailPage(props: {
             )}
           </section>
 
-          <section id="evaluasi" className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <section id="evaluasi" className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <ClipboardCheck className="h-5 w-5 text-slate-700" />
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Evaluasi</div>
-                <h2 className="mt-1 text-xl font-black text-slate-900">Hasil observasi dan asesmen peserta</h2>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Evaluasi</div>
+                <h2 className="mt-1 text-xl font-semibold text-slate-900">Hasil observasi dan asesmen peserta</h2>
               </div>
             </div>
 
@@ -711,11 +711,11 @@ export default async function CompetencyTrainingDetailPage(props: {
                   <input type="hidden" name="trainingId" value={training.id} />
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="text-sm">
-                      <div className="font-black text-slate-900">Peserta</div>
+                      <div className="font-semibold text-slate-900">Peserta</div>
                       <select
                         name="participantId"
                         required
-                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                        className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                       >
                         <option value="">Pilih peserta</option>
                         {trainingDetail.participants.map((participant) => (
@@ -728,11 +728,11 @@ export default async function CompetencyTrainingDetailPage(props: {
                     </label>
 
                     <label className="text-sm">
-                      <div className="font-black text-slate-900">Sesi Terkait</div>
+                      <div className="font-semibold text-slate-900">Sesi Terkait</div>
                       <select
                         name="sessionId"
                         defaultValue=""
-                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                        className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                       >
                         <option value="">Tanpa sesi spesifik</option>
                         {trainingDetail.sessions.map((session) => (
@@ -745,11 +745,11 @@ export default async function CompetencyTrainingDetailPage(props: {
                     </label>
 
                     <label className="text-sm">
-                      <div className="font-black text-slate-900">Jenis Evaluasi</div>
+                      <div className="font-semibold text-slate-900">Jenis Evaluasi</div>
                       <select
                         name="evaluationType"
                         defaultValue="ASSESSMENT"
-                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                        className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                       >
                         <option value="ASSESSMENT">Assessment</option>
                         <option value="PRETEST">Pretest</option>
@@ -760,11 +760,11 @@ export default async function CompetencyTrainingDetailPage(props: {
                     </label>
 
                     <label className="text-sm">
-                      <div className="font-black text-slate-900">Hasil</div>
+                      <div className="font-semibold text-slate-900">Hasil</div>
                       <select
                         name="resultStatus"
                         defaultValue="OBSERVED"
-                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                        className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                       >
                         <option value="OBSERVED">Observed</option>
                         <option value="PASS">Pass</option>
@@ -774,7 +774,7 @@ export default async function CompetencyTrainingDetailPage(props: {
                     </label>
 
                     <label className="text-sm">
-                      <div className="font-black text-slate-900">Skor</div>
+                      <div className="font-semibold text-slate-900">Skor</div>
                       <input
                         type="number"
                         min="0"
@@ -782,23 +782,23 @@ export default async function CompetencyTrainingDetailPage(props: {
                         step="0.01"
                         name="score"
                         placeholder="0 - 100"
-                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                        className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                       />
                     </label>
 
                     <label className="text-sm">
-                      <div className="font-black text-slate-900">Tanggal Evaluasi</div>
+                      <div className="font-semibold text-slate-900">Tanggal Evaluasi</div>
                       <input
                         type="date"
                         name="evaluatedAt"
                         defaultValue={today}
-                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                        className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                       />
                     </label>
                   </div>
 
                   <label className="text-sm">
-                    <div className="font-black text-slate-900">Catatan Evaluasi</div>
+                    <div className="font-semibold text-slate-900">Catatan Evaluasi</div>
                     <textarea
                       name="note"
                       rows={3}
@@ -809,20 +809,20 @@ export default async function CompetencyTrainingDetailPage(props: {
 
                   <button
                     type="submit"
-                    className="inline-flex w-fit items-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-amber-400"
+                    className="inline-flex w-fit items-center gap-2 rounded-xl bg-amber-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400"
                   >
                     Simpan Evaluasi
                   </button>
                 </form>
               ) : (
-                <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+                <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
                   Tambahkan peserta terlebih dulu sebelum merekam evaluasi.
                 </div>
               )
             ) : null}
 
             {trainingDetail.evaluations.length === 0 ? (
-              <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+              <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
                 Belum ada evaluasi yang terekam untuk pelatihan ini.
               </div>
             ) : (
@@ -830,23 +830,23 @@ export default async function CompetencyTrainingDetailPage(props: {
                 {trainingDetail.evaluations.map((evaluation) => (
                   <div key={evaluation.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-700">
+                      <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
                         {formatEvaluationResultLabel(evaluation.resultStatus)}
                       </span>
-                      <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">
+                      <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
                         {formatEvaluationTypeLabel(evaluation.evaluationType)}
                       </span>
-                      <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">
+                      <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
                         Skor {formatScoreLabel(evaluation.score)}
                       </span>
                     </div>
-                    <h3 className="mt-3 text-lg font-black text-slate-900">{evaluation.participantName}</h3>
+                    <h3 className="mt-3 text-lg font-semibold text-slate-900">{evaluation.participantName}</h3>
                     <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-600">
                       {evaluation.participantNik ? <span>NIK: {evaluation.participantNik}</span> : null}
                       {evaluation.sessionTitle ? <span>Sesi: {evaluation.sessionTitle}</span> : null}
                       <span>Penilai: {evaluation.evaluatorName}</span>
                     </div>
-                    <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-600">
+                    <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600">
                       <Sparkles className="h-3.5 w-3.5" />
                       {formatDateTimeLabel(evaluation.evaluatedAt)}
                     </div>

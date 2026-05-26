@@ -57,7 +57,7 @@ export function AttendanceQRButton({ orgId, branchId, branchName }: AttendanceQR
       <button
         type="button"
         onClick={handleOpen}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider hover:bg-slate-700 transition-all cursor-pointer"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider hover:bg-slate-700 transition-all cursor-pointer"
       >
         <QrCode size={13} />
         QR Presensi
@@ -72,12 +72,12 @@ export function AttendanceQRButton({ orgId, branchId, branchName }: AttendanceQR
           />
 
           {/* Modal */}
-          <div className="relative w-full max-w-sm rounded-[36px] bg-white shadow-2xl overflow-hidden">
+          <div className="relative w-full max-w-sm rounded-[36px] bg-white shadow-md overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-7 pt-7 pb-5 border-b border-slate-100">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">QR Presensi</p>
-                <h3 className="text-lg font-black text-slate-900 mt-0.5">{branchName}</h3>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">QR Presensi</p>
+                <h3 className="text-lg font-semibold text-slate-900 mt-0.5">{branchName}</h3>
                 <p className="text-[11px] font-semibold text-slate-400 mt-0.5">{now}</p>
               </div>
               <button
@@ -92,7 +92,7 @@ export function AttendanceQRButton({ orgId, branchId, branchName }: AttendanceQR
             {/* QR Area */}
             <div className="px-7 py-7 flex flex-col items-center gap-5">
               {scanUrl && (
-                <div className="rounded-[28px] border-8 border-slate-50 bg-white shadow-inner p-4">
+                <div className="rounded-xl border-8 border-slate-50 bg-white shadow-inner p-4">
                   <QRCodeSVG
                     id="attendance-qr-svg"
                     value={scanUrl}
@@ -105,11 +105,11 @@ export function AttendanceQRButton({ orgId, branchId, branchName }: AttendanceQR
 
               {/* Instructions */}
               <div className="text-center space-y-1.5">
-                <p className="text-xs font-black text-slate-900 uppercase tracking-wider">Cara Presensi</p>
+                <p className="text-xs font-semibold text-slate-900 uppercase tracking-wider">Cara Presensi</p>
                 <p className="text-[12px] text-slate-500 font-medium leading-relaxed">
                   Arahkan kamera HP ke QR ini.<br />
-                  Scan = <span className="font-black text-emerald-600">Clock In</span> jika belum masuk,{' '}
-                  atau <span className="font-black text-sky-600">Clock Out</span> jika sudah.
+                  Scan = <span className="font-semibold text-emerald-600">Clock In</span> jika belum masuk,{' '}
+                  atau <span className="font-semibold text-sky-600">Clock Out</span> jika sudah.
                 </p>
               </div>
 
@@ -118,7 +118,7 @@ export function AttendanceQRButton({ orgId, branchId, branchName }: AttendanceQR
                 <button
                   type="button"
                   onClick={build}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-xs font-black uppercase tracking-wider hover:bg-slate-100 transition-all cursor-pointer"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider hover:bg-slate-100 transition-all cursor-pointer"
                 >
                   <RefreshCcw size={12} />
                   Refresh
@@ -126,7 +126,7 @@ export function AttendanceQRButton({ orgId, branchId, branchName }: AttendanceQR
                 <button
                   type="button"
                   onClick={handleDownload}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider hover:bg-slate-700 transition-all cursor-pointer"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider hover:bg-slate-700 transition-all cursor-pointer"
                 >
                   <Download size={12} />
                   Unduh QR
@@ -136,8 +136,8 @@ export function AttendanceQRButton({ orgId, branchId, branchName }: AttendanceQR
 
             {/* Bottom strip */}
             <div className="px-7 pb-7">
-              <div className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-center">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                   QR aktif untuk hari ini · otomatis IN/OUT
                 </p>
               </div>

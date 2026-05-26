@@ -164,16 +164,16 @@ function TemplateMiniPreview({
       </div>
       <div className={`${isDetail ? 'space-y-4 p-5' : 'space-y-3 p-4'}`} style={previewStyle}>
         <div className={`border ${isDetail ? 'p-5' : 'p-4'}`} style={heroStyle}>
-          <div className={`${isDetail ? 'text-[10px]' : 'text-[9px]'} font-black uppercase tracking-[0.18em]`} style={{ color: tokens.accentStrong }}>
+          <div className={`${isDetail ? 'text-[10px]' : 'text-[9px]'} font-semibold uppercase tracking-wide`} style={{ color: tokens.accentStrong }}>
             {truncatePreviewText(heroBlock?.eyebrow || template.category, isDetail ? 34 : 26)}
           </div>
-          <div className={`mt-2 ${isDetail ? 'text-base' : 'text-sm'} font-black leading-tight`}>
+          <div className={`mt-2 ${isDetail ? 'text-base' : 'text-sm'} font-semibold leading-tight`}>
             {truncatePreviewText(heroBlock?.title || template.name, isDetail ? 72 : 52)}
           </div>
           <div className={`mt-2 ${isDetail ? 'text-xs leading-5' : 'text-[10px] leading-4'}`} style={{ color: tokens.muted }}>
             {truncatePreviewText(heroBlock?.body || template.description, isDetail ? 140 : 92)}
           </div>
-          <div className={`mt-3 inline-flex ${isDetail ? 'px-4 py-2 text-[11px]' : 'px-3 py-1.5 text-[10px]'} font-black`} style={ctaStyle}>
+          <div className={`mt-3 inline-flex ${isDetail ? 'px-4 py-2 text-[11px]' : 'px-3 py-1.5 text-[10px]'} font-semibold`} style={ctaStyle}>
             {truncatePreviewText(heroBlock?.ctaLabel || 'Belanja Sekarang', isDetail ? 28 : 22)}
           </div>
         </div>
@@ -190,10 +190,10 @@ function TemplateMiniPreview({
 
         <div className="grid gap-2 md:grid-cols-[1.1fr_0.9fr]">
           <div className="border p-3" style={cardStyle}>
-            <div className="text-[9px] font-black uppercase tracking-[0.16em]" style={{ color: tokens.accentStrong }}>
+            <div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: tokens.accentStrong }}>
               Catalog
             </div>
-            <div className="mt-1 text-[11px] font-black" style={{ color: tokens.text }}>
+            <div className="mt-1 text-[11px] font-semibold" style={{ color: tokens.text }}>
               {truncatePreviewText(sectionLabel, 34)}
             </div>
             <div className="mt-1 text-[10px]" style={{ color: tokens.muted }}>
@@ -201,7 +201,7 @@ function TemplateMiniPreview({
             </div>
           </div>
           <div className="border p-3" style={cardStyle}>
-            <div className="text-[9px] font-black uppercase tracking-[0.16em]" style={{ color: tokens.accentStrong }}>
+            <div className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: tokens.accentStrong }}>
               Support
             </div>
             <div className="mt-1 text-[10px] leading-4" style={{ color: tokens.muted }}>
@@ -219,7 +219,7 @@ function TemplatePreviewPanel({ template }: { template: StoreThemeTemplateSeed }
 
   return (
     <div className="rounded-[30px] border border-slate-200 bg-slate-50 p-6 xl:sticky xl:top-6">
-      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Preview Template</div>
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Preview Template</div>
       <div className="mt-4">
         <TemplateMiniPreview template={template} size="detail" />
       </div>
@@ -227,29 +227,29 @@ function TemplatePreviewPanel({ template }: { template: StoreThemeTemplateSeed }
       <div className="mt-5 rounded-[24px] border border-slate-200 bg-white p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-2xl font-black text-slate-900">{template.name}</div>
+            <div className="text-2xl font-semibold text-slate-900">{template.name}</div>
             <div className="mt-2 text-sm leading-6 text-slate-600">{template.description}</div>
           </div>
-          <span className="rounded-full bg-slate-900 px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-white">
+          <span className="rounded-full bg-slate-900 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-white">
             {template.category}
           </span>
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           <div className="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-4">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Font</div>
-            <div className="mt-2 text-sm font-black text-slate-900">{template.tokens.fontLabel}</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Font</div>
+            <div className="mt-2 text-sm font-semibold text-slate-900">{template.tokens.fontLabel}</div>
           </div>
           <div className="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-4">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Aksen</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Aksen</div>
             <div className="mt-2 flex items-center gap-2">
               <span className="h-5 w-5 rounded-full border border-slate-200" style={{ backgroundColor: template.tokens.accent }} />
-              <span className="text-sm font-black text-slate-900">{template.tokens.accent}</span>
+              <span className="text-sm font-semibold text-slate-900">{template.tokens.accent}</span>
             </div>
           </div>
           <div className="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-4">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Blok Awal</div>
-            <div className="mt-2 text-sm font-black capitalize text-slate-900">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Blok Awal</div>
+            <div className="mt-2 text-sm font-semibold capitalize text-slate-900">
               {featuredBlocks.join(' • ')}
             </div>
           </div>
@@ -296,13 +296,13 @@ function StoreFormModal({
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/70 px-8 py-6">
               <div>
-                <div className="text-sm font-black uppercase tracking-[0.16em] text-slate-900">{title}</div>
+                <div className="text-sm font-semibold uppercase tracking-wide text-slate-900">{title}</div>
                 <div className="mt-2 text-sm font-medium leading-6 text-slate-500">{subtitle}</div>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
               >
                 <X size={18} />
               </button>
@@ -614,7 +614,7 @@ export default function EcommerceAdminClient({
       />
 
       {flash && (
-        <div className={`rounded-[28px] border px-5 py-4 text-sm font-bold ${
+        <div className={`rounded-xl border px-5 py-4 text-sm font-bold ${
           flash.tone === 'success'
             ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
             : flash.tone === 'error'
@@ -640,11 +640,11 @@ export default function EcommerceAdminClient({
         />
         <div className="grid gap-4 px-10 py-8 md:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-2">
-            <label className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Store Aktif</label>
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Store Aktif</label>
             <select
               value={selectedStoreId}
               onChange={(event) => applyStoreSelection(event.target.value)}
-              className="w-full rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold text-slate-900 outline-none focus:border-blue-500"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold text-slate-900 outline-none focus:border-blue-500"
             >
               {dashboardData.stores.map((store) => (
                 <option key={store.id} value={store.id}>
@@ -653,9 +653,9 @@ export default function EcommerceAdminClient({
               ))}
             </select>
           </div>
-          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Ringkas</div>
-            <div className="mt-2 text-lg font-black text-slate-900">{selectedStore?.name || 'Belum ada store'}</div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Ringkas</div>
+            <div className="mt-2 text-lg font-semibold text-slate-900">{selectedStore?.name || 'Belum ada store'}</div>
             <div className="mt-1 text-sm font-medium text-slate-500">
               Domain: {(selectedStore?.domainList || []).join(', ') || 'Belum ada custom domain'}
             </div>
@@ -665,7 +665,7 @@ export default function EcommerceAdminClient({
                 <Link
                   href={`/toko/${orgSlug}/${selectedStore.slug}`}
                   target="_blank"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-[11px] font-black text-slate-700"
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700"
                 >
                   Buka Storefront
                 </Link>
@@ -673,7 +673,7 @@ export default function EcommerceAdminClient({
                   <Link
                     href={`/toko/${orgSlug}/${selectedStore.slug}?preview=${storeThemeDraft.previewToken}`}
                     target="_blank"
-                    className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-[11px] font-black text-blue-700"
+                    className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-[11px] font-semibold text-blue-700"
                   >
                     Preview Draft
                   </Link>
@@ -713,7 +713,7 @@ export default function EcommerceAdminClient({
                         : 'border-slate-200 bg-white hover:border-blue-300'
                   }`}
                 >
-                  <div className={`text-sm font-black ${isActive && !tab.disabled ? 'text-blue-700' : 'text-slate-900'}`}>
+                  <div className={`text-sm font-semibold ${isActive && !tab.disabled ? 'text-blue-700' : 'text-slate-900'}`}>
                     {tab.label}
                   </div>
                   <div className={`mt-2 text-xs leading-5 ${tab.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -724,7 +724,7 @@ export default function EcommerceAdminClient({
             })}
           </div>
           {!selectedStore && (
-            <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-bold text-amber-700">
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-bold text-amber-700">
               Tab selain `Store` akan aktif setelah store pertama berhasil dibuat.
             </div>
           )}
@@ -751,9 +751,9 @@ export default function EcommerceAdminClient({
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 {readinessChecks.map((item) => (
-                  <div key={item.label} className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
-                    <div className="text-sm font-black text-slate-900">{item.label}</div>
-                    <div className={`mt-2 text-xs font-black uppercase tracking-[0.14em] ${
+                  <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="text-sm font-semibold text-slate-900">{item.label}</div>
+                    <div className={`mt-2 text-xs font-semibold uppercase tracking-[0.14em] ${
                       item.ready ? 'text-emerald-600' : 'text-amber-600'
                     }`}>
                       {item.ready ? 'Siap' : 'Belum lengkap'}
@@ -812,8 +812,8 @@ export default function EcommerceAdminClient({
             />
             <div className="grid gap-6 px-10 py-8 xl:grid-cols-[0.9fr_1.1fr]">
               <div className="space-y-5">
-                <div className="rounded-[28px] border border-blue-100 bg-blue-50/70 p-5">
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Buat Store Cepat</div>
+                <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-5">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Buat Store Cepat</div>
                   <div className="mt-3 text-sm leading-6 text-slate-600">
                     Cukup isi nama store dan pilih template di modal. Kontak, instruksi transfer, SEO, dan detail lain bisa dilengkapi nanti.
                   </div>
@@ -824,13 +824,13 @@ export default function EcommerceAdminClient({
                   </div>
                 </div>
 
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Default Otomatis</div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Default Otomatis</div>
                   {canQuickCreateStore ? (
                     <div className="mt-3 space-y-2 text-sm text-slate-600">
-                      <div><span className="font-black text-slate-900">Cabang:</span> {quickCreateDefaults.branch?.name}</div>
-                      <div><span className="font-black text-slate-900">Gudang:</span> {quickCreateDefaults.warehouse?.name}</div>
-                      <div><span className="font-black text-slate-900">Rekening:</span> {quickCreateDefaults.bankAccount?.label}</div>
+                      <div><span className="font-semibold text-slate-900">Cabang:</span> {quickCreateDefaults.branch?.name}</div>
+                      <div><span className="font-semibold text-slate-900">Gudang:</span> {quickCreateDefaults.warehouse?.name}</div>
+                      <div><span className="font-semibold text-slate-900">Rekening:</span> {quickCreateDefaults.bankAccount?.label}</div>
                     </div>
                   ) : (
                     <div className="mt-3 text-sm font-bold text-amber-700">
@@ -841,11 +841,11 @@ export default function EcommerceAdminClient({
               </div>
 
               <div className="rounded-[30px] border border-slate-200 bg-slate-50 p-6">
-                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Store Aktif</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Store Aktif</div>
                 {selectedStore ? (
                   <div className="mt-4 space-y-5">
                     <div>
-                      <div className="text-2xl font-black text-slate-900">{selectedStore.name}</div>
+                      <div className="text-2xl font-semibold text-slate-900">{selectedStore.name}</div>
                       <div className="mt-2 text-sm font-medium text-slate-500">Slug: {selectedStore.slug}</div>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -854,12 +854,12 @@ export default function EcommerceAdminClient({
                     </div>
                     <div className="grid gap-3 md:grid-cols-2">
                       <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-4">
-                        <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Brand</div>
-                        <div className="mt-2 text-sm font-black text-slate-900">{selectedStore.brandName || 'Belum diisi'}</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Brand</div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900">{selectedStore.brandName || 'Belum diisi'}</div>
                       </div>
                       <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-4">
-                        <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Domain</div>
-                        <div className="mt-2 text-sm font-black text-slate-900">{selectedStore.domainList[0] || 'Belum ada domain'}</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Domain</div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900">{selectedStore.domainList[0] || 'Belum ada domain'}</div>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-3">
@@ -869,7 +869,7 @@ export default function EcommerceAdminClient({
                       <Link
                         href={`/toko/${orgSlug}/${selectedStore.slug}`}
                         target="_blank"
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-black text-slate-700"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-semibold text-slate-700"
                       >
                         Buka Storefront
                       </Link>
@@ -902,14 +902,14 @@ export default function EcommerceAdminClient({
                   }}
                   className="grid gap-3"
                 >
-                  <label className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Tambah Domain</label>
-                  <input name="domain" placeholder="contoh: toko.brandanda.com" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tambah Domain</label>
+                  <input name="domain" placeholder="contoh: toko.brandanda.com" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
                   <div className="grid gap-3 md:grid-cols-2">
-                    <select name="status" defaultValue="LIVE" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
+                    <select name="status" defaultValue="LIVE" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
                       <option value="PENDING">Pending</option>
                       <option value="LIVE">Live</option>
                     </select>
-                    <select name="is_primary" defaultValue="true" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
+                    <select name="is_primary" defaultValue="true" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
                       <option value="true">Primary</option>
                       <option value="false">Secondary</option>
                     </select>
@@ -931,18 +931,18 @@ export default function EcommerceAdminClient({
                 }}
                 className="grid gap-3"
               >
-                <label className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Tambah Zona</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tambah Zona</label>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <input name="name" placeholder="Nama zona" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
-                  <input name="code" placeholder="kode-zona" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
+                  <input name="name" placeholder="Nama zona" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                  <input name="code" placeholder="kode-zona" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <textarea name="provinces" rows={3} placeholder="Provinsi, pisahkan dengan enter atau koma" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
-                  <textarea name="cities" rows={3} placeholder="Kota / kabupaten, pisahkan dengan enter atau koma" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
+                  <textarea name="provinces" rows={3} placeholder="Provinsi, pisahkan dengan enter atau koma" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
+                  <textarea name="cities" rows={3} placeholder="Kota / kabupaten, pisahkan dengan enter atau koma" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <textarea name="postal_codes" rows={3} placeholder="Kode pos, misalnya 40123 atau 4012" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
-                  <textarea name="countries" rows={3} placeholder="Negara, misalnya ID atau Indonesia" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
+                  <textarea name="postal_codes" rows={3} placeholder="Kode pos, misalnya 40123 atau 4012" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
+                  <textarea name="countries" rows={3} placeholder="Negara, misalnya ID atau Indonesia" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
                 </div>
                 <div className="text-xs font-medium text-slate-500">
                   Kosongkan jika zona ini berlaku umum. Isian akan dipakai untuk auto-match ongkir dari alamat checkout.
@@ -964,16 +964,16 @@ export default function EcommerceAdminClient({
                 }}
                 className="grid gap-3"
               >
-                <label className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Tambah Tarif</label>
-                <select name="zone_id" required className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tambah Tarif</label>
+                <select name="zone_id" required className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
                   <option value="">Pilih zona</option>
                   {selectedStoreZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}
                 </select>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <input name="name" placeholder="Nama tarif" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
-                  <input name="eta_label" placeholder="Contoh: 1-2 hari" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                  <input name="name" placeholder="Nama tarif" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                  <input name="eta_label" placeholder="Contoh: 1-2 hari" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
                 </div>
-                <input name="flat_amount" placeholder="Nominal flat" type="number" min="0" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
+                <input name="flat_amount" placeholder="Nominal flat" type="number" min="0" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
                 <div className="flex justify-end">
                   <SafeButton type="submit" isLoading={isPending}>
                     Simpan Tarif
@@ -981,14 +981,14 @@ export default function EcommerceAdminClient({
                 </div>
               </form>
 
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Tarif Aktif</div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Tarif Aktif</div>
                   <div className="mt-3 space-y-2 text-sm">
                     {selectedStoreRates.length === 0 && <div className="font-medium text-slate-500">Belum ada tarif aktif.</div>}
                     {selectedStoreRates.map((rate) => (
-                      <div key={rate.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                      <div key={rate.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
                         <div>
-                          <div className="font-black text-slate-900">{rate.zoneName} • {rate.name}</div>
+                          <div className="font-semibold text-slate-900">{rate.zoneName} • {rate.name}</div>
                           <div className="text-xs font-medium text-slate-500">{rate.etaLabel || 'Tanpa ETA'}</div>
                           {selectedStoreZoneById.get(rate.zoneId) && (
                             <div className="mt-2 text-[11px] font-medium leading-relaxed text-slate-500">
@@ -996,7 +996,7 @@ export default function EcommerceAdminClient({
                             </div>
                           )}
                         </div>
-                        <div className="font-mono text-sm font-black text-slate-800">{formatRupiah(rate.amount)}</div>
+                        <div className="font-mono text-sm font-semibold text-slate-800">{formatRupiah(rate.amount)}</div>
                       </div>
                     ))}
                   </div>
@@ -1031,11 +1031,11 @@ export default function EcommerceAdminClient({
               }}
               className="space-y-4"
             >
-              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Publikasi Produk</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Publikasi Produk</div>
               <select
                 value={selectedProductId}
                 onChange={(event) => applyProductSelection(event.target.value)}
-                className="w-full rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500"
               >
                 {dashboardData.products.map((product) => (
                   <option key={product.id} value={product.id}>
@@ -1044,26 +1044,26 @@ export default function EcommerceAdminClient({
                 ))}
               </select>
               <div className="grid gap-3 md:grid-cols-2">
-                <input value={catalogForm.publicName} onChange={(event) => setCatalogForm((current) => ({ ...current, publicName: event.target.value }))} placeholder="Nama publik" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
-                <input value={catalogForm.publicSlug} onChange={(event) => setCatalogForm((current) => ({ ...current, publicSlug: event.target.value }))} placeholder="Slug publik" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
+                <input value={catalogForm.publicName} onChange={(event) => setCatalogForm((current) => ({ ...current, publicName: event.target.value }))} placeholder="Nama publik" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                <input value={catalogForm.publicSlug} onChange={(event) => setCatalogForm((current) => ({ ...current, publicSlug: event.target.value }))} placeholder="Slug publik" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
               </div>
-              <textarea value={catalogForm.shortDescription} onChange={(event) => setCatalogForm((current) => ({ ...current, shortDescription: event.target.value }))} rows={2} placeholder="Deskripsi singkat" className="w-full rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
-              <textarea value={catalogForm.publicDescription} onChange={(event) => setCatalogForm((current) => ({ ...current, publicDescription: event.target.value }))} rows={4} placeholder="Deskripsi publik" className="w-full rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
+              <textarea value={catalogForm.shortDescription} onChange={(event) => setCatalogForm((current) => ({ ...current, shortDescription: event.target.value }))} rows={2} placeholder="Deskripsi singkat" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
+              <textarea value={catalogForm.publicDescription} onChange={(event) => setCatalogForm((current) => ({ ...current, publicDescription: event.target.value }))} rows={4} placeholder="Deskripsi publik" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
               <div className="grid gap-3 md:grid-cols-2">
-                <input value={catalogForm.priceOverride} onChange={(event) => setCatalogForm((current) => ({ ...current, priceOverride: event.target.value }))} type="number" min="0" placeholder="Harga override" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
-                <input value={catalogForm.comparePrice} onChange={(event) => setCatalogForm((current) => ({ ...current, comparePrice: event.target.value }))} type="number" min="0" placeholder="Harga coret" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
+                <input value={catalogForm.priceOverride} onChange={(event) => setCatalogForm((current) => ({ ...current, priceOverride: event.target.value }))} type="number" min="0" placeholder="Harga override" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
+                <input value={catalogForm.comparePrice} onChange={(event) => setCatalogForm((current) => ({ ...current, comparePrice: event.target.value }))} type="number" min="0" placeholder="Harga coret" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
               </div>
               <div className="grid gap-3 md:grid-cols-3">
-                <input value={catalogForm.badgeText} onChange={(event) => setCatalogForm((current) => ({ ...current, badgeText: event.target.value }))} placeholder="Badge" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
-                <input value={catalogForm.sortOrder} onChange={(event) => setCatalogForm((current) => ({ ...current, sortOrder: event.target.value }))} type="number" placeholder="Urutan" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
-                <input value={catalogForm.imageUrl} onChange={(event) => setCatalogForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="URL gambar" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
+                <input value={catalogForm.badgeText} onChange={(event) => setCatalogForm((current) => ({ ...current, badgeText: event.target.value }))} placeholder="Badge" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                <input value={catalogForm.sortOrder} onChange={(event) => setCatalogForm((current) => ({ ...current, sortOrder: event.target.value }))} type="number" placeholder="Urutan" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
+                <input value={catalogForm.imageUrl} onChange={(event) => setCatalogForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="URL gambar" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                <select value={String(catalogForm.isFeatured)} onChange={(event) => setCatalogForm((current) => ({ ...current, isFeatured: event.target.value === 'true' }))} className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <select value={String(catalogForm.isFeatured)} onChange={(event) => setCatalogForm((current) => ({ ...current, isFeatured: event.target.value === 'true' }))} className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
                   <option value="false">Biasa</option>
                   <option value="true">Featured</option>
                 </select>
-                <select value={String(catalogForm.isPublished)} onChange={(event) => setCatalogForm((current) => ({ ...current, isPublished: event.target.value === 'true' }))} className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <select value={String(catalogForm.isPublished)} onChange={(event) => setCatalogForm((current) => ({ ...current, isPublished: event.target.value === 'true' }))} className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
                   <option value="true">Tayang</option>
                   <option value="false">Sembunyikan</option>
                 </select>
@@ -1099,44 +1099,44 @@ export default function EcommerceAdminClient({
               }}
               className="space-y-4"
             >
-              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Tambah Varian</div>
-              <select value={selectedVariantProductId} onChange={(event) => applyVariantProductSelection(event.target.value)} className="w-full rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tambah Varian</div>
+              <select value={selectedVariantProductId} onChange={(event) => applyVariantProductSelection(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
                 {dashboardData.products.map((product) => (
                   <option key={product.id} value={product.id}>{product.name}</option>
                 ))}
               </select>
-              <select value={variantForm.inventoryProductId} onChange={(event) => setVariantForm((current) => ({ ...current, inventoryProductId: event.target.value }))} className="w-full rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
+              <select value={variantForm.inventoryProductId} onChange={(event) => setVariantForm((current) => ({ ...current, inventoryProductId: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
                 {dashboardData.products.map((product) => (
                   <option key={product.id} value={product.id}>{product.name} • produk stok</option>
                 ))}
               </select>
               <div className="grid gap-3 md:grid-cols-2">
-                <input value={variantForm.variantName} onChange={(event) => setVariantForm((current) => ({ ...current, variantName: event.target.value }))} placeholder="Nama varian" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
-                <input value={variantForm.sku} onChange={(event) => setVariantForm((current) => ({ ...current, sku: event.target.value }))} placeholder="SKU varian" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
+                <input value={variantForm.variantName} onChange={(event) => setVariantForm((current) => ({ ...current, variantName: event.target.value }))} placeholder="Nama varian" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                <input value={variantForm.sku} onChange={(event) => setVariantForm((current) => ({ ...current, sku: event.target.value }))} placeholder="SKU varian" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                <input value={variantForm.publicName} onChange={(event) => setVariantForm((current) => ({ ...current, publicName: event.target.value }))} placeholder="Nama publik varian" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
-                <input value={variantForm.imageUrl} onChange={(event) => setVariantForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="URL gambar varian" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
+                <input value={variantForm.publicName} onChange={(event) => setVariantForm((current) => ({ ...current, publicName: event.target.value }))} placeholder="Nama publik varian" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                <input value={variantForm.imageUrl} onChange={(event) => setVariantForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="URL gambar varian" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
               </div>
               <div className="grid gap-3 md:grid-cols-3">
-                <input value={variantForm.priceOverride} onChange={(event) => setVariantForm((current) => ({ ...current, priceOverride: event.target.value }))} type="number" min="0" placeholder="Harga override" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
-                <input value={variantForm.comparePrice} onChange={(event) => setVariantForm((current) => ({ ...current, comparePrice: event.target.value }))} type="number" min="0" placeholder="Harga coret" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
-                <input value={variantForm.badgeText} onChange={(event) => setVariantForm((current) => ({ ...current, badgeText: event.target.value }))} placeholder="Badge" className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                <input value={variantForm.priceOverride} onChange={(event) => setVariantForm((current) => ({ ...current, priceOverride: event.target.value }))} type="number" min="0" placeholder="Harga override" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
+                <input value={variantForm.comparePrice} onChange={(event) => setVariantForm((current) => ({ ...current, comparePrice: event.target.value }))} type="number" min="0" placeholder="Harga coret" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
+                <input value={variantForm.badgeText} onChange={(event) => setVariantForm((current) => ({ ...current, badgeText: event.target.value }))} placeholder="Badge" className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500" />
               </div>
-              <textarea value={variantForm.attributesText} onChange={(event) => setVariantForm((current) => ({ ...current, attributesText: event.target.value }))} rows={4} className="w-full rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
+              <textarea value={variantForm.attributesText} onChange={(event) => setVariantForm((current) => ({ ...current, attributesText: event.target.value }))} rows={4} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500" />
               <div className="text-xs font-medium text-slate-500">
                 Tulis satu atribut per baris dengan format `Nama Atribut: Nilai`. Tipe blok theme yang diizinkan: {STORE_THEME_BLOCK_TYPES.join(', ')}.
               </div>
               <div className="grid gap-3 md:grid-cols-3">
-                <select value={String(variantForm.isActive)} onChange={(event) => setVariantForm((current) => ({ ...current, isActive: event.target.value === 'true' }))} className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <select value={String(variantForm.isActive)} onChange={(event) => setVariantForm((current) => ({ ...current, isActive: event.target.value === 'true' }))} className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
                   <option value="true">Varian aktif</option>
                   <option value="false">Varian nonaktif</option>
                 </select>
-                <select value={String(variantForm.isDefault)} onChange={(event) => setVariantForm((current) => ({ ...current, isDefault: event.target.value === 'true' }))} className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <select value={String(variantForm.isDefault)} onChange={(event) => setVariantForm((current) => ({ ...current, isDefault: event.target.value === 'true' }))} className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
                   <option value="false">Bukan default</option>
                   <option value="true">Default</option>
                 </select>
-                <select value={String(variantForm.isPublished)} onChange={(event) => setVariantForm((current) => ({ ...current, isPublished: event.target.value === 'true' }))} className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <select value={String(variantForm.isPublished)} onChange={(event) => setVariantForm((current) => ({ ...current, isPublished: event.target.value === 'true' }))} className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500">
                   <option value="true">Tayang</option>
                   <option value="false">Sembunyikan</option>
                 </select>
@@ -1182,12 +1182,12 @@ export default function EcommerceAdminClient({
             value={orderSearch}
             onChange={(event) => setOrderSearch(event.target.value)}
             placeholder="Cari nomor order, nama, email, atau nomor pelanggan"
-            className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500"
+            className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-medium outline-none focus:border-blue-500"
           />
           <select
             value={orderStatusFilter}
             onChange={(event) => setOrderStatusFilter(event.target.value)}
-            className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500"
+            className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500"
           >
             {orderStatusOptions.map((status) => (
               <option key={status} value={status}>
@@ -1202,7 +1202,7 @@ export default function EcommerceAdminClient({
         <div className="overflow-x-auto px-10 py-6">
           <table className="min-w-full text-left text-sm">
             <thead>
-              <tr className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+              <tr className="text-[11px] uppercase tracking-wide text-slate-500">
                 <th className="pb-4 pr-4">Order</th>
                 <th className="pb-4 pr-4">Pelanggan</th>
                 <th className="pb-4 pr-4">Nilai</th>
@@ -1215,7 +1215,7 @@ export default function EcommerceAdminClient({
               {filteredOrders.map((order) => (
                 <tr key={order.orderId} className="align-top">
                   <td className="py-4 pr-4">
-                    <div className="font-black text-slate-900">{order.orderNumber}</div>
+                    <div className="font-semibold text-slate-900">{order.orderNumber}</div>
                     <div className="text-xs font-medium text-slate-500">{formatDate(order.createdAt)}</div>
                     {order.paymentDueAt && (
                       <div className="text-[11px] font-medium text-slate-400">Jatuh tempo: {formatDate(order.paymentDueAt)}</div>
@@ -1226,7 +1226,7 @@ export default function EcommerceAdminClient({
                     <div className="text-xs font-medium text-slate-500">{order.customerEmail || '-'}</div>
                     <div className="text-xs font-medium text-slate-500">{order.customerPhone || '-'}</div>
                   </td>
-                  <td className="py-4 pr-4 font-mono font-black text-slate-900">{formatRupiah(order.grandTotal)}</td>
+                  <td className="py-4 pr-4 font-mono font-semibold text-slate-900">{formatRupiah(order.grandTotal)}</td>
                   <td className="py-4 pr-4">
                     <div className="flex flex-wrap gap-2">
                       <StatusBadge label={order.status} variant={badgeVariantFromStatus(order.status)} />
@@ -1239,7 +1239,7 @@ export default function EcommerceAdminClient({
                   </td>
                   <td className="py-4 pr-4">
                     {order.proofUrl ? (
-                      <Link href={order.proofUrl} target="_blank" className="text-xs font-black text-blue-600 hover:underline">
+                      <Link href={order.proofUrl} target="_blank" className="text-xs font-semibold text-blue-600 hover:underline">
                         Lihat bukti
                       </Link>
                     ) : (
@@ -1312,11 +1312,11 @@ export default function EcommerceAdminClient({
                       </div>
                       {(orderEventsByOrderId.get(order.orderId) || []).length > 0 && (
                         <div className="w-64 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Riwayat</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Riwayat</div>
                           <div className="mt-3 space-y-3">
                             {(orderEventsByOrderId.get(order.orderId) || []).slice(0, 4).map((event) => (
                               <div key={event.id} className="border-l-2 border-slate-200 pl-3">
-                                <div className="text-[11px] font-black text-slate-800">{event.eventType}</div>
+                                <div className="text-[11px] font-semibold text-slate-800">{event.eventType}</div>
                                 <div className="text-[11px] font-medium text-slate-500">
                                   {event.actorLabel}{event.actorUserId ? ` (${event.actorUserId.slice(0, 8)})` : ''} • {formatDate(event.createdAt)}
                                 </div>
@@ -1363,17 +1363,17 @@ export default function EcommerceAdminClient({
                   name="name"
                   required
                   placeholder="Nama store"
-                  className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-bold outline-none focus:border-blue-500"
                 />
                 <input
                   name="slug"
                   placeholder="Slug publik (opsional)"
-                  className="rounded-[22px] border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 font-mono font-bold outline-none focus:border-blue-500"
                 />
               </div>
 
-              <div className="rounded-[28px] border border-blue-100 bg-blue-50/70 p-5">
-                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">Pilih Template</div>
+              <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-5">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Pilih Template</div>
                 <div className="mt-3 max-h-[520px] space-y-3 overflow-y-auto pr-1">
                   {dashboardData.templates.map((template) => {
                     const isActive = template.key === newStoreTemplateKey
@@ -1389,8 +1389,8 @@ export default function EcommerceAdminClient({
                         }`}
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-sm font-black text-slate-900">{template.name}</div>
-                          <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+                          <div className="text-sm font-semibold text-slate-900">{template.name}</div>
+                          <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
                             isActive ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
                           }`}>
                             {template.category}
@@ -1405,13 +1405,13 @@ export default function EcommerceAdminClient({
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Default Otomatis</div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Default Otomatis</div>
                 {canQuickCreateStore ? (
                   <div className="mt-3 space-y-2 text-sm text-slate-600">
-                    <div><span className="font-black text-slate-900">Cabang:</span> {quickCreateDefaults.branch?.name}</div>
-                    <div><span className="font-black text-slate-900">Gudang:</span> {quickCreateDefaults.warehouse?.name}</div>
-                    <div><span className="font-black text-slate-900">Rekening:</span> {quickCreateDefaults.bankAccount?.label}</div>
+                    <div><span className="font-semibold text-slate-900">Cabang:</span> {quickCreateDefaults.branch?.name}</div>
+                    <div><span className="font-semibold text-slate-900">Gudang:</span> {quickCreateDefaults.warehouse?.name}</div>
+                    <div><span className="font-semibold text-slate-900">Rekening:</span> {quickCreateDefaults.bankAccount?.label}</div>
                     <div className="pt-2 text-xs font-bold text-slate-500">
                       Kontak, instruksi transfer, SEO, dan pengaturan lainnya bisa Anda isi nanti di panel edit store.
                     </div>
@@ -1452,69 +1452,69 @@ export default function EcommerceAdminClient({
         {selectedStore && (
           <form onSubmit={handleEditStoreSubmit} className="space-y-6 px-8 py-8">
             <input type="hidden" name="store_id" value={selectedStore.id} />
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Identitas Store</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Identitas Store</div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <input name="name" defaultValue={selectedStore.name} required placeholder="Nama store" className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
-                <input name="slug" defaultValue={selectedStore.slug} required placeholder="Slug publik" className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
-                <input name="brand_name" defaultValue={selectedStore.brandName} placeholder="Brand / grup" className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
-                <input name="line_name" defaultValue={selectedStore.lineName} placeholder="Lini bisnis" className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                <input name="name" defaultValue={selectedStore.name} required placeholder="Nama store" className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                <input name="slug" defaultValue={selectedStore.slug} required placeholder="Slug publik" className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-mono font-bold outline-none focus:border-blue-500" />
+                <input name="brand_name" defaultValue={selectedStore.brandName} placeholder="Brand / grup" className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                <input name="line_name" defaultValue={selectedStore.lineName} placeholder="Lini bisnis" className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Operasional</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Operasional</div>
               <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <select name="branch_id" defaultValue={selectedStore.branchId} className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <select name="branch_id" defaultValue={selectedStore.branchId} className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
                   {dashboardData.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                 </select>
-                <select name="warehouse_id" defaultValue={selectedStore.warehouseId} className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <select name="warehouse_id" defaultValue={selectedStore.warehouseId} className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
                   {dashboardData.warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
                 </select>
-                <select name="bank_account_id" defaultValue={selectedStore.bankAccountId} className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <select name="bank_account_id" defaultValue={selectedStore.bankAccountId} className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
                   {dashboardData.bankAccounts.map((bank) => <option key={bank.id} value={bank.id}>{bank.label}</option>)}
                 </select>
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <select name="is_active" defaultValue={String(selectedStore.isActive)} className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <select name="is_active" defaultValue={String(selectedStore.isActive)} className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
                   <option value="true">Aktif</option>
                   <option value="false">Nonaktif</option>
                 </select>
-                <select name="is_published" defaultValue={String(selectedStore.isPublished)} className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <select name="is_published" defaultValue={String(selectedStore.isPublished)} className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
                   <option value="true">Live</option>
                   <option value="false">Belum live</option>
                 </select>
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Kontak</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Kontak</div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <input name="support_email" defaultValue={selectedStore.supportEmail} placeholder="Email support" className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
-                <input name="support_phone" defaultValue={selectedStore.supportPhone} placeholder="Nomor support" className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                <input name="support_email" defaultValue={selectedStore.supportEmail} placeholder="Email support" className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                <input name="support_phone" defaultValue={selectedStore.supportPhone} placeholder="Nomor support" className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
               </div>
-              <input name="whatsapp_phone" defaultValue={selectedStore.whatsappPhone} placeholder="Nomor WhatsApp" className="mt-4 w-full rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
+              <input name="whatsapp_phone" defaultValue={selectedStore.whatsappPhone} placeholder="Nomor WhatsApp" className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Tampilan dan SEO</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tampilan dan SEO</div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <input name="logo_url" defaultValue={selectedStore.logoUrl} placeholder="URL logo" className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
-                <input name="headline" defaultValue={selectedStore.headline} placeholder="Headline hero" className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
+                <input name="logo_url" defaultValue={selectedStore.logoUrl} placeholder="URL logo" className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
+                <input name="headline" defaultValue={selectedStore.headline} placeholder="Headline hero" className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500" />
               </div>
-              <textarea name="subheadline" defaultValue={selectedStore.subheadline} rows={3} placeholder="Subheadline" className="mt-4 w-full rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
+              <textarea name="subheadline" defaultValue={selectedStore.subheadline} rows={3} placeholder="Subheadline" className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <input name="seo_title" defaultValue={selectedStore.name} placeholder="SEO title" className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
-                <select name="currency" defaultValue={selectedStore.currency} className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
+                <input name="seo_title" defaultValue={selectedStore.name} placeholder="SEO title" className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
+                <select name="currency" defaultValue={selectedStore.currency} className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-bold outline-none focus:border-blue-500">
                   <option value="IDR">IDR</option>
                 </select>
               </div>
-              <textarea name="seo_description" defaultValue={selectedStore.subheadline} rows={2} placeholder="SEO description" className="mt-4 w-full rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
+              <textarea name="seo_description" defaultValue={selectedStore.subheadline} rows={2} placeholder="SEO description" className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <input name="hero_notice" defaultValue={selectedStore.heroNotice} placeholder="Notice di hero" className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
-                <input name="checkout_notice" defaultValue={selectedStore.checkoutNotice} placeholder="Notice di checkout" className="rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
+                <input name="hero_notice" defaultValue={selectedStore.heroNotice} placeholder="Notice di hero" className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
+                <input name="checkout_notice" defaultValue={selectedStore.checkoutNotice} placeholder="Notice di checkout" className="rounded-xl border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
               </div>
-              <textarea name="transfer_instructions" defaultValue={selectedStore.transferInstructions} rows={3} placeholder="Instruksi transfer" className="mt-4 w-full rounded-[22px] border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
+              <textarea name="transfer_instructions" defaultValue={selectedStore.transferInstructions} rows={3} placeholder="Instruksi transfer" className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-5 py-4 font-medium outline-none focus:border-blue-500" />
             </div>
 
             <div className="flex justify-end gap-3">

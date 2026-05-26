@@ -145,7 +145,7 @@ export default function RatioClient({ initialData }: Props) {
           </h1>
           <p className="text-slate-500 font-medium text-lg">Analisis kesehatan finansial lewat 11 rasio standar akuntansi.</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-400 font-bold bg-white px-4 py-2 rounded-2xl border border-slate-100">
+        <div className="flex items-center gap-2 text-xs text-slate-400 font-bold bg-white px-4 py-2 rounded-xl border border-slate-100">
           <CalendarRange size={14} />
           {ratios.period.startDate} — {ratios.period.endDate}
         </div>
@@ -156,7 +156,7 @@ export default function RatioClient({ initialData }: Props) {
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-tight">Skor Kesehatan</p>
-            <p className="text-5xl font-black text-slate-900 tracking-tight">
+            <p className="text-5xl font-semibold text-slate-900 tracking-tight">
               {healthyCount}/{totalRatios}
             </p>
             <p className="text-sm text-slate-500 font-medium">
@@ -213,7 +213,7 @@ export default function RatioClient({ initialData }: Props) {
             <button
               key={cat.key}
               onClick={() => setActiveCategory(cat.key)}
-              className={`flex items-center gap-3 px-5 py-3 rounded-2xl font-black text-sm transition-all whitespace-nowrap ${
+              className={`flex items-center gap-3 px-5 py-3 rounded-xl font-semibold text-sm transition-all whitespace-nowrap ${
                 activeCategory === cat.key
                   ? 'bg-slate-900 text-white shadow-lg shadow-slate-200'
                   : 'bg-white text-slate-500 border border-slate-100 hover:border-slate-300'
@@ -244,7 +244,7 @@ export default function RatioClient({ initialData }: Props) {
                     {ratio.value}{unit}
                   </p>
                 </div>
-                <div className={`px-3 py-1 rounded-xl text-[10px] font-black flex items-center gap-1 ${getStatusColor(ratio.healthy)}`}>
+                <div className={`px-3 py-1 rounded-xl text-[10px] font-semibold flex items-center gap-1 ${getStatusColor(ratio.healthy)}`}>
                   {ratio.healthy ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
                   {ratio.healthy ? 'SEHAT' : 'WASPADA'}
                 </div>

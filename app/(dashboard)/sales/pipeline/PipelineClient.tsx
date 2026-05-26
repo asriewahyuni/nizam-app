@@ -233,7 +233,7 @@ export default function PipelineClient({ orgId, sales }: PipelineClientProps) {
       ) : (
         <div className="flex items-center justify-between mb-6 pb-4 border-b">
           <div>
-            <h1 className="text-2xl font-black text-slate-900">Pipeline Fullscreen</h1>
+            <h1 className="text-2xl font-semibold text-slate-900">Pipeline Fullscreen</h1>
             <p className="text-slate-500 text-sm font-medium">Kelola drag-and-drop prospek dengan lebih leluasa.</p>
           </div>
           <div className="flex gap-2">
@@ -264,16 +264,16 @@ export default function PipelineClient({ orgId, sales }: PipelineClientProps) {
                 <div className="p-5 border-b border-black/5 flex justify-between items-center bg-white/50 backdrop-blur-sm">
                    <div className="flex items-center gap-2">
                      <Icon size={18} className="text-slate-500" />
-                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-700">{stage.title}</h3>
+                     <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-700">{stage.title}</h3>
                    </div>
-                   <span className="text-[10px] font-black bg-white px-2 py-1 rounded-full shadow-sm">
+                   <span className="text-[10px] font-semibold bg-white px-2 py-1 rounded-full shadow-sm">
                      {items.length}
                    </span>
                 </div>
                 
                 <div className="px-5 py-3 border-b border-black/5 bg-white/30 flex items-center justify-between text-slate-600">
-                   <span className="text-[10px] uppercase font-black tracking-widest">Total Value:</span>
-                   <span className="text-sm font-black">{formatRupiah(totalValue)}</span>
+                   <span className="text-[10px] uppercase font-semibold tracking-wide">Total Value:</span>
+                   <span className="text-sm font-semibold">{formatRupiah(totalValue)}</span>
                 </div>
 
                 <div className="flex-1 p-4 space-y-4 overflow-y-auto no-scrollbar">
@@ -295,10 +295,10 @@ export default function PipelineClient({ orgId, sales }: PipelineClientProps) {
                         draggable={!isUpdating && movingSaleId === null}
                         onDragStart={() => handleDragStart(item.id)}
                         layoutId={item.id}
-                        className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative"
+                        className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative"
                       >
                         <div className="flex justify-between items-start mb-1.5">
-                          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">
+                          <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide group-hover:text-blue-500 transition-colors">
                             {item.sale_number || `DOC-${item.id.slice(0,5)}`}
                           </div>
                           <div className="flex items-center gap-1 group/actions">
@@ -383,7 +383,7 @@ export default function PipelineClient({ orgId, sales }: PipelineClientProps) {
                         <div className="flex items-center justify-between pt-3 border-t border-slate-50">
                           <span className="text-[10px] font-bold text-slate-400">{item.sale_date}</span>
                           <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 text-[11px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                            <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
                                {formatRupiah(item.grand_total)}
                             </div>
                           </div>
@@ -404,9 +404,9 @@ export default function PipelineClient({ orgId, sales }: PipelineClientProps) {
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-md overflow-hidden">
             <div className="p-6 border-b">
-              <h3 className="text-xl font-black text-slate-900">Tambah Card Cepat</h3>
+              <h3 className="text-xl font-semibold text-slate-900">Tambah Card Cepat</h3>
             </div>
             <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
               <div>
@@ -456,7 +456,7 @@ export default function PipelineClient({ orgId, sales }: PipelineClientProps) {
             initial={{ y: 50, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
             exit={{ y: 50, opacity: 0 }}
-            className={`fixed bottom-8 right-8 z-[200] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border ${
+            className={`fixed bottom-8 right-8 z-[200] px-6 py-4 rounded-xl shadow-md flex items-center gap-4 border ${
               toast.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-blue-50 border-blue-100 text-blue-800'
             }`}
           >

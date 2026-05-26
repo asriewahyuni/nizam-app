@@ -60,7 +60,7 @@ export default async function LmsRegistrasiPage() {
           { label: 'Terkonfirmasi', value: stats.confirmed, icon: CheckCircle2, color: 'text-emerald-600' },
           { label: 'Dibatalkan', value: stats.cancelled, icon: XCircle, color: 'text-slate-400' },
         ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+          <div key={label} className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
             <div className="text-[10px] font-semibold tracking-tight text-slate-400">{label}</div>
             <div className={`mt-2 text-3xl font-semibold ${color}`}>{value}</div>
           </div>
@@ -69,7 +69,7 @@ export default async function LmsRegistrasiPage() {
 
       {/* Registrations grouped by batch */}
       {Object.keys(grouped).length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-slate-300 p-16 text-center">
+        <div className="rounded-xl border border-dashed border-slate-300 p-16 text-center">
           <Users className="h-10 w-10 text-slate-300 mx-auto" />
           <p className="mt-4 text-sm font-bold text-slate-400">Belum ada pendaftaran.</p>
           <p className="text-xs text-slate-400 mt-1">Bagikan link pendaftaran batch ke calon peserta.</p>
@@ -82,12 +82,12 @@ export default async function LmsRegistrasiPage() {
           const regLink = `${baseUrl}/lms/daftar/${batchId}`
 
           return (
-            <section key={batchId} className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+            <section key={batchId} className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
               {/* Batch header */}
               <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">{courseTitle}</p>
-                  <h3 className="text-base font-black text-slate-900">{batchInfo?.name || 'Batch'}</h3>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">{courseTitle}</p>
+                  <h3 className="text-base font-semibold text-slate-900">{batchInfo?.name || 'Batch'}</h3>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-bold text-slate-500">{regs.length} pendaftar</span>

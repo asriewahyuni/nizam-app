@@ -91,11 +91,11 @@ export function ConstructionClient({
         <div className="absolute right-0 top-0 h-48 w-48 translate-x-10 -translate-y-10 rounded-full bg-white/10 blur-2xl" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-white/80">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/80">
               <Building2 size={14} />
               Vertical Baru
             </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight md:text-4xl">
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
               Project & Construction
             </h1>
             <p className="mt-3 max-w-xl text-sm font-medium leading-6 text-white/80">
@@ -107,7 +107,7 @@ export function ConstructionClient({
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#e07a5f] px-5 py-3 text-sm font-black text-white shadow-lg shadow-[#e07a5f]/30 transition hover:bg-[#cf694c]"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#e07a5f] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#e07a5f]/30 transition hover:bg-[#cf694c]"
           >
             <Plus size={18} />
             Buat Project Baru
@@ -116,23 +116,23 @@ export function ConstructionClient({
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Total Project</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Total Project</div>
             <Building2 className="text-[#254b63]" size={18} />
           </div>
-          <div className="mt-3 text-3xl font-black tracking-tight text-slate-900">{dashboard.totalProjects}</div>
+          <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{dashboard.totalProjects}</div>
           <p className="mt-2 text-sm font-medium text-slate-500">
             {dashboard.activeProjects} masih berjalan, {dashboard.completedProjects} sudah selesai.
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Nilai Kontrak</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nilai Kontrak</div>
             <Wallet className="text-[#e07a5f]" size={18} />
           </div>
-          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
             {formatRupiah(dashboard.totalContractValue)}
           </div>
           <p className="mt-2 text-sm font-medium text-slate-500">
@@ -140,12 +140,12 @@ export function ConstructionClient({
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Estimasi Cost</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Estimasi Cost</div>
             <ClipboardList className="text-[#3b6b5a]" size={18} />
           </div>
-          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
             {formatRupiah(dashboard.totalEstimatedCost)}
           </div>
           <p className="mt-2 text-sm font-medium text-slate-500">
@@ -153,12 +153,12 @@ export function ConstructionClient({
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Progress Rata-rata</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Progress Rata-rata</div>
             <BarChart3 className="text-[#6a8d73]" size={18} />
           </div>
-          <div className="mt-3 text-3xl font-black tracking-tight text-slate-900">
+          <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
             {dashboard.averageProgress.toFixed(1)}%
           </div>
           <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
@@ -174,8 +174,8 @@ export function ConstructionClient({
         <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Portofolio</div>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Daftar Project Aktif</h2>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Portofolio</div>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Daftar Project Aktif</h2>
               <p className="mt-2 text-sm font-medium text-slate-500">
                 Dashboard ini sengaja dimulai dari project register dulu, lalu siap ditautkan ke RAB,
                 progress lapangan, purchasing, inventory, dan termin billing.
@@ -185,9 +185,9 @@ export function ConstructionClient({
 
           <div className="mt-6 space-y-4">
             {projects.length === 0 ? (
-              <div className="rounded-[28px] border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center">
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center">
                 <Hammer className="mx-auto text-slate-300" size={44} />
-                <div className="mt-4 text-lg font-black text-slate-900">Belum ada project konstruksi</div>
+                <div className="mt-4 text-lg font-semibold text-slate-900">Belum ada project konstruksi</div>
                 <p className="mt-2 text-sm font-medium text-slate-500">
                   Buat project pertama untuk mulai menyusun alur arsitek atau kontraktor di unit aktif.
                 </p>
@@ -196,24 +196,24 @@ export function ConstructionClient({
               projects.map((project) => (
                 <article
                   key={project.id}
-                  className="rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5 shadow-sm"
+                  className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5 shadow-sm"
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${statusStyles[project.projectStatus] || statusStyles.PLANNING}`}>
+                        <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${statusStyles[project.projectStatus] || statusStyles.PLANNING}`}>
                           {project.projectStatus}
                         </span>
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                           {projectTypeLabels[project.projectType] || project.projectType}
                         </span>
-                        <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                           {project.projectCode}
                         </span>
                       </div>
 
                       <div>
-                        <h3 className="text-xl font-black tracking-tight text-slate-900">
+                        <h3 className="text-xl font-semibold tracking-tight text-slate-900">
                           {project.projectName}
                         </h3>
                         <p className="mt-1 text-sm font-medium text-slate-500">
@@ -222,11 +222,11 @@ export function ConstructionClient({
                       </div>
                     </div>
 
-                    <div className="min-w-[168px] rounded-2xl bg-slate-50 px-4 py-3">
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    <div className="min-w-[168px] rounded-xl bg-slate-50 px-4 py-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                         Progress
                       </div>
-                      <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">
+                      <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
                         {project.progressPercent.toFixed(0)}%
                       </div>
                       <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
@@ -239,7 +239,7 @@ export function ConstructionClient({
                   </div>
 
                   <div className="mt-5 grid grid-cols-1 gap-3 text-sm text-slate-600 md:grid-cols-3">
-                    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                    <div className="rounded-xl bg-slate-50 px-4 py-3">
                       <div className="flex items-center gap-2 text-slate-400">
                         <MapPin size={14} />
                         Lokasi
@@ -249,7 +249,7 @@ export function ConstructionClient({
                       </div>
                     </div>
 
-                    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                    <div className="rounded-xl bg-slate-50 px-4 py-3">
                       <div className="flex items-center gap-2 text-slate-400">
                         <Calendar size={14} />
                         Timeline
@@ -262,7 +262,7 @@ export function ConstructionClient({
                       </div>
                     </div>
 
-                    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                    <div className="rounded-xl bg-slate-50 px-4 py-3">
                       <div className="flex items-center gap-2 text-slate-400">
                         <Building2 size={14} />
                         Unit
@@ -277,19 +277,19 @@ export function ConstructionClient({
                   </div>
 
                   <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div className="rounded-2xl border border-[#e7ddd0] bg-[#fff8f2] px-4 py-3">
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#b06a48]">
+                    <div className="rounded-xl border border-[#e7ddd0] bg-[#fff8f2] px-4 py-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#b06a48]">
                         Contract Value
                       </div>
-                      <div className="mt-2 text-lg font-black tracking-tight text-slate-900">
+                      <div className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
                         {formatRupiah(project.contractValue)}
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-[#d4e5df] bg-[#f5fbf8] px-4 py-3">
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#3b6b5a]">
+                    <div className="rounded-xl border border-[#d4e5df] bg-[#f5fbf8] px-4 py-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#3b6b5a]">
                         Estimated Cost
                       </div>
-                      <div className="mt-2 text-lg font-black tracking-tight text-slate-900">
+                      <div className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
                         {formatRupiah(project.estimatedCost)}
                       </div>
                     </div>
@@ -298,7 +298,7 @@ export function ConstructionClient({
                   <div className="mt-5 flex justify-end">
                     <Link
                       href={`/construction/${project.id}`}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-[#254b63] px-4 py-3 text-sm font-black text-white transition hover:bg-[#1e3d52]"
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#254b63] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#1e3d52]"
                     >
                       Lihat Detail Project
                     </Link>
@@ -311,20 +311,20 @@ export function ConstructionClient({
 
         <aside className="space-y-6">
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Fondasi Siap Pakai</div>
-            <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Schema Konstruksi Sudah Disiapkan</h2>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Fondasi Siap Pakai</div>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Schema Konstruksi Sudah Disiapkan</h2>
             <div className="mt-5 space-y-3 text-sm font-medium text-slate-600">
-              <div className="rounded-2xl bg-slate-50 px-4 py-3"><code className="font-mono text-[12px] font-black text-slate-700">construction_projects</code> untuk master proyek dan register kontrak.</div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3"><code className="font-mono text-[12px] font-black text-slate-700">construction_project_stages</code> untuk breakdown tahap dan bobot pekerjaan.</div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3"><code className="font-mono text-[12px] font-black text-slate-700">construction_budget_items</code> untuk baseline RAB/BoQ dan actual cost.</div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3"><code className="font-mono text-[12px] font-black text-slate-700">construction_progress_logs</code> untuk update lapangan, isu, dan bukti progres.</div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3"><code className="font-mono text-[12px] font-black text-slate-700">construction_billing_terms</code> untuk DP, termin progress, final, dan retensi.</div>
+              <div className="rounded-xl bg-slate-50 px-4 py-3"><code className="font-mono text-[12px] font-semibold text-slate-700">construction_projects</code> untuk master proyek dan register kontrak.</div>
+              <div className="rounded-xl bg-slate-50 px-4 py-3"><code className="font-mono text-[12px] font-semibold text-slate-700">construction_project_stages</code> untuk breakdown tahap dan bobot pekerjaan.</div>
+              <div className="rounded-xl bg-slate-50 px-4 py-3"><code className="font-mono text-[12px] font-semibold text-slate-700">construction_budget_items</code> untuk baseline RAB/BoQ dan actual cost.</div>
+              <div className="rounded-xl bg-slate-50 px-4 py-3"><code className="font-mono text-[12px] font-semibold text-slate-700">construction_progress_logs</code> untuk update lapangan, isu, dan bukti progres.</div>
+              <div className="rounded-xl bg-slate-50 px-4 py-3"><code className="font-mono text-[12px] font-semibold text-slate-700">construction_billing_terms</code> untuk DP, termin progress, final, dan retensi.</div>
             </div>
           </div>
 
           <div className="rounded-[32px] border border-slate-200 bg-[linear-gradient(180deg,_#fff7ed_0%,_#ffffff_100%)] p-6 shadow-sm">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#b06a48]">Next Step</div>
-            <h2 className="mt-2 text-xl font-black tracking-tight text-slate-900">Tahap Berikutnya Tinggal Disambung</h2>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-[#b06a48]">Next Step</div>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">Tahap Berikutnya Tinggal Disambung</h2>
             <p className="mt-3 text-sm font-medium leading-6 text-slate-600">
               Setelah fondasi ini, kita bisa lanjut ke detail proyek, editor RAB/BoQ, log progres harian,
               approval change order, lalu termin billing yang terhubung ke sales dan accounting.
@@ -342,16 +342,16 @@ export function ConstructionClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-md">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Project Baru</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Buat Project Konstruksi</h2>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Project Baru</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Buat Project Konstruksi</h2>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
+                className="rounded-xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
                 aria-label="Tutup"
               >
                 <X size={18} />
@@ -361,32 +361,32 @@ export function ConstructionClient({
             <form onSubmit={handleCreateProject} className="space-y-5 px-6 py-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Nama Project</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nama Project</span>
                   <input
                     name="project_name"
                     required
                     placeholder="Contoh: Rumah Tinggal Bukit Asri"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Kode Project</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Kode Project</span>
                   <input
                     name="project_code"
                     placeholder="Kosongkan agar otomatis"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tipe</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tipe</span>
                   <select
                     name="project_type"
                     defaultValue="CONTRACTOR"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     <option value="ARCHITECT">Arsitek</option>
                     <option value="CONTRACTOR">Kontraktor</option>
@@ -397,11 +397,11 @@ export function ConstructionClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Status Awal</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status Awal</span>
                   <select
                     name="project_status"
                     defaultValue="PLANNING"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     <option value="PLANNING">Planning</option>
                     <option value="TENDER">Tender</option>
@@ -412,11 +412,11 @@ export function ConstructionClient({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Klien</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Klien</span>
                   <select
                     name="client_contact_id"
                     defaultValue=""
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
                     <option value="">Belum ditautkan</option>
                     {contacts.map((contact) => (
@@ -429,72 +429,72 @@ export function ConstructionClient({
               </div>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Alamat Site</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Alamat Site</span>
                 <textarea
                   name="site_address"
                   placeholder="Alamat proyek / lokasi lapangan"
-                  className="h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tanggal Mulai</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tanggal Mulai</span>
                   <input
                     name="start_date"
                     type="date"
                     defaultValue={new Date().toISOString().split('T')[0]}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Target Selesai</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Target Selesai</span>
                   <input
                     name="target_end_date"
                     type="date"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Nilai Kontrak</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nilai Kontrak</span>
                   <input
                     name="contract_value"
                     type="number"
                     min="0"
                     step="0.01"
                     placeholder="0"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Estimasi Cost</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Estimasi Cost</span>
                   <input
                     name="estimated_cost"
                     type="number"
                     min="0"
                     step="0.01"
                     placeholder="0"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   />
                 </label>
               </div>
 
               <label className="space-y-2">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Catatan</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Catatan</span>
                 <textarea
                   name="notes"
                   placeholder="Catatan awal, scope singkat, atau arahan kickoff"
-                  className="h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                 />
               </label>
 
               {formError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
                   {formError}
                 </div>
               ) : null}
@@ -503,14 +503,14 @@ export function ConstructionClient({
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+                  className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="rounded-2xl bg-[#254b63] px-5 py-3 text-sm font-black text-white shadow-lg shadow-[#254b63]/20 transition hover:bg-[#1e3d52] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-[#254b63] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#254b63]/20 transition hover:bg-[#1e3d52] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isPending ? 'Menyimpan...' : 'Simpan Project'}
                 </button>

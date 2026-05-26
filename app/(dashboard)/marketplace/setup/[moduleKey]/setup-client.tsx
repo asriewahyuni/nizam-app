@@ -163,7 +163,7 @@ export function SetupClient({
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            className={`w-20 h-20 rounded-3xl ${mod.color} flex items-center justify-center text-4xl mx-auto shadow-2xl`}
+            className={`w-20 h-20 rounded-xl ${mod.color} flex items-center justify-center text-4xl mx-auto shadow-md`}
           >
             {mod.icon}
           </motion.div>
@@ -172,13 +172,13 @@ export function SetupClient({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <h1 className="text-2xl font-black text-slate-900 mt-4">Setup {mod.name}</h1>
+            <h1 className="text-2xl font-semibold text-slate-900 mt-4">Setup {mod.name}</h1>
             <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">{mod.description}</p>
           </motion.div>
         </div>
 
         {/* Progress Steps */}
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-lg p-6">
           <div className="flex items-center justify-between relative">
             {/* Progress track */}
             <div className="absolute left-0 right-0 top-5 h-0.5 bg-slate-100" />
@@ -196,7 +196,7 @@ export function SetupClient({
                     animate={{
                       scale: status === 'active' ? 1.1 : 1,
                     }}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black transition-all duration-300 ${
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${
                       status === 'done'
                         ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
                         : status === 'active'
@@ -214,7 +214,7 @@ export function SetupClient({
                       idx + 1
                     )}
                   </motion.div>
-                  <p className={`text-[10px] font-black mt-2 text-center leading-tight max-w-[80px] ${
+                  <p className={`text-[10px] font-semibold mt-2 text-center leading-tight max-w-[80px] ${
                     status === 'done' ? 'text-emerald-600' : status === 'active' ? 'text-blue-600' : 'text-slate-300'
                   }`}>
                     {step.title}
@@ -232,7 +232,7 @@ export function SetupClient({
               initial={{ opacity: 0, y: -16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -16 }}
-              className={`px-5 py-3 rounded-2xl flex items-center gap-3 shadow-lg ${
+              className={`px-5 py-3 rounded-xl flex items-center gap-3 shadow-lg ${
                 toast.type === 'success'
                   ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
                   : 'bg-rose-50 border border-rose-200 text-rose-700'
@@ -256,25 +256,25 @@ export function SetupClient({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="bg-white rounded-3xl border border-slate-200/80 shadow-xl shadow-slate-100/60 p-8"
+            className="bg-white rounded-xl border border-slate-200/80 shadow-xl shadow-slate-100/60 p-8"
           >
             {/* ── Step: CoA ── */}
             {currentStepIdx === coaStepIdx && coaStepIdx >= 0 && (
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600">
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
                     <BookOpen className="w-6 h-6" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-black text-slate-900">Instal Chart of Accounts</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">Instal Chart of Accounts</h2>
                     <p className="text-sm text-slate-500">
                       {mod.onboardingSteps.find((s) => s.id === 'coa')?.description ?? `Siapkan akun akuntansi untuk ${mod.name}`}
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 space-y-2">
-                  <p className="text-xs font-black text-blue-800">Yang akan dipasang:</p>
+                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 space-y-2">
+                  <p className="text-xs font-semibold text-blue-800">Yang akan dipasang:</p>
                   {mod.onboardingSteps.find((s) => s.id === 'coa') ? (
                     <p className="text-xs text-blue-600">
                       {mod.onboardingSteps.find((s) => s.id === 'coa')!.description}
@@ -287,7 +287,7 @@ export function SetupClient({
                 </div>
 
                 {coaInstalled ? (
-                  <div className="flex items-center gap-3 bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+                  <div className="flex items-center gap-3 bg-emerald-50 rounded-xl p-4 border border-emerald-100">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                     <p className="text-sm font-bold text-emerald-700">Chart of Accounts sudah terpasang sebelumnya.</p>
                   </div>
@@ -295,7 +295,7 @@ export function SetupClient({
                   <button
                     onClick={handleInstallCoa}
                     disabled={isPending}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-3.5 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-600/25"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-600/25"
                   >
                     {isPending ? (
                       <><Loader2 className="w-4 h-4 animate-spin" /> Menginstal CoA...</>
@@ -311,17 +311,17 @@ export function SetupClient({
             {currentStepIdx === settingsStepIdx && (
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600">
+                  <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
                     <Settings className="w-6 h-6" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-black text-slate-900">Pengaturan Awal</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">Pengaturan Awal</h2>
                     <p className="text-sm text-slate-500">Konfigurasi dasar untuk modul {mod.name}</p>
                   </div>
                 </div>
 
                 {mod.onboardingSteps.filter((s) => s.id === 'settings').length > 0 ? (
-                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-4">
+                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-4">
                     {mod.onboardingSteps.filter((s) => s.id === 'settings').map((step) => (
                       <div key={step.id} className="flex items-start gap-3">
                         <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 mt-0.5">
@@ -338,7 +338,7 @@ export function SetupClient({
                     </p>
                   </div>
                 ) : (
-                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-center">
+                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 text-center">
                     <Sparkles className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                     <p className="text-sm text-slate-500 font-medium">
                       Tidak ada pengaturan tambahan yang diperlukan untuk modul ini.
@@ -351,14 +351,14 @@ export function SetupClient({
                   <button
                     onClick={handleSkipSettings}
                     disabled={isPending}
-                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all disabled:opacity-50"
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all disabled:opacity-50"
                   >
                     <SkipForward className="w-4 h-4" /> Lewati
                   </button>
                   <button
                     onClick={handleSaveSettings}
                     disabled={isPending || settingsSaved}
-                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 shadow-lg shadow-blue-600/20"
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 shadow-lg shadow-blue-600/20"
                   >
                     {isPending ? (
                       <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</>
@@ -385,7 +385,7 @@ export function SetupClient({
                 </motion.div>
 
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900">Setup Selesai! 🎉</h2>
+                  <h2 className="text-2xl font-semibold text-slate-900">Setup Selesai! 🎉</h2>
                   <p className="text-sm text-slate-500 mt-2">
                     Modul <strong>{mod.name}</strong> sudah aktif dan siap digunakan.
                   </p>
@@ -408,14 +408,14 @@ export function SetupClient({
                 <div className="flex gap-3 pt-2">
                   <a
                     href="/marketplace"
-                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
                   >
                     Kembali ke Marketplace
                   </a>
                   <button
                     onClick={handleComplete}
                     disabled={isPending}
-                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shadow-emerald-600/25"
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shadow-emerald-600/25"
                   >
                     {isPending ? (
                       <><Loader2 className="w-4 h-4 animate-spin" /> Membuka...</>

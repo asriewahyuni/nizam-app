@@ -151,8 +151,8 @@ export default function CurrencyPicker({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1 z-20 bg-white rounded-2xl border border-slate-100 shadow-xl p-2 min-w-[180px]">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 py-2">Mata Uang</p>
+          <div className="absolute top-full left-0 mt-1 z-20 bg-white rounded-xl border border-slate-100 shadow-xl p-2 min-w-[180px]">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-3 py-2">Mata Uang</p>
             <div className="space-y-0.5 max-h-48 overflow-y-auto">
               {currencies.map(code => {
                 const m = CURRENCY_META[code] || { symbol: code, name: code }
@@ -166,7 +166,7 @@ export default function CurrencyPicker({
                       setOpen(false)
                     }}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-                      code === selected ? 'bg-blue-50 text-blue-700 font-black' : 'hover:bg-slate-50 font-medium text-slate-600'
+                      code === selected ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-slate-50 font-medium text-slate-600'
                     }`}
                   >
                     <span className="text-base w-6">{m.symbol}</span>

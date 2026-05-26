@@ -63,7 +63,7 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-4">
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
+            <h1 className="text-4xl font-semibold text-slate-900 tracking-tight flex items-center gap-4">
                 <ShieldAlert size={40} className="text-orange-500" />
                 Penutupan Buku
             </h1>
@@ -74,7 +74,7 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
         </div>
         <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-3xl font-black shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-xl font-semibold shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-[0.98]"
         >
             <Plus size={20} /> BUKA PERIODE BARU
         </button>
@@ -83,25 +83,25 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
          {/* Warning Box */}
          <div className="lg:col-span-1 space-y-6">
-             <div className="bg-orange-50 p-8 rounded-[40px] border border-orange-100 space-y-6 shadow-sm">
+             <div className="bg-orange-50 p-8 rounded-xl border border-orange-100 space-y-6 shadow-sm">
                 <div className="flex items-center gap-3 text-orange-600">
                     <AlertTriangle size={24} />
-                    <h5 className="font-black text-xs uppercase tracking-widest">Informasi Sistem</h5>
+                    <h5 className="font-semibold text-xs uppercase tracking-wide">Informasi Sistem</h5>
                 </div>
                 <p className="text-sm font-bold text-orange-800 leading-relaxed italic">
                     "Saat periode berstatus TERKUNCI (Closed), seluruh transaksi baru, perubahan, atau penghapusan 
                     jurnal pada tanggal tersebut akan diblokir oleh sistem secara otomatis."
                 </p>
-                <div className="bg-white/50 p-4 rounded-3xl text-[10px] font-bold text-orange-700 border border-orange-200 list-none space-y-2 italic opacity-80">
+                <div className="bg-white/50 p-4 rounded-xl text-[10px] font-bold text-orange-700 border border-orange-200 list-none space-y-2 italic opacity-80">
                    <li>• Tidak boleh ada jurnal draft menggantung.</li>
                    <li>• Lakukan rekonsiliasi kas & bank.</li>
                    <li>• Verifikasi saldo piutang & hutang.</li>
                 </div>
              </div>
              
-             <div className="bg-white p-8 rounded-[40px] border border-slate-100 space-y-4">
+             <div className="bg-white p-8 rounded-xl border border-slate-100 space-y-4">
                 <History size={20} className="text-slate-400" />
-                <h5 className="font-black text-[10px] text-slate-400 uppercase tracking-widest">Log Aktivitas</h5>
+                <h5 className="font-semibold text-[10px] text-slate-400 uppercase tracking-wide">Log Aktivitas</h5>
                 <p className="text-xs text-slate-400 font-medium italic">Belum ada penutupan buku historis di sistem ini.</p>
              </div>
          </div>
@@ -113,7 +113,7 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
                   <motion.div 
                     layout
                     key={pe.id} 
-                    className={`p-8 rounded-[48px] border-2 transition-all relative overflow-hidden group ${pe.is_closed ? 'bg-slate-50 border-slate-100' : 'bg-white border-blue-100 shadow-xl shadow-blue-200/50'}`}
+                    className={`p-8 rounded-xl border-2 transition-all relative overflow-hidden group ${pe.is_closed ? 'bg-slate-50 border-slate-100' : 'bg-white border-blue-100 shadow-xl shadow-blue-200/50'}`}
                   >
                      <div className="absolute top-0 right-0 p-8">
                         {pe.is_closed ? <Lock size={20} className="text-slate-300" /> : <Unlock size={20} className="text-blue-500" />}
@@ -121,25 +121,25 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
 
                      <div className="space-y-6">
                         <div className="flex items-center gap-3">
-                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${pe.is_closed ? 'bg-slate-100 text-slate-400' : 'bg-blue-50 text-blue-500'}`}>
+                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${pe.is_closed ? 'bg-slate-100 text-slate-400' : 'bg-blue-50 text-blue-500'}`}>
                              <Calendar size={24} />
                            </div>
                            <div className="space-y-1">
-                              <h4 className="font-black text-xl text-slate-900 tracking-tight">{pe.name}</h4>
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                              <h4 className="font-semibold text-xl text-slate-900 tracking-tight">{pe.name}</h4>
+                              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
                                  {formatDate(pe.start_date)} — {formatDate(pe.end_date)}
                               </p>
                            </div>
                         </div>
 
                         <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-black border uppercase tracking-wider ${pe.is_closed ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-semibold border uppercase tracking-wider ${pe.is_closed ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
                                 {pe.is_closed ? 'Status: TERKUNCI' : 'Status: DIBUKA'}
                             </span>
                             
                             <button 
                                 onClick={() => handleToggleClose(pe)}
-                                className={`px-6 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all ${pe.is_closed ? 'bg-white border border-slate-200 text-slate-900 hover:bg-slate-900 hover:text-white' : 'bg-slate-900 text-white shadow-lg shadow-slate-200 hover:shadow-xl'}`}
+                                className={`px-6 py-3 rounded-xl text-[10px] font-semibold tracking-wide transition-all ${pe.is_closed ? 'bg-white border border-slate-200 text-slate-900 hover:bg-slate-900 hover:text-white' : 'bg-slate-900 text-white shadow-lg shadow-slate-200 hover:shadow-xl'}`}
                             >
                                 {pe.is_closed ? 'BUKA KEMBALI' : 'TUTUP PERIODE'}
                             </button>
@@ -157,7 +157,7 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
                {periods.length === 0 && (
                   <div className="col-span-full py-20 text-center space-y-4 opacity-30">
                      <GanttChartSquare size={64} className="mx-auto" />
-                     <p className="text-2xl font-black italic tracking-tighter italic">Belum ada periode akuntansi dibuat.</p>
+                     <p className="text-2xl font-semibold italic tracking-tighter italic">Belum ada periode akuntansi dibuat.</p>
                   </div>
                )}
             </div>
@@ -171,38 +171,38 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
                 <motion.div 
                     initial={{ opacity: 0, scale: 0.9, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                    className="relative bg-white w-full max-w-lg rounded-[48px] shadow-2xl overflow-hidden text-slate-900"
+                    className="relative bg-white w-full max-w-lg rounded-xl shadow-md overflow-hidden text-slate-900"
                 >
-                    <div className="p-10 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
-                        <h3 className="text-xl font-black text-slate-900 flex items-center gap-3">
+                    <div className="p-5 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                        <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
                             <Plus size={24} className="text-slate-900" /> Buka Periode Akuntansi
                         </h3>
                     </div>
-                    <div className="p-10 space-y-8">
+                    <div className="p-5 space-y-8">
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Nama Periode</label>
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-4">Nama Periode</label>
                             <input 
                                 placeholder="Misal: Maret 2024" 
                                 value={name} onChange={(e) => setName(e.target.value)}
-                                className="w-full h-16 px-6 bg-slate-50 border-2 border-transparent focus:border-slate-200 outline-none rounded-3xl font-bold transition-all"
+                                className="w-full h-16 px-6 bg-slate-50 border-2 border-transparent focus:border-slate-200 outline-none rounded-xl font-bold transition-all"
                             />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-4">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Tanggal Mulai</label>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-4">Tanggal Mulai</label>
                                 <input 
                                     type="date" 
                                     value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                                    className="w-full h-16 px-6 bg-slate-50 border-2 border-transparent focus:border-slate-200 outline-none rounded-3xl font-bold uppercase font-mono text-xs"
+                                    className="w-full h-16 px-6 bg-slate-50 border-2 border-transparent focus:border-slate-200 outline-none rounded-xl font-bold uppercase font-mono text-xs"
                                 />
                             </div>
                             <div className="space-y-4">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Tanggal Selesai</label>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-4">Tanggal Selesai</label>
                                 <input 
                                     type="date" 
                                     value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                                    className="w-full h-16 px-6 bg-slate-50 border-2 border-transparent focus:border-slate-200 outline-none rounded-3xl font-bold uppercase font-mono text-xs"
+                                    className="w-full h-16 px-6 bg-slate-50 border-2 border-transparent focus:border-slate-200 outline-none rounded-xl font-bold uppercase font-mono text-xs"
                                 />
                             </div>
                         </div>
@@ -219,11 +219,11 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
                             <button 
                                 disabled={isSubmitting}
                                 onClick={handleCreate}
-                                className="w-full py-5 bg-slate-900 disabled:bg-slate-300 text-white rounded-3xl font-black shadow-xl shadow-slate-200 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                className="w-full py-5 bg-slate-900 disabled:bg-slate-300 text-white rounded-xl font-semibold shadow-xl shadow-slate-200 hover:scale-[1.02] active:scale-[0.98] transition-all"
                             >
                                 {isSubmitting ? 'MEMPROSES...' : 'AKTIFKAN PERIODE'}
                             </button>
-                            <button onClick={() => setIsModalOpen(false)} className="w-full py-5 bg-white border border-slate-200 text-slate-400 rounded-3xl font-black text-xs hover:text-slate-600 transition-all">
+                            <button onClick={() => setIsModalOpen(false)} className="w-full py-5 bg-white border border-slate-200 text-slate-400 rounded-xl font-semibold text-xs hover:text-slate-600 transition-all">
                                 BATALKAN
                             </button>
                         </div>

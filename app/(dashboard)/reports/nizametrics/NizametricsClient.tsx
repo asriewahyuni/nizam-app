@@ -612,24 +612,24 @@ export function NizametricsClient({
       {/* ── Header ── */}
       <div className="space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-600 text-white text-[10px] font-semibold uppercase tracking-wide">
             <BarChart3 size={12} />
             Nizametrics
           </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-black uppercase tracking-widest">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-semibold uppercase tracking-wide">
             ✦ Beta
           </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-[10px] font-black uppercase tracking-widest text-slate-500">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-[10px] font-semibold uppercase tracking-wide text-slate-500">
             {setupData.cycle?.cycle_name || setupData.scope.cycle_key}
           </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-[10px] font-black uppercase tracking-widest text-slate-500">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-[10px] font-semibold uppercase tracking-wide text-slate-500">
             Scope: {scopeLabel}
           </div>
         </div>
 
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">Pengukuran Kinerja</h1>
+            <h1 className="text-4xl font-semibold text-slate-900 tracking-tight">Pengukuran Kinerja</h1>
             <p className="text-slate-500 font-medium text-base mt-1">
               4 domain — {setupData.scope.start_date} s/d {setupData.scope.end_date}
             </p>
@@ -639,7 +639,7 @@ export function NizametricsClient({
           <div className="flex items-center gap-3">
             {cycleIsLocked ? (
               <div className="flex items-center gap-3">
-                <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-black uppercase tracking-wider">
+                <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold uppercase tracking-wider">
                   <Lock size={14} />
                   Parameter Terkunci
                 </div>
@@ -647,7 +647,7 @@ export function NizametricsClient({
                   type="button"
                   onClick={handleUnlockCycle}
                   disabled={isPending || !canManageSetup}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-slate-700 text-xs font-black uppercase tracking-wider hover:bg-slate-50 transition-all disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-semibold uppercase tracking-wider hover:bg-slate-50 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   <LockOpen size={14} />
                   Buka Kunci
@@ -655,7 +655,7 @@ export function NizametricsClient({
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-black uppercase tracking-wider">
+                <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold uppercase tracking-wider">
                   <CheckCircle2 size={14} />
                   Mode Setup
                 </div>
@@ -663,7 +663,7 @@ export function NizametricsClient({
                   type="button"
                   onClick={handleLockCycle}
                   disabled={isPending || !canManageSetup}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider hover:bg-slate-700 transition-all disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider hover:bg-slate-700 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   <Lock size={14} />
                   Lock Bulan Ini
@@ -675,12 +675,12 @@ export function NizametricsClient({
 
         {/* Info row */}
         {!canManageSetup && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
             Mode read-only — pilih unit aktif untuk mengubah setup atau mengisi pengukuran.
           </div>
         )}
         {setupData.error && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
             {setupData.error}
           </div>
         )}
@@ -691,7 +691,7 @@ export function NizametricsClient({
             type="button"
             onClick={handleGenerateKpis}
             disabled={isPending || !canManageSetup || cycleIsLocked}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-wider hover:bg-blue-700 transition-all disabled:opacity-40 cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold uppercase tracking-wider hover:bg-blue-700 transition-all disabled:opacity-40 cursor-pointer"
           >
             <Zap size={13} />
             Generate dari Data Saya
@@ -700,16 +700,16 @@ export function NizametricsClient({
             type="button"
             onClick={handleSyncValues}
             disabled={isPending || !canManageSetup}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-black uppercase tracking-wider hover:bg-slate-50 transition-all disabled:opacity-40 cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-semibold uppercase tracking-wider hover:bg-slate-50 transition-all disabled:opacity-40 cursor-pointer"
           >
             <RefreshCcw size={13} />
             Sync Nilai
           </button>
           <div className="flex items-center gap-3 ml-auto">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
               Score: {setupData.summary.overall_score_100}/100
             </span>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
               Coverage: {setupData.summary.completion_percent}%
             </span>
           </div>
@@ -776,37 +776,37 @@ export function NizametricsClient({
               <div className={`px-7 pt-7 pb-5 border-b ${domain.color.accent}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${domain.color.bg} ${domain.color.text}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${domain.color.bg} ${domain.color.text}`}>
                       <Icon size={20} />
                     </div>
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Domain</p>
-                      <h3 className="text-lg font-black text-slate-900">{domain.domainLabel}</h3>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Domain</p>
+                      <h3 className="text-lg font-semibold text-slate-900">{domain.domainLabel}</h3>
                     </div>
                   </div>
-                  <div className={`px-3 py-2 rounded-2xl border text-right ${domain.color.bg} ${domain.color.border}`}>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Score</p>
-                    <p className={`text-base font-black ${domain.color.text}`}>{perspectiveSummary.score_100}/100</p>
+                  <div className={`px-3 py-2 rounded-xl border text-right ${domain.color.bg} ${domain.color.border}`}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Score</p>
+                    <p className={`text-base font-semibold ${domain.color.text}`}>{perspectiveSummary.score_100}/100</p>
                   </div>
                 </div>
 
                 {/* Ikhtiyyar card */}
-                <div className={`mt-4 rounded-2xl border ${domain.color.border} ${domain.color.bg} p-4 space-y-2`}>
+                <div className={`mt-4 rounded-xl border ${domain.color.border} ${domain.color.bg} p-4 space-y-2`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Star size={12} className={domain.color.text} fill="currentColor" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Ikhtiyyar</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Ikhtiyyar</span>
                     </div>
-                    <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${ikhtiyyarOnTarget ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                    <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${ikhtiyyarOnTarget ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                       {ikhtiyyarOnTarget ? 'On Target' : 'Below Target'}
                     </span>
                   </div>
                   <div className="flex items-end justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-xs font-black text-slate-500">{domain.ikhtiyyar.label}</p>
+                        <p className="text-xs font-semibold text-slate-500">{domain.ikhtiyyar.label}</p>
                         {ikhtiyyarIsOverridden && (
-                          <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-white/80 border border-slate-300 text-slate-500">
+                          <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-white/80 border border-slate-300 text-slate-500">
                             Manual
                           </span>
                         )}
@@ -835,7 +835,7 @@ export function NizametricsClient({
                           }}
                           autoFocus
                           placeholder={String(ikhtiyyarComputed)}
-                          className="mt-0.5 w-32 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xl font-black text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+                          className="mt-0.5 w-32 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xl font-semibold text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
                         />
                       ) : (
                         <button
@@ -847,7 +847,7 @@ export function NizametricsClient({
                           className="flex items-center gap-1.5 group cursor-pointer mt-0.5"
                           title="Klik untuk override nilai aktual"
                         >
-                          <span className={`text-2xl font-black ${domain.color.text} group-hover:opacity-80 transition-opacity`}>
+                          <span className={`text-2xl font-semibold ${domain.color.text} group-hover:opacity-80 transition-opacity`}>
                             {formatValue(domain.ikhtiyyar.unit, ikhtiyyarValue)}
                           </span>
                           <Pencil size={11} className="text-slate-300 group-hover:text-slate-500 transition-colors shrink-0 mb-1" />
@@ -857,7 +857,7 @@ export function NizametricsClient({
                         <button
                           type="button"
                           onClick={() => setIkhtiyyarOverrides((prev) => ({ ...prev, [perspective]: null }))}
-                          className="text-[10px] font-black text-slate-400 hover:text-rose-500 transition-colors mt-0.5 cursor-pointer underline underline-offset-2"
+                          className="text-[10px] font-semibold text-slate-400 hover:text-rose-500 transition-colors mt-0.5 cursor-pointer underline underline-offset-2"
                         >
                           Reset ke data sistem ({formatValue(domain.ikhtiyyar.unit, ikhtiyyarComputed)})
                         </button>
@@ -865,7 +865,7 @@ export function NizametricsClient({
                     </div>
                     {/* Editable Ikhtiyyar Target */}
                     <div className="flex flex-col items-end gap-1">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Target</p>
                       {isEditingTarget ? (
                         <div className="flex items-center gap-1">
                           <input
@@ -890,7 +890,7 @@ export function NizametricsClient({
                               if (e.key === 'Escape') setIkhtiyyarTargetEditing(null)
                             }}
                             autoFocus
-                            className="w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-black text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 text-right"
+                            className="w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 text-right"
                           />
                         </div>
                       ) : (
@@ -903,7 +903,7 @@ export function NizametricsClient({
                           className="flex items-center gap-1 group cursor-pointer"
                           title="Klik untuk ubah target"
                         >
-                          <span className="text-sm font-black text-slate-600 group-hover:text-slate-900 transition-colors">
+                          <span className="text-sm font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">
                             {formatValue(domain.ikhtiyyar.unit, ikhtiyyarTarget)}
                           </span>
                           <Pencil size={10} className="text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" />
@@ -923,22 +923,22 @@ export function NizametricsClient({
               {/* Parameters */}
               <div className="px-7 py-5 space-y-4">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                     Parameter Bulan Ini
-                    <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black">
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
                       {perspectiveKpis.length}
                     </span>
                   </p>
                   {cycleIsLocked && (
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 flex items-center gap-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 flex items-center gap-1">
                       <Lock size={10} /> Terkunci
                     </span>
                   )}
                 </div>
 
                 {perspectiveKpis.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center">
-                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Belum Ada Parameter</p>
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Belum Ada Parameter</p>
                     <p className="text-xs text-slate-400 font-medium mt-1">
                       {cycleIsLocked ? 'Buka kunci untuk menambah parameter.' : 'Klik "+ Tambah" di bawah atau gunakan "Generate dari Data Saya".'}
                     </p>
@@ -953,7 +953,7 @@ export function NizametricsClient({
                       return (
                         <div
                           key={kpi.id}
-                          className={`rounded-2xl border p-3.5 space-y-2.5 transition-all ${isIkhtiyyar ? `${domain.color.bg} ${domain.color.border}` : 'border-slate-100 bg-slate-50/50'}`}
+                          className={`rounded-xl border p-3.5 space-y-2.5 transition-all ${isIkhtiyyar ? `${domain.color.bg} ${domain.color.border}` : 'border-slate-100 bg-slate-50/50'}`}
                         >
                           {/* KPI row header */}
                           <div className="flex items-start justify-between gap-2">
@@ -962,7 +962,7 @@ export function NizametricsClient({
                                 <Star size={11} className={domain.color.text} fill="currentColor" />
                               )}
                               <div className="min-w-0">
-                                <p className="text-xs font-black text-slate-900 leading-tight">{kpi.name}</p>
+                                <p className="text-xs font-semibold text-slate-900 leading-tight">{kpi.name}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                   {kpiTargetEditing === kpi.id ? (
                                     <div className="flex items-center gap-1">
@@ -977,7 +977,7 @@ export function NizametricsClient({
                                           if (e.key === 'Escape') setKpiTargetEditing(null)
                                         }}
                                         autoFocus
-                                        className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-black text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+                                        className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
                                       />
                                       {kpi.unit && <span className="text-[11px] text-slate-400 font-medium">{kpi.unit}</span>}
                                     </div>
@@ -1005,7 +1005,7 @@ export function NizametricsClient({
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               {hasScore && (
-                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${domain.color.bg} ${domain.color.border} ${domain.color.text}`}>
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${domain.color.bg} ${domain.color.border} ${domain.color.text}`}>
                                   {kpi.latest_measurement!.score_100}/100
                                 </span>
                               )}
@@ -1053,7 +1053,7 @@ export function NizametricsClient({
                                 type="button"
                                 onClick={() => handleSaveMeasurement(kpi.id)}
                                 disabled={isPending || !draft.actual}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-white text-xs font-black uppercase tracking-wider transition-all disabled:opacity-40 cursor-pointer ${domain.color.button}`}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-white text-xs font-semibold uppercase tracking-wider transition-all disabled:opacity-40 cursor-pointer ${domain.color.button}`}
                               >
                                 <Save size={11} />
                                 Simpan
@@ -1080,7 +1080,7 @@ export function NizametricsClient({
                     <button
                       type="button"
                       onClick={() => setParamPickerOpen(isPickerOpen ? null : perspective)}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 bg-white text-xs font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50 hover:border-slate-400 transition-all cursor-pointer w-full justify-center"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 bg-white text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-50 hover:border-slate-400 transition-all cursor-pointer w-full justify-center"
                     >
                       {isPickerOpen ? <ChevronUp size={13} /> : <Plus size={13} />}
                       {isPickerOpen ? 'Tutup Picker' : '+ Tambah Parameter'}
@@ -1091,10 +1091,10 @@ export function NizametricsClient({
                       <motion.div
                         initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="mt-2 rounded-2xl border border-slate-200 bg-white shadow-md overflow-hidden"
+                        className="mt-2 rounded-xl border border-slate-200 bg-white shadow-md overflow-hidden"
                       >
                         <div className="px-4 py-3 border-b border-slate-100">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                             Pilih dari data tersedia
                           </p>
                         </div>
@@ -1111,19 +1111,19 @@ export function NizametricsClient({
                                   className={`flex items-center justify-between gap-3 px-4 py-3 ${alreadyAdded ? 'opacity-40' : 'hover:bg-slate-50'}`}
                                 >
                                   <div className="min-w-0">
-                                    <p className="text-xs font-black text-slate-900">{metric.label}</p>
+                                    <p className="text-xs font-semibold text-slate-900">{metric.label}</p>
                                     <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                                       Sekarang: {formatValue(metric.unit, metric.value)}
                                     </p>
                                   </div>
                                   {alreadyAdded ? (
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Sudah ada</span>
+                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Sudah ada</span>
                                   ) : (
                                     <button
                                       type="button"
                                       onClick={() => handleAddParam(perspective, metric.key)}
                                       disabled={isPending}
-                                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider text-white transition-all disabled:opacity-40 cursor-pointer ${domain.color.button}`}
+                                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider text-white transition-all disabled:opacity-40 cursor-pointer ${domain.color.button}`}
                                     >
                                       <Plus size={11} />
                                       Tambah
@@ -1141,10 +1141,10 @@ export function NizametricsClient({
 
                 {/* Recommendations */}
                 {recommendations.length > 0 && (
-                  <div className="rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3 space-y-1.5">
+                  <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-3 space-y-1.5">
                     <div className="flex items-center gap-2">
                       <Lightbulb size={12} className="text-amber-600 shrink-0" />
-                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Rekomendasi</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">Rekomendasi</p>
                     </div>
                     {recommendations.map((rec, i) => (
                       <p key={i} className="text-xs text-amber-800 font-medium leading-relaxed pl-5">
@@ -1156,10 +1156,10 @@ export function NizametricsClient({
 
                 {/* Todolist dari Gap Ikhtiyyar */}
                 {todoList.length > 0 && (
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3 space-y-2">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3 space-y-2">
                     <div className="flex items-center gap-2">
                       <ListTodo size={12} className="text-slate-500 shrink-0" />
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Todolist Domain</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Todolist Domain</p>
                     </div>
                     <div className="space-y-1.5 pl-1">
                       {todoList.map((todo, i) => (
@@ -1196,7 +1196,7 @@ export function NizametricsClient({
         {/* Plan header */}
         <div className="px-8 py-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-2xl bg-slate-900 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
               <ListTodo size={17} className="text-white" />
             </div>
             <div className="min-w-0">
@@ -1211,7 +1211,7 @@ export function NizametricsClient({
                     if (e.key === 'Escape') setPlanTitleEditing(false)
                   }}
                   autoFocus
-                  className="text-lg font-black text-slate-900 border-b-2 border-blue-400 bg-transparent outline-none w-full"
+                  className="text-lg font-semibold text-slate-900 border-b-2 border-blue-400 bg-transparent outline-none w-full"
                 />
               ) : (
                 <button
@@ -1219,7 +1219,7 @@ export function NizametricsClient({
                   onClick={() => { setPlanTitleDraft(planTitle); setPlanTitleEditing(true) }}
                   className="flex items-center gap-2 group cursor-pointer"
                 >
-                  <h3 className="text-lg font-black text-slate-900 group-hover:text-slate-700 transition-colors">{planTitle}</h3>
+                  <h3 className="text-lg font-semibold text-slate-900 group-hover:text-slate-700 transition-colors">{planTitle}</h3>
                   <Pencil size={12} className="text-slate-300 group-hover:text-slate-500 transition-colors" />
                 </button>
               )}
@@ -1238,7 +1238,7 @@ export function NizametricsClient({
                     style={{ width: `${Math.round((planItems.filter((i) => i.done).length / planItems.length) * 100)}%` }}
                   />
                 </div>
-                <span className="text-[10px] font-black text-slate-500">
+                <span className="text-[10px] font-semibold text-slate-500">
                   {Math.round((planItems.filter((i) => i.done).length / planItems.length) * 100)}%
                 </span>
               </div>
@@ -1257,7 +1257,7 @@ export function NizametricsClient({
           <div className="px-8 py-6 space-y-6">
 
             {/* Quick-add form */}
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
+            <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
               <div className="flex gap-2.5 flex-wrap sm:flex-nowrap">
                 <input
                   type="text"
@@ -1271,7 +1271,7 @@ export function NizametricsClient({
                   type="button"
                   onClick={handleAddPlanItem}
                   disabled={!planForm.text.trim()}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider hover:bg-slate-700 transition-all disabled:opacity-40 cursor-pointer shrink-0"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider hover:bg-slate-700 transition-all disabled:opacity-40 cursor-pointer shrink-0"
                 >
                   <Plus size={13} />
                   Tambah
@@ -1280,7 +1280,7 @@ export function NizametricsClient({
 
               {/* Domain + priority selector */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-1">Domain:</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mr-1">Domain:</span>
                 {PERSPECTIVES.map((p) => {
                   const d = DOMAIN_CONFIG[p]
                   const isSelected = planForm.perspective === p
@@ -1289,7 +1289,7 @@ export function NizametricsClient({
                       key={p}
                       type="button"
                       onClick={() => setPlanForm((prev) => ({ ...prev, perspective: p }))}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all cursor-pointer ${
                         isSelected
                           ? `${d.color.bg} ${d.color.text} ${d.color.border} border ring-2 ${
                               p === 'FINANCIAL' ? 'ring-emerald-200'
@@ -1305,7 +1305,7 @@ export function NizametricsClient({
                     </button>
                   )
                 })}
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-3 mr-1">Prioritas:</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 ml-3 mr-1">Prioritas:</span>
                 {(['high', 'medium', 'low'] as TodoPriority[]).map((p) => {
                   const pc = PRIORITY_COLORS[p]
                   const isSelected = planForm.priority === p
@@ -1314,7 +1314,7 @@ export function NizametricsClient({
                       key={p}
                       type="button"
                       onClick={() => setPlanForm((prev) => ({ ...prev, priority: p }))}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold uppercase tracking-wider transition-all cursor-pointer ${
                         isSelected
                           ? `ring-2 ${pc.ring} border-slate-200 bg-white text-slate-700`
                           : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
@@ -1330,9 +1330,9 @@ export function NizametricsClient({
 
             {/* Distribution grid — 2×2 matching domain colors */}
             {planItems.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/40 px-6 py-10 text-center">
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/40 px-6 py-10 text-center">
                 <ListTodo size={28} className="text-slate-300 mx-auto mb-3" />
-                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Belum ada rencana</p>
+                <p className="text-sm font-semibold text-slate-400 uppercase tracking-wide">Belum ada rencana</p>
                 <p className="text-xs text-slate-400 font-medium mt-1">Tulis tugas di atas lalu pilih domain tujuannya.</p>
               </div>
             ) : (
@@ -1346,17 +1346,17 @@ export function NizametricsClient({
                   return (
                     <div
                       key={perspective}
-                      className={`rounded-2xl border p-4 space-y-3 min-h-[120px] transition-all ${domain.color.bg} ${domain.color.border}`}
+                      className={`rounded-xl border p-4 space-y-3 min-h-[120px] transition-all ${domain.color.bg} ${domain.color.border}`}
                     >
                       {/* Column header */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <DIcon size={14} className={domain.color.text} />
-                          <p className={`text-[11px] font-black uppercase tracking-widest ${domain.color.text}`}>
+                          <p className={`text-[11px] font-semibold uppercase tracking-wide ${domain.color.text}`}>
                             {domain.domainLabel}
                           </p>
                         </div>
-                        <span className="text-[10px] font-black text-slate-400">
+                        <span className="text-[10px] font-semibold text-slate-400">
                           {doneCount}/{items.length}
                         </span>
                       </div>
@@ -1400,7 +1400,7 @@ export function NizametricsClient({
                                   value={item.perspective}
                                   onChange={(e) => handleMovePlanItem(item.id, e.target.value as BSCPerspective)}
                                   onClick={(e) => e.stopPropagation()}
-                                  className="text-[10px] font-black text-slate-400 bg-transparent border-0 outline-none cursor-pointer py-0 px-0.5 max-w-[60px]"
+                                  className="text-[10px] font-semibold text-slate-400 bg-transparent border-0 outline-none cursor-pointer py-0 px-0.5 max-w-[60px]"
                                   title="Pindah domain"
                                 >
                                   {PERSPECTIVES.map((p) => (
@@ -1443,7 +1443,7 @@ export function NizametricsClient({
                   <button
                     type="button"
                     onClick={() => setPlanItems((prev) => prev.filter((i) => !i.done))}
-                    className="ml-auto text-[11px] font-black text-slate-400 hover:text-rose-500 transition-colors cursor-pointer uppercase tracking-wider"
+                    className="ml-auto text-[11px] font-semibold text-slate-400 hover:text-rose-500 transition-colors cursor-pointer uppercase tracking-wider"
                   >
                     Hapus yang selesai ({planItems.filter((i) => i.done).length})
                   </button>
@@ -1462,8 +1462,8 @@ export function NizametricsClient({
           className="flex items-center justify-between gap-3 w-full px-8 py-5 text-left cursor-pointer hover:bg-slate-100/50 transition-all"
         >
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mode Lanjutan</p>
-            <h4 className="text-base font-black text-slate-900 mt-0.5">Bobot Perspektif · KPI List · Audit Sinkron</h4>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Mode Lanjutan</p>
+            <h4 className="text-base font-semibold text-slate-900 mt-0.5">Bobot Perspektif · KPI List · Audit Sinkron</h4>
           </div>
           {showAdvanced ? <ChevronUp size={18} className="text-slate-500" /> : <ChevronDown size={18} className="text-slate-500" />}
         </button>
@@ -1472,14 +1472,14 @@ export function NizametricsClient({
           <div className="px-8 pb-8 space-y-8">
 
             {/* Perspective Weights */}
-            <div className="bg-white rounded-[28px] border border-slate-100 p-6 space-y-5">
+            <div className="bg-white rounded-xl border border-slate-100 p-6 space-y-5">
               <div className="flex items-center justify-between gap-3">
-                <h5 className="text-base font-black text-slate-900">Bobot Perspektif</h5>
+                <h5 className="text-base font-semibold text-slate-900">Bobot Perspektif</h5>
                 <button
                   type="button"
                   onClick={handleSaveWeights}
                   disabled={isPending || !canManageSetup}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider disabled:opacity-50 cursor-pointer"
                 >
                   <Save size={13} />
                   Simpan Bobot
@@ -1488,14 +1488,14 @@ export function NizametricsClient({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {PERSPECTIVES.map((p) => (
                   <label key={p} className="space-y-1.5">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                       {DOMAIN_CONFIG[p].domainLabel}
                     </span>
                     <input
                       type="number" min={0} max={100}
                       value={weightDraft[p]}
                       onChange={(e) => setWeightDraft((prev) => ({ ...prev, [p]: Number(e.target.value || 0) }))}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-black text-slate-800 outline-none focus:border-blue-400"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-blue-400"
                     />
                   </label>
                 ))}
@@ -1507,10 +1507,10 @@ export function NizametricsClient({
             </div>
 
             {/* KPI Coverage Audit */}
-            <div className="bg-white rounded-[28px] border border-slate-100 p-6 space-y-4">
+            <div className="bg-white rounded-xl border border-slate-100 p-6 space-y-4">
               <div className="flex items-center justify-between gap-3">
-                <h5 className="text-base font-black text-slate-900">Audit Sinkron KPI vs Data Existing</h5>
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider">
+                <h5 className="text-base font-semibold text-slate-900">Audit Sinkron KPI vs Data Existing</h5>
+                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider">
                   <span className="px-2 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700">
                     Terukur: {kpiCoverage.measurable.length}
                   </span>
@@ -1524,7 +1524,7 @@ export function NizametricsClient({
                 <div className="space-y-2">
                   {kpiCoverage.measurable.map((item) => (
                     <div key={item.kpi_id} className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2">
-                      <p className="text-xs font-black text-slate-900">{item.kpi_name}</p>
+                      <p className="text-xs font-semibold text-slate-900">{item.kpi_name}</p>
                       <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                         → {item.metric.label} · {formatValue(item.metric.unit, item.metric.value)}
                       </p>
@@ -1537,7 +1537,7 @@ export function NizametricsClient({
                 <div className="space-y-2">
                   {kpiCoverage.unmapped.map((item) => (
                     <div key={item.kpi_id} className="rounded-xl border border-amber-100 bg-amber-50/50 px-3 py-2 space-y-1">
-                      <p className="text-xs font-black text-slate-900">{item.kpi_name}</p>
+                      <p className="text-xs font-semibold text-slate-900">{item.kpi_name}</p>
                       <p className="text-[11px] text-amber-700 font-semibold">Belum ada sumber data — saran:</p>
                       <div className="flex flex-wrap gap-1.5">
                         {item.suggestions.slice(0, 2).map((s) => (
@@ -1553,7 +1553,7 @@ export function NizametricsClient({
                               })
                             }}
                             disabled={isPending || !canManageSetup}
-                            className="px-2 py-1 rounded-lg border border-blue-200 bg-blue-50 text-[10px] font-black text-blue-700 hover:bg-blue-100 transition-all disabled:opacity-50 cursor-pointer"
+                            className="px-2 py-1 rounded-lg border border-blue-200 bg-blue-50 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition-all disabled:opacity-50 cursor-pointer"
                           >
                             Pakai: {s.label}
                           </button>
@@ -1566,21 +1566,21 @@ export function NizametricsClient({
             </div>
 
             {/* Full KPI list */}
-            <div className="bg-white rounded-[28px] border border-slate-100 p-6 space-y-4">
+            <div className="bg-white rounded-xl border border-slate-100 p-6 space-y-4">
               <div className="flex items-center justify-between gap-3">
-                <h5 className="text-base font-black text-slate-900">Semua KPI Aktif ({sortedKpis.length})</h5>
+                <h5 className="text-base font-semibold text-slate-900">Semua KPI Aktif ({sortedKpis.length})</h5>
               </div>
               {sortedKpis.length === 0 ? (
                 <p className="text-sm text-slate-500 font-medium">Belum ada KPI aktif di siklus ini.</p>
               ) : (
                 <div className="space-y-2">
                   {sortedKpis.map((kpi) => (
-                    <div key={kpi.id} className="rounded-2xl border border-slate-200 px-4 py-3 flex flex-wrap items-start justify-between gap-3">
+                    <div key={kpi.id} className="rounded-xl border border-slate-200 px-4 py-3 flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                           {DOMAIN_CONFIG[kpi.perspective].domainLabel} · {kpi.code}
                         </p>
-                        <p className="text-sm font-black text-slate-900 mt-0.5">{kpi.name}</p>
+                        <p className="text-sm font-semibold text-slate-900 mt-0.5">{kpi.name}</p>
                         <p className="text-xs text-slate-500 font-medium mt-0.5">
                           Target {formatValue(kpi.unit, kpi.target_value)} · Bobot {kpi.weight_percent}% · {kpi.direction === 'HIGHER_BETTER' ? 'Higher better' : 'Lower better'}
                         </p>
@@ -1601,7 +1601,7 @@ export function NizametricsClient({
                             })
                             setIsEditModalOpen(true)
                           }}
-                          className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50 cursor-pointer"
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
                         >
                           Edit
                         </button>
@@ -1617,7 +1617,7 @@ export function NizametricsClient({
                             })
                           }}
                           disabled={isPending || !canManageSetup}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 text-xs font-black text-rose-700 hover:bg-rose-100 disabled:opacity-50 cursor-pointer"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50 cursor-pointer"
                         >
                           <Trash2 size={11} />
                           Nonaktifkan
@@ -1636,13 +1636,13 @@ export function NizametricsClient({
       {/* ── Edit KPI Modal ── */}
       {isEditModalOpen && kpiEditForm.id && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-[32px] bg-white border border-slate-100 shadow-2xl p-8 space-y-6">
+          <div className="w-full max-w-lg rounded-[32px] bg-white border border-slate-100 shadow-md p-8 space-y-6">
             <div className="flex items-center justify-between">
-              <h4 className="text-xl font-black text-slate-900">Edit KPI</h4>
+              <h4 className="text-xl font-semibold text-slate-900">Edit KPI</h4>
               <button
                 type="button"
                 onClick={() => { setIsEditModalOpen(false) }}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-black text-slate-600 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 cursor-pointer"
               >
                 Tutup
               </button>
@@ -1650,7 +1650,7 @@ export function NizametricsClient({
             <form onSubmit={handleSubmitKpiEdit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Arah KPI</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Arah KPI</span>
                   <select
                     value={kpiEditForm.direction}
                     onChange={(e) => setKpiEditForm((prev) => ({ ...prev, direction: e.target.value as BSCDirection }))}
@@ -1661,7 +1661,7 @@ export function NizametricsClient({
                   </select>
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Satuan</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Satuan</span>
                   <input
                     value={kpiEditForm.unit}
                     onChange={(e) => setKpiEditForm((prev) => ({ ...prev, unit: e.target.value }))}
@@ -1671,7 +1671,7 @@ export function NizametricsClient({
                 </label>
               </div>
               <label className="space-y-1 block">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nama KPI</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Nama KPI</span>
                 <input
                   value={kpiEditForm.name}
                   onChange={(e) => setKpiEditForm((prev) => ({ ...prev, name: e.target.value }))}
@@ -1680,7 +1680,7 @@ export function NizametricsClient({
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Target</span>
                   <input
                     type="number"
                     value={kpiEditForm.targetValue}
@@ -1689,7 +1689,7 @@ export function NizametricsClient({
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Bobot (%)</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Bobot (%)</span>
                   <input
                     type="number"
                     value={kpiEditForm.weightPercent}
@@ -1699,8 +1699,8 @@ export function NizametricsClient({
                 </label>
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-black text-slate-600 cursor-pointer">Batal</button>
-                <button type="submit" disabled={isPending} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-wider disabled:opacity-50 cursor-pointer">
+                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 cursor-pointer">Batal</button>
+                <button type="submit" disabled={isPending} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold uppercase tracking-wider disabled:opacity-50 cursor-pointer">
                   <Save size={13} />
                   Simpan
                 </button>

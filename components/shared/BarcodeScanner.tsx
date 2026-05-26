@@ -46,9 +46,9 @@ export const BarcodeScanner = ({ onScan, onClose, title = "Scan Barcode" }: Barc
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
-      <div className="relative w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl">
+      <div className="relative w-full max-w-md bg-white rounded-xl overflow-hidden shadow-md">
         <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-          <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide flex items-center gap-2">
             <Camera size={16} className="text-blue-600" /> {title}
           </h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
@@ -57,7 +57,7 @@ export const BarcodeScanner = ({ onScan, onClose, title = "Scan Barcode" }: Barc
         </div>
 
         <div className="p-6">
-          <div id="scanner-reader" className="overflow-hidden rounded-2xl border-4 border-slate-100" />
+          <div id="scanner-reader" className="overflow-hidden rounded-xl border-4 border-slate-100" />
           
           <div className="mt-6 p-4 bg-blue-50 rounded-xl text-center">
             <p className="text-xs font-bold text-blue-600">Arahkan kamera ke Barcode produk atau kode rak (Bin).</p>

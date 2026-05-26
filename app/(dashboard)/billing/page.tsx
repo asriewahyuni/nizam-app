@@ -645,7 +645,7 @@ function BillingContent() {
     provisioningModuleOptions,
   ])
 
-  if (loading) return <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest animate-pulse">Memuat Data Billing...</div>
+  if (loading) return <div className="p-6 text-center text-slate-400 font-bold uppercase tracking-wide animate-pulse">Memuat Data Billing...</div>
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-12">
@@ -656,15 +656,15 @@ function BillingContent() {
         {showCheckoutModal && checkoutInvoice && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeCheckout} className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.96, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl overflow-hidden ring-1 ring-slate-200">
-              <div className="p-8 md:p-10 space-y-6">
+            <motion.div initial={{ scale: 0.96, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-xl shadow-md overflow-hidden ring-1 ring-slate-200">
+              <div className="p-8 md:p-5 space-y-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-rose-100 bg-rose-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-rose-600">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-rose-100 bg-rose-50 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-rose-600">
                       <Clock size={14} /> Selesaikan Dalam {formatTime(timeLeft)}
                     </div>
                     <div>
-                      <h3 className="text-2xl font-black tracking-tighter text-slate-900">Checkout Pembayaran</h3>
+                      <h3 className="text-2xl font-semibold tracking-tighter text-slate-900">Checkout Pembayaran</h3>
                       <p className="mt-1 text-sm font-semibold text-slate-500">
                         Review invoice, transfer ke rekening resmi, lalu unggah bukti pembayaran dalam satu alur yang rapi.
                       </p>
@@ -674,58 +674,58 @@ function BillingContent() {
                     type="button"
                     onClick={closeCheckout}
                     disabled={processing}
-                    className="rounded-2xl border border-slate-200 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-50"
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-50"
                   >
                     Tutup
                   </button>
                 </div>
 
                 {checkoutFeedback && (
-                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-semibold leading-relaxed text-indigo-900">
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-semibold leading-relaxed text-indigo-900">
                     {checkoutFeedback}
                   </div>
                 )}
 
                 <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                  <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Invoice Aktif</p>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Invoice Aktif</p>
                     <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                       <div>
-                        <p className="text-sm font-black text-slate-900">{checkoutInvoice.item_name || 'Pembelian Nizam ERP'}</p>
+                        <p className="text-sm font-semibold text-slate-900">{checkoutInvoice.item_name || 'Pembelian Nizam ERP'}</p>
                         <p className="mt-1 text-xs font-semibold text-slate-500">#{checkoutInvoice.invoice_number}</p>
                       </div>
                       <div className="text-left md:text-right">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Total Tagihan</p>
-                        <p className="text-2xl font-black tracking-tighter text-indigo-700">{formatRupiah(checkoutInvoice.amount)}</p>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Total Tagihan</p>
+                        <p className="text-2xl font-semibold tracking-tighter text-indigo-700">{formatRupiah(checkoutInvoice.amount)}</p>
                       </div>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={() => copyToClipboard(String(checkoutInvoice.invoice_number || ''), 'invoice')}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700"
                       >
                         {copiedField === 'invoice' ? <Check size={12} /> : <Copy size={12} />}
                         {copiedField === 'invoice' ? 'Invoice Dicopy' : 'Copy Nomor Invoice'}
                       </button>
                       <Link
                         href={`/billing/invoice/${checkoutInvoice.id}`}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                       >
                         Lihat Detail Invoice <ArrowUpRight size={12} />
                       </Link>
                     </div>
                   </div>
 
-                  <div className="rounded-[28px] border border-slate-200 bg-white p-5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Langkah Checkout</p>
+                  <div className="rounded-xl border border-slate-200 bg-white p-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Langkah Checkout</p>
                     <div className="mt-4 space-y-3">
                       {[
                         'Pastikan nominal transfer sesuai invoice.',
                         'Transfer ke rekening resmi Nizam.',
                         'Upload bukti transfer agar tim kami bisa verifikasi.',
                       ].map((step) => (
-                        <div key={step} className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3">
+                        <div key={step} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
                           <div className="mt-0.5 rounded-full bg-emerald-100 p-1 text-emerald-600">
                             <CheckCircle2 size={12} />
                           </div>
@@ -739,15 +739,15 @@ function BillingContent() {
                 <div className="rounded-[32px] bg-indigo-600 p-6 text-white shadow-xl">
                   <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div className="space-y-2">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-100">Rekening Tujuan</p>
-                      <p className="text-sm font-black uppercase tracking-[0.14em] text-indigo-100">{bankInfo.bank}</p>
-                      <p className="text-3xl font-black tracking-widest">{bankInfo.account}</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-100">Rekening Tujuan</p>
+                      <p className="text-sm font-semibold uppercase tracking-[0.14em] text-indigo-100">{bankInfo.bank}</p>
+                      <p className="text-3xl font-semibold tracking-wide">{bankInfo.account}</p>
                       <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-indigo-100">a.n {bankInfo.name}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => copyToClipboard(String(bankInfo.account || ''), 'account')}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-700 transition hover:bg-indigo-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 transition hover:bg-indigo-50"
                     >
                       {copiedField === 'account' ? <Check size={12} /> : <Copy size={12} />}
                       {copiedField === 'account' ? 'Rekening Dicopy' : 'Copy Rekening'}
@@ -769,7 +769,7 @@ function BillingContent() {
                         <ArrowUpRight size={24} className="rotate-45" />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-900">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-900">
                           {proofFile ? 'File Siap Dikirim' : 'Upload Bukti Transfer'}
                         </p>
                         <p className="text-sm font-semibold text-slate-600">
@@ -783,14 +783,14 @@ function BillingContent() {
                     <button
                       disabled={processing || !proofFile}
                       onClick={handleManualPayment}
-                      className="min-w-[240px] rounded-[28px] bg-slate-900 px-6 py-4 text-[11px] font-black uppercase tracking-[0.22em] text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="min-w-[240px] rounded-xl bg-slate-900 px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {processing ? 'Mengirim Bukti...' : 'Konfirmasi Pembayaran'}
                     </button>
                     <Link
                       href={`https://wa.me/${supportInfo.wa}`}
                       target="_blank"
-                      className="inline-flex items-center justify-center gap-2 rounded-[28px] border border-slate-200 px-6 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-6 py-4 text-[10px] font-semibold uppercase tracking-wide text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
                     >
                       Butuh Bantuan Support
                     </Link>
@@ -803,22 +803,22 @@ function BillingContent() {
       </AnimatePresence>
 
       {/* Header & Status Langganan */}
-      <section className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden relative">
+      <section className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden relative">
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-50/50 rounded-full -translate-y-1/2 translate-x-1/2 blur-[80px]" />
 
-        <div className="relative p-8 md:p-12 flex flex-col md:flex-row items-center gap-12">
-          <div className="w-64 h-64 rounded-[48px] bg-slate-900 flex flex-col items-center justify-center text-white relative shadow-2xl overflow-hidden group">
+        <div className="relative p-8 md:p-6 flex flex-col md:flex-row items-center gap-12">
+          <div className="w-64 h-64 rounded-xl bg-slate-900 flex flex-col items-center justify-center text-white relative shadow-md overflow-hidden group">
              <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
              <Zap size={48} className="text-amber-400 fill-amber-400/20 mb-4 animate-bounce" />
-             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">PAKET ANDA</p>
-             <h2 className="text-3xl font-black tracking-tighter uppercase">{activeOrg?.settings?.plan || 'Free'}</h2>
+             <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400 mb-1">PAKET ANDA</p>
+             <h2 className="text-3xl font-semibold tracking-tighter uppercase">{activeOrg?.settings?.plan || 'Free'}</h2>
              {inheritsPlanFromHolding && (
-               <div className="mt-2 px-3 py-1 bg-sky-500/15 border border-sky-400/30 rounded-full text-[9px] font-black text-sky-200 uppercase tracking-widest">
+               <div className="mt-2 px-3 py-1 bg-sky-500/15 border border-sky-400/30 rounded-full text-[9px] font-semibold text-sky-200 uppercase tracking-wide">
                  MENGIKUTI HOLDING
                </div>
              )}
              {activeOrg?.settings?.is_demo && (
-               <div className="mt-2 px-3 py-1 bg-amber-500/20 border border-amber-500/50 rounded-full text-[9px] font-black text-amber-500 uppercase tracking-widest">
+               <div className="mt-2 px-3 py-1 bg-amber-500/20 border border-amber-500/50 rounded-full text-[9px] font-semibold text-amber-500 uppercase tracking-wide">
                  SESI DEMO
                </div>
              )}
@@ -828,27 +828,27 @@ function BillingContent() {
             <div className="flex items-start justify-between">
               <div className="space-y-2">
                 <div className="flex items-center gap-3 mb-2">
-                   <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">NIZAM <span className="text-indigo-600">ERP</span></h1>
-                   <div className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full border border-emerald-100">SYSTEM ACTIVE</div>
+                   <h1 className="text-4xl font-semibold text-slate-900 tracking-tighter uppercase italic">NIZAM <span className="text-indigo-600">ERP</span></h1>
+                   <div className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-semibold uppercase rounded-full border border-emerald-100">SYSTEM ACTIVE</div>
                 </div>
                 <p className="text-slate-500 font-bold leading-relaxed max-w-xl">
                   Kelola infrastruktur operasional Anda. Tambah kekuatan sistem sesuai skala bisnis Anda tanpa biaya tersembunyi.
                 </p>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-600">
                   Core Family Aktif: {currentCoreFamilyLabel}
                 </p>
               </div>
 
               {/* Tagihan Rutin Per Bulan */}
-              <div className="bg-slate-900 p-8 rounded-[40px] text-white shadow-2xl border border-white/10 relative overflow-hidden group">
+              <div className="bg-slate-900 p-8 rounded-xl text-white shadow-md border border-white/10 relative overflow-hidden group">
                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/30 to-transparent opacity-50" />
                  <div className="relative z-10 space-y-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">Tagihan Rutin Per Bulan</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-300">Tagihan Rutin Per Bulan</p>
                     <div className="flex items-baseline gap-2">
-                       <h3 className="text-3xl font-black font-mono tracking-tighter italic">{formatRupiah(totalMonthly)}</h3>
+                       <h3 className="text-3xl font-semibold font-mono tracking-tighter italic">{formatRupiah(totalMonthly)}</h3>
                        <p className="text-xs font-bold text-slate-400 text-right">/bln</p>
                     </div>
-                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest border-t border-white/5 pt-2">
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide border-t border-white/5 pt-2">
                        Include Plan & {activeOrg?.active_addons?.length || 0} Addons
                     </p>
                  </div>
@@ -863,10 +863,10 @@ function BillingContent() {
 
             {activeAddonDetails.length > 0 && (
               <div className="space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Add-on Aktif Saat Ini</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Add-on Aktif Saat Ini</p>
                 <div className="flex flex-wrap gap-2">
                   {activeAddonDetails.map((addon: any) => (
-                    <div key={addon.id} className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                    <div key={addon.id} className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
                       <CheckCircle2 size={12} />
                       {addon.name}
                     </div>
@@ -877,8 +877,8 @@ function BillingContent() {
 
             <div className="flex flex-col gap-6 pt-4 w-full">
                {inheritsPlanFromHolding ? (
-                 <div className="w-full rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">Paket Mengikuti Holding</p>
+                 <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-6 py-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">Paket Mengikuti Holding</p>
                     <p className="mt-2 text-sm font-bold text-amber-900 leading-relaxed">
                       {inheritedPlanNotice}
                     </p>
@@ -890,11 +890,11 @@ function BillingContent() {
                      <button
                        type="button"
                        onClick={() => scrollToSection('billing-history')}
-                       className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+                       className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                      >
                        <History size={18} /> Lihat Invoice
                      </button>
-                     <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                     <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                        <CreditCard size={14} /> Transfer Manual + Upload Bukti
                      </div>
                    </div>
@@ -906,7 +906,7 @@ function BillingContent() {
                          placeholder="Punya Voucher? Contoh: ABS2024"
                          value={voucherCode}
                          onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-xs font-bold text-slate-900 transition-all focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-3 text-xs font-bold text-slate-900 transition-all focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                        />
                        {voucherCode && (
                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-600 animate-pulse">
@@ -917,7 +917,7 @@ function BillingContent() {
                      <button
                        disabled={applyingVoucher || !voucherCode}
                        onClick={handleApplyVoucher}
-                       className="rounded-2xl bg-slate-900 px-6 py-3 text-xs font-black uppercase tracking-widest text-white transition hover:bg-indigo-600 disabled:opacity-50 shadow-xl"
+                       className="rounded-xl bg-slate-900 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-indigo-600 disabled:opacity-50 shadow-xl"
                      >
                        {applyingVoucher ? 'Memproses...' : 'Apply Voucher'}
                      </button>
@@ -930,13 +930,13 @@ function BillingContent() {
       </section>
 
       {false && (
-      <section id="billing-provisioning" className="rounded-[40px] border border-slate-100 bg-white p-6 md:p-8 shadow-xl shadow-slate-200/50">
+      <section id="billing-provisioning" className="rounded-xl border border-slate-100 bg-white p-6 md:p-8 shadow-xl shadow-slate-200/50">
         <div className="flex flex-col gap-3 border-b border-slate-100 pb-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-700">
+          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
             <Layers3 size={12} /> Provisioning Builder
           </div>
           <div>
-            <h2 className="text-3xl font-black tracking-tighter text-slate-900">Flow yang sama seperti provisioning admin, tapi khusus untuk billing</h2>
+            <h2 className="text-3xl font-semibold tracking-tighter text-slate-900">Flow yang sama seperti provisioning admin, tapi khusus untuk billing</h2>
             <p className="mt-1 text-sm font-semibold text-slate-500">
               Pilih core untuk preview paket, fokuskan module, lalu pilih add-on yang memang kompatibel untuk dibeli lewat checkout.
             </p>
@@ -944,13 +944,13 @@ function BillingContent() {
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.25fr_1.25fr_0.95fr]">
-          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">1. Core</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-700">1. Core</h3>
                 <p className="mt-1 text-[11px] font-semibold text-slate-500">Preview paket core yang akan menjadi fondasi compatibility.</p>
               </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">3 opsi</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">3 opsi</span>
             </div>
             <div className="mt-4 space-y-3">
               {(['lite', 'starter', 'full'] as const).map((coreFamily) => {
@@ -978,7 +978,7 @@ function BillingContent() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-700">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
                           {getSaasCoreFamilyLabel(coreFamily)}
                         </div>
                         <p className="mt-1 text-[11px] font-semibold text-slate-500">
@@ -986,11 +986,11 @@ function BillingContent() {
                         </p>
                       </div>
                       {isSelected ? (
-                        <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                        <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-indigo-700">
                           Preview
                         </span>
                       ) : isCurrentFamily ? (
-                        <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                        <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
                           Current
                         </span>
                       ) : null}
@@ -1004,13 +1004,13 @@ function BillingContent() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">2. Modules</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-700">2. Modules</h3>
                 <p className="mt-1 text-[11px] font-semibold text-slate-500">Klik module untuk memfokuskan daftar add-on di kolom sebelah.</p>
               </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 {provisioningModuleOptions.length} opsi
               </span>
             </div>
@@ -1041,14 +1041,14 @@ function BillingContent() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-700">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-700">
                             {option.label}
                           </div>
                           <p className="mt-1 text-[11px] font-semibold text-slate-500">
                             {option.description}
                           </p>
                         </div>
-                        <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                        <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                           {option.sectionTitle}
                         </span>
                       </div>
@@ -1056,17 +1056,17 @@ function BillingContent() {
 
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {isCurrentActive && (
-                        <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                        <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
                           Active
                         </span>
                       )}
                       {!isCurrentActive && isProvisioned && (
-                        <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                        <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-indigo-700">
                           Preview Core
                         </span>
                       )}
                       {isSelected && (
-                        <span className="rounded-full border border-indigo-200 bg-indigo-100 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                        <span className="rounded-full border border-indigo-200 bg-indigo-100 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-indigo-700">
                           Dipilih
                         </span>
                       )}
@@ -1081,7 +1081,7 @@ function BillingContent() {
                           setSelectedCheckoutItem(buildAddonCheckoutItem(marketplaceModule))
                           scrollToSection('billing-checkout')
                         }}
-                        className={`w-full rounded-2xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] transition ${
+                        className={`w-full rounded-xl px-4 py-3 text-[10px] font-semibold uppercase tracking-wide transition ${
                           isProvisioned
                             ? 'cursor-default border border-slate-200 bg-slate-100 text-slate-500'
                             : !marketplaceModule
@@ -1106,13 +1106,13 @@ function BillingContent() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">3. Add-ons</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-700">3. Add-ons</h3>
                 <p className="mt-1 text-[11px] font-semibold text-slate-500">Add-on mengikuti module yang sedang difokuskan dan rule compatibility billing.</p>
               </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 {provisioningRelatedAddons.length} opsi
               </span>
             </div>
@@ -1138,31 +1138,31 @@ function BillingContent() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-700">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-700">
                             {addon.name}
                           </div>
                           <p className="mt-1 text-[11px] font-semibold text-slate-500">
                             {addon.desc}
                           </p>
                         </div>
-                        <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-blue-700">
+                        <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-blue-700">
                           {getOperatorMarketplaceLabel(addon)}
                         </span>
                       </div>
 
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {isActive && (
-                          <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                          <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
                             Sudah Aktif
                           </span>
                         )}
                         {isSelected && !isActive && (
-                          <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                          <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-indigo-700">
                             Dipilih
                           </span>
                         )}
                         {isLocked && (
-                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-amber-700">
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-700">
                             Locked
                           </span>
                         )}
@@ -1174,8 +1174,8 @@ function BillingContent() {
 
                       <div className="mt-4 flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Harga</p>
-                          <p className="mt-1 text-lg font-black text-slate-900">{formatRupiah(addon.price)}</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Harga</p>
+                          <p className="mt-1 text-lg font-semibold text-slate-900">{formatRupiah(addon.price)}</p>
                         </div>
                         <button
                           type="button"
@@ -1184,7 +1184,7 @@ function BillingContent() {
                             setSelectedCheckoutItem(buildAddonCheckoutItem(addon))
                             scrollToSection('billing-checkout')
                           }}
-                          className={`rounded-2xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] transition ${
+                          className={`rounded-xl px-4 py-3 text-[10px] font-semibold uppercase tracking-wide transition ${
                             isActive
                               ? 'cursor-default border border-emerald-200 bg-emerald-100 text-emerald-700'
                               : isSelected
@@ -1206,35 +1206,35 @@ function BillingContent() {
             </div>
           </div>
 
-          <div id="billing-checkout" className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+          <div id="billing-checkout" className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">4. Summary</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-700">4. Summary</h3>
                 <p className="mt-1 text-[11px] font-semibold text-slate-500">Ringkasan preview, target checkout, dan invoice action ada di sini.</p>
               </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Live</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Live</span>
             </div>
             <div className="mt-4 space-y-3">
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Preview Core</div>
-                <div className="mt-1 text-sm font-black text-slate-900">{getSaasCoreFamilyLabel(previewCoreFamily)}</div>
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Preview Core</div>
+                <div className="mt-1 text-sm font-semibold text-slate-900">{getSaasCoreFamilyLabel(previewCoreFamily)}</div>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Preview Plan</div>
-                <div className="mt-1 text-sm font-black text-slate-900">{previewPackage?.name || activeOrg?.settings?.plan || 'Belum Ada'}</div>
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Preview Plan</div>
+                <div className="mt-1 text-sm font-semibold text-slate-900">{previewPackage?.name || activeOrg?.settings?.plan || 'Belum Ada'}</div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Modules</div>
-                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{previewEnabledModules.length}</div>
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Modules</div>
+                  <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{previewEnabledModules.length}</div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Add-ons</div>
-                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{previewAddonNames.length}</div>
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Add-ons</div>
+                  <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{previewAddonNames.length}</div>
                 </div>
               </div>
-              <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700">Checkout Target</div>
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-700">Checkout Target</div>
                 <p className="mt-1 text-[11px] font-semibold text-indigo-700">
                   {selectedCheckoutItem ? `${selectedCheckoutItem?.label ?? ''}: ${selectedCheckoutItem?.name ?? ''}` : 'Belum ada item dipilih dari builder.'}
                 </p>
@@ -1243,35 +1243,35 @@ function BillingContent() {
                 <div className="rounded-[24px] border border-slate-200 bg-white p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="inline-flex rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-700">
+                      <div className="inline-flex rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
                         {selectedCheckoutItem?.label}
                       </div>
-                      <h4 className="mt-3 text-lg font-black tracking-tight text-slate-900">{selectedCheckoutItem?.name}</h4>
+                      <h4 className="mt-3 text-lg font-semibold tracking-tight text-slate-900">{selectedCheckoutItem?.name}</h4>
                       <p className="mt-2 text-[11px] font-semibold leading-relaxed text-slate-600">
                         {selectedCheckoutItem?.description}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Harga</p>
-                      <p className="mt-1 text-xl font-black tracking-tight text-slate-900">{formatRupiah(selectedCheckoutItem?.price ?? 0)}</p>
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">/{selectedCheckoutItem?.billing}</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Harga</p>
+                      <p className="mt-1 text-xl font-semibold tracking-tight text-slate-900">{formatRupiah(selectedCheckoutItem?.price ?? 0)}</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">/{selectedCheckoutItem?.billing}</p>
                     </div>
                   </div>
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Catatan Aktivasi</p>
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Catatan Aktivasi</p>
                     <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-600">{selectedCheckoutItem?.note}</p>
                   </div>
                 </div>
               ) : (
                 <div className="rounded-[24px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Belum Ada Item Dipilih</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Belum Ada Item Dipilih</p>
                   <p className="mt-2 text-[11px] font-semibold leading-relaxed text-slate-600">
                     Pilih core, module, add-on, atau paket token dari builder supaya checkout target muncul di sini.
                   </p>
                 </div>
               )}
               {selectedCheckoutDisabledReason && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-semibold leading-relaxed text-amber-900">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-semibold leading-relaxed text-amber-900">
                   {selectedCheckoutDisabledReason}
                 </div>
               )}
@@ -1279,29 +1279,29 @@ function BillingContent() {
                 type="button"
                 disabled={processing || Boolean(selectedCheckoutDisabledReason) || !activeOrg || !selectedCheckoutItem}
                 onClick={() => activeOrg && selectedCheckoutItem && handleBuyItem(activeOrg, selectedCheckoutItem)}
-                className="w-full rounded-[24px] bg-slate-900 px-5 py-4 text-[11px] font-black uppercase tracking-[0.18em] text-white transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-[24px] bg-slate-900 px-5 py-4 text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {processing ? 'Membuat Invoice...' : selectedCheckoutItem ? 'Buat Invoice & Lanjut Checkout' : 'Pilih Item Dulu'}
               </button>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Invoice UNPAID</div>
-                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{unpaidInvoiceCount}</div>
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Invoice UNPAID</div>
+                  <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{unpaidInvoiceCount}</div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Metode Bayar</div>
-                  <div className="mt-1 text-sm font-black tracking-tight text-slate-900">Transfer Manual</div>
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Metode Bayar</div>
+                  <div className="mt-1 text-sm font-semibold tracking-tight text-slate-900">Transfer Manual</div>
                 </div>
               </div>
               <div id="ai-token" className="rounded-[24px] border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">AI Token Quick Top Up</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">AI Token Quick Top Up</p>
                     <p className="mt-1 text-[11px] font-semibold text-slate-500">
                       Saldo saat ini {aiTokenBalance.toLocaleString('id-ID')} token. Estimasi {Math.floor(aiTokenBalance / 4000).toLocaleString('id-ID')}x generate.
                     </p>
                   </div>
-                  <span className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                  <span className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-indigo-700">
                     3 Paket
                   </span>
                 </div>
@@ -1314,21 +1314,21 @@ function BillingContent() {
                         type="button"
                         disabled={processing || !activeOrg}
                         onClick={() => setSelectedCheckoutItem(buildAiTokenCheckoutItem(pkg))}
-                        className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left transition ${
+                        className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left transition ${
                           isSelected
                             ? 'border-indigo-200 bg-indigo-50'
                             : 'border-slate-200 bg-slate-50 hover:border-indigo-200 hover:bg-white'
                         }`}
                       >
                         <div>
-                          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-700">{pkg.name}</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700">{pkg.name}</div>
                           <div className="mt-1 text-[11px] font-semibold text-slate-500">
                             {Number(pkg.tokens || 0).toLocaleString('id-ID')} token
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm font-black text-slate-900">{formatRupiah(Number(pkg.price_idr || 0))}</div>
-                          <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                          <div className="text-sm font-semibold text-slate-900">{formatRupiah(Number(pkg.price_idr || 0))}</div>
+                          <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                             {isSelected ? 'Dipilih' : 'Pilih'}
                           </div>
                         </div>
@@ -1338,8 +1338,8 @@ function BillingContent() {
                 </div>
               </div>
               {inheritsPlanFromHolding && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">Holding Rule</div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700">Holding Rule</div>
                   <p className="mt-1 text-[11px] font-semibold text-amber-800">
                     Core package tetap mengikuti organisasi induk. Builder billing masih bisa dipakai untuk melihat compatibility dan add-on yang diizinkan.
                   </p>
@@ -1353,18 +1353,18 @@ function BillingContent() {
 
 
       {/* History Penagihan */}
-      <section id="billing-history" className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
+      <section id="billing-history" className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
         <div className="px-8 py-6 border-b border-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
              <div className="p-2.5 bg-slate-100 rounded-xl">
                <History size={18} className="text-slate-600" />
              </div>
              <div>
-               <h3 className="text-lg font-black text-slate-900 tracking-tight">Riwayat Penagihan & Invoice</h3>
-               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Audit log pembayaran paket SaaS</p>
+               <h3 className="text-lg font-semibold text-slate-900 tracking-tight">Riwayat Penagihan & Invoice</h3>
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Audit log pembayaran paket SaaS</p>
              </div>
           </div>
-          <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+          <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
             {invoices.length} Invoice
           </div>
         </div>
@@ -1373,12 +1373,12 @@ function BillingContent() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">No Invoice</th>
-                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Paket / Item</th>
-                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Tgl Terbit</th>
-                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Nilai Tagihan</th>
-                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-                <th className="px-8 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
+                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-wide">No Invoice</th>
+                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-wide">Paket / Item</th>
+                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-wide">Tgl Terbit</th>
+                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-wide text-right">Nilai Tagihan</th>
+                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-wide text-center">Status</th>
+                <th className="px-8 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-wide text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -1389,7 +1389,7 @@ function BillingContent() {
                   <tr key={inv.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-8 py-4">
                       <Link href={`/billing/invoice/${inv.id}`} className="flex items-center gap-1">
-                         <span className="text-xs font-black text-slate-900 tracking-tighter hover:text-blue-600 transition-colors">#{inv.invoice_number}</span>
+                         <span className="text-xs font-semibold text-slate-900 tracking-tighter hover:text-blue-600 transition-colors">#{inv.invoice_number}</span>
                       </Link>
                     </td>
                     <td className="px-8 py-4">
@@ -1402,20 +1402,20 @@ function BillingContent() {
                       {new Date(inv.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="px-8 py-4 text-right">
-                      <span className="text-xs font-black text-slate-900 font-mono tracking-tighter">{formatRupiah(inv.amount)}</span>
+                      <span className="text-xs font-semibold text-slate-900 font-mono tracking-tighter">{formatRupiah(inv.amount)}</span>
                     </td>
                     <td className="px-8 py-4 text-center">
                        <div className="flex flex-col items-center gap-1.5">
                           <SubscriptionStatus status={inv.status} />
                           {inv.status === 'UNPAID' && (
                              inheritsPlanFromHolding && inv.package_id ? (
-                               <span className="text-[9px] font-black text-amber-600 uppercase tracking-[0.1em]">
+                               <span className="text-[9px] font-semibold text-amber-600 uppercase tracking-[0.1em]">
                                  Kelola via Holding
                                </span>
                              ) : (
                                <button
                                  onClick={() => openCheckout(inv)}
-                                 className="text-[9px] font-black text-rose-500 hover:text-rose-600 uppercase tracking-[0.1em] flex items-center gap-1 animate-pulse"
+                                 className="text-[9px] font-semibold text-rose-500 hover:text-rose-600 uppercase tracking-[0.1em] flex items-center gap-1 animate-pulse"
                                >
                                  <CreditCard size={10} /> Bayar Sekarang
                                </button>
@@ -1424,7 +1424,7 @@ function BillingContent() {
                        </div>
                     </td>
                     <td className="px-8 py-4 text-right">
-                       <Link href={`/billing/invoice/${inv.id}`} className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 text-[10px] font-black uppercase rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm">
+                       <Link href={`/billing/invoice/${inv.id}`} className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 text-[10px] font-semibold uppercase rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm">
                           Lihat Invoice
                        </Link>
                     </td>
@@ -1443,15 +1443,15 @@ function UsageMetric({ icon: Icon, label, current, max, unit }: any) {
   const safeMax = Math.max(Number(max || 0), 1)
   const percentage = Math.min((Number(current || 0) / safeMax) * 100, 100)
   return (
-    <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100 space-y-3">
+    <div className="p-5 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
        <div className="flex items-center justify-between">
          <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">
            <Icon size={16} className="text-indigo-600" />
          </div>
-         <span className="text-[10px] font-black text-slate-900 uppercase italic tracking-tighter">{current} / {safeMax} {unit}</span>
+         <span className="text-[10px] font-semibold text-slate-900 uppercase italic tracking-tighter">{current} / {safeMax} {unit}</span>
        </div>
        <div className="space-y-1">
-         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+         <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
          <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
            <motion.div initial={{ width: 0 }} animate={{ width: `${percentage}%` }} className={`h-full rounded-full ${percentage > 90 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
          </div>
@@ -1468,7 +1468,7 @@ function BillingFlashMessage({ tone, text }: FlashMessage) {
   } as const
 
   return (
-    <div className={`rounded-[28px] border px-5 py-4 text-sm font-semibold leading-relaxed shadow-sm ${palette[tone]}`}>
+    <div className={`rounded-xl border px-5 py-4 text-sm font-semibold leading-relaxed shadow-sm ${palette[tone]}`}>
       {text}
     </div>
   )
@@ -1477,7 +1477,7 @@ function BillingFlashMessage({ tone, text }: FlashMessage) {
 function SubscriptionStatus({ status }: { status: string }) {
   const colors: any = { PAID: 'bg-emerald-50 text-emerald-600 border-emerald-100', UNPAID: 'bg-amber-50 text-amber-600 border-amber-100', EXPIRED: 'bg-rose-50 text-rose-600 border-rose-100' }
   return (
-    <div className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${colors[status] || 'bg-slate-50'}`}>
+    <div className={`px-2.5 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wide border ${colors[status] || 'bg-slate-50'}`}>
       {status}
     </div>
   )
@@ -1485,7 +1485,7 @@ function SubscriptionStatus({ status }: { status: string }) {
 
 export default function BillingPage() {
   return (
-    <Suspense fallback={<div className="p-12 text-center text-slate-400">Loading Billing System...</div>}>
+    <Suspense fallback={<div className="p-6 text-center text-slate-400">Loading Billing System...</div>}>
       <BillingContent />
     </Suspense>
   )

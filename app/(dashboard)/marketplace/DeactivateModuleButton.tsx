@@ -37,9 +37,9 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
       {/* Confirmation Dialog */}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-xl shadow-md border border-slate-100 max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
                 <AlertTriangle className="h-5 w-5 text-red-500" />
               </div>
               <button
@@ -50,7 +50,7 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
               </button>
             </div>
 
-            <h3 className="text-base font-black text-slate-900 mb-1">
+            <h3 className="text-base font-semibold text-slate-900 mb-1">
               Nonaktifkan {moduleName}?
             </h3>
             <p className="text-sm text-slate-500 leading-relaxed">
@@ -62,14 +62,14 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
               <button
                 onClick={() => setShowConfirm(false)}
                 disabled={isPending}
-                className="flex-1 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
               >
                 Batal
               </button>
               <button
                 onClick={handleConfirm}
                 disabled={isPending}
-                className="flex-1 rounded-2xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isPending ? (
                   <>

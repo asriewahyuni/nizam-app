@@ -395,7 +395,7 @@ function buildPreviewPayload(args: {
 
 function EditorLabel({ children }: { children: ReactNode }) {
   return (
-    <label className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+    <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
       {children}
     </label>
   )
@@ -811,7 +811,7 @@ export default function ThemeHomepageEditor({
 
       <div className="space-y-6 px-10 py-8">
         {localMessage && (
-          <div className={`rounded-[22px] border px-5 py-4 text-sm font-bold ${
+          <div className={`rounded-xl border px-5 py-4 text-sm font-bold ${
             localMessage.tone === 'success'
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
               : localMessage.tone === 'error'
@@ -824,8 +824,8 @@ export default function ThemeHomepageEditor({
 
         <div className="grid gap-4 xl:grid-cols-[0.78fr_0.92fr_1.3fr]">
           <div className="space-y-5">
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Versi Theme</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Versi Theme</div>
               <div className="mt-3 space-y-3">
                 <input
                   value={versionName}
@@ -841,7 +841,7 @@ export default function ThemeHomepageEditor({
                   <Link
                     href={previewHref}
                     target="_blank"
-                    className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-black text-blue-700"
+                    className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-700"
                   >
                     Buka Preview Draft Publik
                   </Link>
@@ -849,8 +849,8 @@ export default function ThemeHomepageEditor({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Halaman Yang Sedang Diedit</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Halaman Yang Sedang Diedit</div>
               <div className="mt-4 grid gap-3">
                 {THEME_EDITOR_PAGES.map((page) => (
                   <button
@@ -863,7 +863,7 @@ export default function ThemeHomepageEditor({
                         [page.key]: current[page.key] || themeLayout[page.key][0]?.id || '',
                       }))
                     }}
-                    className={`rounded-[22px] border px-4 py-4 text-left transition ${
+                    className={`rounded-xl border px-4 py-4 text-left transition ${
                       activePage === page.key
                         ? 'border-blue-300 bg-blue-50'
                         : 'border-slate-200 bg-white hover:border-slate-300'
@@ -871,7 +871,7 @@ export default function ThemeHomepageEditor({
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-sm font-black text-slate-900">{page.label}</div>
+                        <div className="text-sm font-semibold text-slate-900">{page.label}</div>
                         <div className="mt-1 text-xs font-medium text-slate-500">
                           {themeLayout[page.key].length} blok aktif
                         </div>
@@ -891,9 +891,9 @@ export default function ThemeHomepageEditor({
                 appendStoreContext(formData)
                 void runAction(uploadStoreThemeAssetAction, formData, 'Asset theme berhasil diunggah.')
               }}
-              className="rounded-[28px] border border-slate-200 bg-slate-50 p-5"
+              className="rounded-xl border border-slate-200 bg-slate-50 p-5"
             >
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Upload Asset Theme</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Upload Asset Theme</div>
               <div className="mt-4 space-y-3">
                 <input
                   name="label"
@@ -922,9 +922,9 @@ export default function ThemeHomepageEditor({
                 appendStoreContext(formData)
                 void runAction(resetStoreThemeDraftAction, formData, 'Draft theme berhasil diganti dari starter template.')
               }}
-              className="rounded-[28px] border border-slate-200 bg-slate-50 p-5"
+              className="rounded-xl border border-slate-200 bg-slate-50 p-5"
             >
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Starter Template</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Starter Template</div>
               <div className="mt-4 space-y-3">
                 <select
                   value={templateKey}
@@ -943,10 +943,10 @@ export default function ThemeHomepageEditor({
               </div>
             </form>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Blok {activePageMeta.label}</div>
-                <div className="text-xs font-black text-slate-500">{pageBlocks.length} blok</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Blok {activePageMeta.label}</div>
+                <div className="text-xs font-semibold text-slate-500">{pageBlocks.length} blok</div>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
                 <select
@@ -978,7 +978,7 @@ export default function ThemeHomepageEditor({
                     key={block.id}
                     type="button"
                     onClick={() => setSelectedBlockByPage((current) => ({ ...current, [activePage]: block.id }))}
-                    className={`w-full rounded-[22px] border px-4 py-4 text-left transition ${
+                    className={`w-full rounded-xl border px-4 py-4 text-left transition ${
                       block.id === activeBlock?.id
                         ? 'border-blue-300 bg-blue-50'
                         : 'border-slate-200 bg-white hover:border-slate-300'
@@ -986,10 +986,10 @@ export default function ThemeHomepageEditor({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                           {index + 1}. {STORE_THEME_BLOCK_SCHEMAS[block.type].label}
                         </div>
-                        <div className="mt-1 font-black text-slate-900">
+                        <div className="mt-1 font-semibold text-slate-900">
                           {block.title || block.body || 'Blok tanpa judul'}
                         </div>
                         <div className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
@@ -1006,8 +1006,8 @@ export default function ThemeHomepageEditor({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Pustaka Asset</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Pustaka Asset</div>
               <div className="mt-4 space-y-3">
                 {selectedThemeAssets.length === 0 && (
                   <div className="rounded-[20px] border border-dashed border-slate-200 bg-white px-4 py-5 text-sm font-medium text-slate-500">
@@ -1015,7 +1015,7 @@ export default function ThemeHomepageEditor({
                   </div>
                 )}
                 {selectedThemeAssets.slice(0, 8).map((asset) => (
-                  <div key={asset.id} className="rounded-[22px] border border-slate-200 bg-white p-4">
+                  <div key={asset.id} className="rounded-xl border border-slate-200 bg-white p-4">
                     <div
                       className="h-24 rounded-[18px] bg-cover bg-center"
                       style={{
@@ -1023,7 +1023,7 @@ export default function ThemeHomepageEditor({
                         backgroundColor: '#E2E8F0',
                       }}
                     />
-                    <div className="mt-3 text-sm font-black text-slate-900">{asset.label || 'Tanpa label'}</div>
+                    <div className="mt-3 text-sm font-semibold text-slate-900">{asset.label || 'Tanpa label'}</div>
                     <input
                       readOnly
                       value={asset.publicUrl}
@@ -1050,7 +1050,7 @@ export default function ThemeHomepageEditor({
                       <Link
                         href={asset.publicUrl}
                         target="_blank"
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-black text-slate-700"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700"
                       >
                         <ExternalLink size={14} />
                         Buka
@@ -1063,8 +1063,8 @@ export default function ThemeHomepageEditor({
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Token Theme</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Token Theme</div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 {TOKEN_COLOR_FIELDS.map((field) => (
                   <div key={field.key} className="space-y-2">
@@ -1149,8 +1149,8 @@ export default function ThemeHomepageEditor({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Branding Checkout</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Branding Checkout</div>
               <div className="mt-4 space-y-3">
                 <div className="space-y-2">
                   <EditorLabel>Banner Title</EditorLabel>
@@ -1181,10 +1181,10 @@ export default function ThemeHomepageEditor({
             </div>
 
             {advancedMode ? (
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Mode Lanjutan</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Mode Lanjutan</div>
                     <div className="mt-1 text-sm font-medium text-slate-500">
                       Jalur ini dipakai kalau Anda memang perlu sentuh JSON secara langsung.
                     </div>
@@ -1222,10 +1222,10 @@ export default function ThemeHomepageEditor({
                 </div>
               </div>
             ) : (
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Editor Blok Aktif</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Editor Blok Aktif</div>
                     <div className="mt-1 text-sm font-medium text-slate-500">
                       Pilih blok di kolom kiri, lalu edit isi dan urutannya untuk halaman {activePageMeta.label.toLowerCase()}.
                     </div>
@@ -1243,7 +1243,7 @@ export default function ThemeHomepageEditor({
 
                 {activeBlock && blockSchema && (
                   <div className="mt-4 space-y-5">
-                    <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
                       <div className="flex flex-wrap gap-2">
                         <SafeButton
                           size="sm"
@@ -1305,7 +1305,7 @@ export default function ThemeHomepageEditor({
                               </select>
                               {activeBlock.featuredProductId && previewProductById.get(activeBlock.featuredProductId) && (
                                 <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600">
-                                  Produk terpilih: <span className="font-black text-slate-900">{previewProductById.get(activeBlock.featuredProductId)?.name}</span>
+                                  Produk terpilih: <span className="font-semibold text-slate-900">{previewProductById.get(activeBlock.featuredProductId)?.name}</span>
                                 </div>
                               )}
                             </div>
@@ -1348,7 +1348,7 @@ export default function ThemeHomepageEditor({
                       <div className="rounded-[24px] border border-slate-200 bg-white p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                               Item Berulang
                             </div>
                             <div className="mt-1 text-sm font-medium text-slate-500">
@@ -1423,10 +1423,10 @@ export default function ThemeHomepageEditor({
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Live Preview</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Live Preview</div>
                   <div className="mt-1 text-sm font-medium text-slate-500">
                     Preview di bawah memakai renderer storefront yang sama dengan halaman publik.
                   </div>
@@ -1452,7 +1452,7 @@ export default function ThemeHomepageEditor({
               </div>
             </div>
             <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white">
-              <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+              <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 {activePageMeta.previewLabel}
               </div>
               <div className="max-h-[1320px] overflow-auto bg-slate-100">

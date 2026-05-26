@@ -224,11 +224,11 @@ function renderMetricValue(value: string) {
       return (
          <span key={`${part}-${index}`} className="block w-full">
             {index > 0 ? (
-               <span className="mb-1 block text-[0.42em] font-black leading-none text-current/45">/</span>
+               <span className="mb-1 block text-[0.42em] font-semibold leading-none text-current/45">/</span>
             ) : null}
             {currencyMatch?.groups ? (
                <span className="flex w-full flex-col items-start gap-1 min-w-0">
-                  <span className="flex items-center gap-1 text-[0.3em] font-black uppercase leading-none tracking-[0.12em] text-current/60">
+                  <span className="flex items-center gap-1 text-[0.3em] font-semibold uppercase leading-none tracking-[0.12em] text-current/60">
                      {currencyMatch.groups.sign ? <span className="text-[1.15em] tracking-normal">{currencyMatch.groups.sign}</span> : null}
                      <span>{currencyMatch.groups.currency}</span>
                   </span>

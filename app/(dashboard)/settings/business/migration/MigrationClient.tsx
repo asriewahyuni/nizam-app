@@ -397,7 +397,7 @@ function FlowStageIcon({ status, step }: { status: FlowStageStatus; step: number
   if (status === 'done') return <CheckCircle2 size={18} />
   if (status === 'attention') return <AlertTriangle size={18} />
   if (status === 'active') return <ShieldCheck size={18} />
-  return <span className="text-sm font-black">{step}</span>
+  return <span className="text-sm font-semibold">{step}</span>
 }
 
 async function parseWorkbook(file: File): Promise<WorkbookReport> {
@@ -613,9 +613,9 @@ function SheetPreviewTable({ sheet }: { sheet: SheetReport }) {
       <table className="min-w-full divide-y divide-slate-100 text-sm">
         <thead className="bg-slate-50">
           <tr>
-            <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Baris</th>
+            <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500">Baris</th>
             {previewColumns.map((column) => (
-              <th key={`${sheet.name}-${column}`} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+              <th key={`${sheet.name}-${column}`} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                 {column}
               </th>
             ))}
@@ -624,7 +624,7 @@ function SheetPreviewTable({ sheet }: { sheet: SheetReport }) {
         <tbody className="divide-y divide-slate-100 bg-white">
           {sheet.samples.map((sample) => (
             <tr key={`${sheet.name}-sample-${sample.rowNumber}`}>
-              <td className="px-4 py-3 font-black text-slate-500">{sample.rowNumber}</td>
+              <td className="px-4 py-3 font-semibold text-slate-500">{sample.rowNumber}</td>
               {previewColumns.map((column) => (
                 <td key={`${sheet.name}-${sample.rowNumber}-${column}`} className="px-4 py-3 font-semibold text-slate-700">
                   {sample.values[column] || '-'}
@@ -642,15 +642,15 @@ function SheetDetailCard({ sheet }: { sheet: SheetReport }) {
   const toneClasses = getToneClasses(sheet.status)
 
   return (
-    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           <div className="flex items-center gap-3">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${toneClasses}`}>
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${toneClasses}`}>
               <StatusIcon status={sheet.status} size={18} />
             </div>
             <div>
-              <h4 className="text-sm font-black uppercase tracking-[0.1em] text-slate-900">{sheet.name}</h4>
+              <h4 className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-900">{sheet.name}</h4>
               <p className="text-sm font-medium text-slate-500">
                 {sheet.rowCount} baris terbaca · {getStatusLabel(sheet.status)}
               </p>
@@ -670,7 +670,7 @@ function SheetDetailCard({ sheet }: { sheet: SheetReport }) {
           ) : null}
         </div>
 
-        <div className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] ${toneClasses}`}>
+        <div className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-semibold uppercase tracking-wide ${toneClasses}`}>
           <StatusIcon status={sheet.status} size={14} />
           {getStatusLabel(sheet.status)}
         </div>
@@ -681,7 +681,7 @@ function SheetDetailCard({ sheet }: { sheet: SheetReport }) {
           {sheet.issues.slice(0, 6).map((issue, index) => (
             <div
               key={`${sheet.name}-issue-${index}`}
-              className={`rounded-2xl px-4 py-3 text-sm font-semibold ${
+              className={`rounded-xl px-4 py-3 text-sm font-semibold ${
                 issue.severity === 'blocked'
                   ? 'bg-rose-50 text-rose-700'
                   : 'bg-amber-50 text-amber-700'
@@ -691,13 +691,13 @@ function SheetDetailCard({ sheet }: { sheet: SheetReport }) {
             </div>
           ))}
           {sheet.issues.length > 6 ? (
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
               +{sheet.issues.length - 6} isu tambahan
             </div>
           ) : null}
         </div>
       ) : (
-        <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+        <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
           Sheet ini lolos validasi dasar.
         </div>
       )}
@@ -1341,7 +1341,7 @@ export default function MigrationClient() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               href="/settings/business"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
             >
               <ArrowLeft size={16} />
               Kembali
@@ -1349,7 +1349,7 @@ export default function MigrationClient() {
             <a
               href="/templates/migrasi/NIZAM_Migration_Template.xlsx"
               download
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:bg-black"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-black"
             >
               <Download size={16} />
               Download Template Migrasi
@@ -1366,11 +1366,11 @@ export default function MigrationClient() {
         />
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-5">
           {migrationSteps.map((step, index) => (
-            <div key={step.title} className="rounded-[28px] border border-slate-100 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-sm font-black text-white">
+            <div key={step.title} className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-sm font-semibold text-white">
                 {index + 1}
               </div>
-              <h3 className="text-sm font-black uppercase tracking-[0.08em] text-slate-900">{step.title}</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-900">{step.title}</h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">{step.description}</p>
             </div>
           ))}
@@ -1385,10 +1385,10 @@ export default function MigrationClient() {
             icon={Upload}
           />
 
-          <div className="mt-6 flex flex-col gap-5 rounded-[28px] border border-dashed border-blue-200 bg-white/80 p-6">
+          <div className="mt-6 flex flex-col gap-5 rounded-xl border border-dashed border-blue-200 bg-white/80 p-6">
             <div className="space-y-2">
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700">Workbook Excel</div>
-              <h3 className="text-xl font-black tracking-tight text-slate-900">Pilih file `.xlsx` hasil pengisian client</h3>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-700">Workbook Excel</div>
+              <h3 className="text-xl font-semibold tracking-tight text-slate-900">Pilih file `.xlsx` hasil pengisian client</h3>
               <p className="text-sm font-medium leading-6 text-slate-600">
                 Template ini sudah berisi sheet `coa`, `coa_sample`, dan `coa_referensi` agar tim finance bisa langsung mengisi struktur akun sebelum bagian lain dimigrasikan.
               </p>
@@ -1408,7 +1408,7 @@ export default function MigrationClient() {
               <a
                 href="/templates/migrasi/NIZAM_Migration_Template.xlsx"
                 download
-                className="inline-flex items-center justify-center gap-2 rounded-[22px] border border-slate-200 bg-white px-7 py-3.5 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-7 py-3.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
               >
                 <FileSpreadsheet size={16} />
                 Ambil Template Resmi
@@ -1432,13 +1432,13 @@ export default function MigrationClient() {
             {report ? (
               <div className="space-y-3 rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">
                 <div>
-                  File aktif: <span className="font-black">{report.fileName}</span>
+                  File aktif: <span className="font-semibold">{report.fileName}</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {report.detectedSheetNames.map((sheetName) => (
                     <span
                       key={sheetName}
-                      className="inline-flex items-center rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700"
+                      className="inline-flex items-center rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700"
                     >
                       {sheetName}
                     </span>
@@ -1494,13 +1494,13 @@ export default function MigrationClient() {
 
         <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-5">
           {flowStages.map((stage) => (
-            <div key={stage.id} className={`rounded-[28px] border p-5 ${getFlowStageClasses(stage.status)}`}>
+            <div key={stage.id} className={`rounded-xl border p-5 ${getFlowStageClasses(stage.status)}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-2">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] opacity-70">Step {stage.step}</div>
-                  <h3 className="text-lg font-black tracking-tight">{stage.title}</h3>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide opacity-70">Step {stage.step}</div>
+                  <h3 className="text-lg font-semibold tracking-tight">{stage.title}</h3>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-current/20 bg-white/80">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-current/20 bg-white/80">
                   <FlowStageIcon status={stage.status} step={stage.step} />
                 </div>
               </div>
@@ -1509,8 +1509,8 @@ export default function MigrationClient() {
           ))}
         </div>
 
-        <div className="mt-6 rounded-[28px] border border-slate-200 bg-white/90 px-5 py-4 text-sm font-semibold leading-6 text-slate-700">
-          <span className="font-black text-slate-900">Arah sistem sekarang:</span> {flowCallout}
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white/90 px-5 py-4 text-sm font-semibold leading-6 text-slate-700">
+          <span className="font-semibold text-slate-900">Arah sistem sekarang:</span> {flowCallout}
         </div>
       </SectionCard>
 
@@ -1522,11 +1522,11 @@ export default function MigrationClient() {
         />
         <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3">
-            <div className={`inline-flex items-center rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] ${approvalNotice.badgeClass}`}>
+            <div className={`inline-flex items-center rounded-full border px-4 py-2 text-[10px] font-semibold uppercase tracking-wide ${approvalNotice.badgeClass}`}>
               Approval Gate
             </div>
             <div>
-              <h3 className="text-xl font-black tracking-tight text-slate-900">{approvalNotice.title}</h3>
+              <h3 className="text-xl font-semibold tracking-tight text-slate-900">{approvalNotice.title}</h3>
               <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-700">
                 {approvalNotice.message}
               </p>
@@ -1551,12 +1551,12 @@ export default function MigrationClient() {
         />
 
         {!report ? (
-          <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-8 text-sm font-semibold text-slate-500">
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-8 text-sm font-semibold text-slate-500">
             Upload workbook dulu untuk melihat status tiap bagian, mulai dari Chart of Accounts, master data, sampai opening balances.
           </div>
         ) : (
           <div className="mt-6 space-y-6">
-            <div className="rounded-[28px] border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-semibold text-blue-800">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-semibold text-blue-800">
               Tiap tombol upload di bawah tetap memakai satu workbook yang sama. Bedanya, sekarang review-nya diurutkan per bagian supaya tim onboarding lebih gampang mengikuti tahap kerja.
             </div>
 
@@ -1598,16 +1598,16 @@ export default function MigrationClient() {
                 <div key={section.id} className="rounded-[32px] border border-slate-200 bg-slate-50/70 p-5">
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="flex gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-sm font-black text-white">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-semibold text-white">
                         {index + 1}
                       </div>
                       <div className="space-y-2">
-                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700">Bagian Migrasi</div>
-                        <h3 className="text-2xl font-black tracking-tight text-slate-900">{section.title}</h3>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-700">Bagian Migrasi</div>
+                        <h3 className="text-2xl font-semibold tracking-tight text-slate-900">{section.title}</h3>
                         <p className="max-w-3xl text-sm font-medium leading-6 text-slate-600">
                           {section.description}
                         </p>
-                        <div className="flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                        <div className="flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                           {section.sheets.map((sheetName) => (
                             <span key={`${section.id}-${sheetName}`} className="rounded-full bg-white px-3 py-1">
                               {sheetName}
@@ -1618,7 +1618,7 @@ export default function MigrationClient() {
                     </div>
 
                     <div className="flex flex-col gap-3 xl:items-end">
-                      <div className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] ${toneClasses}`}>
+                      <div className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-semibold uppercase tracking-wide ${toneClasses}`}>
                         <StatusIcon status={section.status} size={14} />
                         {getStatusLabel(section.status)}
                       </div>
@@ -1637,7 +1637,7 @@ export default function MigrationClient() {
                         <a
                           href="/templates/migrasi/NIZAM_Migration_Template.xlsx"
                           download
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
                         >
                           <Download size={14} />
                           Template
@@ -1787,7 +1787,7 @@ export default function MigrationClient() {
 
                   {showApprovalSectionNotice ? (
                     <div className="mt-4 rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-semibold leading-6 text-amber-800">
-                      <span className="font-black">Notifikasi Approval:</span> bagian ini sudah `Ready`, tetapi sebaiknya tetap menunggu persetujuan PIC atau finance lead sebelum tombol `Migrate Now` ditekan karena proses ini akan menulis data pembuka langsung ke sistem.
+                      <span className="font-semibold">Notifikasi Approval:</span> bagian ini sudah `Ready`, tetapi sebaiknya tetap menunggu persetujuan PIC atau finance lead sebelum tombol `Migrate Now` ditekan karena proses ini akan menulis data pembuka langsung ke sistem.
                     </div>
                   ) : null}
 
@@ -1851,24 +1851,24 @@ export default function MigrationClient() {
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                     }`}>
-                      <div className="font-black">{coaImportResult.message}</div>
+                      <div className="font-semibold">{coaImportResult.message}</div>
                       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                         {coaSummaryCards.map(({ label, value }) => (
-                          <div key={label} className="rounded-2xl bg-white/80 px-4 py-3">
-                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</div>
+                          <div key={label} className="rounded-xl bg-white/80 px-4 py-3">
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
                             <div className="mt-2 text-xs font-semibold text-slate-700">{value}</div>
                           </div>
                         ))}
                       </div>
 
-                      <div className="mt-3 rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                      <div className="mt-3 rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                         Sinkron akun berhasil diproses: {coaImportResult.metadata.syncedAccounts} akun.
                       </div>
 
                       {coaImportResult.warnings.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {coaImportResult.warnings.map((warning) => (
-                            <div key={warning} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={warning} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {warning}
                             </div>
                           ))}
@@ -1878,7 +1878,7 @@ export default function MigrationClient() {
                       {coaImportResult.summary.errors.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {coaImportResult.summary.errors.slice(0, 6).map((error) => (
-                            <div key={error} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={error} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {error}
                             </div>
                           ))}
@@ -1893,11 +1893,11 @@ export default function MigrationClient() {
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                     }`}>
-                      <div className="font-black">{masterDataImportResult.message}</div>
+                      <div className="font-semibold">{masterDataImportResult.message}</div>
                       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                         {masterDataSummaryCards.map(({ label, summary }) => (
-                          <div key={label} className="rounded-2xl bg-white/80 px-4 py-3">
-                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</div>
+                          <div key={label} className="rounded-xl bg-white/80 px-4 py-3">
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
                             <div className="mt-2 text-xs font-semibold text-slate-700">
                               Created: {summary.created} · Updated: {summary.updated} · Skipped: {summary.skipped}
                             </div>
@@ -1906,7 +1906,7 @@ export default function MigrationClient() {
                       </div>
 
                       {masterDataImportResult.ignored.coaMappingRows > 0 ? (
-                        <div className="mt-3 rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                        <div className="mt-3 rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                           `coa_mapping` terbaca {masterDataImportResult.ignored.coaMappingRows} baris dan tetap disimpan sebagai lampiran mapping legacy. Import akun utama dijalankan dari sheet `coa`.
                         </div>
                       ) : null}
@@ -1914,7 +1914,7 @@ export default function MigrationClient() {
                       {masterDataImportResult.warnings.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {masterDataImportResult.warnings.map((warning) => (
-                            <div key={warning} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={warning} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {warning}
                             </div>
                           ))}
@@ -1925,7 +1925,7 @@ export default function MigrationClient() {
                         <div className="mt-3 space-y-2">
                           {masterDataSummaryCards.flatMap(({ label, summary }) =>
                             summary.errors.slice(0, 3).map((error) => (
-                              <div key={`${label}-${error}`} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                              <div key={`${label}-${error}`} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                                 [{label}] {error}
                               </div>
                             ))
@@ -1941,28 +1941,28 @@ export default function MigrationClient() {
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                     }`}>
-                      <div className="font-black">{openingStockImportResult.message}</div>
+                      <div className="font-semibold">{openingStockImportResult.message}</div>
                       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Rows Imported</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Rows Imported</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Created: {openingStockImportResult.summary.created} · Skipped: {openingStockImportResult.summary.skipped}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Total Qty</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Total Qty</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             {openingStockImportResult.summary.totalQuantity}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Total Value</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Total Value</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Rp {openingStockImportResult.summary.totalValue.toLocaleString('id-ID')}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Journal</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Journal</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             {openingStockImportResult.metadata.journalEntriesCreated} entry · {openingStockImportResult.metadata.movementDate}
                           </div>
@@ -1972,7 +1972,7 @@ export default function MigrationClient() {
                       {openingStockImportResult.warnings.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {openingStockImportResult.warnings.map((warning) => (
-                            <div key={warning} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={warning} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {warning}
                             </div>
                           ))}
@@ -1982,12 +1982,12 @@ export default function MigrationClient() {
                       {openingStockImportResult.summary.errors.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {openingStockImportResult.summary.errors.slice(0, 6).map((error) => (
-                            <div key={error} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={error} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {error}
                             </div>
                           ))}
                           {openingStockImportResult.summary.errors.length > 6 ? (
-                            <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                               +{openingStockImportResult.summary.errors.length - 6} error tambahan
                             </div>
                           ) : null}
@@ -2002,28 +2002,28 @@ export default function MigrationClient() {
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                     }`}>
-                      <div className="font-black">{openingArImportResult.message}</div>
+                      <div className="font-semibold">{openingArImportResult.message}</div>
                       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Invoices Imported</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Invoices Imported</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Created: {openingArImportResult.summary.created} · Skipped: {openingArImportResult.summary.skipped}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Outstanding</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Outstanding</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Rp {openingArImportResult.summary.totalOutstanding.toLocaleString('id-ID')}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Journal</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Journal</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             {openingArImportResult.metadata.journalEntriesCreated} entry
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Journal Date</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Journal Date</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             {openingArImportResult.metadata.journalDate}
                           </div>
@@ -2033,7 +2033,7 @@ export default function MigrationClient() {
                       {openingArImportResult.warnings.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {openingArImportResult.warnings.map((warning) => (
-                            <div key={warning} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={warning} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {warning}
                             </div>
                           ))}
@@ -2043,12 +2043,12 @@ export default function MigrationClient() {
                       {openingArImportResult.summary.errors.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {openingArImportResult.summary.errors.slice(0, 6).map((error) => (
-                            <div key={error} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={error} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {error}
                             </div>
                           ))}
                           {openingArImportResult.summary.errors.length > 6 ? (
-                            <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                               +{openingArImportResult.summary.errors.length - 6} error tambahan
                             </div>
                           ) : null}
@@ -2063,28 +2063,28 @@ export default function MigrationClient() {
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                     }`}>
-                      <div className="font-black">{openingApImportResult.message}</div>
+                      <div className="font-semibold">{openingApImportResult.message}</div>
                       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Bills Imported</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Bills Imported</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Created: {openingApImportResult.summary.created} · Skipped: {openingApImportResult.summary.skipped}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Outstanding</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Outstanding</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Rp {openingApImportResult.summary.totalOutstanding.toLocaleString('id-ID')}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Journal</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Journal</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             {openingApImportResult.metadata.journalEntriesCreated} entry
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Journal Date</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Journal Date</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             {openingApImportResult.metadata.journalDate}
                           </div>
@@ -2094,7 +2094,7 @@ export default function MigrationClient() {
                       {openingApImportResult.warnings.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {openingApImportResult.warnings.map((warning) => (
-                            <div key={warning} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={warning} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {warning}
                             </div>
                           ))}
@@ -2104,12 +2104,12 @@ export default function MigrationClient() {
                       {openingApImportResult.summary.errors.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {openingApImportResult.summary.errors.slice(0, 6).map((error) => (
-                            <div key={error} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={error} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {error}
                             </div>
                           ))}
                           {openingApImportResult.summary.errors.length > 6 ? (
-                            <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                               +{openingApImportResult.summary.errors.length - 6} error tambahan
                             </div>
                           ) : null}
@@ -2124,28 +2124,28 @@ export default function MigrationClient() {
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                     }`}>
-                      <div className="font-black">{openingCashBankImportResult.message}</div>
+                      <div className="font-semibold">{openingCashBankImportResult.message}</div>
                       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Accounts Imported</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Accounts Imported</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Created: {openingCashBankImportResult.summary.created} · Skipped: {openingCashBankImportResult.summary.skipped}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Total Balance</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Total Balance</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Rp {openingCashBankImportResult.summary.totalBalance.toLocaleString('id-ID')}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Bank Accounts</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Bank Accounts</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Baru dibuat: {openingCashBankImportResult.summary.bankAccountsCreated}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Journal Date</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Journal Date</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             {openingCashBankImportResult.metadata.journalEntriesCreated} entry · {openingCashBankImportResult.metadata.journalDate}
                           </div>
@@ -2155,7 +2155,7 @@ export default function MigrationClient() {
                       {openingCashBankImportResult.warnings.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {openingCashBankImportResult.warnings.map((warning) => (
-                            <div key={warning} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={warning} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {warning}
                             </div>
                           ))}
@@ -2165,12 +2165,12 @@ export default function MigrationClient() {
                       {openingCashBankImportResult.summary.errors.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {openingCashBankImportResult.summary.errors.slice(0, 6).map((error) => (
-                            <div key={error} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={error} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {error}
                             </div>
                           ))}
                           {openingCashBankImportResult.summary.errors.length > 6 ? (
-                            <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                               +{openingCashBankImportResult.summary.errors.length - 6} error tambahan
                             </div>
                           ) : null}
@@ -2185,28 +2185,28 @@ export default function MigrationClient() {
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                     }`}>
-                      <div className="font-black">{fixedAssetsImportResult.message}</div>
+                      <div className="font-semibold">{fixedAssetsImportResult.message}</div>
                       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Assets Imported</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Assets Imported</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Created: {fixedAssetsImportResult.summary.created} · Skipped: {fixedAssetsImportResult.summary.skipped}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Acquisition Cost</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Acquisition Cost</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Rp {fixedAssetsImportResult.summary.totalAcquisitionCost.toLocaleString('id-ID')}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Book Value</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Book Value</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Rp {fixedAssetsImportResult.summary.totalBookValue.toLocaleString('id-ID')}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Journal</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Journal</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             {fixedAssetsImportResult.metadata.journalEntriesCreated} entry · {fixedAssetsImportResult.metadata.journalDate}
                           </div>
@@ -2216,7 +2216,7 @@ export default function MigrationClient() {
                       {fixedAssetsImportResult.warnings.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {fixedAssetsImportResult.warnings.map((warning) => (
-                            <div key={warning} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={warning} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {warning}
                             </div>
                           ))}
@@ -2226,12 +2226,12 @@ export default function MigrationClient() {
                       {fixedAssetsImportResult.summary.errors.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {fixedAssetsImportResult.summary.errors.slice(0, 6).map((error) => (
-                            <div key={error} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={error} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {error}
                             </div>
                           ))}
                           {fixedAssetsImportResult.summary.errors.length > 6 ? (
-                            <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                               +{fixedAssetsImportResult.summary.errors.length - 6} error tambahan
                             </div>
                           ) : null}
@@ -2246,22 +2246,22 @@ export default function MigrationClient() {
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                     }`}>
-                      <div className="font-black">{manufacturingImportResult.message}</div>
+                      <div className="font-semibold">{manufacturingImportResult.message}</div>
                       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">BoM Imported</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">BoM Imported</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Created: {manufacturingImportResult.summary.created} · Skipped: {manufacturingImportResult.summary.skipped}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Component Lines</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Component Lines</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             {manufacturingImportResult.summary.componentLinesCreated}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Status</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Status</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             {manufacturingImportResult.metadata.bomsCreated} header BoM dibuat
                           </div>
@@ -2271,7 +2271,7 @@ export default function MigrationClient() {
                       {manufacturingImportResult.warnings.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {manufacturingImportResult.warnings.map((warning) => (
-                            <div key={warning} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={warning} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {warning}
                             </div>
                           ))}
@@ -2281,12 +2281,12 @@ export default function MigrationClient() {
                       {manufacturingImportResult.summary.errors.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {manufacturingImportResult.summary.errors.slice(0, 6).map((error) => (
-                            <div key={error} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={error} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {error}
                             </div>
                           ))}
                           {manufacturingImportResult.summary.errors.length > 6 ? (
-                            <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                               +{manufacturingImportResult.summary.errors.length - 6} error tambahan
                             </div>
                           ) : null}
@@ -2301,22 +2301,22 @@ export default function MigrationClient() {
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                     }`}>
-                      <div className="font-black">{employeesImportResult.message}</div>
+                      <div className="font-semibold">{employeesImportResult.message}</div>
                       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Employees Imported</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Employees Imported</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Created: {employeesImportResult.summary.created} · Skipped: {employeesImportResult.summary.skipped}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Total Basic Salary</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Total Basic Salary</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             Rp {employeesImportResult.summary.totalBasicSalary.toLocaleString('id-ID')}
                           </div>
                         </div>
-                        <div className="rounded-2xl bg-white/80 px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Assigned Branch</div>
+                        <div className="rounded-xl bg-white/80 px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Assigned Branch</div>
                           <div className="mt-2 text-xs font-semibold text-slate-700">
                             {employeesImportResult.metadata.assignedBranchId || 'Tidak tersedia'}
                           </div>
@@ -2326,7 +2326,7 @@ export default function MigrationClient() {
                       {employeesImportResult.warnings.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {employeesImportResult.warnings.map((warning) => (
-                            <div key={warning} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={warning} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {warning}
                             </div>
                           ))}
@@ -2336,12 +2336,12 @@ export default function MigrationClient() {
                       {employeesImportResult.summary.errors.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {employeesImportResult.summary.errors.slice(0, 6).map((error) => (
-                            <div key={error} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                            <div key={error} className="rounded-xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
                               {error}
                             </div>
                           ))}
                           {employeesImportResult.summary.errors.length > 6 ? (
-                            <div className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
                               +{employeesImportResult.summary.errors.length - 6} error tambahan
                             </div>
                           ) : null}
@@ -2371,7 +2371,7 @@ export default function MigrationClient() {
             />
             <ul className="mt-6 space-y-3">
               {requiredFiles.map((item) => (
-                <li key={item} className="flex items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                <li key={item} className="flex items-start gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
                   <CheckCircle2 className="mt-0.5 shrink-0 text-blue-600" size={16} />
                   <span>{item}</span>
                 </li>
@@ -2387,7 +2387,7 @@ export default function MigrationClient() {
             />
             <div className="mt-6 grid grid-cols-1 gap-3">
               {supportItems.map((item) => (
-                <div key={item} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                <div key={item} className="rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
                   {item}
                 </div>
               ))}
@@ -2400,7 +2400,7 @@ export default function MigrationClient() {
               subtitle="Upload, validasi, dan import bertahap sekarang sudah aktif untuk semua bagian utama di workbook migrasi."
               icon={FileSpreadsheet}
             />
-            <div className="mt-4 rounded-2xl bg-white/80 px-4 py-4 text-sm font-semibold leading-6 text-slate-700">
+            <div className="mt-4 rounded-xl bg-white/80 px-4 py-4 text-sm font-semibold leading-6 text-slate-700">
               {report
                 ? overallStatus === 'blocked'
                   ? 'Workbook sudah terbaca, tetapi masih ada bagian yang blocked. Ikuti alur: perbaiki warning dulu, tunggu Ready, lalu migrate.'

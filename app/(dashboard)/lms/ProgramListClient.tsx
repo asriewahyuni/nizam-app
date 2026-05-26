@@ -40,7 +40,7 @@ export function ProgramListClient({ courses }: { courses: Course[] }) {
         {courses.slice(0, 5).map((c) => (
           <div
             key={c.slug}
-            className="flex items-center gap-3 p-4 rounded-2xl bg-white/10 hover:bg-white/15 transition-colors border border-white/5 group"
+            className="flex items-center gap-3 p-4 rounded-xl bg-white/10 hover:bg-white/15 transition-colors border border-white/5 group"
           >
             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-blue-300 shrink-0">
               <BookOpen size={18} />
@@ -74,8 +74,8 @@ export function ProgramListClient({ courses }: { courses: Course[] }) {
         ))}
 
         {courses.length === 0 && (
-          <div className="p-6 text-center border border-dashed border-slate-700 rounded-2xl space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto">
+          <div className="p-6 text-center border border-dashed border-slate-700 rounded-xl space-y-3">
+            <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto">
               <GraduationCap size={22} className="text-slate-500" />
             </div>
             <div>

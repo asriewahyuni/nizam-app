@@ -617,7 +617,7 @@ export function AppSidebar({
       <aside className={`
         ${effectiveIsCollapsed ? 'w-16' : 'w-60'}
         transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col h-full bg-white border-r border-slate-200 group/sidebar z-50 print:hidden
-        ${isMobileOpen ? 'fixed inset-y-0 left-0 shadow-2xl translate-x-0' : 'fixed inset-y-0 left-0 -translate-x-full md:relative md:translate-x-0 md:flex'}
+        ${isMobileOpen ? 'fixed inset-y-0 left-0 shadow-md translate-x-0' : 'fixed inset-y-0 left-0 -translate-x-full md:relative md:translate-x-0 md:flex'}
       `}>
       {/* Collapse Toggle Button */}
       <button
@@ -738,7 +738,7 @@ export function AppSidebar({
                                   </div>
                                 )}
                                 {!locked && effectiveIsCollapsed && badgeCount > 0 && (
-                                  <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#003366] border border-white flex items-center justify-center text-[7px] font-black text-white shrink-0">
+                                  <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#003366] border border-white flex items-center justify-center text-[7px] font-semibold text-white shrink-0">
                                     {badgeCount > 9 ? '9+' : badgeCount}
                                   </div>
                                 )}
@@ -752,17 +752,17 @@ export function AppSidebar({
                             {!effectiveIsCollapsed && (
                               <div className="flex items-center gap-2">
                                 {!locked && badgeCount > 0 && (
-                                  <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest leading-none flex items-center justify-center animate-in fade-in zoom-in ${isActive ? 'bg-white text-[#003366] shadow-sm' : 'bg-[#003366] text-white shadow-sm shadow-[#003366]/10'}`}>
+                                  <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-semibold tracking-wide leading-none flex items-center justify-center animate-in fade-in zoom-in ${isActive ? 'bg-white text-[#003366] shadow-sm' : 'bg-[#003366] text-white shadow-sm shadow-[#003366]/10'}`}>
                                     {badgeCount}
                                   </div>
                                 )}
                                 {!locked && item.module_key && pendingModules.includes(item.module_key) && badgeCount === 0 && (
-                                  <div className="px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest leading-none bg-amber-400 text-white animate-in fade-in zoom-in">
+                                  <div className="px-1.5 py-0.5 rounded-md text-[9px] font-semibold tracking-wide leading-none bg-amber-400 text-white animate-in fade-in zoom-in">
                                     SETUP
                                   </div>
                                 )}
                                 {!locked && isCore && !isActive && badgeCount === 0 && !(item.module_key && pendingModules.includes(item.module_key)) && (
-                                  <div className="px-1.5 py-0.5 rounded-md text-[8px] font-black tracking-widest leading-none bg-teal-50 text-teal-600 border border-teal-200/80 opacity-0 group-hover/item:opacity-100 transition-opacity duration-150">
+                                  <div className="px-1.5 py-0.5 rounded-md text-[8px] font-semibold tracking-wide leading-none bg-teal-50 text-teal-600 border border-teal-200/80 opacity-0 group-hover/item:opacity-100 transition-opacity duration-150">
                                     CORE
                                   </div>
                                 )}
@@ -828,7 +828,7 @@ export function AppSidebar({
                               </div>
                             )}
                             {!locked && badgeCount > 0 && (
-                              <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#003366] border border-white flex items-center justify-center text-[7px] font-black text-white shrink-0">
+                              <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#003366] border border-white flex items-center justify-center text-[7px] font-semibold text-white shrink-0">
                                 {badgeCount > 9 ? '9+' : badgeCount}
                               </div>
                             )}

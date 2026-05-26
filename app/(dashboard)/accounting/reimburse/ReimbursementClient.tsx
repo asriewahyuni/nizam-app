@@ -249,7 +249,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
+            <h1 className="text-4xl font-semibold text-slate-900 tracking-tight flex items-center gap-4">
                 <CreditCard size={40} className="text-[#003366]" />
                 Reimbursement
             </h1>
@@ -257,22 +257,22 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
         </div>
         <button 
             onClick={() => setIsSubmitModalOpen(true)}
-            className="flex items-center gap-3 px-8 py-4 bg-[#003366] text-white rounded-3xl font-black shadow-xl shadow-[#003366]/10 hover:bg-[#002d5a] transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center gap-3 px-8 py-4 bg-[#003366] text-white rounded-xl font-semibold shadow-xl shadow-[#003366]/10 hover:bg-[#002d5a] transition-all hover:scale-[1.02] active:scale-[0.98]"
         >
             <Plus size={20} /> AJUKAN REIMBURSE
         </button>
       </div>
 
       {/* Main Table */}
-      <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50/50 border-b border-slate-50">
-                        <th className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Karyawan & Status</th>
-                        <th className="px-6 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Klaim # & Deskripsi</th>
-                        <th className="px-6 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Total Biaya</th>
-                        <th className="px-8 py-6 text-center text-[10px] font-black uppercase text-slate-400 tracking-widest">Aksi</th>
+                        <th className="px-8 py-6 text-[10px] font-semibold uppercase text-slate-400 tracking-wide">Karyawan & Status</th>
+                        <th className="px-6 py-6 text-[10px] font-semibold uppercase text-slate-400 tracking-wide">Klaim # & Deskripsi</th>
+                        <th className="px-6 py-6 text-[10px] font-semibold uppercase text-slate-400 tracking-wide text-right">Total Biaya</th>
+                        <th className="px-8 py-6 text-center text-[10px] font-semibold uppercase text-slate-400 tracking-wide">Aksi</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -280,16 +280,16 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                         <tr key={re.id} className="hover:bg-slate-50/50 transition-colors group">
                              <td className="px-8 py-6">
                                  <div className="space-y-2 text-xs">
-                                     <p className="font-black text-slate-900 leading-tight">Karyawan Pengaju</p>
+                                     <p className="font-semibold text-slate-900 leading-tight">Karyawan Pengaju</p>
                                      <p className="text-[10px] text-slate-400 font-mono italic truncate max-w-[120px]">{re.user_id}</p>
-                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black border uppercase ${getStatusColor(re.status)}`}>
+                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-semibold border uppercase ${getStatusColor(re.status)}`}>
                                         {getStatusIcon(re.status)} {re.status}
                                     </span>
                                  </div>
                              </td>
                              <td className="px-6 py-6">
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-black text-[#003366] font-mono italic opacity-70">#{re.claim_number}</p>
+                                    <p className="text-[10px] font-semibold text-[#003366] font-mono italic opacity-70">#{re.claim_number}</p>
                                     <p className="text-sm font-bold text-slate-800">{re.description}</p>
                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                         <p className="text-[10px] text-slate-400 font-medium">
@@ -301,7 +301,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                                 href={it.receipt_url} 
                                                 target="_blank" 
                                                 rel="noreferrer"
-                                                className="inline-flex items-center gap-1 text-[9px] font-black text-[#003366] hover:text-[#003366] bg-[#003366]/5 px-2 py-0.5 rounded-full border border-[#003366]/10 transition-colors"
+                                                className="inline-flex items-center gap-1 text-[9px] font-semibold text-[#003366] hover:text-[#003366] bg-[#003366]/5 px-2 py-0.5 rounded-full border border-[#003366]/10 transition-colors"
                                             >
                                                 <ImageIcon size={10} /> NOTA {re.items.length > 1 ? `#${idx + 1}` : ''}
                                             </a>
@@ -309,17 +309,17 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                     </div>
                                 </div>
                             </td>
-                            <td className="px-6 py-6 text-right font-black text-slate-900 text-lg font-mono">
+                            <td className="px-6 py-6 text-right font-semibold text-slate-900 text-lg font-mono">
                                 {formatRupiah(re.total_amount)}
                             </td>
                             <td className="px-8 py-6">
                                 <div className="flex items-center justify-center gap-2">
                                     {re.status === 'PENDING' && (
                                         <>
-                                            <button onClick={() => handleApprove(re.id)} className="p-3 bg-white border border-slate-200 text-emerald-500 hover:bg-emerald-50 rounded-2xl transition-all shadow-sm" title="Approve">
+                                            <button onClick={() => handleApprove(re.id)} className="p-3 bg-white border border-slate-200 text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all shadow-sm" title="Approve">
                                                 <CheckCircle size={18}/>
                                             </button>
-                                            <button onClick={() => handleReject(re.id)} className="p-3 bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 rounded-2xl transition-all shadow-sm" title="Reject">
+                                            <button onClick={() => handleReject(re.id)} className="p-3 bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm" title="Reject">
                                                 <XOctagon size={18}/>
                                             </button>
                                         </>
@@ -327,7 +327,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                     {re.status === 'APPROVED' && (
                                         <button 
                                             onClick={() => { setSelectedReimbursement(re); setIsPayModalOpen(true); }}
-                                            className="px-5 py-2.5 bg-emerald-600 text-white text-[10px] font-black rounded-xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center gap-2"
+                                            className="px-5 py-2.5 bg-emerald-600 text-white text-[10px] font-semibold rounded-xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center gap-2"
                                         >
                                             <Wallet size={14}/> BAYAR SEKARANG
                                         </button>
@@ -335,7 +335,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                     {re.status === 'PAID' && (
                                         <div className="flex items-center gap-2 text-emerald-500 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
                                             <CheckCircle size={14} />
-                                            <span className="text-[9px] font-black uppercase tracking-widest">Dibayar</span>
+                                            <span className="text-[9px] font-semibold uppercase tracking-wide">Dibayar</span>
                                         </div>
                                     )}
                                     {re.status === 'REJECTED' && (
@@ -358,7 +358,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                             <td colSpan={4} className="py-24 text-center">
                                 <div className="space-y-4 opacity-30">
                                     <FileText size={48} className="mx-auto" />
-                                    <p className="font-black text-xl italic tracking-tighter">Belum ada pengajuan reimbursement.</p>
+                                    <p className="font-semibold text-xl italic tracking-tighter">Belum ada pengajuan reimbursement.</p>
                                 </div>
                             </td>
                         </tr>
@@ -371,27 +371,27 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
       {/* Submission Modal */}
       <AnimatePresence>
         {isSubmitModalOpen && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12 overflow-y-auto">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-6 overflow-y-auto">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsSubmitModalOpen(false)} />
                 <motion.div 
                     initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                    className="relative bg-white w-full max-w-4xl rounded-[48px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                    className="relative bg-white w-full max-w-4xl rounded-xl shadow-md overflow-hidden flex flex-col max-h-[90vh]"
                 >
-                    <div className="p-10 border-b border-slate-50 flex items-center justify-between bg-[#003366]/5/30">
+                    <div className="p-5 border-b border-slate-50 flex items-center justify-between bg-[#003366]/5/30">
                         <div className="space-y-1">
-                            <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                            <h3 className="text-2xl font-semibold text-slate-900 flex items-center gap-3">
                                 <Plus size={24} className="text-[#003366]" /> Pengajuan Klaim Biaya
                             </h3>
                             <p className="text-slate-400 text-sm font-medium italic">Silahkan isi detail pengeluaran yang ingin di-reimburse.</p>
                         </div>
-                        <button onClick={() => setIsSubmitModalOpen(false)} className="p-3 hover:bg-white rounded-2xl transition-all shadow-sm group">
+                        <button onClick={() => setIsSubmitModalOpen(false)} className="p-3 hover:bg-white rounded-xl transition-all shadow-sm group">
                             <XOctagon size={24} className="text-slate-300 group-hover:text-rose-500 transition-colors" />
                         </button>
                     </div>
 
-                    <div className="p-10 overflow-y-auto flex-1 space-y-10 custom-scrollbar">
+                    <div className="p-5 overflow-y-auto flex-1 space-y-10 custom-scrollbar">
                         <div className="space-y-3">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Judul Pengajuan</label>
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-4">Judul Pengajuan</label>
                             <input 
                                 placeholder="Contoh: Perjalanan Dinas ke Bandung" 
                                 value={description} onChange={(e) => setDescription(e.target.value)}
@@ -401,8 +401,8 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
 
                         <div className="space-y-6">
                             <div className="flex items-center justify-between ml-4">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Detail Item Pengeluaran</label>
-                                <button onClick={addItem} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-slate-100 rounded-2xl text-[10px] font-black text-slate-600 hover:border-blue-400 hover:text-[#003366] transition-all">
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Detail Item Pengeluaran</label>
+                                <button onClick={addItem} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-slate-100 rounded-xl text-[10px] font-semibold text-slate-600 hover:border-blue-400 hover:text-[#003366] transition-all">
                                     <Plus size={14} /> TAMBAH BARIS
                                 </button>
                             </div>
@@ -410,11 +410,11 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                             <div className="space-y-4">
                                 {items.map((it, idx) => (
                                     <motion.div key={idx} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="grid grid-cols-12 gap-4 items-end bg-slate-50/50 p-6 rounded-[32px] border border-slate-100 relative">
-                                        <div className="col-span-12 md:col-span-2 space-y-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                                        <div className="col-span-12 md:col-span-2 space-y-2 text-[10px] font-semibold uppercase text-slate-400 tracking-wide">
                                             Tanggal
                                             <input type="date" value={it.expense_date} onChange={(e) => handleItemChange(idx, 'expense_date', e.target.value)} className="w-full bg-white border border-slate-200 p-3 rounded-xl text-slate-900 uppercase font-mono" />
                                         </div>
-                                        <div className="col-span-12 md:col-span-3 space-y-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                                        <div className="col-span-12 md:col-span-3 space-y-2 text-[10px] font-semibold uppercase text-slate-400 tracking-wide">
                                             Kategori Biaya
                                             <select
                                               value={it.category_account_id}
@@ -430,18 +430,18 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                               })}
                                             </select>
                                         </div>
-                                        <div className="col-span-12 md:col-span-4 space-y-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                                        <div className="col-span-12 md:col-span-4 space-y-2 text-[10px] font-semibold uppercase text-slate-400 tracking-wide">
                                             Uraian
                                             <input value={it.description} onChange={(e) => handleItemChange(idx, 'description', e.target.value)} placeholder="Misal: Taksi, Makan Siang" className="w-full bg-white border border-slate-200 p-3 rounded-xl text-slate-900" />
                                         </div>
-                                        <div className="col-span-12 md:col-span-2 space-y-2 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                                        <div className="col-span-12 md:col-span-2 space-y-2 text-[10px] font-semibold uppercase text-slate-400 tracking-wide">
                                             Nominal
                                             <input type="number" value={it.amount} onChange={(e) => handleItemChange(idx, 'amount', parseFloat(e.target.value))} className="w-full bg-white border border-slate-200 p-3 rounded-xl text-slate-900 font-bold" />
                                         </div>
-                                        <div className="col-span-12 space-y-2 text-[10px] font-black uppercase text-slate-400 tracking-widest relative">
+                                        <div className="col-span-12 space-y-2 text-[10px] font-semibold uppercase text-slate-400 tracking-wide relative">
                                             <div className="flex items-center gap-2">
                                               Foto Nota
-                                              <span className="bg-violet-100 text-violet-600 text-[8px] font-black px-1.5 py-0.5 rounded-full tracking-wider">🤖 AI READY</span>
+                                              <span className="bg-violet-100 text-violet-600 text-[8px] font-semibold px-1.5 py-0.5 rounded-full tracking-wider">🤖 AI READY</span>
                                             </div>
                                             <div className="flex items-start gap-3">
                                               {/* Upload Zone */}
@@ -493,14 +493,14 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                                   <div className={`relative w-20 h-20 rounded-xl overflow-hidden border-2 shadow-sm ${it.isUploading ? 'border-amber-400 animate-pulse' : it.isScanning ? 'border-violet-500 animate-pulse' : it.receipt_url ? 'border-emerald-400' : 'border-rose-400'}`}>
                                                     <img src={it.receipt_preview} alt="nota" className="w-full h-full object-cover" />
                                                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                                      <span className="text-white text-[8px] font-black">{it.isUploading ? 'UPLOADING...' : it.isScanning ? 'SCANNING...' : 'GANTI'}</span>
+                                                      <span className="text-white text-[8px] font-semibold">{it.isUploading ? 'UPLOADING...' : it.isScanning ? 'SCANNING...' : 'GANTI'}</span>
                                                     </div>
-                                                    {it.isUploading && <div className="absolute inset-0 bg-amber-400/30 flex items-center justify-center"><span className="text-white text-[7px] font-black">⏫</span></div>}
+                                                    {it.isUploading && <div className="absolute inset-0 bg-amber-400/30 flex items-center justify-center"><span className="text-white text-[7px] font-semibold">⏫</span></div>}
                                                   </div>
                                                 ) : (
                                                   <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-300 hover:border-blue-300 hover:text-[#003366]/60 transition-all">
                                                     <ImageIcon size={20} />
-                                                    <span className="text-[7px] font-black mt-1">UPLOAD</span>
+                                                    <span className="text-[7px] font-semibold mt-1">UPLOAD</span>
                                                   </div>
                                                 )}
                                               </div>
@@ -510,14 +510,14 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                                 it.ai_failed ? (
                                                   /* ── OCR FALLBACK: Explicit banner — tidak boleh diam ── */
                                                   <div className="flex-1 bg-rose-50 border border-rose-200 rounded-xl p-3 space-y-2">
-                                                    <p className="text-[9px] font-black uppercase tracking-wider text-rose-600 flex items-center gap-1.5">
+                                                    <p className="text-[9px] font-semibold uppercase tracking-wider text-rose-600 flex items-center gap-1.5">
                                                       ⚠️ AI Gagal Membaca Nota
                                                     </p>
                                                     <p className="text-[8px] text-rose-400 leading-relaxed">
                                                       {it.ai_error || 'Foto terlalu buram atau format tidak dikenali.'}
                                                     </p>
                                                     <div className="bg-white border border-rose-100 rounded-lg p-2 space-y-1">
-                                                      <p className="text-[8px] font-black text-slate-500 uppercase">↓ Input Manual Diperlukan:</p>
+                                                      <p className="text-[8px] font-semibold text-slate-500 uppercase">↓ Input Manual Diperlukan:</p>
                                                       <p className="text-[8px] text-slate-400">• Isi kolom <strong>Nominal</strong> secara manual</p>
                                                       <p className="text-[8px] text-slate-400">• Isi <strong>Uraian</strong> sesuai nota</p>
                                                       <p className="text-[8px] text-slate-400">• Foto tetap tersimpan sebagai bukti</p>
@@ -525,14 +525,14 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                                     <button
                                                       type="button"
                                                       onClick={() => handleScanReceipt(idx, it.receipt_file)}
-                                                      className="w-full text-[8px] font-black text-rose-500 border border-rose-200 rounded-lg py-1 hover:bg-rose-100 transition-colors"
+                                                      className="w-full text-[8px] font-semibold text-rose-500 border border-rose-200 rounded-lg py-1 hover:bg-rose-100 transition-colors"
                                                     >
                                                       🔄 Coba Scan Ulang
                                                     </button>
                                                   </div>
                                                 ) : (
                                                 <div className={`flex-1 ${it.isUploading ? 'bg-amber-50 border-amber-100' : it.isScanning ? 'bg-slate-50 border-slate-100' : 'bg-violet-50 border-violet-100'} border rounded-xl p-3 space-y-1 transition-colors`}>
-                                                  <p className={`text-[9px] font-black uppercase tracking-wider flex items-center gap-1 ${it.isUploading ? 'text-amber-500' : 'text-violet-500'}`}>
+                                                  <p className={`text-[9px] font-semibold uppercase tracking-wider flex items-center gap-1 ${it.isUploading ? 'text-amber-500' : 'text-violet-500'}`}>
                                                     {it.isUploading ? '\u23eb Mengupload Foto...' : `\ud83e\udd16 ${it.isScanning ? 'AI Sedang Memproses...' : 'Dideteksi Oleh AI'}`}
                                                   </p>
                                                   <p className="text-[8px] text-violet-400">
@@ -587,17 +587,17 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                         </div>
                     </div>
 
-                    <div className="p-10 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+                    <div className="p-5 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
                         <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Pengajuan</span>
-                            <span className="text-3xl font-black text-slate-900 font-mono tracking-tighter">
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total Pengajuan</span>
+                            <span className="text-3xl font-semibold text-slate-900 font-mono tracking-tighter">
                                 {formatRupiah(items.reduce((s, it) => s + (it.amount || 0), 0))}
                             </span>
                         </div>
                         <button 
                             disabled={isSubmitting}
                             onClick={handleSubmit} 
-                            className="flex items-center gap-3 px-12 py-5 bg-[#003366] disabled:bg-slate-300 text-white rounded-3xl font-black shadow-2xl shadow-[#003366]/10 transition-all active:scale-95"
+                            className="flex items-center gap-3 px-12 py-5 bg-[#003366] disabled:bg-slate-300 text-white rounded-xl font-semibold shadow-md shadow-[#003366]/10 transition-all active:scale-95"
                         >
                            {isSubmitting ? 'MEMPROSES...' : <><Send size={20} /> KIRIM PENGAJUAN</>}
                         </button>
@@ -610,19 +610,19 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
       {/* Payment Modal */}
       <AnimatePresence>
         {isPayModalOpen && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12 overflow-y-auto">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-6 overflow-y-auto">
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsPayModalOpen(false)} />
                 <motion.div 
                     initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                    className="relative bg-white w-full max-w-lg rounded-[48px] shadow-2xl overflow-hidden"
+                    className="relative bg-white w-full max-w-lg rounded-xl shadow-md overflow-hidden"
                 >
-                    <div className="p-10 border-b border-slate-50 flex items-center justify-between bg-emerald-50/30">
-                        <h3 className="text-xl font-black text-slate-900 flex items-center gap-3">
+                    <div className="p-5 border-b border-slate-50 flex items-center justify-between bg-emerald-50/30">
+                        <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
                             <Wallet size={24} className="text-emerald-500" /> Proses Pembayaran
                         </h3>
                     </div>
-                    <div className="p-10 space-y-8">
-                        <div className="p-6 bg-slate-50 rounded-3xl space-y-4">
+                    <div className="p-5 space-y-8">
+                        <div className="p-6 bg-slate-50 rounded-xl space-y-4">
                             <div className="flex justify-between text-xs font-bold">
                                 <span className="text-slate-400">NOMOR KLAIM</span>
                                 <span className="text-slate-900 font-mono">{selectedReimbursement?.claim_number}</span>
@@ -632,26 +632,26 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                 <span className="text-slate-900">{selectedReimbursement?.description}</span>
                             </div>
                             <div className="pt-4 border-t border-slate-200 flex justify-between items-end">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">TOTAL KETERSEDIAAN</span>
-                                <span className="text-2xl font-black text-emerald-600 font-mono tracking-tighter">{formatRupiah(selectedReimbursement?.total_amount)}</span>
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">TOTAL KETERSEDIAAN</span>
+                                <span className="text-2xl font-semibold text-emerald-600 font-mono tracking-tighter">{formatRupiah(selectedReimbursement?.total_amount)}</span>
                             </div>
                         </div>
 
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Sumber Dana (Bank/Kas)</label>
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-4">Sumber Dana (Bank/Kas)</label>
                             <div className="grid grid-cols-1 gap-3">
                                 {bankAccounts.map((bank) => (
                                     <button 
                                         key={bank.id} 
                                         onClick={() => setSelectedBankId(bank.id)}
-                                        className={`flex items-center justify-between p-5 rounded-3xl border-2 transition-all group ${selectedBankId === bank.id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 hover:border-slate-300 bg-white'}`}
+                                        className={`flex items-center justify-between p-5 rounded-xl border-2 transition-all group ${selectedBankId === bank.id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 hover:border-slate-300 bg-white'}`}
                                     >
                                         <div className="flex items-center gap-4 text-left">
-                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${selectedBankId === bank.id ? 'bg-emerald-200 text-emerald-700' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'}`}>
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${selectedBankId === bank.id ? 'bg-emerald-200 text-emerald-700' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'}`}>
                                                 <Building2 size={24} />
                                             </div>
                                             <div>
-                                                <p className="font-black text-slate-900 text-sm italic tracking-tight">{bank.bank_name}</p>
+                                                <p className="font-semibold text-slate-900 text-sm italic tracking-tight">{bank.bank_name}</p>
                                                 <p className="text-[10px] text-slate-400 font-bold font-mono">{bank.account_number}</p>
                                             </div>
                                         </div>
@@ -669,11 +669,11 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                             <button 
                                 disabled={isSubmitting}
                                 onClick={handlePay}
-                                className="w-full py-5 bg-emerald-600 disabled:bg-slate-300 text-white rounded-3xl font-black text-sm shadow-xl shadow-emerald-200 flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                className="w-full py-5 bg-emerald-600 disabled:bg-slate-300 text-white rounded-xl font-semibold text-sm shadow-xl shadow-emerald-200 flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98]"
                             >
                                 {isSubmitting ? 'MEMPROSES TRANSAKSI...' : <><DollarSign size={18} /> KONFIRMASI PEMBAYARAN</>}
                             </button>
-                            <button onClick={() => setIsPayModalOpen(false)} className="w-full py-5 bg-white border border-slate-200 text-slate-400 rounded-3xl font-black text-xs hover:text-slate-600 transition-all">
+                            <button onClick={() => setIsPayModalOpen(false)} className="w-full py-5 bg-white border border-slate-200 text-slate-400 rounded-xl font-semibold text-xs hover:text-slate-600 transition-all">
                                 BATALKAN
                             </button>
                         </div>

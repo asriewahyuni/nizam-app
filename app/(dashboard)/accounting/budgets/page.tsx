@@ -42,7 +42,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
   ])
 
   return (
-    <div className="p-10 min-h-screen bg-slate-50/20">
+    <div className="p-5 min-h-screen bg-slate-50/20">
       <BudgetClient 
         orgId={orgData.org.id} 
         activeBranchId={activeBranch?.id ?? null}

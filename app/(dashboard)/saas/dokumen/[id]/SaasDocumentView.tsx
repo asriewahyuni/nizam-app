@@ -362,7 +362,7 @@ type PricingRow = {
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">
+    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
       {children}
     </span>
   )
@@ -383,9 +383,9 @@ function TotalsRow({
     <div
       className={`flex items-center justify-between ${
         highlight
-          ? 'rounded-xl border border-amber-300 bg-amber-100 px-3 py-2 text-sm font-black text-amber-900'
+          ? 'rounded-xl border border-amber-300 bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-900'
           : strong
-            ? 'text-base font-black text-slate-900'
+            ? 'text-base font-semibold text-slate-900'
             : 'text-sm font-semibold text-slate-600'
       }`}
     >
@@ -542,7 +542,7 @@ export default function SaasDocumentView({
     return (
       <div className="min-h-screen bg-slate-50 p-4 md:p-8">
         <div className="mx-auto max-w-5xl">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-500">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-500">
             Memuat dokumen...
           </div>
         </div>
@@ -599,7 +599,7 @@ export default function SaasDocumentView({
           <button
             type="button"
             onClick={() => router.back()}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-600"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-600"
           >
             <ArrowLeft size={14} /> Kembali
           </button>
@@ -607,14 +607,14 @@ export default function SaasDocumentView({
             <button
               type="button"
               onClick={handlePrintOrPdf}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white"
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white"
             >
               <Printer size={14} /> Print / Download PDF
             </button>
             <button
               type="button"
               onClick={handleDownloadHtml}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-600"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-600"
             >
               <Download size={14} /> Download HTML
             </button>
@@ -629,7 +629,7 @@ export default function SaasDocumentView({
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between print:flex-row print:items-start print:justify-between print:gap-8">
               <div className="space-y-4 print:max-w-[62%]">
                 <div className="inline-flex items-center gap-3">
-                  <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl bg-white/95 shadow-lg shadow-black/20 ring-1 ring-white/10">
+                  <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white/95 shadow-lg shadow-black/20 ring-1 ring-white/10">
                     <Image
                       src="/logo.png"
                       alt=""
@@ -639,13 +639,13 @@ export default function SaasDocumentView({
                     />
                   </span>
                   <span className="flex flex-col leading-none">
-                    <span className="text-lg font-black uppercase tracking-tight text-white">NIZAM</span>
-                    <MiniErpWordmark className="mt-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-300" erpClassName="text-amber-300" />
+                    <span className="text-lg font-semibold uppercase tracking-tight text-white">NIZAM</span>
+                    <MiniErpWordmark className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-300" erpClassName="text-amber-300" />
                   </span>
                 </div>
                 <div>
                   <p className="text-sm font-bold uppercase tracking-[0.35em] text-slate-300">Dokumen Komersial</p>
-                  <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">{documentLabel}</h1>
+                  <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">{documentLabel}</h1>
                   <p className="mt-2 text-xs font-semibold text-slate-300">
                     {isQuotation
                       ? 'Ruang lingkup layanan dan nilai komersial yang ditawarkan kepada calon pelanggan.'
@@ -654,18 +654,18 @@ export default function SaasDocumentView({
                 </div>
               </div>
 
-              <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:min-w-[280px] print:ml-auto print:min-w-[290px] print:max-w-[36%]">
+              <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4 md:min-w-[280px] print:ml-auto print:min-w-[290px] print:max-w-[36%]">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Nomor Dokumen</p>
-                  <p className="mt-1 text-sm font-black text-white">{invoice.invoice_number}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">Nomor Dokumen</p>
+                  <p className="mt-1 text-sm font-semibold text-white">{invoice.invoice_number}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Tanggal Terbit</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">Tanggal Terbit</p>
                     <p className="mt-1 font-bold">{formatDate(invoice.created_at)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Berlaku Sampai</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300">Berlaku Sampai</p>
                     <p className="mt-1 font-bold">{formatDate(invoice.due_date)}</p>
                   </div>
                 </div>
@@ -675,17 +675,17 @@ export default function SaasDocumentView({
 
           <section className="grid grid-cols-1 gap-5 border-b border-slate-100 px-6 py-6 md:grid-cols-[1.3fr_0.7fr] md:px-10 print:grid-cols-[1.3fr_0.7fr]">
             <div className="space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Kepada Yth.</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Kepada Yth.</p>
               <div>
-                <p className="text-2xl font-black tracking-tight text-slate-900">{invoice.organization?.name || '-'}</p>
+                <p className="text-2xl font-semibold tracking-tight text-slate-900">{invoice.organization?.name || '-'}</p>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
                   {invoice.organization?.owner_email || 'Organisasi Tenant NIZAM SaaS'}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ringkasan</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ringkasan</p>
               <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
                 <div className="flex items-center justify-between gap-4">
                   <span>Status</span>
@@ -693,21 +693,21 @@ export default function SaasDocumentView({
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span>Core Family</span>
-                  <span className="text-right font-black text-slate-900">{invoice.package?.name || '-'}</span>
+                  <span className="text-right font-semibold text-slate-900">{invoice.package?.name || '-'}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span>Layer</span>
-                  <span className="text-right font-black text-slate-900">{breakdown.coreFamilyLayer || packageArchitecture.bundleLabel}</span>
+                  <span className="text-right font-semibold text-slate-900">{breakdown.coreFamilyLayer || packageArchitecture.bundleLabel}</span>
                 </div>
                 {invoice.package?.billing && (
                   <div className="flex items-center justify-between gap-4">
                     <span>Billing</span>
-                    <span className="text-right font-black text-slate-900">{invoice.package.billing}</span>
+                    <span className="text-right font-semibold text-slate-900">{invoice.package.billing}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between gap-4">
                   <span>Durasi</span>
-                  <span className="text-right font-black text-slate-900">{Math.max(1, breakdown.durationMonths || 1)} bulan</span>
+                  <span className="text-right font-semibold text-slate-900">{Math.max(1, breakdown.durationMonths || 1)} bulan</span>
                 </div>
               </div>
             </div>
@@ -717,7 +717,7 @@ export default function SaasDocumentView({
             <div className="overflow-x-auto print:overflow-visible">
               <table className="w-full min-w-[640px] border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  <tr className="border-b border-slate-200 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                     <th className="py-3">Uraian</th>
                     <th className="py-3 text-right">Qty</th>
                     <th className="py-3 text-right">Nominal</th>
@@ -732,15 +732,15 @@ export default function SaasDocumentView({
                             <Building2 size={16} />
                           </div>
                           <div>
-                            <p className="font-black text-slate-900">{row.label}</p>
+                            <p className="font-semibold text-slate-900">{row.label}</p>
                             {row.note && (
                               <p className="mt-1 text-xs font-medium text-slate-500">{row.note}</p>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 text-right text-sm font-black text-slate-700">{row.qty}</td>
-                      <td className="py-4 text-right text-sm font-black text-slate-900">{formatIdr(row.total)}</td>
+                      <td className="py-4 text-right text-sm font-semibold text-slate-700">{row.qty}</td>
+                      <td className="py-4 text-right text-sm font-semibold text-slate-900">{formatIdr(row.total)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -750,13 +750,13 @@ export default function SaasDocumentView({
 
           {(coreCoverage.length > 0 || includedModuleNames.length > 0 || includedAddonNames.length > 0 || additionalNote) && (
             <section className="grid grid-cols-1 gap-4 border-t border-slate-100 bg-slate-50 px-6 py-6 md:grid-cols-2 md:px-10 xl:grid-cols-4 print:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Cakupan Core Family</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Cakupan Core Family</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {coreCoverage.length > 0 ? coreCoverage.map((moduleName) => (
                     <span
                       key={moduleName}
-                      className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700"
+                      className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700"
                     >
                       {moduleName}
                     </span>
@@ -766,13 +766,13 @@ export default function SaasDocumentView({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Module Tercakup</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Module Tercakup</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {includedModuleNames.length > 0 ? includedModuleNames.map((moduleName) => (
                     <span
                       key={moduleName}
-                      className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-700"
+                      className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-700"
                     >
                       {moduleName}
                     </span>
@@ -782,13 +782,13 @@ export default function SaasDocumentView({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Add-on Tercakup</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Add-on Tercakup</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {includedAddonNames.length > 0 ? includedAddonNames.map((addonName) => (
                     <span
                       key={addonName}
-                      className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-700"
+                      className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700"
                     >
                       {addonName}
                     </span>
@@ -798,8 +798,8 @@ export default function SaasDocumentView({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                   {isQuotation ? 'Catatan Penawaran' : 'Catatan Invoice'}
                 </p>
                 <p className="mt-3 whitespace-pre-line text-sm font-medium leading-relaxed text-slate-600">
@@ -811,17 +811,17 @@ export default function SaasDocumentView({
 
           <section className="grid grid-cols-1 gap-6 px-6 py-6 md:grid-cols-[1.1fr_0.9fr] md:px-10 print:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+              <div className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 <CreditCard size={12} /> Pembayaran
               </div>
               {bankInfo?.bank || bankInfo?.account || bankInfo?.name ? (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-black text-slate-800">{bankInfo?.bank || '-'}</p>
-                  <p className="mt-1 font-mono text-lg font-black tracking-tight text-slate-900">{bankInfo?.account || '-'}</p>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold text-slate-800">{bankInfo?.bank || '-'}</p>
+                  <p className="mt-1 font-mono text-lg font-semibold tracking-tight text-slate-900">{bankInfo?.account || '-'}</p>
                   <p className="text-xs font-semibold text-slate-500">a.n {bankInfo?.name || '-'}</p>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold text-slate-500">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold text-slate-500">
                   Informasi rekening belum diatur di `saas_config.bank_info`.
                 </div>
               )}
@@ -830,7 +830,7 @@ export default function SaasDocumentView({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="space-y-3">
                 {breakdown.monthlySubtotal && breakdown.monthlySubtotal > 0 && (
                   <TotalsRow label="Subtotal Bulanan" value={formatIdr(breakdown.monthlySubtotal)} />

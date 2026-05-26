@@ -226,7 +226,7 @@ export function WarehouseClient({
       />
 
       {warehouseMutationGuardMessage && (
-        <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
           {warehouseMutationGuardMessage} {activeBranchName ? `Unit aktif saat ini: ${activeBranchName}.` : ''}
         </div>
       )}
@@ -234,13 +234,13 @@ export function WarehouseClient({
       {(error || success) && (
         <div className="space-y-3">
           {error && (
-            <div className="flex items-start gap-3 rounded-[28px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-700 shadow-sm">
+            <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-700 shadow-sm">
               <AlertCircle size={18} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
           {success && (
-            <div className="flex items-start gap-3 rounded-[28px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700 shadow-sm">
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700 shadow-sm">
               <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
               <span>{success}</span>
             </div>
@@ -265,14 +265,14 @@ export function WarehouseClient({
           }
         />
 
-        <div className="px-10 pt-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+        <div className="px-10 pt-6 text-[11px] font-bold text-slate-400 uppercase tracking-wide">
           Menampilkan {filteredWarehouses.length} dari {warehouses.length} gudang aktif
         </div>
 
-        <div className="p-10 pt-6">
+        <div className="p-5 pt-6">
           {filteredWarehouses.length === 0 ? (
-            <div className="col-span-full py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-400">
+            <div className="col-span-full py-20 bg-white rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-16 h-16 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-400">
                 <Warehouse size={32} />
               </div>
               <div className="space-y-1">
@@ -289,7 +289,7 @@ export function WarehouseClient({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredWarehouses.map((warehouse) => (
-                <div key={warehouse.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-emerald-100 transition-all group relative overflow-hidden">
+                <div key={warehouse.id} className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm hover:shadow-emerald-100 transition-all group relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-teal-400 opacity-0 group-hover:opacity-100 transition-opacity" />
 
                   <div className="flex items-start justify-between gap-4 mb-6">
@@ -305,7 +305,7 @@ export function WarehouseClient({
                             type="button"
                             onClick={() => openEditModal(warehouse)}
                             disabled={Boolean(warehouseMutationGuardMessage)}
-                            className="w-10 h-10 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-500"
+                            className="w-10 h-10 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-500"
                             title={warehouseMutationGuardMessage || 'Edit gudang'}
                           >
                             <Pencil size={15} />
@@ -314,7 +314,7 @@ export function WarehouseClient({
                             type="button"
                             onClick={() => handleDelete(warehouse)}
                             disabled={Boolean(warehouseMutationGuardMessage)}
-                            className="w-10 h-10 rounded-2xl border border-slate-200 bg-white text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-400"
+                            className="w-10 h-10 rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-400"
                             title={warehouseMutationGuardMessage || 'Hapus gudang'}
                           >
                             <Trash2 size={15} />
@@ -339,7 +339,7 @@ export function WarehouseClient({
                         <Package size={18} className="text-emerald-500" />
                         <span>Atur Bin & Layout</span>
                       </div>
-                      <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide bg-emerald-50 px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
                         Buka &rarr;
                       </div>
                     </div>
@@ -354,7 +354,7 @@ export function WarehouseClient({
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Warehouse size={20} className="text-emerald-600" />

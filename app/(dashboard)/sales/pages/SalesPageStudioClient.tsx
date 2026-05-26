@@ -235,8 +235,8 @@ function GeneratorSection({
   return (
     <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.28)]">
       <div className="mb-5">
-        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{eyebrow}</div>
-        <h4 className="mt-2 text-lg font-black tracking-tight text-slate-900">{title}</h4>
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{eyebrow}</div>
+        <h4 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">{title}</h4>
         <p className="mt-1 text-sm font-medium text-slate-500">{description}</p>
       </div>
       {children}
@@ -810,12 +810,12 @@ export default function SalesPageStudioClient({
       />
 
       {error && (
-        <div className="rounded-[28px] border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-bold text-rose-700">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-bold text-rose-700">
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-bold text-emerald-700">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-bold text-emerald-700">
           {success}
         </div>
       )}
@@ -846,16 +846,16 @@ export default function SalesPageStudioClient({
         />
 
         <form id="brand-brain-form" onSubmit={handleSaveBrandBrain} className="p-8 space-y-6">
-          <div className="rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Reusable Defaults</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Reusable Defaults</div>
               <p className="mt-1 text-sm font-medium text-slate-500">
                 Draft baru akan memakai default audience, tone, CTA, hero visual, benefit, dan proof dari sini.
               </p>
             </div>
             <div className="text-right">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Terakhir Disimpan</div>
-              <div className="mt-1 text-sm font-black text-slate-900">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Terakhir Disimpan</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">
                 {profileSnapshot.updatedAt ? formatDate(profileSnapshot.updatedAt, 'short') : 'Belum pernah'}
               </div>
             </div>
@@ -863,21 +863,21 @@ export default function SalesPageStudioClient({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Brand Positioning</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Brand Positioning</label>
               <textarea
                 value={profileState.brandPositioning}
                 onChange={(event) => setProfileState((prev) => ({ ...prev, brandPositioning: event.target.value }))}
                 rows={4}
                 placeholder="Contoh: Kami membantu bisnis jasa menjual lebih meyakinkan dengan penawaran yang jelas, cepat, dan enak difollow-up."
-                className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Default Tone</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Default Tone</label>
               <select
                 value={profileState.defaultToneStyle}
                 onChange={(event) => setProfileState((prev) => ({ ...prev, defaultToneStyle: event.target.value as SalesPageToneStyleId }))}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
               >
                 {SALES_PAGE_TONE_STYLE_OPTIONS.map((option) => (
                   <option key={option.id} value={option.id}>{option.label}</option>
@@ -891,58 +891,58 @@ export default function SalesPageStudioClient({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Default Audience</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Default Audience</label>
               <input
                 value={profileState.defaultAudience}
                 onChange={(event) => setProfileState((prev) => ({ ...prev, defaultAudience: event.target.value }))}
                 placeholder="Contoh: owner jasa, kontraktor, atau retail multi cabang"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Default CTA Label</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Default CTA Label</label>
               <input
                 value={profileState.defaultPrimaryCtaLabel}
                 onChange={(event) => setProfileState((prev) => ({ ...prev, defaultPrimaryCtaLabel: event.target.value }))}
                 placeholder="Contoh: Jadwalkan Survey"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Default CTA URL</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Default CTA URL</label>
               <input
                 value={profileState.defaultPrimaryCtaUrl}
                 onChange={(event) => setProfileState((prev) => ({ ...prev, defaultPrimaryCtaUrl: event.target.value }))}
                 placeholder="#lead-form atau https://wa.me/..."
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Default Hero Image URL</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Default Hero Image URL</label>
               <input
                 value={profileState.defaultHeroImageUrl}
                 onChange={(event) => setProfileState((prev) => ({ ...prev, defaultHeroImageUrl: event.target.value }))}
                 placeholder="https://..."
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Default Hero Image Alt</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Default Hero Image Alt</label>
               <input
                 value={profileState.defaultHeroImageAlt}
                 onChange={(event) => setProfileState((prev) => ({ ...prev, defaultHeroImageAlt: event.target.value }))}
                 placeholder="Deskripsi visual default"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Default Key Benefits</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Default Key Benefits</label>
               <textarea
                 value={profileState.keyBenefits}
                 onChange={(event) => setProfileState((prev) => ({ ...prev, keyBenefits: event.target.value }))}
@@ -951,11 +951,11 @@ export default function SalesPageStudioClient({
 Respons cepat
 Hasil kerja rapi
 Follow-up lebih gampang`}
-                className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Default Proof Assets</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Default Proof Assets</label>
               <textarea
                 value={profileState.proofAssets}
                 onChange={(event) => setProfileState((prev) => ({ ...prev, proofAssets: event.target.value }))}
@@ -964,30 +964,30 @@ Follow-up lebih gampang`}
 Tim berpengalaman
 Respon cepat
 Proses kerja transparan`}
-                className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Default Objection Handling</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Default Objection Handling</label>
               <textarea
                 value={profileState.objectionHandling}
                 onChange={(event) => setProfileState((prev) => ({ ...prev, objectionHandling: event.target.value }))}
                 rows={4}
                 placeholder="Contoh: Mulai dari assessment singkat dulu agar scope dan estimasi bisa jelas sebelum deal."
-                className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">AI Guardrails</label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">AI Guardrails</label>
               <textarea
                 value={profileState.aiRules}
                 onChange={(event) => setProfileState((prev) => ({ ...prev, aiRules: event.target.value }))}
                 rows={4}
                 placeholder="Contoh: Hindari klaim berlebihan, gunakan bahasa ringkas, jangan terlalu ramai, CTA fokus ke konsultasi."
-                className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
               />
             </div>
           </div>
@@ -1001,8 +1001,8 @@ Proses kerja transparan`}
             <div className="absolute bottom-0 right-0 h-48 w-48 rounded-full bg-blue-500/20 blur-3xl" />
             <div className="relative space-y-6">
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">AI Campaign Architect</div>
-                <h3 className="mt-3 max-w-xl text-3xl font-black tracking-tight text-white">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-200">AI Campaign Architect</div>
+                <h3 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight text-white">
                   User tidak lagi isi prompt kosong. User tinggal isi section, AI yang merakit strategi dan draft halaman.
                 </h3>
                 <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-slate-300">
@@ -1012,8 +1012,8 @@ Proses kerja transparan`}
 
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-[24px] border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100">Brand Brain</div>
-                  <div className="mt-2 text-lg font-black text-white">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-100">Brand Brain</div>
+                  <div className="mt-2 text-lg font-semibold text-white">
                     {profileSnapshot.brandPositioning ? 'Aktif' : 'Belum Diisi'}
                   </div>
                   <p className="mt-1 text-xs font-medium leading-relaxed text-slate-300">
@@ -1021,15 +1021,15 @@ Proses kerja transparan`}
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100">Service Seeds</div>
-                  <div className="mt-2 text-lg font-black text-white">{serviceSeeds.length}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-100">Service Seeds</div>
+                  <div className="mt-2 text-lg font-semibold text-white">{serviceSeeds.length}</div>
                   <p className="mt-1 text-xs font-medium leading-relaxed text-slate-300">
                     Job order bisa langsung dipakai untuk prefill offer, pain point, dan value stack.
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100">Live Preview</div>
-                  <div className="mt-2 text-lg font-black text-white">Aktif</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-100">Live Preview</div>
+                  <div className="mt-2 text-lg font-semibold text-white">Aktif</div>
                   <p className="mt-1 text-xs font-medium leading-relaxed text-slate-300">
                     Objective, CTA, brief, dan mini visual landing page sekarang terlihat sebelum generate.
                   </p>
@@ -1050,10 +1050,10 @@ Proses kerja transparan`}
           <div className="bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)] px-8 py-8">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Workflow Preview</div>
-                <h4 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Alur baru generator sekarang kelihatan jelas</h4>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Workflow Preview</div>
+                <h4 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Alur baru generator sekarang kelihatan jelas</h4>
               </div>
-              <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+              <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                 Guided
               </div>
             </div>
@@ -1064,11 +1064,11 @@ Proses kerja transparan`}
                   key={step.id}
                   className="flex items-start gap-4 rounded-[26px] border border-slate-200 bg-white px-5 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.22)]"
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-sm font-black text-white">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-semibold text-white">
                     {step.id}
                   </div>
                   <div>
-                    <div className="text-sm font-black text-slate-900">{step.title}</div>
+                    <div className="text-sm font-semibold text-slate-900">{step.title}</div>
                     <p className="mt-1 text-sm font-medium leading-relaxed text-slate-500">{step.detail}</p>
                   </div>
                 </div>
@@ -1091,7 +1091,7 @@ Proses kerja transparan`}
           />
 
           {!pages.length ? (
-            <div className="p-10">
+            <div className="p-5">
               <EmptyState
                 icon={LayoutTemplate}
                 title="Belum ada sales page"
@@ -1113,9 +1113,9 @@ Proses kerja transparan`}
                 return (
                   <div
                     key={page.id}
-                    className={`w-full rounded-[28px] border p-6 transition-all ${
+                    className={`w-full rounded-xl border p-6 transition-all ${
                       isSelected
-                        ? 'border-slate-900 bg-slate-900 text-white shadow-2xl shadow-slate-900/10'
+                        ? 'border-slate-900 bg-slate-900 text-white shadow-md shadow-slate-900/10'
                         : 'border-slate-100 bg-white hover:border-slate-300 hover:-translate-y-0.5'
                     }`}
                   >
@@ -1124,12 +1124,12 @@ Proses kerja transparan`}
                         <div className="flex flex-wrap items-center gap-2">
                           <StatusBadge label={page.status} variant={getStatusVariant(page.status)} />
                           {page.metaPixelId ? <StatusBadge label="Meta Pixel" variant="indigo" /> : <StatusBadge label="Tanpa Pixel" variant="neutral" />}
-                          <span className={`text-[10px] font-black uppercase tracking-[0.18em] ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>
+                          <span className={`text-[10px] font-semibold uppercase tracking-wide ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>
                             {leadCount} lead
                           </span>
                         </div>
                         <div>
-                          <h3 className={`text-2xl font-black tracking-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{page.title}</h3>
+                          <h3 className={`text-2xl font-semibold tracking-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{page.title}</h3>
                           <p className={`text-sm font-medium mt-1 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>{page.headline}</p>
                         </div>
                         <div className="text-[11px] font-bold text-slate-400">
@@ -1213,7 +1213,7 @@ Proses kerja transparan`}
                   <div className="relative space-y-4">
                     <StatusBadge label={selectedPage.status} variant={getStatusVariant(selectedPage.status)} />
                     <div>
-                      <h3 className="text-2xl font-black tracking-tight text-slate-900">{selectedPage.headline}</h3>
+                      <h3 className="text-2xl font-semibold tracking-tight text-slate-900">{selectedPage.headline}</h3>
                       <p className="text-sm text-slate-600 font-medium mt-2 leading-relaxed">{selectedPage.subheadline || selectedPage.description}</p>
                     </div>
                     <div className="flex flex-wrap gap-3">
@@ -1232,7 +1232,7 @@ Proses kerja transparan`}
                         href={selectedPublicPath}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-xs font-black text-white shadow-xl"
+                        className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-xs font-semibold text-white shadow-xl"
                         style={{ backgroundColor: selectedPage.theme.accent }}
                       >
                         Buka Halaman
@@ -1241,7 +1241,7 @@ Proses kerja transparan`}
                       <button
                         type="button"
                         onClick={() => copyPublicUrl(selectedPublicPath)}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs font-black text-slate-700"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-xs font-semibold text-slate-700"
                       >
                         Copy URL
                         <Copy size={14} />
@@ -1252,25 +1252,25 @@ Proses kerja transparan`}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Lead Masuk</div>
-                    <div className="mt-2 text-2xl font-black tracking-tight text-slate-900">{selectedPageLeads.length}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Lead Masuk</div>
+                    <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{selectedPageLeads.length}</div>
                   </div>
                   <div className="rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Meta Pixel</div>
-                    <div className="mt-2 text-sm font-black tracking-tight text-slate-900">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Meta Pixel</div>
+                    <div className="mt-2 text-sm font-semibold tracking-tight text-slate-900">
                       {selectedPage.metaPixelId ? selectedPage.metaPixelId : 'Belum diisi'}
                     </div>
                   </div>
                 </div>
 
                 <div className="rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4 space-y-3">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Custom Domain (DNS)</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Custom Domain (DNS)</div>
                   <div className="flex flex-col sm:flex-row gap-3">
                      <input
                         value={quickDomain}
                         onChange={(e) => setQuickDomain(e.target.value)}
                         placeholder="Cth: promo.bisnisanda.com"
-                        className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 shadow-sm"
+                        className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 shadow-sm"
                      />
                      <SafeButton
                         variant="primary"
@@ -1289,11 +1289,11 @@ Proses kerja transparan`}
                 </div>
 
                 <div className="space-y-3">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Value Stack</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Value Stack</div>
                   <div className="space-y-3">
                     {selectedPage.offerItems.slice(0, 3).map((item) => (
-                      <div key={item.title} className="rounded-[22px] border border-slate-100 bg-white px-4 py-4">
-                        <div className="font-black text-slate-900 text-sm">{item.title}</div>
+                      <div key={item.title} className="rounded-xl border border-slate-100 bg-white px-4 py-4">
+                        <div className="font-semibold text-slate-900 text-sm">{item.title}</div>
                         <div className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">{item.description}</div>
                       </div>
                     ))}
@@ -1325,7 +1325,7 @@ Proses kerja transparan`}
                   <div key={lead.id} className="rounded-[24px] border border-slate-100 bg-white px-5 py-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="font-black text-slate-900">{lead.fullName}</div>
+                        <div className="font-semibold text-slate-900">{lead.fullName}</div>
                         <div className="text-xs text-slate-500 font-medium mt-1">
                           {lead.email || lead.phone || 'Kontak belum lengkap'}
                         </div>
@@ -1349,12 +1349,12 @@ Proses kerja transparan`}
       {showCreateModal && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowCreateModal(false)} />
-          <div className="relative w-full max-w-7xl rounded-[40px] bg-white shadow-2xl overflow-hidden">
+          <div className="relative w-full max-w-7xl rounded-xl bg-white shadow-md overflow-hidden">
             <div className="border-b border-slate-100 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.16),_transparent_26%),linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)] px-8 py-7">
               <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-500">Generator</div>
-                  <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-900">Generate Sales Page Baru</h3>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-500">Generator</div>
+                  <h3 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Generate Sales Page Baru</h3>
                   <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-slate-500">
                     Ini sekarang bukan lagi form datar. Isi step by step, lalu lihat objective, visual hero, CTA, offer stack, dan brief AI berubah secara live sebelum draft dibuat.
                   </p>
@@ -1362,18 +1362,18 @@ Proses kerja transparan`}
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-[24px] border border-white/70 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] backdrop-blur-sm">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Auto Fill</div>
-                    <div className="mt-2 text-sm font-black text-slate-900">Job Order + Brand Brain</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Auto Fill</div>
+                    <div className="mt-2 text-sm font-semibold text-slate-900">Job Order + Brand Brain</div>
                     <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">Gunakan seed dan default brand supaya user tidak mulai dari nol.</p>
                   </div>
                   <div className="rounded-[24px] border border-white/70 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] backdrop-blur-sm">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Live Feedback</div>
-                    <div className="mt-2 text-sm font-black text-slate-900">Preview + Brief</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Live Feedback</div>
+                    <div className="mt-2 text-sm font-semibold text-slate-900">Preview + Brief</div>
                     <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">User bisa langsung lihat bentuk output sebelum menekan generate.</p>
                   </div>
                   <div className="rounded-[24px] border border-white/70 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] backdrop-blur-sm">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Draft Engine</div>
-                    <div className="mt-2 text-sm font-black text-slate-900">Siap Publish</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Draft Engine</div>
+                    <div className="mt-2 text-sm font-semibold text-slate-900">Siap Publish</div>
                     <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">AI tetap menyusun hero, proof, FAQ, dan form lead siap edit.</p>
                   </div>
                 </div>
@@ -1388,10 +1388,10 @@ Proses kerja transparan`}
                     className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.16)]"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-xs font-black text-white">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-xs font-semibold text-white">
                         {step.id}
                       </div>
-                      <div className="text-sm font-black text-slate-900">{step.title}</div>
+                      <div className="text-sm font-semibold text-slate-900">{step.title}</div>
                     </div>
                     <p className="mt-3 text-[11px] font-medium leading-relaxed text-slate-500">{step.detail}</p>
                   </div>
@@ -1423,7 +1423,7 @@ Proses kerja transparan`}
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div>
-                                  <div className={`text-xs font-black tracking-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{template.label}</div>
+                                  <div className={`text-xs font-semibold tracking-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{template.label}</div>
                                   <p className={`mt-1 text-[11px] font-medium leading-relaxed ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
                                     {template.description}
                                   </p>
@@ -1433,7 +1433,7 @@ Proses kerja transparan`}
                                 </div>
                               </div>
 
-                              <div className={`mt-3 rounded-2xl border p-3 ${isSelected ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'}`}>
+                              <div className={`mt-3 rounded-xl border p-3 ${isSelected ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'}`}>
                                 <div className={`rounded-xl border p-3 ${isSelected ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'}`}>
                                   <div className={`h-2 w-24 rounded-full ${isSelected ? 'bg-slate-600' : 'bg-slate-300'}`} />
                                   <div className={`mt-2 h-2 w-full rounded-full ${isSelected ? 'bg-slate-700' : 'bg-slate-200'}`} />
@@ -1447,7 +1447,7 @@ Proses kerja transparan`}
                                   {guide.sectionBlocks.slice(0, 3).map((block) => (
                                     <div
                                       key={`${template.id}-${block}`}
-                                      className={`rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-wide ${
+                                      className={`rounded-lg px-2 py-1 text-[9px] font-semibold uppercase tracking-wide ${
                                         isSelected ? 'bg-slate-700 text-slate-300' : 'bg-white text-slate-500 border border-slate-200'
                                       }`}
                                     >
@@ -1462,10 +1462,10 @@ Proses kerja transparan`}
                       </div>
 
                       <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4">
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Color Guide</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Color Guide</div>
                         <div className="mt-2 flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-sm font-black text-slate-900">{selectedTemplateGuide.colorGuide.name}</div>
+                            <div className="text-sm font-semibold text-slate-900">{selectedTemplateGuide.colorGuide.name}</div>
                             <p className="text-[11px] font-medium text-slate-500 mt-0.5">{selectedTemplateGuide.frameTitle}: {selectedTemplateGuide.frameCaption}</p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -1491,11 +1491,11 @@ Proses kerja transparan`}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-[1.3fr_0.7fr] gap-4">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Seed Job Order</label>
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Seed Job Order</label>
                         <select
                           value={createState.serviceSeedId}
                           onChange={(event) => handleServiceSeedChange(event.target.value)}
-                          className="w-full rounded-2xl border border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm font-bold outline-none focus:border-emerald-500"
+                          className="w-full rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm font-bold outline-none focus:border-emerald-500"
                         >
                           <option value="">Pilih job order sebagai dasar campaign</option>
                           {serviceSeeds.map((seed) => (
@@ -1505,9 +1505,9 @@ Proses kerja transparan`}
                           ))}
                         </select>
                       </div>
-                      <div className="rounded-[22px] border border-emerald-200 bg-emerald-50/60 px-4 py-3">
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">Status Seed</div>
-                        <div className="mt-2 text-sm font-black text-slate-900">
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Status Seed</div>
+                        <div className="mt-2 text-sm font-semibold text-slate-900">
                           {selectedServiceSeed ? selectedServiceSeed.status : 'Belum dipilih'}
                         </div>
                         <p className="mt-1 text-[11px] font-medium text-slate-500">
@@ -1529,22 +1529,22 @@ Proses kerja transparan`}
                     <div className="space-y-5">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Judul Campaign</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Judul Campaign</label>
                           <input
                             value={createState.title}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, title: event.target.value }))}
                             placeholder="Cth: Sales Page NIZAM ERP Retail"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                             required
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Nama Produk / Offer</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Nama Produk / Offer</label>
                           <input
                             value={createState.productName}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, productName: event.target.value }))}
                             placeholder="Cth: NIZAM ERP"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                             required
                           />
                         </div>
@@ -1552,34 +1552,34 @@ Proses kerja transparan`}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Target Audience</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Target Audience</label>
                           <input
                             value={createState.audience}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, audience: event.target.value }))}
                             placeholder="Cth: owner retail multi-cabang"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                             required
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Price Label</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Price Label</label>
                           <input
                             value={createState.priceLabel}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, priceLabel: event.target.value }))}
                             placeholder="Cth: Mulai dari Rp 499rb / bulan"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                           />
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Janji / Hook Utama</label>
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Janji / Hook Utama</label>
                         <textarea
                           value={createState.promise}
                           onChange={(event) => setCreateState((prev) => ({ ...prev, promise: event.target.value }))}
                           rows={4}
                           placeholder="Cth: Satukan penjualan, stok, kas, dan laporan dalam satu dashboard yang siap dipakai tim."
-                          className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
                           required
                         />
                       </div>
@@ -1594,11 +1594,11 @@ Proses kerja transparan`}
                     <div className="space-y-5">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Objective</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Objective</label>
                           <select
                             value={createState.campaignObjective}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, campaignObjective: event.target.value as SalesPageCampaignObjectiveId }))}
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                           >
                             {SALES_PAGE_CAMPAIGN_OBJECTIVE_OPTIONS.map((option) => (
                               <option key={option.id} value={option.id}>{option.label}</option>
@@ -1609,11 +1609,11 @@ Proses kerja transparan`}
                           </p>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Traffic Source</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Traffic Source</label>
                           <select
                             value={createState.trafficSource}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, trafficSource: event.target.value as SalesPageTrafficSourceId }))}
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                           >
                             {SALES_PAGE_TRAFFIC_SOURCE_OPTIONS.map((option) => (
                               <option key={option.id} value={option.id}>{option.label}</option>
@@ -1624,11 +1624,11 @@ Proses kerja transparan`}
                           </p>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Tone Style</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Tone Style</label>
                           <select
                             value={createState.toneStyle}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, toneStyle: event.target.value as SalesPageToneStyleId }))}
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                           >
                             {SALES_PAGE_TONE_STYLE_OPTIONS.map((option) => (
                               <option key={option.id} value={option.id}>{option.label}</option>
@@ -1642,17 +1642,17 @@ Proses kerja transparan`}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Pain Point Utama</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Pain Point Utama</label>
                           <textarea
                             value={createState.targetPainPoints}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, targetPainPoints: event.target.value }))}
                             rows={4}
                             placeholder="Contoh: prospek bingung pilih vendor, follow-up lambat, hasil kerja tidak transparan"
-                            className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Benefit Kunci</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Benefit Kunci</label>
                           <textarea
                             value={createState.keyBenefits}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, keyBenefits: event.target.value }))}
@@ -1661,14 +1661,14 @@ Proses kerja transparan`}
 Proses cepat
 Harga transparan
 Laporan hasil rapi`}
-                            className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Deliverables / Offer Stack</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Deliverables / Offer Stack</label>
                           <textarea
                             value={createState.deliverables}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, deliverables: event.target.value }))}
@@ -1677,52 +1677,52 @@ Laporan hasil rapi`}
 Survey awal
 Eksekusi layanan
 Laporan & rekomendasi`}
-                            className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Proof / Trust Assets</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Proof / Trust Assets</label>
                           <textarea
                             value={createState.proofAssets}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, proofAssets: event.target.value }))}
                             rows={4}
                             placeholder="Contoh: Tim berpengalaman, respon cepat, pernah handle puluhan project"
-                            className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Objection Handling</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Objection Handling</label>
                           <textarea
                             value={createState.objectionHandling}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, objectionHandling: event.target.value }))}
                             rows={4}
                             placeholder="Contoh: Mulai dari assessment singkat agar scope dan estimasi bisa jelas lebih dulu."
-                            className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Urgency / Promo</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Urgency / Promo</label>
                           <textarea
                             value={createState.urgencyOffer}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, urgencyOffer: event.target.value }))}
                             rows={4}
                             placeholder="Contoh: Slot implementasi batch bulan ini terbatas."
-                            className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
                           />
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Catatan Tambahan untuk AI</label>
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Catatan Tambahan untuk AI</label>
                         <textarea
                           value={createState.aiPrompt}
                           onChange={(event) => setCreateState((prev) => ({ ...prev, aiPrompt: event.target.value }))}
                           rows={3}
                           placeholder="Opsional. Misalnya: jangan terlalu ramai, hindari bahasa bombastis, arahkan CTA ke demo 30 menit."
-                          className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-blue-500"
                         />
                       </div>
                     </div>
@@ -1736,22 +1736,22 @@ Laporan & rekomendasi`}
                     <div className="space-y-5">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">CTA Utama</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">CTA Utama</label>
                           <input
                             value={createState.primaryCtaLabel}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, primaryCtaLabel: event.target.value }))}
                             placeholder="Cth: Jadwalkan Demo"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                             required
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">URL CTA Utama</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">URL CTA Utama</label>
                           <input
                             value={createState.primaryCtaUrl}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, primaryCtaUrl: event.target.value }))}
                             placeholder="#lead-form atau https://wa.me/..."
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                             required
                           />
                         </div>
@@ -1759,60 +1759,60 @@ Laporan & rekomendasi`}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Hero Image URL</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Hero Image URL</label>
                           <input
                             value={createState.heroImageUrl}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, heroImageUrl: event.target.value }))}
                             placeholder="https://..."
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Hero Image Alt</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Hero Image Alt</label>
                           <input
                             value={createState.heroImageAlt}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, heroImageAlt: event.target.value }))}
                             placeholder="Deskripsi gambar hero"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                         <div className="space-y-2 md:col-span-1">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">CTA Sekunder</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">CTA Sekunder</label>
                           <input
                             value={createState.secondaryCtaLabel}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, secondaryCtaLabel: event.target.value }))}
                             placeholder="Cth: Lihat Benefit"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                           />
                         </div>
                         <div className="space-y-2 md:col-span-1">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">URL CTA Sekunder</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">URL CTA Sekunder</label>
                           <input
                             value={createState.secondaryCtaUrl}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, secondaryCtaUrl: event.target.value }))}
                             placeholder="#benefits"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                           />
                         </div>
                         <div className="space-y-2 md:col-span-1">
-                          <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Meta Pixel ID</label>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Meta Pixel ID</label>
                           <input
                             value={createState.metaPixelId}
                             onChange={(event) => setCreateState((prev) => ({ ...prev, metaPixelId: event.target.value }))}
                             placeholder="123456789012345"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
                           />
                         </div>
                       </div>
                     </div>
                   </GeneratorSection>
 
-                  <div className="flex items-center justify-between gap-4 rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-4">
+                  <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
                     <div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Ready To Generate</div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ready To Generate</div>
                       <p className="mt-1 text-sm font-medium text-slate-500">
                         Preview di kanan akan mengikuti input ini secara live sebelum draft dibuat.
                       </p>
@@ -1821,7 +1821,7 @@ Laporan & rekomendasi`}
                       <button
                         type="button"
                         onClick={() => setShowCreateModal(false)}
-                        className="px-5 py-3 text-sm font-black text-slate-400"
+                        className="px-5 py-3 text-sm font-semibold text-slate-400"
                       >
                         Batal
                       </button>
@@ -1836,28 +1836,28 @@ Laporan & rekomendasi`}
                   <div className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.28)]">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Live Preview</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Live Preview</div>
                         <p className="mt-1 text-[11px] font-medium text-slate-500">Ringkasan strategi dan halaman yang sedang terbentuk.</p>
                       </div>
                       <Sparkles size={18} className="text-slate-400" />
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-3">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Objective</div>
-                        <div className="mt-1 text-sm font-black text-slate-900">{previewObjectiveLabel}</div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Objective</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">{previewObjectiveLabel}</div>
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Traffic</div>
-                        <div className="mt-1 text-sm font-black text-slate-900">{previewTrafficLabel}</div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Traffic</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">{previewTrafficLabel}</div>
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Tone</div>
-                        <div className="mt-1 text-sm font-black text-slate-900">{previewToneLabel}</div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Tone</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">{previewToneLabel}</div>
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Preview Path</div>
-                        <div className="mt-1 text-xs font-black text-slate-900">{previewPublicPath}</div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Preview Path</div>
+                        <div className="mt-1 text-xs font-semibold text-slate-900">{previewPublicPath}</div>
                       </div>
                     </div>
                   </div>
@@ -1871,12 +1871,12 @@ Laporan & rekomendasi`}
                         : `radial-gradient(circle at top right, ${previewPage.theme.accentSoft} 0%, transparent 28%), linear-gradient(145deg, ${previewPage.theme.surface} 0%, #ffffff 58%, ${previewPage.theme.surfaceAlt} 100%)`,
                     }}
                   >
-                    <div className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] ${previewPage.templateId === 'CONSULTING' ? 'border-slate-700 bg-slate-900/60 text-slate-200' : 'bg-white/90 text-slate-700'}`} style={{ borderColor: previewPage.templateId === 'CONSULTING' ? undefined : previewPage.theme.border }}>
+                    <div className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.22em] ${previewPage.templateId === 'CONSULTING' ? 'border-slate-700 bg-slate-900/60 text-slate-200' : 'bg-white/90 text-slate-700'}`} style={{ borderColor: previewPage.templateId === 'CONSULTING' ? undefined : previewPage.theme.border }}>
                       {previewPage.offerBadge || 'Offer Preview'}
                     </div>
 
                     <div className="mt-5 space-y-4">
-                      <h4 className={`text-3xl font-black tracking-tight ${previewPage.templateId === 'CONSULTING' ? 'text-white' : 'text-slate-950'}`}>
+                      <h4 className={`text-3xl font-semibold tracking-tight ${previewPage.templateId === 'CONSULTING' ? 'text-white' : 'text-slate-950'}`}>
                         {previewPage.headline}
                       </h4>
                       <p className={`text-sm font-medium leading-relaxed ${previewPage.templateId === 'CONSULTING' ? 'text-slate-300' : 'text-slate-600'}`}>
@@ -1886,13 +1886,13 @@ Laporan & rekomendasi`}
 
                     <div className="mt-5 flex flex-wrap gap-3">
                       <div
-                        className="inline-flex items-center rounded-[20px] px-5 py-3 text-xs font-black text-white shadow-xl"
+                        className="inline-flex items-center rounded-[20px] px-5 py-3 text-xs font-semibold text-white shadow-xl"
                         style={{ backgroundColor: previewPage.theme.accent }}
                       >
                         {previewPage.primaryCtaLabel}
                       </div>
                       {previewPage.secondaryCtaLabel && (
-                        <div className={`inline-flex items-center rounded-[20px] border px-5 py-3 text-xs font-black ${previewPage.templateId === 'CONSULTING' ? 'border-slate-700 bg-slate-900/40 text-slate-100' : 'bg-white text-slate-800'}`} style={{ borderColor: previewPage.templateId === 'CONSULTING' ? undefined : previewPage.theme.border }}>
+                        <div className={`inline-flex items-center rounded-[20px] border px-5 py-3 text-xs font-semibold ${previewPage.templateId === 'CONSULTING' ? 'border-slate-700 bg-slate-900/40 text-slate-100' : 'bg-white text-slate-800'}`} style={{ borderColor: previewPage.templateId === 'CONSULTING' ? undefined : previewPage.theme.border }}>
                           {previewPage.secondaryCtaLabel}
                         </div>
                       )}
@@ -1902,19 +1902,19 @@ Laporan & rekomendasi`}
                       {previewPage.proofPoints.slice(0, 3).map((point) => (
                         <div
                           key={`${point.label}-${point.value}`}
-                          className={`rounded-[22px] border px-4 py-4 ${previewPage.templateId === 'CONSULTING' ? 'border-slate-700 bg-slate-900/50' : 'bg-white/90'}`}
+                          className={`rounded-xl border px-4 py-4 ${previewPage.templateId === 'CONSULTING' ? 'border-slate-700 bg-slate-900/50' : 'bg-white/90'}`}
                           style={{ borderColor: previewPage.templateId === 'CONSULTING' ? undefined : previewPage.theme.border }}
                         >
-                          <div className={`text-[9px] font-black uppercase tracking-[0.18em] ${previewPage.templateId === 'CONSULTING' ? 'text-slate-400' : ''}`} style={{ color: previewPage.templateId === 'CONSULTING' ? undefined : previewPage.theme.muted }}>
+                          <div className={`text-[9px] font-semibold uppercase tracking-wide ${previewPage.templateId === 'CONSULTING' ? 'text-slate-400' : ''}`} style={{ color: previewPage.templateId === 'CONSULTING' ? undefined : previewPage.theme.muted }}>
                             {point.label}
                           </div>
-                          <div className={`mt-2 text-sm font-black ${previewPage.templateId === 'CONSULTING' ? 'text-white' : 'text-slate-900'}`}>{point.value}</div>
+                          <div className={`mt-2 text-sm font-semibold ${previewPage.templateId === 'CONSULTING' ? 'text-white' : 'text-slate-900'}`}>{point.value}</div>
                         </div>
                       ))}
                     </div>
 
                     <div
-                      className="mt-5 rounded-[28px] border p-4"
+                      className="mt-5 rounded-xl border p-4"
                       style={{
                         borderColor: previewPage.theme.border,
                         background: previewPage.heroImageUrl
@@ -1923,8 +1923,8 @@ Laporan & rekomendasi`}
                       }}
                     >
                       <div className="rounded-[24px] border border-white/15 bg-white/10 p-4 text-white backdrop-blur-sm">
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70">Offer Value</div>
-                        <div className="mt-2 text-2xl font-black tracking-tight">{previewPage.priceLabel || 'Penawaran spesial'}</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/70">Offer Value</div>
+                        <div className="mt-2 text-2xl font-semibold tracking-tight">{previewPage.priceLabel || 'Penawaran spesial'}</div>
                         <div className="mt-4 space-y-2 text-xs font-bold leading-relaxed text-white/85">
                           <div>{previewPage.bonusText}</div>
                           <div>{previewPage.guaranteeText}</div>
@@ -1935,11 +1935,11 @@ Laporan & rekomendasi`}
                   </div>
 
                   <div className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.28)]">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Offer Stack Preview</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Offer Stack Preview</div>
                     <div className="mt-4 space-y-3">
                       {previewPage.offerItems.slice(0, 3).map((item) => (
-                        <div key={item.title} className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
-                          <div className="text-sm font-black text-slate-900">{item.title}</div>
+                        <div key={item.title} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                          <div className="text-sm font-semibold text-slate-900">{item.title}</div>
                           <div className="mt-1 text-xs font-medium leading-relaxed text-slate-500">{item.description}</div>
                         </div>
                       ))}
@@ -1947,9 +1947,9 @@ Laporan & rekomendasi`}
                   </div>
 
                   <div className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.28)]">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Brief Preview</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Brief Preview</div>
                     <p className="mt-1 text-[11px] font-medium text-slate-500">Inilah ringkasan yang akan dipakai engine AI untuk generate copy.</p>
-                    <pre className="mt-4 whitespace-pre-wrap rounded-2xl bg-slate-50 px-4 py-4 text-[11px] font-medium leading-relaxed text-slate-600">
+                    <pre className="mt-4 whitespace-pre-wrap rounded-xl bg-slate-50 px-4 py-4 text-[11px] font-medium leading-relaxed text-slate-600">
                       {guidedBriefPreview || 'Isi konteks campaign untuk melihat brief otomatis.'}
                     </pre>
                   </div>
@@ -1963,38 +1963,38 @@ Laporan & rekomendasi`}
       {editingPageId && editState && selectedPage && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setEditingPageId(null)} />
-          <div className="relative w-full max-w-5xl rounded-[40px] bg-white shadow-2xl overflow-hidden">
+          <div className="relative w-full max-w-5xl rounded-xl bg-white shadow-md overflow-hidden">
             <div className="px-8 py-6 border-b border-slate-100 bg-slate-50">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500">Editor</div>
-              <h3 className="text-2xl font-black tracking-tight text-slate-900 mt-2">Edit Sales Page</h3>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">Editor</div>
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-900 mt-2">Edit Sales Page</h3>
               <p className="text-sm text-slate-500 font-medium mt-2">
                 Format textarea:
-                <span className="font-black text-slate-700"> `Label | Value`</span> untuk proof point,
-                <span className="font-black text-slate-700"> `Title | Description`</span> untuk benefit/offer,
+                <span className="font-semibold text-slate-700"> `Label | Value`</span> untuk proof point,
+                <span className="font-semibold text-slate-700"> `Title | Description`</span> untuk benefit/offer,
                 dan
-                <span className="font-black text-slate-700"> `Nama | Role | Quote`</span> untuk testimonial.
+                <span className="font-semibold text-slate-700"> `Nama | Role | Quote`</span> untuk testimonial.
               </p>
             </div>
 
             <form onSubmit={handleSavePage} className="max-h-[82vh] overflow-y-auto p-8 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Judul</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Judul</label>
                   <input
                     value={editState.title}
                     onChange={(event) => setEditState((prev) => (prev ? { ...prev, title: event.target.value } : prev))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Status</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Status</label>
                   <select
                     value={editState.status}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, status: event.target.value as SalesPageStatus } : prev))
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   >
                     <option value="DRAFT">Draft</option>
                     <option value="PUBLISHED">Published</option>
@@ -2004,20 +2004,20 @@ Laporan & rekomendasi`}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Headline</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Headline</label>
                   <input
                     value={editState.headline}
                     onChange={(event) => setEditState((prev) => (prev ? { ...prev, headline: event.target.value } : prev))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Slug</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Slug</label>
                   <input
                     value={editState.slug}
                     onChange={(event) => setEditState((prev) => (prev ? { ...prev, slug: event.target.value } : prev))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                     required
                   />
                 </div>
@@ -2025,126 +2025,126 @@ Laporan & rekomendasi`}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Offer Badge</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Offer Badge</label>
                   <input
                     value={editState.offerBadge}
                     onChange={(event) => setEditState((prev) => (prev ? { ...prev, offerBadge: event.target.value } : prev))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Target Audience</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Target Audience</label>
                   <input
                     value={editState.targetAudience}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, targetAudience: event.target.value } : prev))
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Subheadline</label>
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Subheadline</label>
                 <textarea
                   value={editState.subheadline}
                   onChange={(event) => setEditState((prev) => (prev ? { ...prev, subheadline: event.target.value } : prev))}
                   rows={3}
-                  className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Deskripsi</label>
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Deskripsi</label>
                 <textarea
                   value={editState.description}
                   onChange={(event) => setEditState((prev) => (prev ? { ...prev, description: event.target.value } : prev))}
                   rows={4}
-                  className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Price Label</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Price Label</label>
                   <input
                     value={editState.priceLabel}
                     onChange={(event) => setEditState((prev) => (prev ? { ...prev, priceLabel: event.target.value } : prev))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Meta Pixel ID</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Meta Pixel ID</label>
                   <input
                     value={editState.metaPixelId}
                     onChange={(event) => setEditState((prev) => (prev ? { ...prev, metaPixelId: event.target.value } : prev))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Bonus Text</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Bonus Text</label>
                   <input
                     value={editState.bonusText}
                     onChange={(event) => setEditState((prev) => (prev ? { ...prev, bonusText: event.target.value } : prev))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Guarantee Text</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Guarantee Text</label>
                   <input
                     value={editState.guaranteeText}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, guaranteeText: event.target.value } : prev))
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Urgency Text</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Urgency Text</label>
                   <input
                     value={editState.urgencyText}
                     onChange={(event) => setEditState((prev) => (prev ? { ...prev, urgencyText: event.target.value } : prev))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Hero Image URL</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Hero Image URL</label>
                   <input
                     value={editState.heroImageUrl}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, heroImageUrl: event.target.value } : prev))
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                     placeholder="https://..."
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Hero Image Alt</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Hero Image Alt</label>
                   <input
                     value={editState.heroImageAlt}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, heroImageAlt: event.target.value } : prev))
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">CTA Utama</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">CTA Utama</label>
                   <input
                     value={editState.primaryCtaLabel}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, primaryCtaLabel: event.target.value } : prev))
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                     required
                   />
                   <input
@@ -2152,26 +2152,26 @@ Laporan & rekomendasi`}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, primaryCtaUrl: event.target.value } : prev))
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                     placeholder="#lead-form / https://..."
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">CTA Sekunder</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">CTA Sekunder</label>
                   <input
                     value={editState.secondaryCtaLabel}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, secondaryCtaLabel: event.target.value } : prev))
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                   <input
                     value={editState.secondaryCtaUrl}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, secondaryCtaUrl: event.target.value } : prev))
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                     placeholder="#benefits / https://..."
                   />
                 </div>
@@ -2179,129 +2179,129 @@ Laporan & rekomendasi`}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Meta Title</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Meta Title</label>
                   <input
                     value={editState.metaTitle}
                     onChange={(event) => setEditState((prev) => (prev ? { ...prev, metaTitle: event.target.value } : prev))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Meta Description</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Meta Description</label>
                   <textarea
                     value={editState.metaDescription}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, metaDescription: event.target.value } : prev))
                     }
                     rows={3}
-                    className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Judul Form Lead</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Judul Form Lead</label>
                   <input
                     value={editState.formTitle}
                     onChange={(event) => setEditState((prev) => (prev ? { ...prev, formTitle: event.target.value } : prev))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Label Tombol Form</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Label Tombol Form</label>
                   <input
                     value={editState.formCtaLabel}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, formCtaLabel: event.target.value } : prev))
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Subtitle Form Lead</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Subtitle Form Lead</label>
                   <textarea
                     value={editState.formSubtitle}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, formSubtitle: event.target.value } : prev))
                     }
                     rows={3}
-                    className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Pesan Sukses</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Pesan Sukses</label>
                   <textarea
                     value={editState.formSuccessMessage}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, formSuccessMessage: event.target.value } : prev))
                     }
                     rows={3}
-                    className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Proof Points</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Proof Points</label>
                   <textarea
                     value={editState.proofPointsText}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, proofPointsText: event.target.value } : prev))
                     }
                     rows={6}
-                    className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Benefits</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Benefits</label>
                   <textarea
                     value={editState.benefitsText}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, benefitsText: event.target.value } : prev))
                     }
                     rows={6}
-                    className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Offer Stack</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Offer Stack</label>
                   <textarea
                     value={editState.offerItemsText}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, offerItemsText: event.target.value } : prev))
                     }
                     rows={6}
-                    className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Testimonials</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Testimonials</label>
                   <textarea
                     value={editState.testimonialsText}
                     onChange={(event) =>
                       setEditState((prev) => (prev ? { ...prev, testimonialsText: event.target.value } : prev))
                     }
                     rows={6}
-                    className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">FAQ</label>
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">FAQ</label>
                 <textarea
                   value={editState.faqText}
                   onChange={(event) => setEditState((prev) => (prev ? { ...prev, faqText: event.target.value } : prev))}
                   rows={7}
-                  className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
                 />
               </div>
 
@@ -2309,7 +2309,7 @@ Laporan & rekomendasi`}
                 <button
                   type="button"
                   onClick={() => setEditingPageId(null)}
-                  className="px-5 py-3 text-sm font-black text-slate-400"
+                  className="px-5 py-3 text-sm font-semibold text-slate-400"
                 >
                   Tutup
                 </button>

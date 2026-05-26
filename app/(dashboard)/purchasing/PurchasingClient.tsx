@@ -781,16 +781,16 @@ export default function PurchasingClient({
         />
       </div>
 
-      <div className="flex bg-slate-100/50 p-1.5 rounded-2xl w-fit border border-slate-100">
+      <div className="flex bg-slate-100/50 p-1.5 rounded-xl w-fit border border-slate-100">
          <button
             onClick={() => setActiveTab('PURCHASES')}
-            className={`px-8 py-2.5 text-xs font-black rounded-xl transition-all uppercase tracking-widest ${activeTab === 'PURCHASES' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`px-8 py-2.5 text-xs font-semibold rounded-xl transition-all uppercase tracking-wide ${activeTab === 'PURCHASES' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
          >
             Purchase Orders
          </button>
          <button
             onClick={() => setActiveTab('REQUESTS')}
-            className={`px-8 py-2.5 text-xs font-black rounded-xl transition-all uppercase tracking-widest flex items-center gap-2 ${activeTab === 'REQUESTS' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`px-8 py-2.5 text-xs font-semibold rounded-xl transition-all uppercase tracking-wide flex items-center gap-2 ${activeTab === 'REQUESTS' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
          >
             Permintaan Produksi
             {purchaseRequests.filter((r: any) => r.status === 'PENDING').length > 0 && (
@@ -818,11 +818,11 @@ export default function PurchasingClient({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">No PO</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Keterangan Transaksi</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Nilai Faktur</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Aksi Cepat</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">No PO</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Keterangan Transaksi</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Nilai Faktur</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-center">Status</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Aksi Cepat</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -838,13 +838,13 @@ export default function PurchasingClient({
                   return (
                     <tr key={p.id} className="group hover:bg-slate-50 transition-colors">
                       <td className="px-8 py-6">
-                         <div className="text-xs font-black text-rose-600 tracking-tighter">{p.purchase_number}</div>
+                         <div className="text-xs font-semibold text-rose-600 tracking-tighter">{p.purchase_number}</div>
                          <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(p.purchase_date)}</div>
                       </td>
                       <td className="px-8 py-6">
                          <div className="text-sm font-bold text-slate-900">{p.contacts?.name || 'Unknown Vendor'}</div>
                          <div className="flex gap-2 mt-1.5 overflow-hidden max-w-[300px]">
-                            <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200 uppercase tracking-tighter">
+                            <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200 uppercase tracking-tighter">
                               {p.purchase_items?.length || 0} SKU
                             </span>
                             <span className="text-[10px] text-slate-400 truncate font-medium">
@@ -860,7 +860,7 @@ export default function PurchasingClient({
                          
                          return (
                            <div className="flex flex-col items-end gap-1">
-                             <div className="text-sm font-black text-slate-900 font-mono tracking-tighter">
+                             <div className="text-sm font-semibold text-slate-900 font-mono tracking-tighter">
                                {outstanding > 0 && outstanding < p.grand_total ? formatRupiah(outstanding) : formatRupiah(p.grand_total)}
                              </div>
                              {outstanding > 0 && outstanding < p.grand_total && (
@@ -868,7 +868,7 @@ export default function PurchasingClient({
                                  Faktur: {formatRupiah(p.grand_total)}
                                </div>
                              )}
-                             <div className={`text-[9px] font-black uppercase tracking-widest ${p.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                             <div className={`text-[9px] font-semibold uppercase tracking-wide ${p.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}>
                                {p.payment_status === 'PAID' ? 'Lunas' : outstanding < p.grand_total ? 'Cicilan / Sisa' : 'Belum Lunas'}
                              </div>
                            </div>
@@ -917,7 +917,7 @@ export default function PurchasingClient({
                          )}
 
                          {(p.status === 'RECEIVED' || (isPurchaseSalam(p) && p.status === 'ORDERED')) && p.payment_status !== 'PAID' && (
-                           <button onClick={() => handleOpenPayment(p)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                           <button onClick={() => handleOpenPayment(p)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[10px] font-semibold uppercase tracking-wide rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
                              <CreditCard size={14}/> Bayar
                            </button>
                          )}
@@ -947,11 +947,11 @@ export default function PurchasingClient({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">No. Request</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Barang & Jumlah</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Sumber / Notes</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Aksi</th>
+                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">No. Request</th>
+                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Barang & Jumlah</th>
+                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Sumber / Notes</th>
+                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-center">Status</th>
+                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -961,15 +961,15 @@ export default function PurchasingClient({
                   purchaseRequests.map((r: any) => (
                     <tr key={r.id} className="group hover:bg-slate-50 transition-colors">
                       <td className="px-8 py-6">
-                        <div className="text-xs font-black text-slate-900">{r.request_number}</div>
+                        <div className="text-xs font-semibold text-slate-900">{r.request_number}</div>
                         <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(r.created_at)}</div>
                       </td>
                       <td className="px-8 py-6">
                         <div className="text-sm font-bold text-slate-900">{r.product_name}</div>
-                        <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">Butuh: {r.quantity} {r.unit}</div>
+                        <div className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide mt-1">Butuh: {r.quantity} {r.unit}</div>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="text-[10px] font-black text-rose-500 uppercase">{r.source_type}</div>
+                        <div className="text-[10px] font-semibold text-rose-500 uppercase">{r.source_type}</div>
                         <div className="text-[10px] text-slate-500 italic mt-1">{r.notes || '-'}</div>
                       </td>
                       <td className="px-8 py-6 text-center">
@@ -1001,7 +1001,7 @@ export default function PurchasingClient({
                                   }])
                                   setShowModal(true)
                                 }}
-                                className="px-3 py-1.5 bg-rose-600 text-white text-[10px] font-black uppercase rounded-lg shadow-sm"
+                                className="px-3 py-1.5 bg-rose-600 text-white text-[10px] font-semibold uppercase rounded-lg shadow-sm"
                               >
                                 Proses ke PO
                               </button>
@@ -1011,14 +1011,14 @@ export default function PurchasingClient({
                                     await updatePurchaseRequestStatus(orgId, r.id, 'REJECTED', activeBranchId || undefined)
                                   }
                                 }}
-                                className="px-3 py-1.5 bg-slate-100 text-slate-400 text-[10px] font-black uppercase rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-all"
+                                className="px-3 py-1.5 bg-slate-100 text-slate-400 text-[10px] font-semibold uppercase rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-all"
                               >
                                 Tolak
                               </button>
                             </>
                           )}
                           {r.status === 'ORDERED' && (
-                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest italic">Sudah di-PO</span>
+                            <span className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wide italic">Sudah di-PO</span>
                           )}
                         </div>
                       </td>
@@ -1036,7 +1036,7 @@ export default function PurchasingClient({
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowModal(false); resetPurchaseForm() }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-8 overflow-hidden max-h-[90vh] overflow-y-auto">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-xl shadow-md p-8 overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="absolute top-0 left-0 w-2 h-full bg-rose-500" />
                 <h3 className="text-xl font-bold mb-6">
                   {editingDraftPurchaseId ? 'Edit Draft Purchase Order (PO)' : 'Buat Purchase Order (PO) & Update Master Barang'}
@@ -1045,10 +1045,10 @@ export default function PurchasingClient({
                 <form onSubmit={handleCreatePurchase} className="space-y-6">
                   {/* HEADER PO */}
                   {/* HEADER PO & PAYMENT GUARDRAIL */}
-                  <div className={`grid grid-cols-1 ${paymentTerm === 'TEMPO' ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4 p-5 bg-slate-50 rounded-[28px] border border-slate-100 shadow-inner transition-all`}>
+                  <div className={`grid grid-cols-1 ${paymentTerm === 'TEMPO' ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4 p-5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner transition-all`}>
                     <div className="flex-1 space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Mode Transaksi</label>
-                      <select value={shariahMode} onChange={(e) => setShariahMode(e.target.value as any)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-indigo-600 shadow-sm focus:border-indigo-500 transition-all">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Mode Transaksi</label>
+                      <select value={shariahMode} onChange={(e) => setShariahMode(e.target.value as any)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-xl outline-none text-sm bg-white font-semibold text-indigo-600 shadow-sm focus:border-indigo-500 transition-all">
                          <option value="CASH">PEMBELIAN LANGSUNG (CASH)</option>
                          <option value="SALAM">PEMBELIAN SALAM (BAYAR DEPAN)</option>
                          <option value="ISTISHNA">PEMBELIAN ISTISHNA (PESANAN/DP)</option>
@@ -1058,16 +1058,16 @@ export default function PurchasingClient({
                     </div>
 
                     <div className={`${paymentTerm === 'TEMPO' ? 'md:col-span-1' : 'md:col-span-2'} space-y-2`}>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Vendor / Supplier</label>
-                      <select required value={vendorId} onChange={(e) => setVendorId(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-slate-900 shadow-sm focus:border-rose-500 transition-all">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Vendor / Supplier</label>
+                      <select required value={vendorId} onChange={(e) => setVendorId(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-xl outline-none text-sm bg-white font-semibold text-slate-900 shadow-sm focus:border-rose-500 transition-all">
                          <option value="">Pilih Vendor / Supplier...</option>
                          {vendors.map((v: any) => <option key={v.id} value={v.id}>{v.name}</option>)}
                       </select>
                     </div>
 
                     <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Metode Pembayaran</label>
-                       <div className="flex p-1 bg-white border border-slate-200 rounded-2xl h-[52px]">
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Metode Pembayaran</label>
+                       <div className="flex p-1 bg-white border border-slate-200 rounded-xl h-[52px]">
                           <button 
                              type="button" 
                              onClick={() => {
@@ -1075,14 +1075,14 @@ export default function PurchasingClient({
                                setPaymentTerm('TEMPO')
                              }}
                              disabled={shariahMode === 'SALAM'}
-                             className={`flex-1 rounded-xl text-[10px] font-black transition-all ${paymentTerm === 'TEMPO' ? 'bg-amber-500 text-white shadow-md' : 'text-slate-400'} ${shariahMode === 'SALAM' ? 'opacity-40 cursor-not-allowed' : ''}`}
+                             className={`flex-1 rounded-xl text-[10px] font-semibold transition-all ${paymentTerm === 'TEMPO' ? 'bg-amber-500 text-white shadow-md' : 'text-slate-400'} ${shariahMode === 'SALAM' ? 'opacity-40 cursor-not-allowed' : ''}`}
                           >
                              TEMPO
                           </button>
                           <button 
                              type="button" 
                              onClick={() => setPaymentTerm('LUNAS')}
-                             className={`flex-1 rounded-xl text-[10px] font-black transition-all ${paymentTerm === 'LUNAS' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400'}`}
+                             className={`flex-1 rounded-xl text-[10px] font-semibold transition-all ${paymentTerm === 'LUNAS' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400'}`}
                           >
                              LUNAS
                           </button>
@@ -1093,22 +1093,22 @@ export default function PurchasingClient({
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Tanggal Belanja</label>
-                      <input type="date" required value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-rose-500 transition-all" />
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Tanggal Belanja</label>
+                      <input type="date" required value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-rose-500 transition-all" />
                     </div>
 
                     {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM') && (
                       <div className="space-y-2 animate-in slide-in-from-right-2">
-                        <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block px-1">{shariahMode === 'SALAM' ? 'Tanggal Barang Disediakan' : 'Jatuh Tempo'}</label>
-                        <input type="date" required={paymentTerm === 'TEMPO' || shariahMode === 'SALAM'} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-white font-bold text-amber-600 shadow-sm focus:border-amber-500 transition-all" />
+                        <label className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide block px-1">{shariahMode === 'SALAM' ? 'Tanggal Barang Disediakan' : 'Jatuh Tempo'}</label>
+                        <input type="date" required={paymentTerm === 'TEMPO' || shariahMode === 'SALAM'} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-xl outline-none text-sm bg-white font-bold text-amber-600 shadow-sm focus:border-amber-500 transition-all" />
                       </div>
                     )}
 
                     {paymentTerm === 'TEMPO' && (
-                      <div className="md:col-span-4 mt-2 p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100 flex flex-col gap-4">
+                      <div className="md:col-span-4 mt-2 p-5 bg-indigo-50/50 rounded-xl border border-indigo-100 flex flex-col gap-4">
                         <div className="flex items-center gap-3">
                            <input type="checkbox" id="dp_checkbox" checked={hasDp} onChange={(e) => setHasDp(e.target.checked)} className="w-5 h-5 rounded-md accent-indigo-600" />
-                           <label htmlFor="dp_checkbox" className="text-xs font-black text-indigo-900 cursor-pointer">{shariahMode === 'ISTISHNA' ? 'Proses DP Istishna / Titip Dana' : 'Bayar Down Payment (Uang Muka)'}</label>
+                           <label htmlFor="dp_checkbox" className="text-xs font-semibold text-indigo-900 cursor-pointer">{shariahMode === 'ISTISHNA' ? 'Proses DP Istishna / Titip Dana' : 'Bayar Down Payment (Uang Muka)'}</label>
                         </div>
                         {hasDp && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300 border-t border-indigo-100 pt-4">
@@ -1122,10 +1122,10 @@ export default function PurchasingClient({
                                />
                              </div>
                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block px-1">Nominal DP</label>
-                                <div className="flex bg-white rounded-2xl p-1 border border-indigo-200 shadow-sm">
-                                   <button type="button" onClick={() => setDpMode('NOMINAL')} className={`px-4 py-2 text-[10px] font-black rounded-xl transition flex-1 ${dpMode === 'NOMINAL' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Nominal (Rp)</button>
-                                   <button type="button" onClick={() => setDpMode('PERCENT')} className={`px-4 py-2 text-[10px] font-black rounded-xl transition flex-1 ${dpMode === 'PERCENT' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Persentase (%)</button>
+                                <label className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wide block px-1">Nominal DP</label>
+                                <div className="flex bg-white rounded-xl p-1 border border-indigo-200 shadow-sm">
+                                   <button type="button" onClick={() => setDpMode('NOMINAL')} className={`px-4 py-2 text-[10px] font-semibold rounded-xl transition flex-1 ${dpMode === 'NOMINAL' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Nominal (Rp)</button>
+                                   <button type="button" onClick={() => setDpMode('PERCENT')} className={`px-4 py-2 text-[10px] font-semibold rounded-xl transition flex-1 ${dpMode === 'PERCENT' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Persentase (%)</button>
                                 </div>
                                 {dpMode === 'NOMINAL' ? (
                                    <CurrencyInput 
@@ -1143,7 +1143,7 @@ export default function PurchasingClient({
                                        value={dpPercent} onChange={(e) => setDpPercent(e.target.value)}
                                        className="w-full h-[42px] px-4 py-2 border border-indigo-200 rounded-xl outline-none text-sm font-bold text-slate-900 pr-10"
                                      />
-                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 font-black text-slate-400">%</span>
+                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 font-semibold text-slate-400">%</span>
                                    </div>
                                 )}
                              </div>
@@ -1153,7 +1153,7 @@ export default function PurchasingClient({
                     )}
 
                     {paymentTerm === 'LUNAS' && (
-                      <div className="md:col-span-4 mt-2 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 animate-in slide-in-from-top-2 duration-300">
+                      <div className="md:col-span-4 mt-2 p-4 bg-emerald-50 rounded-xl border border-emerald-100 animate-in slide-in-from-top-2 duration-300">
                          <SearchableSelect 
                             label="Rekening Pembayaran (Cash/Bank)"
                             options={paymentAccounts}
@@ -1173,7 +1173,7 @@ export default function PurchasingClient({
                   {/* LINE ITEMS */}
                   <div className="space-y-3">
                     <div className="flex justify-between items-center mb-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Detail Barang (Items)</label>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Detail Barang (Items)</label>
                       <button type="button" onClick={handleAddLine} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
                         <Plus size={14}/> Tambah Baris
                       </button>
@@ -1186,7 +1186,7 @@ export default function PurchasingClient({
                       ))}
                     </datalist>
 
-                    <div className="hidden sm:grid grid-cols-12 gap-3 px-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+                    <div className="hidden sm:grid grid-cols-12 gap-3 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-4">
                        <div className="col-span-2">Nama Barang</div>
                        <div className="col-span-1 text-center">Jenis</div>
                        <div className="col-span-1 text-center">Qty</div>
@@ -1205,10 +1205,10 @@ export default function PurchasingClient({
                       const trueHpp = line.unit_price + allocatedOverheadPerUnit
                       const suggestedPrice = calculateSuggestedSellingPrice(trueHpp, line.margin)
                       return (
-                      <div key={line.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-white p-4 sm:p-0 border sm:border-0 border-slate-100 rounded-3xl sm:rounded-none mb-4 sm:mb-2 text-left">
+                      <div key={line.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-white p-4 sm:p-0 border sm:border-0 border-slate-100 rounded-xl sm:rounded-none mb-4 sm:mb-2 text-left">
                         
                         <div className="sm:col-span-2 min-h-[58px] flex flex-col justify-start">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Nama Barang</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">Nama Barang</label>
                           <input 
                             required 
                             list="product_suggestions" 
@@ -1218,18 +1218,18 @@ export default function PurchasingClient({
                             className="w-full h-[42px] px-4 py-2 border border-slate-200 rounded-xl outline-none text-sm group-hover:border-blue-400 transition-colors" 
                           />
                           {line.product_id ? (
-                            <span className="text-[9px] font-black text-emerald-600 block mt-1 px-1">✓ Terhubung Prod. Master</span>
+                            <span className="text-[9px] font-semibold text-emerald-600 block mt-1 px-1">✓ Terhubung Prod. Master</span>
                           ) : line.product_name ? (
-                            <span className="text-[9px] font-black text-amber-500 block mt-1 px-1">+ Akan Dibuat Baru</span>
+                            <span className="text-[9px] font-semibold text-amber-500 block mt-1 px-1">+ Akan Dibuat Baru</span>
                           ) : <div className="h-[14px]" />}
                         </div>
 
                         <div className="col-span-1 min-h-[58px]">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Jenis</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">Jenis</label>
                           <select 
                             value={line.category} 
                             onChange={(e) => handleLineChange(line.id, 'category', e.target.value)} 
-                            className="w-full h-[42px] px-1 py-1 border border-slate-100 rounded-xl outline-none text-[10px] font-black bg-slate-50 text-slate-700 text-center"
+                            className="w-full h-[42px] px-1 py-1 border border-slate-100 rounded-xl outline-none text-[10px] font-semibold bg-slate-50 text-slate-700 text-center"
                           >
                              <option value="Bahan">Bahan Baku</option>
                              <option value="Setengah Jadi">Stgh Jadi</option>
@@ -1241,22 +1241,22 @@ export default function PurchasingClient({
                         </div>
 
                         <div className="col-span-1 min-h-[58px]">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Qty</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">Qty</label>
                           <input 
                             type="number" required min="1" step="any"
                             value={line.quantity || ''} 
                             onChange={(e) => handleLineChange(line.id, 'quantity', parseFloat(e.target.value) || 0)} 
-                            className="w-full h-[42px] px-1 py-2 border border-slate-200 rounded-xl outline-none text-xs text-center font-black" 
+                            className="w-full h-[42px] px-1 py-2 border border-slate-200 rounded-xl outline-none text-xs text-center font-semibold" 
                             placeholder="0"
                           />
                         </div>
 
                         <div className="col-span-1 min-h-[58px]">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Satuan</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">Satuan</label>
                           <select
                             value={line.unit}
                             onChange={(e) => handleLineChange(line.id, 'unit', e.target.value)}
-                            className="w-full h-[42px] px-1 py-2 border border-slate-200 rounded-xl outline-none text-[10px] font-black text-blue-700 bg-white text-center"
+                            className="w-full h-[42px] px-1 py-2 border border-slate-200 rounded-xl outline-none text-[10px] font-semibold text-blue-700 bg-white text-center"
                           >
                             {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
                           </select>
@@ -1283,21 +1283,21 @@ export default function PurchasingClient({
                         </div>
 
                         <div className="col-span-1 min-h-[58px]">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Margin (%)</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">Margin (%)</label>
                           <div className="relative">
                             <input 
                               type="number" required min="0" max="99"
                               value={line.margin || ''} 
                               onChange={(e) => handleLineChange(line.id, 'margin', parseFloat(e.target.value) || 0)} 
-                              className="w-[110%] -ml-[5%] h-[42px] px-2 py-2 border border-slate-200 rounded-xl outline-none text-xs font-black text-blue-600 text-center" 
+                              className="w-[110%] -ml-[5%] h-[42px] px-2 py-2 border border-slate-200 rounded-xl outline-none text-xs font-semibold text-blue-600 text-center" 
                               placeholder="20"
                             />
-                            <span className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 text-[9px] font-black">%</span>
+                            <span className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 text-[9px] font-semibold">%</span>
                           </div>
                         </div>
 
                         <div className="col-span-3 min-h-[58px] sm:text-right flex flex-col justify-start">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Final Jual</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">Final Jual</label>
                           <div className="flex items-center gap-1">
                             <CurrencyInput 
                                label="Final Jual"
@@ -1328,7 +1328,7 @@ export default function PurchasingClient({
                     )})}
                   </div>
                   {/* Kalkulasi Footer */}
-                  <div className="flex flex-col gap-3 bg-blue-50/50 px-6 py-4 rounded-2xl border border-blue-100">
+                  <div className="flex flex-col gap-3 bg-blue-50/50 px-6 py-4 rounded-xl border border-blue-100">
                      <div className="flex justify-between items-center text-sm font-semibold text-blue-900">
                        <span>Total Harga Barang (Gross):</span>
                        <span>{formatCurrency(grossSubTotal)}</span>
@@ -1356,10 +1356,10 @@ export default function PurchasingClient({
                          <input type="number" min="0" max="100" value={headerTaxPercent || ''} onChange={(e) => setHeaderTaxPercent(parseFloat(e.target.value) || 0)} className="w-20 px-3 py-1.5 border border-slate-200 rounded-lg outline-none text-right font-medium text-slate-700 bg-white" placeholder="0" />
                        </div>
                      </div>
-                     <div className="bg-white rounded-2xl border border-slate-200 p-4 mt-2">
+                     <div className="bg-white rounded-xl border border-slate-200 p-4 mt-2">
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-2 border-b border-slate-50 pb-3">
                           <div>
-                            <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Landed Cost (Overhead)</h4>
+                            <h4 className="text-[11px] font-semibold text-slate-800 uppercase tracking-wide">Landed Cost (Overhead)</h4>
                             <p className="text-[10px] font-medium text-slate-400 mt-0.5">Ongkir/Ekspedisi & Asuransi (otomatis menambah HPP / Modal barang).</p>
                           </div>
                           {paymentTerm === 'TEMPO' && (
@@ -1407,11 +1407,11 @@ export default function PurchasingClient({
                   </div>
 
                   <div className="flex gap-3 pt-4 border-t border-slate-100">
-                    <button type="button" onClick={() => { setShowModal(false); resetPurchaseForm() }} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-2xl transition">Batal</button>
-                    <button type="submit" value="DRAFT" disabled={loading} className="flex-1 py-4 px-6 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-2xl border border-indigo-200 transition">
+                    <button type="button" onClick={() => { setShowModal(false); resetPurchaseForm() }} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-xl transition">Batal</button>
+                    <button type="submit" value="DRAFT" disabled={loading} className="flex-1 py-4 px-6 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 transition">
                       {loading ? 'Menyimpan...' : 'Save Draft'}
                     </button>
-                    <button type="submit" value="PUBLISH" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-2xl shadow-lg transition">
+                    <button type="submit" value="PUBLISH" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-xl shadow-lg transition">
                       {loading ? 'Memproses...' : 'Terbitkan PO'}
                     </button>
                   </div>
@@ -1424,7 +1424,7 @@ export default function PurchasingClient({
         {showContactModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowContactModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-md p-8">
                 <h3 className="text-xl font-bold mb-8">Tambah Vendor Rekanan</h3>
                 <form onSubmit={handleCreateVendor} className="space-y-6">
                    <input name="name" required placeholder="Nama Perusahaan / Supplier" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-bold text-slate-900 focus:border-rose-500 transition-all" />
@@ -1438,8 +1438,8 @@ export default function PurchasingClient({
                    </div>
                    <textarea name="address" placeholder="Alamat Gudang / Kantor" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm min-h-[80px]" />
                    <div className="flex gap-3 pt-4">
-                    <button type="button" onClick={() => setShowContactModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 rounded-2xl">Batal</button>
-                    <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-2xl shadow-lg shadow-rose-100">{loading ? 'Menyimpan...' : 'Simpan Vendor'}</button>
+                    <button type="button" onClick={() => setShowContactModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 rounded-xl">Batal</button>
+                    <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-xl shadow-lg shadow-rose-100">{loading ? 'Menyimpan...' : 'Simpan Vendor'}</button>
                   </div>
                 </form>
               </motion.div>
@@ -1450,23 +1450,23 @@ export default function PurchasingClient({
         {showPaymentModal && selectedPurchase && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowPaymentModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-md p-5 overflow-hidden">
                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16" />
                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-200">
+                  <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-200">
                     <CreditCard size={24}/>
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-900 leading-none">Bayar Tagihan Vendor</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">{selectedPurchase.purchase_number} • {selectedPurchase.contacts?.name}</p>
+                    <h3 className="text-xl font-semibold text-slate-900 leading-none">Bayar Tagihan Vendor</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1.5">{selectedPurchase.purchase_number} • {selectedPurchase.contacts?.name}</p>
                   </div>
                </div>
 
                <form onSubmit={handleSubmitPayment} className="space-y-6">
                  <div className="p-6 bg-slate-50 rounded-[32px] border border-slate-100 space-y-4">
-                    <div className="flex justify-between items-center px-2 py-3 bg-white rounded-2xl border border-slate-100 shadow-sm mb-4">
-                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sisa Hutang Tagihan:</span>
-                       <span className="text-sm font-black text-rose-600">{formatCurrency(debtAmount)}</span>
+                    <div className="flex justify-between items-center px-2 py-3 bg-white rounded-xl border border-slate-100 shadow-sm mb-4">
+                       <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Sisa Hutang Tagihan:</span>
+                       <span className="text-sm font-semibold text-rose-600">{formatCurrency(debtAmount)}</span>
                     </div>
 
                     <SearchableSelect 
@@ -1523,10 +1523,10 @@ export default function PurchasingClient({
                     <div className="pt-2 px-1">
                        <div className="flex justify-between items-center py-3 border-t border-slate-200">
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Pelunasan Hutang</span>
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-1">Total Pelunasan Hutang</span>
                             <span className="text-[10px] font-bold text-slate-400 opacity-60 italic leading-none">(Bayar + Potongan)</span>
                           </div>
-                          <span className={`text-xl font-black ${paymentAmount + paymentDiscount > debtAmount ? 'text-rose-500' : 'text-slate-900'}`}>
+                          <span className={`text-xl font-semibold ${paymentAmount + paymentDiscount > debtAmount ? 'text-rose-500' : 'text-slate-900'}`}>
                             {formatCurrency(paymentAmount + paymentDiscount)}
                           </span>
                        </div>
@@ -1548,18 +1548,18 @@ export default function PurchasingClient({
 
                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Tanggal</label>
-                       <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none text-sm font-bold" />
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-1">Tanggal</label>
+                       <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-xl outline-none text-sm font-bold" />
                     </div>
                     <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Catatan</label>
-                       <input value={payNotes} onChange={(e) => setPayNotes(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none text-sm font-bold" />
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-1">Catatan</label>
+                       <input value={payNotes} onChange={(e) => setPayNotes(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-xl outline-none text-sm font-bold" />
                     </div>
                  </div>
 
                  <div className="flex gap-3 pt-4">
-                    <button type="button" onClick={() => setShowPaymentModal(false)} className="flex-1 py-4 text-xs font-black text-slate-400 hover:bg-slate-50 rounded-2xl transition-colors uppercase tracking-widest">Batal</button>
-                    <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-black text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-xl shadow-blue-100 transition-all uppercase tracking-widest">
+                    <button type="button" onClick={() => setShowPaymentModal(false)} className="flex-1 py-4 text-xs font-semibold text-slate-400 hover:bg-slate-50 rounded-xl transition-colors uppercase tracking-wide">Batal</button>
+                    <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xl shadow-blue-100 transition-all uppercase tracking-wide">
                        {loading ? 'Proses...' : 'Konfirmasi Bayar'}
                     </button>
                  </div>
@@ -1572,41 +1572,41 @@ export default function PurchasingClient({
         {showReturnModal && selectedPurchase && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowReturnModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden max-h-[90vh] overflow-y-auto">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-xl shadow-md p-5 overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-200">
+                  <div className="w-12 h-12 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-200">
                     <RotateCcw size={24}/>
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-900 leading-none">Retur Pembelian Barang</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">{selectedPurchase.purchase_number} • {selectedPurchase.contacts?.name}</p>
+                    <h3 className="text-xl font-semibold text-slate-900 leading-none">Retur Pembelian Barang</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1.5">{selectedPurchase.purchase_number} • {selectedPurchase.contacts?.name}</p>
                   </div>
                 </div>
 
                 <form onSubmit={handleSubmitReturn} className="space-y-6">
                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">No. Retur</label>
-                        <input value={returnNumber} onChange={(e) => setReturnNumber(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none text-sm font-bold bg-slate-50" />
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-1">No. Retur</label>
+                        <input value={returnNumber} onChange={(e) => setReturnNumber(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-xl outline-none text-sm font-bold bg-slate-50" />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Tanggal Retur</label>
-                        <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none text-sm font-bold bg-white" />
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-1">Tanggal Retur</label>
+                        <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-xl outline-none text-sm font-bold bg-white" />
                       </div>
                    </div>
 
                    <div className="bg-slate-50 rounded-[32px] border border-slate-100 p-6 space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Pilih Barang yang Dikembalikan</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-1">Pilih Barang yang Dikembalikan</label>
                       <div className="space-y-2">
                          {returnItems.map((it, idx) => (
-                           <div key={it.id} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 transition-all hover:border-amber-200 group">
+                           <div key={it.id} className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-100 transition-all hover:border-amber-200 group">
                               <div className="flex-1">
-                                 <p className="text-xs font-black text-slate-900">{it.description}</p>
+                                 <p className="text-xs font-semibold text-slate-900">{it.description}</p>
                                  <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">Diterima: {it.quantity} {it.products?.unit || 'Pcs'} • {formatCurrency(it.unit_price)}</p>
                               </div>
                               <div className="flex items-center gap-3">
                                  <div className="text-right">
-                                    <label className="text-[8px] font-black text-slate-400 block mb-1">JML RETUR</label>
+                                    <label className="text-[8px] font-semibold text-slate-400 block mb-1">JML RETUR</label>
                                     <input 
                                       type="number" 
                                       min="0" 
@@ -1616,31 +1616,31 @@ export default function PurchasingClient({
                                         const val = Math.min(it.quantity, parseFloat(e.target.value) || 0)
                                         setReturnItems(returnItems.map((ri, ridx) => ridx === idx ? { ...ri, return_qty: val } : ri))
                                       }}
-                                      className="w-20 px-3 py-1.5 border-2 border-slate-100 rounded-xl outline-none text-center text-sm font-black focus:border-amber-500 transition-all"
+                                      className="w-20 px-3 py-1.5 border-2 border-slate-100 rounded-xl outline-none text-center text-sm font-semibold focus:border-amber-500 transition-all"
                                     />
                                  </div>
                                  <div className="w-24 text-right">
-                                    <p className="text-[8px] font-black text-slate-400 mb-1">VALUE</p>
-                                    <p className="text-xs font-black text-slate-900">{formatCurrency(it.return_qty * it.unit_price)}</p>
+                                    <p className="text-[8px] font-semibold text-slate-400 mb-1">VALUE</p>
+                                    <p className="text-xs font-semibold text-slate-900">{formatCurrency(it.return_qty * it.unit_price)}</p>
                                  </div>
                               </div>
                            </div>
                          ))}
                       </div>
                       <div className="pt-4 flex justify-between items-center border-t border-slate-200">
-                         <span className="text-[10px] font-black text-slate-400 uppercase">Total Estimasi Kredit AP</span>
-                         <span className="text-lg font-black text-rose-600">{formatCurrency(returnItems.reduce((s, x) => s + (x.return_qty * x.unit_price * 1.11), 0))}</span>
+                         <span className="text-[10px] font-semibold text-slate-400 uppercase">Total Estimasi Kredit AP</span>
+                         <span className="text-lg font-semibold text-rose-600">{formatCurrency(returnItems.reduce((s, x) => s + (x.return_qty * x.unit_price * 1.11), 0))}</span>
                       </div>
                    </div>
 
                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Alasan Retur / Catatan</label>
-                      <textarea value={returnNotes} onChange={(e) => setReturnNotes(e.target.value)} placeholder="Contoh: Barang rusak atau tidak sesuai spek..." className="w-full px-5 py-4 border border-slate-200 rounded-2xl outline-none text-sm font-medium min-h-[80px]" />
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-1">Alasan Retur / Catatan</label>
+                      <textarea value={returnNotes} onChange={(e) => setReturnNotes(e.target.value)} placeholder="Contoh: Barang rusak atau tidak sesuai spek..." className="w-full px-5 py-4 border border-slate-200 rounded-xl outline-none text-sm font-medium min-h-[80px]" />
                    </div>
 
                    <div className="flex gap-3 pt-4">
-                      <button type="button" onClick={() => setShowReturnModal(false)} className="flex-1 py-4 text-xs font-black text-slate-400 hover:bg-slate-50 rounded-2xl transition-colors uppercase tracking-widest">Batal</button>
-                      <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-black text-white bg-amber-500 hover:bg-amber-600 rounded-2xl shadow-xl shadow-amber-100 transition-all uppercase tracking-widest">
+                      <button type="button" onClick={() => setShowReturnModal(false)} className="flex-1 py-4 text-xs font-semibold text-slate-400 hover:bg-slate-50 rounded-xl transition-colors uppercase tracking-wide">Batal</button>
+                      <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-xl shadow-amber-100 transition-all uppercase tracking-wide">
                          {loading ? 'Memproses...' : 'Konfirmasi Retur'}
                       </button>
                    </div>
@@ -1653,7 +1653,7 @@ export default function PurchasingClient({
          {showDetailModal && selectedDetailPurchase && (
            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:static print:block print:p-0">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowDetailModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden no-print" />
-             <motion.div id="po-print-area" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none print:text-[11px] print:leading-relaxed">
+             <motion.div id="po-print-area" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-xl shadow-md overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none print:text-[11px] print:leading-relaxed">
                 
                 {/* Print Styles for PO */}
                 <style>{`
@@ -1698,11 +1698,11 @@ export default function PurchasingClient({
                    </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-10 relative bg-white print:overflow-visible print:p-0">
+                <div className="flex-1 overflow-y-auto p-5 relative bg-white print:overflow-visible print:p-0">
                    {/* Watermark/Status Background */}
                    {selectedDetailPurchase.status === 'VOIDED' && (
                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-0 opacity-10">
-                       <span className="text-[120px] font-black text-rose-600 rotate-[-30deg] uppercase">VOIDED</span>
+                       <span className="text-[120px] font-semibold text-rose-600 rotate-[-30deg] uppercase">VOIDED</span>
                      </div>
                    )}
 
@@ -1711,7 +1711,7 @@ export default function PurchasingClient({
                       <div className="flex items-start gap-5">
                         <img src={companyProfile.logo} alt="Logo Perusahaan" className="w-14 h-14 object-contain" />
                         <div>
-                          <h1 className="text-3xl font-black tracking-tighter text-slate-900 mb-1">{companyProfile.name}</h1>
+                          <h1 className="text-3xl font-semibold tracking-tighter text-slate-900 mb-1">{companyProfile.name}</h1>
                           <p className="text-sm text-slate-500 max-w-sm">{companyProfile.address}</p>
                           <div className="flex items-center flex-wrap gap-3 mt-1.5 text-[10px] font-bold text-slate-500">
                             {companyProfile.hotline && <span>Telp/WA: {companyProfile.hotline}</span>}
@@ -1721,10 +1721,10 @@ export default function PurchasingClient({
                         </div>
                       </div>
                       <div className="text-right">
-                        <h2 className="text-2xl font-black text-blue-600 uppercase tracking-widest mb-1">PURCHASE ORDER</h2>
+                        <h2 className="text-2xl font-semibold text-blue-600 uppercase tracking-wide mb-1">PURCHASE ORDER</h2>
                         <p className="text-sm font-bold text-slate-900 font-mono">{selectedDetailPurchase.purchase_number}</p>
                         <div className="mt-4 inline-block px-3 py-1 bg-slate-100 rounded-md">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-0.5">Tanggal Terbit</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block mb-0.5">Tanggal Terbit</span>
                           <span className="text-sm font-bold text-slate-900">{formatDate(selectedDetailPurchase.purchase_date, 'long')}</span>
                         </div>
                       </div>
@@ -1733,8 +1733,8 @@ export default function PurchasingClient({
                    {/* Info Grid */}
                    <div className="grid grid-cols-2 gap-12 mb-10 relative z-10">
                       <div className="space-y-4">
-                         <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-6">
-                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-200 pb-2">Ditujukan Kepada (Vendor):</h4>
+                         <div className="w-full bg-slate-50 border border-slate-100 rounded-xl p-6">
+                            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-4 border-b border-slate-200 pb-2">Ditujukan Kepada (Vendor):</h4>
                             <p className="text-lg font-bold text-slate-900">{selectedDetailPurchase.contacts?.name || 'Unknown Vendor'}</p>
                             {selectedDetailPurchase.contacts?.address && (
                               <p className="text-sm text-slate-500 mt-2 whitespace-pre-wrap">{selectedDetailPurchase.contacts.address}</p>
@@ -1742,22 +1742,22 @@ export default function PurchasingClient({
                          </div>
                       </div>
                       <div className="space-y-4">
-                         <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-6 h-full flex flex-col justify-center">
+                         <div className="w-full bg-slate-50 border border-slate-100 rounded-xl p-6 h-full flex flex-col justify-center">
                             <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
                               <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Jatuh Tempo</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">Jatuh Tempo</span>
                                 <span className="font-bold text-slate-900">{selectedDetailPurchase.due_date ? formatDate(selectedDetailPurchase.due_date, 'long') : 'Pembayaran Lunas (Tunai)'}</span>
                               </div>
                               <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Metode Pembayaran</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">Metode Pembayaran</span>
                                 <span className="font-bold text-slate-900">{selectedDetailPurchase.payment_term}</span>
                               </div>
                               <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Mode Syariah</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">Mode Syariah</span>
                                 <span className="font-bold text-indigo-600">{selectedDetailPurchase.shariah_mode || 'CASH'}</span>
                               </div>
                               <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Status Eksekusi</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 block">Status Eksekusi</span>
                                 <span className="font-bold text-slate-900">{selectedDetailPurchase.status}</span>
                               </div>
                             </div>
@@ -1766,7 +1766,7 @@ export default function PurchasingClient({
                    </div>
 
                    {/* Details Table */}
-	                   <div className="border border-slate-200 rounded-2xl overflow-hidden mb-8 relative z-10 font-mono text-sm">
+	                   <div className="border border-slate-200 rounded-xl overflow-hidden mb-8 relative z-10 font-mono text-sm">
 	                      <table className="w-full text-left bg-white">
 	                        <thead className="bg-slate-100">
 	                           <tr>
@@ -1855,10 +1855,10 @@ export default function PurchasingClient({
                                   includeMargin={false} 
                                   fgColor="#0f172a" 
                                 />
-                                <p className="text-[8px] font-mono text-emerald-600 font-bold mt-2 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded">e-Signed Verified</p>
+                                <p className="text-[8px] font-mono text-emerald-600 font-bold mt-2 uppercase tracking-wide bg-emerald-50 px-2 py-0.5 rounded">e-Signed Verified</p>
                               </div>
                             ) : approvalData?.status === 'REJECTED' ? (
-                              <div className="text-rose-500 font-black border-4 border-rose-500 rounded-lg px-4 py-2 rotate-[-10deg] opacity-60">REJECTED</div>
+                              <div className="text-rose-500 font-semibold border-4 border-rose-500 rounded-lg px-4 py-2 rotate-[-10deg] opacity-60">REJECTED</div>
                             ) : (
                               <span className="text-xs text-slate-400 italic">Dokumen Belum Disetujui (Draft)</span>
                             )}
@@ -1898,15 +1898,15 @@ export default function PurchasingClient({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
+              className="bg-white rounded-xl shadow-md w-full max-w-lg overflow-hidden"
             >
               <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                     <Wrench size={20} className="text-white" />
                   </div>
                   <div>
-                    <h2 className="text-white font-black text-lg">Repair Stok Inventaris</h2>
+                    <h2 className="text-white font-semibold text-lg">Repair Stok Inventaris</h2>
                     <p className="text-amber-100 text-xs font-medium">Sinkronisasi ulang PO RECEIVED yang stoknya belum masuk</p>
                   </div>
                 </div>
@@ -1921,7 +1921,7 @@ export default function PurchasingClient({
               <div className="p-8 space-y-6">
                 {!repairResult && !repairLoading && (
                   <div className="space-y-4">
-                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
                       <p className="font-bold text-amber-800 text-sm mb-2">⚠️ Apa yang akan dilakukan?</p>
                       <ul className="space-y-1 text-xs font-medium list-disc list-inside text-amber-700">
                         <li>Mencari semua PO berstatus <strong>RECEIVED</strong> yang stoknya belum masuk</li>
@@ -1932,7 +1932,7 @@ export default function PurchasingClient({
                     </div>
                     <button
                       onClick={handleRepairStock}
-                      className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black rounded-2xl hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg shadow-amber-100 flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg shadow-amber-100 flex items-center justify-center gap-2"
                     >
                       <Wrench size={18} />
                       Jalankan Repair Sekarang
@@ -1951,30 +1951,30 @@ export default function PurchasingClient({
                 {repairResult && !repairLoading && (
                   <div className="space-y-5">
                     <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-center">
-                        <div className="text-2xl font-black text-emerald-600">{repairResult.fixed}</div>
-                        <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-1">Diperbaiki</div>
+                      <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
+                        <div className="text-2xl font-semibold text-emerald-600">{repairResult.fixed}</div>
+                        <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide mt-1">Diperbaiki</div>
                       </div>
-                      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
-                        <div className="text-2xl font-black text-slate-500">{repairResult.skipped}</div>
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Dilewati</div>
+                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-center">
+                        <div className="text-2xl font-semibold text-slate-500">{repairResult.skipped}</div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">Dilewati</div>
                       </div>
-                      <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-center">
-                        <div className="text-2xl font-black text-red-500">{repairResult.errors.length}</div>
-                        <div className="text-[10px] font-bold text-red-400 uppercase tracking-widest mt-1">Error</div>
+                      <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
+                        <div className="text-2xl font-semibold text-red-500">{repairResult.errors.length}</div>
+                        <div className="text-[10px] font-bold text-red-400 uppercase tracking-wide mt-1">Error</div>
                       </div>
                     </div>
 
                     {repairResult.fixed > 0 && (
-                      <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3">
+                      <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
                         <ShieldCheck size={18} className="text-emerald-500 shrink-0" />
                         <p className="text-emerald-700 text-sm font-bold">{repairResult.fixed} PO berhasil disinkronkan. Stok inventaris sudah diperbarui.</p>
                       </div>
                     )}
 
                     {repairResult.errors.length > 0 && (
-                      <div className="bg-red-50 border border-red-100 rounded-2xl p-4 space-y-1">
-                        <p className="text-red-700 text-[10px] font-black uppercase tracking-widest mb-2">Error</p>
+                      <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-1">
+                        <p className="text-red-700 text-[10px] font-semibold uppercase tracking-wide mb-2">Error</p>
                         {repairResult.errors.map((e, i) => (
                           <p key={i} className="text-red-600 text-xs font-medium">{e}</p>
                         ))}
@@ -1982,8 +1982,8 @@ export default function PurchasingClient({
                     )}
 
                     {repairResult.details.length > 0 && (
-                      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 max-h-48 overflow-y-auto space-y-1">
-                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Log Detail</p>
+                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 max-h-48 overflow-y-auto space-y-1">
+                        <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-wide mb-2">Log Detail</p>
                         {repairResult.details.map((d, i) => (
                           <p key={i} className={`text-xs font-medium font-mono ${d.startsWith('[FIXED]') ? 'text-emerald-600' : d.startsWith('[ERROR]') ? 'text-red-500' : 'text-slate-400'}`}>{d}</p>
                         ))}
@@ -1991,7 +1991,7 @@ export default function PurchasingClient({
                     )}
 
                     {repairResult.fixed === 0 && repairResult.errors.length === 0 && (
-                      <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3">
+                      <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
                         <ShieldCheck size={18} className="text-blue-500 shrink-0" />
                         <p className="text-blue-700 text-sm font-bold">Semua stok sudah tersinkronisasi dengan benar. Tidak ada yang perlu diperbaiki.</p>
                       </div>
@@ -2000,13 +2000,13 @@ export default function PurchasingClient({
                     <div className="flex gap-3">
                       <button
                         onClick={() => setRepairResult(null)}
-                        className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition-all text-sm"
+                        className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all text-sm"
                       >
                         Jalankan Ulang
                       </button>
                       <button
                         onClick={() => setShowRepairModal(false)}
-                        className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-700 transition-all text-sm"
+                        className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-700 transition-all text-sm"
                       >
                         Tutup
                       </button>
@@ -2023,12 +2023,12 @@ export default function PurchasingClient({
       <div className="fixed bottom-8 right-8 z-[100] flex flex-col gap-2">
         <AnimatePresence>
           {error && (
-            <motion.div key="error-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
+            <motion.div key="error-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
               <AlertCircle size={18} /> {error}
             </motion.div>
           )}
           {success && (
-            <motion.div key="success-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
+            <motion.div key="success-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
               <CheckCircle2 size={18} /> {success}
             </motion.div>
           )}

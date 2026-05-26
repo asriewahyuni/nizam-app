@@ -1138,20 +1138,20 @@ export function AppHeader({
           return (
             <div
               key={metric.key}
-              className={`min-w-0 rounded-2xl border ${compact ? 'px-2 py-1.5' : 'px-2.5 py-2'} ${
+              className={`min-w-0 rounded-xl border ${compact ? 'px-2 py-1.5' : 'px-2.5 py-2'} ${
                 active
                   ? 'border-white/10 bg-white/5 text-white'
                   : 'border-slate-200 bg-white text-slate-900'
               }`}
             >
-              <div className={`truncate text-[9px] font-black uppercase tracking-[0.14em] ${
+              <div className={`truncate text-[9px] font-semibold uppercase tracking-[0.14em] ${
                 active ? 'text-slate-300' : 'text-slate-400'
               }`}>
                 {metric.label}
               </div>
               <div
                 title={fullValueLabel}
-                className={`mt-1 font-black leading-[1.1] tracking-tight tabular-nums ${valueClassName} ${
+                className={`mt-1 font-semibold leading-[1.1] tracking-tight tabular-nums ${valueClassName} ${
                   active ? 'text-white' : 'text-slate-900'
                 }`}
               >
@@ -1227,7 +1227,7 @@ export function AppHeader({
 
         <div className="flex items-center gap-4">
           {contextSwitchLabel && (
-            <div className="hidden lg:flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
+            <div className="hidden lg:flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-700">
               <LoaderCircle size={12} className="animate-spin" />
               <span>{contextSwitchLabel}</span>
             </div>
@@ -1248,7 +1248,7 @@ export function AppHeader({
                 {pendingContextSwitch?.kind === 'org' ? <LoaderCircle size={12} className="animate-spin" /> : <Building2 size={12} />}
               </div>
               <div className="flex flex-col overflow-hidden min-w-0">
-                <span className="text-[11px] font-black text-slate-900 leading-tight truncate max-w-[130px]">{org.name}</span>
+                <span className="text-[11px] font-semibold text-slate-900 leading-tight truncate max-w-[130px]">{org.name}</span>
                 <span className="text-[9px] font-semibold text-slate-400 leading-tight truncate max-w-[130px]">
                   {effectiveActiveOrgRole} · {activeOrgIsParent ? 'ROOT' : activeOrgHierarchyLabel}
                 </span>
@@ -1257,18 +1257,18 @@ export function AppHeader({
             </button>
 
             {isOrgMenuOpen && (
-              <div className="absolute top-full left-0 mt-2 w-[340px] bg-white border border-slate-100 rounded-3xl shadow-2xl p-3 z-50">
+              <div className="absolute top-full left-0 mt-2 w-[340px] bg-white border border-slate-100 rounded-xl shadow-md p-3 z-50">
                 <div className="px-2 pt-1 pb-3 border-b border-slate-100">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Konteks Organisasi</div>
-                  <div className="mt-1 text-sm font-black text-slate-900">{org.name}</div>
-                  <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Konteks Organisasi</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">{org.name}</div>
+                  <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-700">
                     {activeOrgHierarchyLabel}
                   </div>
                   <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">
                     Pilih organisasi aktif sebelum memilih unit kerja. Setiap organisasi punya konteks unit, data, dan paketnya sendiri.
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${activeOrgIsParent ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${activeOrgIsParent ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
                       {activeOrgIsParent ? 'Parent (Holding)' : 'Child (Anak Perusahaan)'}
                     </span>
                     <span className="text-[10px] font-semibold text-slate-500">
@@ -1283,12 +1283,12 @@ export function AppHeader({
                         <button
                           type="button"
                           onClick={openOrgDeck}
-                          className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700 transition hover:bg-blue-100"
+                          className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-700 transition hover:bg-blue-100"
                         >
                           <Workflow size={13} />
                           Open Deck
                         </button>
-                        <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
+                        <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                           <Command size={10} />
                           Shift + D
                         </div>
@@ -1301,7 +1301,7 @@ export function AppHeader({
                   <Link
                     href={activeOrgIsParent ? '/reports?consolidated=true' : '/reports'}
                     onClick={() => setIsOrgMenuOpen(false)}
-                    className={`flex items-center justify-between gap-2 p-3 border rounded-2xl transition group ${
+                    className={`flex items-center justify-between gap-2 p-3 border rounded-xl transition group ${
                       activeOrgIsParent
                         ? 'bg-blue-50/50 hover:bg-blue-50 border-blue-100'
                         : 'bg-slate-50 border-slate-200'
@@ -1312,7 +1312,7 @@ export function AppHeader({
                          <Layers size={14} />
                        </div>
                        <div className="flex flex-col">
-                         <span className={`text-xs font-black leading-none ${activeOrgIsParent ? 'text-blue-900' : 'text-slate-700'}`}>
+                         <span className={`text-xs font-semibold leading-none ${activeOrgIsParent ? 'text-blue-900' : 'text-slate-700'}`}>
                            Laporan Gabungan Grup
                          </span>
                          <span className={`text-[9px] font-bold mt-1 uppercase tracking-wider ${activeOrgIsParent ? 'text-blue-600' : 'text-slate-500'}`}>
@@ -1339,7 +1339,7 @@ export function AppHeader({
                         if (!droppedOrgId) return
                         handleHierarchyDrop(droppedOrgId, null)
                       }}
-                      className={`rounded-2xl border border-dashed px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.14em] transition ${
+                      className={`rounded-xl border border-dashed px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] transition ${
                         draggingOrgId && !isUpdatingHierarchy
                           ? 'border-blue-300 bg-blue-50 text-blue-700'
                           : 'border-slate-200 bg-slate-50 text-slate-500'
@@ -1371,7 +1371,7 @@ export function AppHeader({
                           if (!droppedOrgId || droppedOrgId === membership.orgId) return
                           handleHierarchyDrop(droppedOrgId, membership.orgId)
                         }}
-                        className={`relative rounded-2xl transition ${
+                        className={`relative rounded-xl transition ${
                           canDropHere ? 'ring-1 ring-blue-200 bg-blue-50/40' : ''
                         } ${isDraggingThis ? 'opacity-60' : ''}`}
                       >
@@ -1379,17 +1379,17 @@ export function AppHeader({
                           type="button"
                           disabled={isSwitchingContext || isUpdatingHierarchy}
                           onClick={() => handleOrgChange(membership.orgId)}
-                          className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl text-left transition disabled:cursor-wait disabled:opacity-60 ${
+                          className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition disabled:cursor-wait disabled:opacity-60 ${
                             activeOrgId === membership.orgId ? 'bg-slate-900 text-white' : 'hover:bg-slate-50 text-slate-700'
                           } ${canManageAffiliates ? 'pr-10' : ''}`}
                         >
                           <div className="min-w-0">
-                            <div className="text-xs font-black truncate">{membership.org.name}</div>
+                            <div className="text-xs font-semibold truncate">{membership.org.name}</div>
                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                              <span className={`text-[9px] font-black uppercase tracking-[0.18em] ${activeOrgId === membership.orgId ? 'text-slate-300' : 'text-slate-400'}`}>
+                              <span className={`text-[9px] font-semibold uppercase tracking-wide ${activeOrgId === membership.orgId ? 'text-slate-300' : 'text-slate-400'}`}>
                                 {membership.role}
                               </span>
-                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
                                 membership.org.parent_org_id
                                   ? activeOrgId === membership.orgId
                                     ? 'bg-orange-500/20 text-orange-200'
@@ -1438,7 +1438,7 @@ export function AppHeader({
                                 event.stopPropagation()
                                 handleEditChildFromMenu(membership.orgId, membership.org.name)
                               }}
-                              className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] transition disabled:cursor-wait disabled:opacity-60 ${
+                              className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] transition disabled:cursor-wait disabled:opacity-60 ${
                                 activeOrgId === membership.orgId
                                   ? 'border-slate-600 bg-slate-800 text-slate-100'
                                   : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -1455,7 +1455,7 @@ export function AppHeader({
                                 event.stopPropagation()
                                 handleDeleteChildFromMenu(membership.orgId, membership.org.name)
                               }}
-                              className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] transition disabled:cursor-wait disabled:opacity-60 ${
+                              className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] transition disabled:cursor-wait disabled:opacity-60 ${
                                 activeOrgId === membership.orgId
                                   ? 'border-rose-500/40 bg-rose-500/20 text-rose-100'
                                   : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
@@ -1470,14 +1470,14 @@ export function AppHeader({
                     )
                   })}
                   {isLoadingNavigationContext && organizations.length === 0 && (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-4 text-[11px] font-bold text-slate-500">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 text-[11px] font-bold text-slate-500">
                       Memuat organisasi yang bisa Anda akses...
                     </div>
                   )}
                 </div>
 
                 {orgFeedback && (
-                  <div className={`mt-3 flex items-start gap-2 rounded-2xl border px-3 py-2.5 text-[11px] font-bold ${
+                  <div className={`mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[11px] font-bold ${
                     orgFeedback.type === 'success'
                       ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
                       : 'border-rose-100 bg-rose-50 text-rose-700'
@@ -1494,7 +1494,7 @@ export function AppHeader({
                         <Link
                           href="/settings/sub-orgs"
                           onClick={() => setIsOrgMenuOpen(false)}
-                          className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-blue-700 transition hover:bg-blue-100"
+                          className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700 transition hover:bg-blue-100"
                         >
                           <Plus size={14} />
                           Tambah Anak Perusahaan
@@ -1505,7 +1505,7 @@ export function AppHeader({
                       <Link
                         href="/settings/sub-orgs"
                         onClick={() => setIsOrgMenuOpen(false)}
-                        className="text-[11px] font-black uppercase tracking-[0.14em] text-[#003366] hover:text-[#00264d]"
+                        className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#003366] hover:text-[#00264d]"
                       >
                         Kelola Anak Perusahaan
                       </Link>
@@ -1513,8 +1513,8 @@ export function AppHeader({
                   </div>
 
                   {canManageAffiliates && (
-                    <p className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-blue-800">
-                      Struktur entitas anak dikelola melalui menu <span className="font-black">Kelola Anak Perusahaan</span>.
+                    <p className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-blue-800">
+                      Struktur entitas anak dikelola melalui menu <span className="font-semibold">Kelola Anak Perusahaan</span>.
                       Cabang tetap dibuat dari menu cabang dalam organisasi aktif, bukan dari area ini.
                     </p>
                   )}
@@ -1541,17 +1541,17 @@ export function AppHeader({
                 ? <LoaderCircle size={12} className="text-[#003366] shrink-0 animate-spin" />
                 : <MapPin size={12} className="text-[#003366] shrink-0" />}
               <div className="flex flex-col overflow-hidden min-w-0">
-                <span className="text-[11px] font-black text-blue-900 leading-tight truncate max-w-[130px]">{branchHeadline}</span>
+                <span className="text-[11px] font-semibold text-blue-900 leading-tight truncate max-w-[130px]">{branchHeadline}</span>
                 <span className="text-[9px] font-semibold text-[#003366]/50 leading-tight truncate max-w-[130px]">{branchCaption}</span>
               </div>
               <ChevronDown size={11} className={`text-[#003366]/60 ml-0.5 shrink-0 transition-transform ${isBranchMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isBranchMenuOpen && (
-              <div className="absolute top-full left-0 mt-2 w-[320px] bg-white border border-slate-100 rounded-3xl shadow-2xl p-3 z-50">
+              <div className="absolute top-full left-0 mt-2 w-[320px] bg-white border border-slate-100 rounded-xl shadow-md p-3 z-50">
                 <div className="px-2 pt-1 pb-3 border-b border-slate-100">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Konteks Unit</div>
-                  <div className="mt-1 text-sm font-black text-slate-900">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Konteks Unit</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">
                     {activeBranch?.name || (allowAllBranchSelection ? 'Semua Unit' : 'Belum ada unit aktif')}
                   </div>
                   <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">
@@ -1569,11 +1569,11 @@ export function AppHeader({
                     type="button"
                     disabled={isSwitchingContext || isCreatingBranch}
                     onClick={() => handleBranchChange(null)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === null ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === null ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
                     >
                       <div className="text-left">
                         <div className="text-xs font-bold truncate">Semua Unit</div>
-                        <div className={`text-[9px] font-black uppercase tracking-[0.16em] ${activeBranchId === null ? 'text-white/70' : 'text-slate-400'}`}>
+                        <div className={`text-[9px] font-semibold uppercase tracking-wide ${activeBranchId === null ? 'text-white/70' : 'text-slate-400'}`}>
                           Read-only agregat
                         </div>
                       </div>
@@ -1593,11 +1593,11 @@ export function AppHeader({
                       type="button"
                       disabled={isSwitchingContext || isCreatingBranch}
                       onClick={() => handleBranchChange(branch.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === branch.id ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === branch.id ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
                     >
                       <div className="text-left min-w-0">
                         <div className="text-xs font-bold truncate">{branch.name}</div>
-                        <div className={`text-[9px] font-black uppercase tracking-[0.16em] ${activeBranchId === branch.id ? 'text-white/70' : 'text-slate-400'}`}>
+                        <div className={`text-[9px] font-semibold uppercase tracking-wide ${activeBranchId === branch.id ? 'text-white/70' : 'text-slate-400'}`}>
                           {branch.code}
                         </div>
                       </div>
@@ -1606,14 +1606,14 @@ export function AppHeader({
                   )
                 })}
                 {branches.length === 0 && (
-                  <div className="px-3 py-4 rounded-2xl bg-amber-50 border border-amber-100 text-xs font-bold text-amber-700">
+                  <div className="px-3 py-4 rounded-xl bg-amber-50 border border-amber-100 text-xs font-bold text-amber-700">
                     {isLoadingNavigationContext ? 'Memuat unit yang bisa diakses...' : 'Belum ada unit yang bisa diakses.'}
                   </div>
                 )}
                 </div>
 
                 {branchFeedback && (
-                  <div className={`mt-3 flex items-start gap-2 rounded-2xl border px-3 py-2.5 text-[11px] font-bold ${
+                  <div className={`mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[11px] font-bold ${
                     branchFeedback.type === 'success'
                       ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
                       : 'border-rose-100 bg-rose-50 text-rose-700'
@@ -1632,7 +1632,7 @@ export function AppHeader({
                           setBranchFeedback(null)
                           setIsQuickCreateOpen((prev) => !prev)
                         }}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50 transition-all"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50 transition-all"
                       >
                         <Plus size={14} />
                         Tambah Unit
@@ -1640,35 +1640,35 @@ export function AppHeader({
                       <Link
                         href="/settings/branches"
                         onClick={() => setIsBranchMenuOpen(false)}
-                        className="text-[11px] font-black uppercase tracking-[0.14em] text-[#003366] hover:text-[#00264d]"
+                        className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#003366] hover:text-[#00264d]"
                       >
                         Kelola Unit
                       </Link>
                     </div>
 
                     {isQuickCreateOpen && (
-                      <form onSubmit={handleCreateBranch} className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <form onSubmit={handleCreateBranch} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                         <input
                           name="name"
                           required
                           placeholder="Nama unit"
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-[#003366]"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-[#003366]"
                         />
                         <input
                           name="code"
                           required
                           placeholder="Kode unit"
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold uppercase text-slate-900 outline-none focus:border-[#003366]"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold uppercase text-slate-900 outline-none focus:border-[#003366]"
                         />
                         <textarea
                           name="address"
                           placeholder="Alamat operasional"
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-[#003366] min-h-[72px]"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-[#003366] min-h-[72px]"
                         />
                         <button
                           type="submit"
                           disabled={isCreatingBranch || isSwitchingContext}
-                          className="w-full rounded-2xl bg-slate-900 px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.16em] text-white hover:bg-[#003366] transition-all disabled:cursor-wait disabled:opacity-60"
+                          className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#003366] transition-all disabled:cursor-wait disabled:opacity-60"
                         >
                           {isCreatingBranch ? 'Membuat Unit...' : 'Buat Dan Aktifkan'}
                         </button>
@@ -1686,7 +1686,7 @@ export function AppHeader({
         {isPlatformAdmin && (
           <Link
             href="/admin"
-            className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-700 transition-all hover:border-amber-300 hover:bg-amber-100"
+            className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 transition-all hover:border-amber-300 hover:bg-amber-100"
           >
             <ShieldAlert size={14} />
             <span className="hidden sm:inline">SaaS Admin</span>
@@ -1701,7 +1701,7 @@ export function AppHeader({
             onFocus={prewarmTokenSummary}
             onTouchStart={prewarmTokenSummary}
             onPointerDown={prewarmTokenSummary}
-            className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all ${
+            className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] transition-all ${
               isLowBalance
                 ? 'border-amber-300 bg-amber-50 text-amber-700'
                 : 'border-indigo-200 bg-indigo-50 text-indigo-700'
@@ -1714,29 +1714,29 @@ export function AppHeader({
           </button>
 
           {isTokenPopupOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-[290px] rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl">
+            <div className="absolute right-0 top-full z-50 mt-2 w-[290px] rounded-xl border border-slate-200 bg-white p-4 shadow-md">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">AI Token Wallet</div>
-                  <div className="mt-1 text-xl font-black tracking-tight text-slate-900">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">AI Token Wallet</div>
+                  <div className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
                     {isLoadingTokenSummary && !aiTokens ? 'Memuat...' : tokenSummary.balance.toLocaleString('id-ID')}
                   </div>
                 </div>
-                <div className={`rounded-full px-2 py-1 text-[9px] font-black uppercase ${isLowBalance ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                <div className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase ${isLowBalance ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                   {isLowBalance ? 'Low' : 'Healthy'}
                 </div>
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                  <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Estimasi Generate</div>
-                  <div className="mt-1 text-sm font-black text-slate-900">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">Estimasi Generate</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">
                     {isLoadingTokenSummary && !aiTokens ? '...' : `${tokenSummary.generationLeft.toLocaleString('id-ID')}x`}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                  <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Total Terpakai</div>
-                  <div className="mt-1 text-sm font-black text-slate-900">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">Total Terpakai</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">
                     {isLoadingTokenSummary && !aiTokens ? '...' : tokenSummary.used.toLocaleString('id-ID')}
                   </div>
                 </div>
@@ -1751,7 +1751,7 @@ export function AppHeader({
               <Link
                 href="/billing?section=ai-token"
                 onClick={() => setIsTokenPopupOpen(false)}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-white hover:bg-indigo-600 transition-all"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-indigo-600 transition-all"
               >
                 <Sparkles size={12} />
                 Top Up Token AI
@@ -1763,7 +1763,7 @@ export function AppHeader({
         <div className="flex items-center gap-2 pr-6 border-r border-slate-100">
           <Link href="/accounting/approvals" className={`relative w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${hasRequests ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-white border-slate-100 text-slate-400'}`}>
             <Bell size={16} />
-            {hasRequests && <div className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-rose-500 border-2 border-white flex items-center justify-center text-[9px] font-black text-white">{headerPendingApprovals}</div>}
+            {hasRequests && <div className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-rose-500 border-2 border-white flex items-center justify-center text-[9px] font-semibold text-white">{headerPendingApprovals}</div>}
           </Link>
         </div>
 
@@ -1774,8 +1774,8 @@ export function AppHeader({
 
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-black text-slate-900 leading-tight tracking-tight">{user.fullName || user.email}</p>
-            <p className="text-[10px] text-blue-600 font-bold leading-none mt-1 uppercase tracking-widest">{jobTitle || 'Enterprise Member'}</p>
+            <p className="text-sm font-semibold text-slate-900 leading-tight tracking-tight">{user.fullName || user.email}</p>
+            <p className="text-[10px] text-blue-600 font-bold leading-none mt-1 uppercase tracking-wide">{jobTitle || 'Enterprise Member'}</p>
           </div>
           <div className="w-9 h-9 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center text-slate-600 text-xs font-bold ring-1 ring-slate-100 uppercase">
             {initials}
@@ -1796,26 +1796,26 @@ export function AppHeader({
           <div className="relative flex h-full items-center justify-center p-3 md:p-6">
             <div
               ref={orgDeckPanelRef}
-              className="relative flex h-[calc(100vh-24px)] w-[calc(100vw-24px)] max-w-none flex-col overflow-hidden rounded-[30px] border border-white/70 bg-white shadow-2xl md:h-[calc(100vh-48px)] md:w-[calc(100vw-48px)] md:rounded-[36px]"
+              className="relative flex h-[calc(100vh-24px)] w-[calc(100vw-24px)] max-w-none flex-col overflow-hidden rounded-[30px] border border-white/70 bg-white shadow-md md:h-[calc(100vh-48px)] md:w-[calc(100vw-48px)] md:rounded-[36px]"
             >
               <div className="border-b border-slate-100 bg-[radial-gradient(circle_at_top_left,_rgba(191,219,254,0.32),_transparent_48%),linear-gradient(135deg,_rgba(248,250,252,0.98),_rgba(255,255,255,0.98))] px-5 py-4 md:px-7">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-700">
                       <Workflow size={12} />
                       Open Deck
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                       <Command size={10} />
                       Shift + D
                     </span>
-                    <h2 className="text-lg font-black tracking-tight text-slate-950 md:text-xl">
+                    <h2 className="text-lg font-semibold tracking-tight text-slate-950 md:text-xl">
                       Struktur Grup
                     </h2>
                   </div>
 
                   <div data-deck-control className="flex flex-wrap items-center gap-2">
-                    <div className="inline-flex items-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="inline-flex items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                       <button
                         type="button"
                         onClick={() => updateOrgDeckZoom(orgDeckZoom - ORG_DECK_ZOOM_STEP)}
@@ -1826,7 +1826,7 @@ export function AppHeader({
                       >
                         <ZoomOut size={14} />
                       </button>
-                      <div className="min-w-[64px] border-x border-slate-200 px-3 text-center text-[11px] font-black text-slate-700">
+                      <div className="min-w-[64px] border-x border-slate-200 px-3 text-center text-[11px] font-semibold text-slate-700">
                         {Math.round(orgDeckZoom * 100)}%
                       </div>
                       <button
@@ -1843,7 +1843,7 @@ export function AppHeader({
                     <button
                       type="button"
                       onClick={resetOrgDeckView}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
                       aria-label="Reset view"
                       title="Reset view"
                     >
@@ -1852,7 +1852,7 @@ export function AppHeader({
                     <button
                       type="button"
                       onClick={() => void toggleOrgDeckFullscreen()}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
                       aria-label={isOrgDeckFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
                       title={isOrgDeckFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
                     >
@@ -1862,7 +1862,7 @@ export function AppHeader({
                       <Link
                         href="/settings/sub-orgs"
                         onClick={closeOrgDeck}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700 transition hover:bg-blue-100"
+                        className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-700 transition hover:bg-blue-100"
                       >
                         <Plus size={12} />
                         Tambah
@@ -1872,7 +1872,7 @@ export function AppHeader({
                       <Link
                         href="/settings/sub-orgs"
                         onClick={closeOrgDeck}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 transition hover:bg-slate-50"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:bg-slate-50"
                       >
                         Kelola
                         <ArrowUpRight size={12} />
@@ -1881,7 +1881,7 @@ export function AppHeader({
                     <button
                       type="button"
                       onClick={closeOrgDeck}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 transition hover:bg-slate-50"
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:bg-slate-50"
                     >
                       <X size={12} />
                       Tutup
@@ -1913,7 +1913,7 @@ export function AppHeader({
                   >
                   {isLoadingOrgDeckData && !hasLoadedOrgDeckData && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/78 backdrop-blur-sm">
-                      <div className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 shadow-lg">
+                      <div className="inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600 shadow-lg">
                         <LoaderCircle size={14} className="animate-spin" />
                         Memuat struktur lintas entitas...
                       </div>
@@ -1992,7 +1992,7 @@ export function AppHeader({
                       <div
                         key={`deck-${membership.orgId}`}
                         data-deck-card="org"
-                        className={`absolute w-[272px] rounded-[28px] border shadow-xl transition ${
+                        className={`absolute w-[272px] rounded-xl border shadow-xl transition ${
                           isActiveCard
                             ? 'border-slate-900 bg-slate-950 text-white shadow-slate-900/20'
                             : 'border-slate-200 bg-white text-slate-900 shadow-slate-200/70'
@@ -2015,14 +2015,14 @@ export function AppHeader({
                           }`}
                         >
                           <div className="min-w-0">
-                            <div className={`text-[9px] font-black uppercase tracking-[0.18em] ${isActiveCard ? 'text-slate-300' : 'text-slate-400'}`}>
+                            <div className={`text-[9px] font-semibold uppercase tracking-wide ${isActiveCard ? 'text-slate-300' : 'text-slate-400'}`}>
                               {membership.role}
                             </div>
                             <div className={`mt-1 text-[11px] font-semibold ${isActiveCard ? 'text-slate-200' : 'text-slate-500'}`}>
                               Geser kartu
                             </div>
                           </div>
-                          <div className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] ${
+                          <div className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] ${
                             isActiveCard
                               ? 'bg-white/10 text-white'
                               : 'bg-blue-50 text-blue-700'
@@ -2035,7 +2035,7 @@ export function AppHeader({
                         <div className="space-y-4 p-4">
                           <div>
                             <div className="flex items-center gap-2">
-                              <div className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${
+                              <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${
                                 isActiveCard
                                   ? 'border-white/10 bg-white/10 text-white'
                                   : 'border-slate-200 bg-slate-50 text-[#003366]'
@@ -2045,10 +2045,10 @@ export function AppHeader({
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="min-w-0">
-                                    <div className="truncate text-sm font-black">{membership.org.name}</div>
+                                    <div className="truncate text-sm font-semibold">{membership.org.name}</div>
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0">
-                                    <div className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black ${
+                                    <div className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ${
                                       bscIsReady
                                         ? (bscSummary?.overall_score_100 ?? 0) >= 85
                                           ? isActiveCard
@@ -2098,7 +2098,7 @@ export function AppHeader({
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] ${
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] ${
                               membership.org.parent_org_id
                                 ? isActiveCard
                                   ? 'bg-orange-500/20 text-orange-100'
@@ -2109,7 +2109,7 @@ export function AppHeader({
                             }`}>
                               {membership.org.parent_org_id ? 'Child' : 'Parent'}
                             </span>
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] ${
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] ${
                               isActiveCard
                                 ? 'bg-white/10 text-slate-100'
                                 : 'bg-slate-100 text-slate-600'
@@ -2118,7 +2118,7 @@ export function AppHeader({
                             </span>
                           </div>
 
-                          <div className={`rounded-2xl border px-3 py-2 text-[11px] font-semibold leading-relaxed ${
+                          <div className={`rounded-xl border px-3 py-2 text-[11px] font-semibold leading-relaxed ${
                             isActiveCard
                               ? 'border-white/10 bg-white/5 text-slate-200'
                               : 'border-slate-200 bg-slate-50 text-slate-600'
@@ -2126,12 +2126,12 @@ export function AppHeader({
                             {relationLabel}
                           </div>
 
-                          <div className={`rounded-2xl border px-3 py-3 ${
+                          <div className={`rounded-xl border px-3 py-3 ${
                             isActiveCard
                               ? 'border-white/10 bg-white/5'
                               : 'border-slate-200 bg-slate-50'
                           }`}>
-                            <div className={`mb-2 text-[9px] font-black uppercase tracking-[0.18em] ${
+                            <div className={`mb-2 text-[9px] font-semibold uppercase tracking-wide ${
                               isActiveCard ? 'text-slate-300' : 'text-slate-400'
                             }`}>
                               Kas / Cash Flow
@@ -2140,7 +2140,7 @@ export function AppHeader({
                           </div>
 
                           {bscIsReady && isPerspectiveExpanded && (
-                            <div className={`grid grid-cols-2 gap-2 rounded-2xl border p-2 ${
+                            <div className={`grid grid-cols-2 gap-2 rounded-xl border p-2 ${
                               isActiveCard
                                 ? 'border-white/10 bg-white/5'
                                 : 'border-slate-200 bg-slate-50'
@@ -2151,16 +2151,16 @@ export function AppHeader({
                                 return (
                                   <div
                                     key={`${membership.orgId}-${perspective.key}`}
-                                    className={`rounded-2xl border px-3 py-2 ${
+                                    className={`rounded-xl border px-3 py-2 ${
                                       isActiveCard
                                         ? 'border-white/10 bg-white/5'
                                         : 'border-slate-200 bg-white'
                                     }`}
                                   >
-                                    <div className={`inline-flex rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] ${perspective.accent}`}>
+                                    <div className={`inline-flex rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] ${perspective.accent}`}>
                                       {perspective.label}
                                     </div>
-                                    <div className={`mt-2 text-lg font-black ${
+                                    <div className={`mt-2 text-lg font-semibold ${
                                       isActiveCard ? 'text-white' : 'text-slate-900'
                                     }`}>
                                       {perspectiveScore?.score_100 ?? 0}
@@ -2194,7 +2194,7 @@ export function AppHeader({
                                 closeOrgDeck()
                                 void handleOrgChange(membership.orgId)
                               }}
-                              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-2xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition disabled:cursor-wait disabled:opacity-60 ${
+                              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] transition disabled:cursor-wait disabled:opacity-60 ${
                                 isActiveCard
                                   ? 'bg-white/10 text-white'
                                   : 'bg-slate-900 text-white hover:bg-[#003366]'
@@ -2210,7 +2210,7 @@ export function AppHeader({
                                   event.stopPropagation()
                                   closeOrgDeck()
                                 }}
-                                className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition ${
+                                className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] transition ${
                                   isActiveCard
                                     ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
                                     : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
@@ -2251,7 +2251,7 @@ export function AppHeader({
                           event.preventDefault()
                           void handleDeckBranchActivate(node.orgId, node.branch.id)
                         }}
-                        className={`absolute w-[186px] rounded-[22px] border text-left transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+                        className={`absolute w-[186px] rounded-xl border text-left transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
                           isActiveBranchCard || isSwitchingContext
                             ? 'cursor-wait opacity-70'
                             : 'cursor-pointer'
@@ -2269,7 +2269,7 @@ export function AppHeader({
                         }}
                       >
                         <div className="flex items-center gap-2 px-3 pt-3">
-                          <div className={`flex h-9 w-9 items-center justify-center rounded-2xl border ${
+                          <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${
                             isActiveBranchCard
                               ? 'border-white/10 bg-white/10 text-white'
                               : isParentOrgActive
@@ -2281,7 +2281,7 @@ export function AppHeader({
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <div className="truncate text-[11px] font-black uppercase tracking-[0.12em]">
+                                <div className="truncate text-[11px] font-semibold uppercase tracking-[0.12em]">
                                   {node.branch.name}
                                 </div>
                               </div>

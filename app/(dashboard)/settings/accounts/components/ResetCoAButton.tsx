@@ -59,10 +59,10 @@ export default function ResetCoAButton() {
               initial={{ scale: 0.95, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 overflow-hidden"
+              className="relative w-full max-w-sm bg-white rounded-xl shadow-md p-8 overflow-hidden"
             >
               <div className="flex flex-col items-center text-center space-y-4">
-                <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center">
+                <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-xl flex items-center justify-center">
                   <AlertTriangle size={32} />
                 </div>
                 <div>
@@ -85,7 +85,7 @@ export default function ResetCoAButton() {
                     onChange={(e) => setConfirmText(e.target.value)}
                     disabled={loading}
                     placeholder={CONFIRM_KEYWORD}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-center font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-rose-300 disabled:opacity-50"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-center font-mono tracking-wide focus:outline-none focus:ring-2 focus:ring-rose-300 disabled:opacity-50"
                   />
                 </div>
 
@@ -93,7 +93,7 @@ export default function ResetCoAButton() {
                   <button
                     disabled={loading || !isConfirmed}
                     onClick={handleReset}
-                    className="w-full py-3.5 bg-rose-600 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-rose-700 transition shadow-xl shadow-rose-200/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="w-full py-3.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-rose-700 transition shadow-xl shadow-rose-200/50 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {loading ? <Loader2 className="animate-spin" size={20} /> : <><RotateCcw size={16} /> Reset & Seed Ulang PSAK</>}
                   </button>

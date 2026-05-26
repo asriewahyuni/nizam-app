@@ -1088,11 +1088,11 @@ export default function SalesClient({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">No Invoice</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Pelanggan & Item</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Nilai Tagihan</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Aksi Cepat</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">No Invoice</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Pelanggan & Item</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Nilai Tagihan</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-center">Status</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Aksi Cepat</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -1102,7 +1102,7 @@ export default function SalesClient({
                 sales.map((s: any) => (
                   <tr key={s.id} className="group hover:bg-slate-50 transition-colors">
                     <td className="px-8 py-6">
-                       <button onClick={() => setViewSale(s)} className="text-xs font-black text-blue-600 tracking-tighter hover:underline">
+                       <button onClick={() => setViewSale(s)} className="text-xs font-semibold text-blue-600 tracking-tighter hover:underline">
                          {s.sale_number}
                        </button>
                        <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(s.sale_date, 'short')}</div>
@@ -1113,7 +1113,7 @@ export default function SalesClient({
                     <td className="px-8 py-6">
                        <div className="text-sm font-bold text-slate-900">{s.contacts?.name || 'Unknown Client'}</div>
                        <div className="flex gap-2 mt-1.5 overflow-hidden max-w-[300px]">
-                          <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200 uppercase tracking-tighter">
+                          <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200 uppercase tracking-tighter">
                             {s.sales_items?.length || 0} Item
                           </span>
                           <span className="text-[10px] text-slate-400 truncate font-medium italic">
@@ -1121,8 +1121,8 @@ export default function SalesClient({
                           </span>
                        </div>
                        {pickRelation(s.sales_resellers) && (
-                         <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-black text-indigo-700">
-                           <span className="uppercase tracking-widest">Reseller</span>
+                         <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-semibold text-indigo-700">
+                           <span className="uppercase tracking-wide">Reseller</span>
                            <span className="truncate">{getResellerDisplayName(pickRelation(s.sales_resellers))}</span>
                          </div>
                        )}
@@ -1136,7 +1136,7 @@ export default function SalesClient({
 
                           return (
                              <div className="flex flex-col items-end gap-1">
-                                <div className="text-sm font-black text-slate-900 font-mono tracking-tighter">
+                                <div className="text-sm font-semibold text-slate-900 font-mono tracking-tighter">
                                   {outstanding > 0 && outstanding < (s.grand_total - totalReturned) ? formatRupiah(outstanding) : formatRupiah(s.grand_total - totalReturned)}
                                 </div>
                                 {outstanding > 0 && outstanding < (s.grand_total - totalReturned) && (
@@ -1144,7 +1144,7 @@ export default function SalesClient({
                                      Faktur: {formatRupiah(s.grand_total - totalReturned)}
                                    </div>
                                 )}
-                                <div className={`text-[9px] font-black uppercase tracking-widest ${s.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                <div className={`text-[9px] font-semibold uppercase tracking-wide ${s.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}>
                                   {s.payment_status === 'PAID' ? 'Lunas' : s.payment_status === 'PARTIAL' ? 'Angsuran / Sisa' : 'Unpaid'}
                                 </div>
                                 {totalReturned > 0 && (
@@ -1209,13 +1209,13 @@ export default function SalesClient({
                                setLoading(false);
                              }}
                              disabled={loading}
-                             className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-purple-700 transition-all shadow-lg shadow-purple-100 disabled:opacity-50" title="Auto-Generate BoM & SPK dari SO">
+                             className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white text-[10px] font-semibold uppercase tracking-wide rounded-xl hover:bg-purple-700 transition-all shadow-lg shadow-purple-100 disabled:opacity-50" title="Auto-Generate BoM & SPK dari SO">
                              <Factory size={14}/> {loading ? 'Memproses...' : 'Proses Produksi'}
                            </button>
                          )}
 
                          {s.payment_status !== 'PAID' && (s.status === 'FINISHED' || ((isSaleSalam(s) || String(s?.shariah_mode || '').trim().toUpperCase() === 'ISTISHNA') && s.status === 'ORDERED')) && (
-                           <button onClick={() => handleOpenPayment(s)} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
+                           <button onClick={() => handleOpenPayment(s)} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-[10px] font-semibold uppercase tracking-wide rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
                              <DollarSign size={14}/> Terima Bayar
                            </button>
                          )}
@@ -1241,7 +1241,7 @@ export default function SalesClient({
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowModal(false); resetSaleForm() }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-8 overflow-hidden max-h-[90vh] overflow-y-auto">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-xl shadow-md p-8 overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="absolute top-0 left-0 w-2 h-full bg-blue-600" />
                 <h3 className="text-xl font-bold mb-6">
                   {editingDraftSaleId ? 'Edit Draft Sales Order (SO)' : 'Buat Pesanan Penjualan (SO / Invoice)'}
@@ -1250,10 +1250,10 @@ export default function SalesClient({
                 <form onSubmit={handleCreateSale} className="space-y-6">
                   {/* HEADER SALES */}
                   {/* HEADER SALES & PAYMENT GUARDRAIL */}
-                  <div className="flex flex-col md:flex-row gap-4 p-5 bg-slate-50 rounded-[28px] border border-slate-100 shadow-inner">
+                  <div className="flex flex-col md:flex-row gap-4 p-5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
                     <div className="flex-1 space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Mode Transaksi</label>
-                      <select value={shariahMode} onChange={(e) => setShariahMode(e.target.value as any)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-blue-600 shadow-sm focus:border-blue-500 transition-all">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Mode Transaksi</label>
+                      <select value={shariahMode} onChange={(e) => setShariahMode(e.target.value as any)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-xl outline-none text-sm bg-white font-semibold text-blue-600 shadow-sm focus:border-blue-500 transition-all">
                          <option value="CASH">PENJUALAN LANGSUNG / STOK SIAP</option>
                          {shariahMode === 'SALAM' && <option value="SALAM">PENJUALAN SALAM (OTOMATIS)</option>}
                          <option value="ISTISHNA">PENJUALAN ISTISHNA (PESANAN PRODUKSI)</option>
@@ -1264,16 +1264,16 @@ export default function SalesClient({
                     </div>
 
                     <div className="flex-1 space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Customer / Klien</label>
-                      <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-slate-900 shadow-sm focus:border-blue-500 transition-all">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Customer / Klien</label>
+                      <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-xl outline-none text-sm bg-white font-semibold text-slate-900 shadow-sm focus:border-blue-500 transition-all">
                          <option value="">Pilih Customer...</option>
                          {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     </div>
 
                     <div className="w-full md:w-48 space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Metode Bayar</label>
-                       <div className="flex p-1 bg-white border border-slate-200 rounded-2xl h-[52px]">
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Metode Bayar</label>
+                       <div className="flex p-1 bg-white border border-slate-200 rounded-xl h-[52px]">
                           <button 
                              type="button" 
                              onClick={() => {
@@ -1281,14 +1281,14 @@ export default function SalesClient({
                                setPaymentTerm('TEMPO')
                              }}
                              disabled={shariahMode === 'SALAM'}
-                             className={`flex-1 rounded-xl text-[10px] font-black transition-all ${paymentTerm === 'TEMPO' ? 'bg-amber-500 text-white shadow-md' : 'text-slate-400'} ${shariahMode === 'SALAM' ? 'opacity-40 cursor-not-allowed' : ''}`}
+                             className={`flex-1 rounded-xl text-[10px] font-semibold transition-all ${paymentTerm === 'TEMPO' ? 'bg-amber-500 text-white shadow-md' : 'text-slate-400'} ${shariahMode === 'SALAM' ? 'opacity-40 cursor-not-allowed' : ''}`}
                           >
                              TEMPO
                           </button>
                           <button 
                              type="button" 
                              onClick={() => setPaymentTerm('LUNAS')}
-                             className={`flex-1 rounded-xl text-[10px] font-black transition-all ${paymentTerm === 'LUNAS' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400'}`}
+                             className={`flex-1 rounded-xl text-[10px] font-semibold transition-all ${paymentTerm === 'LUNAS' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400'}`}
                           >
                              LUNAS
                           </button>
@@ -1299,22 +1299,22 @@ export default function SalesClient({
                     </div>
 
                     <div className="w-full md:w-40 space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Tgl Faktur</label>
-                      <input type="date" required value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-blue-500 transition-all" />
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Tgl Faktur</label>
+                      <input type="date" required value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-blue-500 transition-all" />
                     </div>
 
                     {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM' || shariahMode === 'ISTISHNA') && (
                        <div className="w-full md:w-40 space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                         <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block px-1">{shariahMode === 'SALAM' || shariahMode === 'ISTISHNA' ? 'Target Kirim' : 'Jatuh Tempo'}</label>
-                         <input type="date" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-amber-50/50 font-bold text-slate-900 shadow-sm focus:border-amber-500 transition-all" />
+                         <label className="text-[10px] font-semibold text-amber-500 uppercase tracking-wide block px-1">{shariahMode === 'SALAM' || shariahMode === 'ISTISHNA' ? 'Target Kirim' : 'Jatuh Tempo'}</label>
+                         <input type="date" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-xl outline-none text-sm bg-amber-50/50 font-bold text-slate-900 shadow-sm focus:border-amber-500 transition-all" />
                        </div>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 p-5 bg-indigo-50/60 rounded-[28px] border border-indigo-100">
+                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 p-5 bg-indigo-50/60 rounded-xl border border-indigo-100">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block px-1">Reseller / Perusahaan Mitra</label>
-                      <select value={resellerId} onChange={(e) => setResellerId(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-indigo-200 rounded-2xl outline-none text-sm bg-white font-black text-slate-900 shadow-sm focus:border-indigo-500 transition-all">
+                      <label className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide block px-1">Reseller / Perusahaan Mitra</label>
+                      <select value={resellerId} onChange={(e) => setResellerId(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-indigo-200 rounded-xl outline-none text-sm bg-white font-semibold text-slate-900 shadow-sm focus:border-indigo-500 transition-all">
                         <option value="">Tanpa reseller (direct customer)</option>
                         {resellers.map((reseller: any) => (
                           <option key={reseller.id} value={reseller.id}>
@@ -1330,10 +1330,10 @@ export default function SalesClient({
                     <div className="rounded-[24px] border border-white/70 bg-white/80 px-5 py-4">
                       {selectedReseller ? (
                         <div className="space-y-2">
-                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Snapshot Komisi Saat SO Dibuat</div>
-                          <div className="text-sm font-black text-slate-900">{getResellerDisplayName(selectedReseller)}</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Snapshot Komisi Saat SO Dibuat</div>
+                          <div className="text-sm font-semibold text-slate-900">{getResellerDisplayName(selectedReseller)}</div>
                           <div className="text-[11px] font-bold text-slate-500">{getResellerSubtitle(selectedReseller)}</div>
-                          <div className="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700">
+                          <div className="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
                             {getCommissionSchemeLabel(selectedReseller.commission_type, selectedReseller.commission_value)}
                           </div>
                           <div className="text-[10px] font-bold text-slate-500">
@@ -1342,8 +1342,8 @@ export default function SalesClient({
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Mode Direct Sales</div>
-                          <div className="text-sm font-black text-slate-900">Invoice tidak terhubung reseller</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Mode Direct Sales</div>
+                          <div className="text-sm font-semibold text-slate-900">Invoice tidak terhubung reseller</div>
                           <div className="text-[11px] font-bold text-slate-500">
                             Pilih reseller jika transaksi ini berasal dari personal reseller atau perusahaan mitra.
                           </div>
@@ -1353,7 +1353,7 @@ export default function SalesClient({
                   </div>
 
                      {paymentTerm === 'LUNAS' && (
-                       <div className="md:col-span-4 mt-2 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 animate-in slide-in-from-top-2 duration-300">
+                       <div className="md:col-span-4 mt-2 p-4 bg-emerald-50 rounded-xl border border-emerald-100 animate-in slide-in-from-top-2 duration-300">
                           <SearchableSelect 
                              label="Rekening Penerimaan (Kas/Bank)"
                              options={paymentAccounts}
@@ -1368,7 +1368,7 @@ export default function SalesClient({
                      )}
 
                      {paymentTerm === 'TEMPO' && shariahMode !== 'SALAM' && (
-                      <div className="md:col-span-4 mt-2 p-4 bg-amber-50 rounded-2xl border border-amber-200 animate-in slide-in-from-top-2 duration-300 space-y-3">
+                      <div className="md:col-span-4 mt-2 p-4 bg-amber-50 rounded-xl border border-amber-200 animate-in slide-in-from-top-2 duration-300 space-y-3">
                          <div className="flex items-center gap-2">
                            <input type="checkbox" id="has_dp" checked={hasDp} onChange={e => setHasDp(e.target.checked)} className="w-4 h-4 text-amber-600 rounded border-amber-300" />
                            <label htmlFor="has_dp" className="text-xs font-bold text-amber-900 cursor-pointer">Terima Uang Muka (DP) Sebagian Tunai Hari Ini?</label>
@@ -1391,9 +1391,9 @@ export default function SalesClient({
                                   />
                                ) : (
                                   <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Persentase DP (%)</label>
+                                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Persentase DP (%)</label>
                                     <div className="relative">
-                                      <input type="number" min="0" max="100" step="any" value={dpPercent} onChange={e => setDpPercent(e.target.value)} className="w-full h-[52px] px-4 pr-10 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-amber-500 transition-all" />
+                                      <input type="number" min="0" max="100" step="any" value={dpPercent} onChange={e => setDpPercent(e.target.value)} className="w-full h-[52px] px-4 pr-10 py-2.5 border border-amber-200 rounded-xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-amber-500 transition-all" />
                                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">%</span>
                                     </div>
                                     {parseFloat(dpPercent) > 0 && <p className="text-[10px] font-bold text-amber-600 px-1 mt-1">Estimasi Setara: Rp {Intl.NumberFormat('id-ID').format((parseFloat(dpPercent)/100)*grandTotal)}</p>}
@@ -1421,7 +1421,7 @@ export default function SalesClient({
                   {/* LINE ITEMS */}
                   <div className="space-y-3">
                     <div className="flex justify-between items-center mb-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Detail Penjualan (Items)</label>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Detail Penjualan (Items)</label>
                       <button type="button" onClick={handleAddLine} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
                         <Plus size={14}/> Tambah Baris
                       </button>
@@ -1434,7 +1434,7 @@ export default function SalesClient({
                       ))}
                     </datalist>
 
-                    <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wide">
                        <div className="col-span-4">Barang / Jasa</div>
                        <div className="col-span-2">Qty Kuintitas</div>
                        <div className="col-span-3">Harga Jual / Satuan</div>
@@ -1450,7 +1450,7 @@ export default function SalesClient({
                       <div key={line.id} className={`grid grid-cols-1 sm:grid-cols-12 gap-2 items-start bg-white p-3 sm:p-0 border sm:border-0 ${isStockShortage ? 'border-amber-400 bg-amber-50 rounded-xl' : 'border-slate-100 rounded-xl sm:rounded-none'}`}>
                         
                         <div className="sm:col-span-4">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Barang / Jasa</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">Barang / Jasa</label>
                           <input 
                             required 
                             list="product_sales_suggestions" 
@@ -1477,7 +1477,7 @@ export default function SalesClient({
 
                         <div className="col-span-2 flex gap-2">
                           <div className="w-full">
-                            <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Qty</label>
+                            <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">Qty</label>
                             <input 
                               type="number" required min="1" step="any"
                               value={line.quantity || ''} 
@@ -1489,7 +1489,7 @@ export default function SalesClient({
                         </div>
 
                         <div className="sm:col-span-3">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Harga Jual / Satuan</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">Harga Jual / Satuan</label>
                           <CurrencyInput
                             label=""
                             value={line.unit_price}
@@ -1500,7 +1500,7 @@ export default function SalesClient({
                         </div>
 
                         <div className="sm:col-span-2">
-                           <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Potongan Harga / {line.unit} (Rp)</label>
+                           <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">Potongan Harga / {line.unit} (Rp)</label>
                           <CurrencyInput
                             label=""
                             value={line.discount_amount}
@@ -1520,7 +1520,7 @@ export default function SalesClient({
                   </div>
 
                   {/* Kalkulasi Footer */}
-                  <div className="flex flex-col gap-3 bg-blue-50/50 px-6 py-4 rounded-2xl border border-blue-100">
+                  <div className="flex flex-col gap-3 bg-blue-50/50 px-6 py-4 rounded-xl border border-blue-100">
                      <div className="flex justify-between items-center text-sm font-semibold text-blue-900">
                        <span>Total Harga Barang (Gross):</span>
                        <span>{formatCurrency(grossSubTotal)}</span>
@@ -1732,11 +1732,11 @@ export default function SalesClient({
                   </div>
 
                   <div className="flex gap-3 pt-4 border-t border-slate-100">
-                    <button type="button" onClick={() => { setShowModal(false); resetSaleForm() }} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-2xl transition">Batal</button>
-                    <button type="submit" value="DRAFT" disabled={loading} className="flex-1 py-4 px-6 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-2xl border border-indigo-200 transition">
+                    <button type="button" onClick={() => { setShowModal(false); resetSaleForm() }} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-xl transition">Batal</button>
+                    <button type="submit" value="DRAFT" disabled={loading} className="flex-1 py-4 px-6 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 transition">
                       {loading ? 'Menyimpan...' : 'Save Draft'}
                     </button>
-                    <button type="submit" value="PUBLISH" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-lg transition">
+                    <button type="submit" value="PUBLISH" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg transition">
                       {loading ? 'Memproses...' : 'Terbitkan SO'}
                     </button>
                   </div>
@@ -1749,7 +1749,7 @@ export default function SalesClient({
         {showCustomerModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowCustomerModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-md p-8">
                 <h3 className="text-xl font-bold mb-8">Daftarkan Customer Baru</h3>
                 <form onSubmit={handleCreateCustomer} className="space-y-6">
                    <input name="name" required placeholder="Nama Klien / Perusahaan" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-bold text-slate-900 focus:border-blue-500 transition-all" />
@@ -1763,8 +1763,8 @@ export default function SalesClient({
                    </div>
                    <textarea name="address" placeholder="Alamat Pengiriman/Penagihan" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm min-h-[80px]" />
                    <div className="flex gap-3 pt-4">
-                    <button type="button" onClick={() => setShowCustomerModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 rounded-2xl">Batal</button>
-                    <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-lg shadow-blue-100">{loading ? 'Menyimpan...' : 'Simpan Customer'}</button>
+                    <button type="button" onClick={() => setShowCustomerModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 rounded-xl">Batal</button>
+                    <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-100">{loading ? 'Menyimpan...' : 'Simpan Customer'}</button>
                   </div>
                 </form>
              </motion.div>
@@ -1774,18 +1774,18 @@ export default function SalesClient({
         {showDeliveryModal && selectedSaleForDelivery && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !loading && setShowDeliveryModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl p-8">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-xl bg-white rounded-xl shadow-md p-8">
                 <h3 className="text-xl font-bold mb-2">Pilih Gudang Pengiriman</h3>
                 <p className="text-sm text-slate-500 font-medium mb-6">
                   Stok fisik untuk <span className="font-bold text-slate-800">{selectedSaleForDelivery.sale_number}</span> akan dikurangi dari gudang ini.
                 </p>
 
                 <div className="space-y-2 mb-8">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Gudang Aktif di {activeBranchName || 'Unit Terpilih'}</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Gudang Aktif di {activeBranchName || 'Unit Terpilih'}</label>
                   <select
                     value={deliveryWarehouseId}
                     onChange={(e) => setDeliveryWarehouseId(e.target.value)}
-                    className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-slate-900 shadow-sm focus:border-emerald-500 transition-all"
+                    className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-xl outline-none text-sm bg-white font-semibold text-slate-900 shadow-sm focus:border-emerald-500 transition-all"
                   >
                     <option value="">Pilih gudang pengiriman...</option>
                     {warehouses.map((warehouse: any) => (
@@ -1797,12 +1797,12 @@ export default function SalesClient({
                 </div>
 
                 <div className="flex gap-3 pt-4 border-t border-slate-100">
-                  <button type="button" onClick={() => setShowDeliveryModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-2xl transition">Batal</button>
+                  <button type="button" onClick={() => setShowDeliveryModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-xl transition">Batal</button>
                   <button
                     type="button"
                     disabled={loading || !deliveryWarehouseId}
                     onClick={() => executeDelivery(selectedSaleForDelivery.id, deliveryWarehouseId)}
-                    className="flex-1 py-4 px-8 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 rounded-2xl shadow-lg transition"
+                    className="flex-1 py-4 px-8 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 rounded-xl shadow-lg transition"
                   >
                     {loading ? 'Memproses...' : 'Kirim Barang'}
                   </button>
@@ -1814,7 +1814,7 @@ export default function SalesClient({
         {showReturnModal && selectedSaleForReturn && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !loading && setShowReturnModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white w-full max-w-2xl rounded-xl shadow-md overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-amber-50/50">
                    <div>
                      <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -1828,18 +1828,18 @@ export default function SalesClient({
                 <div className="p-6 overflow-y-auto space-y-6">
                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Nota Retur (Tax Sync)</label>
-                        <input value={notaRetur} onChange={(e) => setNotaRetur(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold text-slate-700 focus:bg-white focus:border-amber-200 transition-all" />
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1">Nota Retur (Tax Sync)</label>
+                        <input value={notaRetur} onChange={(e) => setNotaRetur(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm font-bold text-slate-700 focus:bg-white focus:border-amber-200 transition-all" />
                       </div>
                       <div className="space-y-1.5 opacity-50">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Customer</label>
-                        <div className="px-4 py-3 bg-slate-100 rounded-2xl text-sm font-bold text-slate-600">{selectedSaleForReturn.contacts?.name}</div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1">Customer</label>
+                        <div className="px-4 py-3 bg-slate-100 rounded-xl text-sm font-bold text-slate-600">{selectedSaleForReturn.contacts?.name}</div>
                       </div>
                    </div>
 
                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Pilih Barang yang Dikembalikan</label>
-                      <div className="divide-y divide-slate-50 border border-slate-50 rounded-2xl overflow-hidden">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1">Pilih Barang yang Dikembalikan</label>
+                      <div className="divide-y divide-slate-50 border border-slate-50 rounded-xl overflow-hidden">
                         {selectedSaleForReturn.sales_items.map((it: any) => (
                            <div key={it.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                               <div>
@@ -1861,11 +1861,11 @@ export default function SalesClient({
                    </div>
 
                    <div className="space-y-4 px-6">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Mode Pengembalian Dana</label>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1">Mode Pengembalian Dana</label>
                       
                       {selectedSaleForReturn?.payment_status !== 'PAID' ? (
-                         <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex flex-col gap-1">
-                            <span className="text-xs font-black text-blue-800">Sistem Mengunci Potong Piutang (AR)</span>
+                         <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex flex-col gap-1">
+                            <span className="text-xs font-semibold text-blue-800">Sistem Mengunci Potong Piutang (AR)</span>
                             <span className="text-[10px] font-bold text-blue-600">Karena tagihan invoice ini belum berstatus Lunas Penuh (PAID), sistem ERP akan secara paksa mengalihkan pengembalian ini untuk memotong sisa hutang/piutang pelanggan agar neraca tidak selisih.</span>
                          </div>
                       ) : (
@@ -1887,11 +1887,11 @@ export default function SalesClient({
 
                           {refundMode === 'CASH' && (
                             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-1.5 pt-2">
-                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Keluar dari Akun Kas/Bank</label>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1">Keluar dari Akun Kas/Bank</label>
                               <select 
                                 value={refundAccountId}
                                 onChange={(e) => setRefundAccountId(e.target.value)}
-                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl outline-none text-sm font-bold text-slate-700 focus:border-amber-400 transition-all appearance-none"
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold text-slate-700 focus:border-amber-400 transition-all appearance-none"
                               >
                                 <option value="">-- Pilih Akun Kas/Bank --</option>
                                 {coa.filter((a: any) => a.code.startsWith('11')).map((a: any) => (
@@ -1904,7 +1904,7 @@ export default function SalesClient({
                       )}
                     </div>
 
-                    <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 flex flex-col gap-2 mx-6 mb-6">
+                    <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 flex flex-col gap-2 mx-6 mb-6">
                        <div className="flex justify-between items-center text-xs font-bold text-slate-500">
                          <span>Estimasi Nilai Barang (Net):</span>
                          <span>{formatCurrency(selectedReturnBaseAmount)}</span>
@@ -1916,7 +1916,7 @@ export default function SalesClient({
                          </div>
                        ))}
                        <div className="border-t border-amber-200 my-1"></div>
-                       <div className="flex justify-between items-center text-sm font-black text-slate-900 uppercase">
+                       <div className="flex justify-between items-center text-sm font-semibold text-slate-900 uppercase">
                          <span>{refundMode === 'AR' ? 'Total Pengurangan Piutang:' : 'Total Refund Tunai/Bank:'}</span>
                          <span>{formatCurrency(selectedReturnGrandTotal)}</span>
                        </div>
@@ -1929,7 +1929,7 @@ export default function SalesClient({
                       <button 
                         onClick={handleProcessReturn}
                         disabled={loading}
-                        className="px-8 py-3 bg-amber-600 text-white text-sm font-bold rounded-2xl hover:bg-amber-700 shadow-xl shadow-amber-100 disabled:opacity-50 transition-all flex items-center gap-2"
+                        className="px-8 py-3 bg-amber-600 text-white text-sm font-bold rounded-xl hover:bg-amber-700 shadow-xl shadow-amber-100 disabled:opacity-50 transition-all flex items-center gap-2"
                       >
                         {loading ? 'Memproses...' : 'Konfirmasi Retur Barang'}
                         {!loading && <CheckSquare size={18}/>}
@@ -1965,13 +1965,13 @@ export default function SalesClient({
                }
              `}</style>
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setViewSale(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden so-no-print" />
-             <motion.div id="so-print-area" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none print:text-[11px] print:leading-relaxed">
+             <motion.div id="so-print-area" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-xl shadow-md overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none print:text-[11px] print:leading-relaxed">
                 {/* Print Business Profile Header */}
                 <div className="hidden print:flex justify-between items-start pb-6 border-b-2 border-slate-900 mb-6 w-full">
                     <div className="flex flex-col text-left">
                        <div className="flex items-center gap-4">
                           <img src={companyProfile.logo} alt="Logo Perusahaan" className="w-14 h-14 object-contain" />
-                          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{companyProfile.name}</h2>
+                          <h2 className="text-2xl font-semibold text-slate-900 uppercase tracking-tighter">{companyProfile.name}</h2>
                        </div>
                        <p className="text-xs font-medium text-slate-700 max-w-[350px] mt-1">{companyProfile.address}</p>
                        <div className="flex items-center gap-4 mt-2 text-[10px] font-bold text-slate-500">
@@ -1984,7 +1984,7 @@ export default function SalesClient({
 
                 <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center print:bg-transparent print:border-none print:px-0 print:pt-0 print:mb-0">
                    <div className="print:text-center print:w-full">
-                      <h3 className="text-xl font-bold text-slate-900 print:text-2xl print:tracking-widest">{printMode === 'DELIVERY_ORDER' ? 'SURAT JALAN / MANIFEST PENGIRIMAN' : 'SALES ORDER / INVOICE'}</h3>
+                      <h3 className="text-xl font-bold text-slate-900 print:text-2xl print:tracking-wide">{printMode === 'DELIVERY_ORDER' ? 'SURAT JALAN / MANIFEST PENGIRIMAN' : 'SALES ORDER / INVOICE'}</h3>
                       <p className="text-sm font-semibold text-blue-600 print:text-slate-900 print:mt-1">{viewSale.sale_number}</p>
                    </div>
                    <button onClick={() => setViewSale(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-full hover:bg-slate-200 transition-colors print:hidden so-no-print">
@@ -1995,7 +1995,7 @@ export default function SalesClient({
                    <div className="p-6 overflow-y-auto w-full print:overflow-visible print:px-0 print:py-0">
                    <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
                       <div>
-                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">Customer / Klien</p>
+                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wide mb-1 print:text-slate-600">Customer / Klien</p>
                          <p className="font-bold text-slate-900">{viewSale.contacts?.name || 'Unknown'}</p>
                          {printMode === 'DELIVERY_ORDER' && (
                            <div className="mt-2 space-y-2 text-[11px] leading-relaxed">
@@ -2019,7 +2019,7 @@ export default function SalesClient({
                          )}
                       </div>
                       <div className="text-right">
-                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">{printMode === 'DELIVERY_ORDER' ? 'Tanggal Dokumen' : 'Tanggal & Status'}</p>
+                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wide mb-1 print:text-slate-600">{printMode === 'DELIVERY_ORDER' ? 'Tanggal Dokumen' : 'Tanggal & Status'}</p>
                          {printMode === 'DELIVERY_ORDER' ? (
                            <>
                              <p className="font-bold text-slate-900 mb-1">Tgl Order: {formatDate(viewSale.sale_date, 'long')}</p>
@@ -2038,11 +2038,11 @@ export default function SalesClient({
                    <table className="w-full mb-6 relative border-collapse print:border print:border-slate-200">
                      <thead className="border-y border-slate-100 bg-slate-50/50 print:bg-slate-100 print:text-slate-900">
                         <tr>
-                           <th className="py-3 px-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200">Deskripsi Barang/Jasa</th>
-                           <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200 w-24">Qty</th>
-                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Harga</th>
-                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Diskon</th>
-                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Total</th>
+                           <th className="py-3 px-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wide print:text-slate-900 print:border print:border-slate-200">Deskripsi Barang/Jasa</th>
+                           <th className="py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wide print:text-slate-900 print:border print:border-slate-200 w-24">Qty</th>
+                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wide print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Harga</th>
+                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wide print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Diskon</th>
+                           <th className={`py-3 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wide print:text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>Total</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50 text-xs">
@@ -2058,7 +2058,7 @@ export default function SalesClient({
                      </tbody>
                    </table>
 
-                   <div className={`w-full bg-slate-50 rounded-2xl p-4 flex flex-col gap-2 shadow-inner print:shadow-none print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>
+                   <div className={`w-full bg-slate-50 rounded-xl p-4 flex flex-col gap-2 shadow-inner print:shadow-none print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>
                       <div className="flex justify-between text-xs font-semibold text-slate-500">
                          <span>Subtotal Barang:</span>
                          <span>{formatCurrency(viewSaleLineSubtotal)}</span>
@@ -2083,15 +2083,15 @@ export default function SalesClient({
                       ))}
                       <div className="border-t border-slate-200 mt-2 pt-2 flex justify-between items-center">
                          <span className="font-bold text-slate-900 text-sm">TOTAL TAGIHAN (AR):</span>
-                         <span className="font-black text-blue-600 text-lg">{formatCurrency(viewSale.grand_total)}</span>
+                         <span className="font-semibold text-blue-600 text-lg">{formatCurrency(viewSale.grand_total)}</span>
                       </div>
                    </div>
 
                    {/* Riwayat Pembayaran */}
                    <div className={`${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>
                       {viewSale.sales_payments && viewSale.sales_payments.length > 0 && (
-                         <div className="mt-6 border border-emerald-100 bg-emerald-50/50 rounded-2xl p-4 print:border-slate-200 print:bg-white">
-                            <h4 className="text-xs font-bold text-emerald-800 uppercase tracking-widest mb-3 flex items-center gap-1 print:text-slate-800"><DollarSign size={14}/> Histori Pembayaran / Pelunasan</h4>
+                         <div className="mt-6 border border-emerald-100 bg-emerald-50/50 rounded-xl p-4 print:border-slate-200 print:bg-white">
+                            <h4 className="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-3 flex items-center gap-1 print:text-slate-800"><DollarSign size={14}/> Histori Pembayaran / Pelunasan</h4>
                             <div className="space-y-2">
                                {viewSale.sales_payments.map((p: any, i: number) => (
                                   <div key={i} className="flex justify-between text-xs text-emerald-700 bg-white p-2 rounded-xl border border-emerald-100 shadow-sm print:text-slate-800 print:border-slate-200">
@@ -2118,7 +2118,7 @@ export default function SalesClient({
                        {approvalQr ? (
                          <div className="flex flex-col items-center gap-1">
                            <QRCodeSVG value={approvalQr} size={72} level="H" fgColor="#1e293b" />
-                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Disetujui &amp; Ditandatangani Digital</p>
+                           <p className="text-[8px] font-semibold text-slate-400 uppercase tracking-wider">Disetujui &amp; Ditandatangani Digital</p>
                            <p className="text-[7px] text-slate-300 font-mono">{viewSale.id}</p>
                          </div>
                        ) : (
@@ -2158,10 +2158,10 @@ export default function SalesClient({
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowPaymentModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
               
-              <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+              <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[32px] shadow-md overflow-hidden flex flex-col max-h-[95vh]">
                 <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-emerald-50/50">
                     <div>
-                       <h3 className="text-xl font-black text-slate-900">Terima Pembayaran</h3>
+                       <h3 className="text-xl font-semibold text-slate-900">Terima Pembayaran</h3>
                        <p className="text-xs text-slate-400 font-bold mt-1 uppercase">Faktur: {selectedSaleForPayment.sale_number}</p>
                     </div>
                     <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-white rounded-full transition-colors text-slate-400 hover:text-rose-500">
@@ -2171,16 +2171,16 @@ export default function SalesClient({
                 
                 <div className="p-8 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
                    {/* INFO SISA TAGIHAN */}
-                   <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                   <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
                       <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200">
                         <div className="text-xs font-bold text-slate-400 uppercase">Sisa Tagihan</div>
-                        <div className="text-xl font-black text-emerald-600">
+                        <div className="text-xl font-semibold text-emerald-600">
                           {formatCurrency(getOutstandingAmount(selectedSaleForPayment))}
                         </div>
                       </div>
                       
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Rincian Faktur</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Rincian Faktur</label>
                         <div className="bg-white rounded-xl border border-slate-100 overflow-hidden divide-y divide-slate-50">
                            {selectedSaleForPayment.sales_items?.map((item: any) => (
                              <div key={item.id} className="p-3 flex justify-between items-center text-xs">
@@ -2193,7 +2193,7 @@ export default function SalesClient({
                            ))}
                            <div className="p-3 bg-slate-50/50 flex justify-between items-center text-[11px] font-bold">
                               <span className="text-slate-500 uppercase">Total Invoice (+Tax/Disc):</span>
-                              <span className="text-blue-600 font-black">{formatCurrency(selectedSaleForPayment.grand_total)}</span>
+                              <span className="text-blue-600 font-semibold">{formatCurrency(selectedSaleForPayment.grand_total)}</span>
                            </div>
                         </div>
                       </div>
@@ -2235,11 +2235,11 @@ export default function SalesClient({
 
                    <div className="space-y-4">
                       <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Terima ke Akun</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase ml-1">Terima ke Akun</label>
                         <select 
                           value={collectionAccountId}
                           onChange={(e) => setCollectionAccountId(e.target.value)}
-                          className="w-full mt-1.5 px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 ring-emerald-100 text-sm font-bold text-slate-700 appearance-none"
+                          className="w-full mt-1.5 px-5 py-4 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 ring-emerald-100 text-sm font-bold text-slate-700 appearance-none"
                         >
                           <option value="">-- Pilih Kas/Bank --</option>
                           {coa.filter((a: any) => a.code.startsWith('11')).map((a: any) => (
@@ -2249,12 +2249,12 @@ export default function SalesClient({
                       </div>
 
                       <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Tanggal Bayar</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase ml-1">Tanggal Bayar</label>
                         <input 
                           type="date" 
                           value={paymentDate}
                           onChange={(e) => setPaymentDate(e.target.value)}
-                          className="w-full mt-1.5 px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 ring-emerald-100 text-sm font-bold text-slate-700"
+                          className="w-full mt-1.5 px-5 py-4 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 ring-emerald-100 text-sm font-bold text-slate-700"
                         />
                       </div>
                    </div>
@@ -2262,16 +2262,16 @@ export default function SalesClient({
    
 
                 <div className="px-8 py-6 bg-slate-50 border-t border-slate-100">
-                   <div className="bg-slate-900/5 p-4 rounded-2xl flex justify-between items-center mb-6">
-                       <span className="text-[10px] font-black text-slate-400 uppercase">Total Pengurangan Piutang:</span>
-                       <span className="text-sm font-black text-slate-700">{formatCurrency(paymentAmount + discountAmount)}</span>
+                   <div className="bg-slate-900/5 p-4 rounded-xl flex justify-between items-center mb-6">
+                       <span className="text-[10px] font-semibold text-slate-400 uppercase">Total Pengurangan Piutang:</span>
+                       <span className="text-sm font-semibold text-slate-700">{formatCurrency(paymentAmount + discountAmount)}</span>
                     </div>
                     <div className="flex items-center justify-end gap-3">
                        <button onClick={() => setShowPaymentModal(false)} className="px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">Batal</button>
                        <button 
                          onClick={handleProcessPayment}
                          disabled={loading || !collectionAccountId || (paymentAmount + discountAmount) <= 0}
-                         className="px-8 py-3 bg-emerald-600 text-white text-sm font-bold rounded-2xl hover:bg-emerald-700 shadow-xl shadow-emerald-100 disabled:opacity-50 transition-all flex items-center gap-2"
+                         className="px-8 py-3 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 shadow-xl shadow-emerald-100 disabled:opacity-50 transition-all flex items-center gap-2"
                        >
                          {loading ? 'Memproses...' : 'Simpan Pembayaran'}
                          {!loading && <CheckSquare size={18}/>}
@@ -2286,12 +2286,12 @@ export default function SalesClient({
       <div className="fixed bottom-8 right-8 z-[100] flex flex-col gap-2">
         <AnimatePresence>
           {error && (
-            <motion.div key="sales-error-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
+            <motion.div key="sales-error-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
               <AlertCircle size={18} /> {error}
             </motion.div>
           )}
           {success && (
-            <motion.div key="sales-success-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
+            <motion.div key="sales-success-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
               <CheckCircle2 size={18} /> {success}
             </motion.div>
           )}

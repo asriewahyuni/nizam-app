@@ -201,7 +201,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
   return (
     <div className="max-w-5xl mx-auto space-y-8 relative">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+        <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
           <Bell className="text-[#003366]" size={32} />
           Approval Center
         </h1>
@@ -213,14 +213,14 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
            <div className="flex gap-8">
               <button 
                 onClick={() => setActiveTab('PENDING')}
-                className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === 'PENDING' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`pb-4 text-sm font-semibold uppercase tracking-wide transition-all relative ${activeTab === 'PENDING' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 Menunggu ({approvals.length})
                 {activeTab === 'PENDING' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-[#003366] rounded-t-full" />}
               </button>
               <button 
                 onClick={() => setActiveTab('HISTORY')}
-                className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === 'HISTORY' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`pb-4 text-sm font-semibold uppercase tracking-wide transition-all relative ${activeTab === 'HISTORY' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 Riwayat Selesai
                 {activeTab === 'HISTORY' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-[#003366] rounded-t-full" />}
@@ -231,8 +231,8 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
         {activeTab === 'PENDING' ? (
           <div className="grid grid-cols-1 gap-6">
         {approvals.length === 0 ? (
-          <div className="py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500">
+          <div className="py-20 bg-white rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
+            <div className="w-16 h-16 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500">
               <ShieldCheck size={32} />
             </div>
             <div className="space-y-1">
@@ -244,16 +244,16 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
           approvals.map((req) => {
             const sourceTone = getSourceTypeTone(req.source_type)
             return (
-            <div key={req.id} className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-6 overflow-hidden relative group">
+            <div key={req.id} className="bg-white rounded-xl p-8 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-6 overflow-hidden relative group">
               <div className="absolute top-0 left-0 w-2 h-full bg-[#003366] opacity-0 group-hover:opacity-100 transition-all" />
 
               <div className="flex items-center gap-6">
-                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${sourceTone.icon}`}>
+                 <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${sourceTone.icon}`}>
                     <FileText size={24} />
                  </div>
                  <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                       <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${sourceTone.badge}`}>{req.source_type}</span>
+                       <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-lg ${sourceTone.badge}`}>{req.source_type}</span>
                        <span className="text-slate-400 text-xs font-mono">• {formatDate(req.requested_at)}</span>
                     </div>
                     <h3 className="text-lg font-bold text-slate-900">{req.reason || 'Permintaan Persetujuan Operasional'}</h3>
@@ -263,15 +263,15 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
 
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                  <button disabled={submitting === req.id} onClick={() => handleDetail(req)}
-                   className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-slate-100 transition-all">
+                   className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all">
                     <View size={18} /> Detail
                  </button>
                  <button disabled={submitting === req.id} onClick={() => openConfirm(req.id, 'REJECTED')}
-                   className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-rose-600 bg-white border border-rose-100 rounded-2xl hover:bg-rose-50 transition-all">
+                   className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-rose-600 bg-white border border-rose-100 rounded-xl hover:bg-rose-50 transition-all">
                     <X size={18} /> Tolak
                  </button>
                  <button disabled={submitting === req.id} onClick={() => openConfirm(req.id, 'APPROVED')}
-                   className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-3 text-sm font-bold text-white bg-[#003366] rounded-2xl hover:bg-[#002d5a] shadow-lg shadow-[#003366]/10 transition-all">
+                   className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-3 text-sm font-bold text-white bg-[#003366] rounded-xl hover:bg-[#002d5a] shadow-lg shadow-[#003366]/10 transition-all">
                     {submitting === req.id ? '⏳ Memproses...' : <><QrCode size={18} /> Setujui &amp; TTD</>}
                  </button>
               </div>
@@ -285,20 +285,20 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
             {loadingDetail ? (
                <div className="py-20 text-center text-slate-400 font-bold animate-pulse">Memuat riwayat...</div>
             ) : history.length === 0 ? (
-              <div className="py-20 bg-white rounded-3xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="py-20 bg-white rounded-xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-4">
                 <Shield size={48} className="text-slate-200" />
                 <p className="text-slate-400 font-medium">Belum ada riwayat persetujuan.</p>
               </div>
             ) : (
               history.map((req) => (
-                <div key={req.id} className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative group border-l-4 border-l-slate-200">
+                <div key={req.id} className="bg-white rounded-xl p-8 border border-slate-100 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative group border-l-4 border-l-slate-200">
                   <div className="flex items-center gap-6">
-                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                     <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                         <ShieldCheck size={24} />
                      </div>
                      <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                           <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{req.status}</span>
+                           <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-lg ${req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{req.status}</span>
                            <span className="text-slate-400 text-xs font-mono">• {formatDate(req.decided_at || req.updated_at)}</span>
                         </div>
                         <h3 className="text-lg font-bold text-slate-900">{req.reason || req.source_type}</h3>
@@ -306,7 +306,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                      </div>
                   </div>
                   <button onClick={() => handleDetail(req)}
-                    className="flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-[#003366] bg-[#003366]/5 rounded-2xl hover:bg-[#003366]/10 transition-all">
+                    className="flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-[#003366] bg-[#003366]/5 rounded-xl hover:bg-[#003366]/10 transition-all">
                      <View size={18} /> Lihat Log &amp; Dokumen
                   </button>
                 </div>
@@ -319,7 +319,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
       {/* DETAIL MODAL */}
       {detailOpen && selectedReq && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-md">
             <div className="sticky top-0 bg-white p-6 border-b flex items-center justify-between z-10">
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2"><FileText className="text-[#003366]" /> Detail {selectedReq.source_type}</h2>
@@ -337,19 +337,19 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                 <div className="space-y-6">
                   {selectedReq.source_type === 'PURCHASE_ORDER' && (
                     <>
-                      <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl">
+                      <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
                         <div>
                           <p className="text-xs text-slate-500 uppercase font-bold">Total Pembelian</p>
-                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.grand_total)}</p>
+                          <p className="text-lg font-semibold text-slate-900">{formatRupiah(detailData.grand_total)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-slate-500 uppercase font-bold">Mode Syariah</p>
-                          <p className="text-lg font-black text-slate-900">{detailData.shariah_mode || 'CASH'}</p>
+                          <p className="text-lg font-semibold text-slate-900">{detailData.shariah_mode || 'CASH'}</p>
                         </div>
                       </div>
                       <h3 className="font-bold text-slate-800 flex items-center justify-between">
                         Rincian Item Pembelian
-                        <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter">Verified Items</span>
+                        <span className="text-[10px] font-semibold text-blue-500 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter">Verified Items</span>
                       </h3>
                       <div className="space-y-3">
                         {detailData.purchase_items?.map((item: any, index: number) => {
@@ -359,12 +359,12 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                             <div>
                                <p className="font-bold text-slate-900">{item.products?.name || item.description}</p>
                                <div className="flex items-center gap-2 mt-1">
-                                 <span className="inline-flex h-6 px-3 items-center justify-center bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg border border-emerald-100 uppercase tracking-tighter">
+                                 <span className="inline-flex h-6 px-3 items-center justify-center bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded-lg border border-emerald-100 uppercase tracking-tighter">
                                    {item.quantity} {item.unit || item.products?.unit || 'Unit/Pcs'}
                                  </span>
                                  <span className="text-xs text-slate-400 font-bold">@ {formatRupiah(item.unit_price)}</span>
                                  {displayDiscountAmount > 0 && (
-                                   <span className="inline-flex h-6 px-3 items-center justify-center bg-rose-50 text-rose-600 text-[10px] font-black rounded-lg border border-rose-100 uppercase tracking-tighter">
+                                   <span className="inline-flex h-6 px-3 items-center justify-center bg-rose-50 text-rose-600 text-[10px] font-semibold rounded-lg border border-rose-100 uppercase tracking-tighter">
                                      Diskon {formatRupiah(displayDiscountAmount)}
                                    </span>
                                  )}
@@ -381,48 +381,48 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                       </div>
 
                       {/* Financial Summary Breakdown */}
-                      <div className="bg-slate-50 rounded-2xl p-6 space-y-4 border border-slate-100 shadow-inner">
-                        <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest">
+                      <div className="bg-slate-50 rounded-xl p-6 space-y-4 border border-slate-100 shadow-inner">
+                        <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-wide">
                           <span>Keterangan</span>
                           <span>Total Jurnal</span>
                         </div>
                         <div className="space-y-2 pt-2">
                            <div className="flex justify-between text-sm">
                              <span className="text-slate-500 font-medium">Subtotal Barang</span>
-                             <span className="font-black text-slate-700">{formatRupiah(detailData.total_amount)}</span>
+                             <span className="font-semibold text-slate-700">{formatRupiah(detailData.total_amount)}</span>
                            </div>
                            {purchaseLineDiscountTotal > 0 && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-rose-500 font-medium italic">Diskon Item</span>
-                                <span className="font-black text-rose-600">-{formatRupiah(purchaseLineDiscountTotal)}</span>
+                                <span className="font-semibold text-rose-600">-{formatRupiah(purchaseLineDiscountTotal)}</span>
                               </div>
                            )}
                            {purchaseHeaderDiscountAmount > 0 && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-rose-500 font-medium italic">Diskon Header / Faktur</span>
-                                <span className="font-black text-rose-600">-{formatRupiah(purchaseHeaderDiscountAmount)}</span>
+                                <span className="font-semibold text-rose-600">-{formatRupiah(purchaseHeaderDiscountAmount)}</span>
                               </div>
                            )}
                            {detailData.tax_amount > 0 && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-[#003366] font-medium">Pajak (PPN/PPh)</span>
-                                <span className="font-black text-[#003366]">+{formatRupiah(detailData.tax_amount)}</span>
+                                <span className="font-semibold text-[#003366]">+{formatRupiah(detailData.tax_amount)}</span>
                               </div>
                            )}
                            {(detailData.shipping_amount > 0 || detailData.insurance_amount > 0) && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-slate-500 font-medium italic">Ongkir & Asuransi</span>
-                                <span className="font-black text-slate-700">+{formatRupiah((detailData.shipping_amount || 0) + (detailData.insurance_amount || 0))}</span>
+                                <span className="font-semibold text-slate-700">+{formatRupiah((detailData.shipping_amount || 0) + (detailData.insurance_amount || 0))}</span>
                               </div>
                            )}
                            <div className="pt-4 border-t border-slate-200 mt-2 flex justify-between items-end">
                               <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Bayar (Konfirmasi)</p>
-                                <p className="text-2xl font-black text-[#003366] tracking-tighter leading-none">{formatRupiah(detailData.grand_total)}</p>
+                                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-1">Total Bayar (Konfirmasi)</p>
+                                <p className="text-2xl font-semibold text-[#003366] tracking-tighter leading-none">{formatRupiah(detailData.grand_total)}</p>
                               </div>
                               <div className="text-right">
-                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">Status Dana</p>
-                                <p className="text-sm font-black text-slate-900 leading-none">{detailData.payment_status || 'UNPAID'}</p>
+                                <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wide leading-none mb-1">Status Dana</p>
+                                <p className="text-sm font-semibold text-slate-900 leading-none">{detailData.payment_status || 'UNPAID'}</p>
                               </div>
                            </div>
                         </div>
@@ -431,40 +431,40 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                   )}
                   {selectedReq.source_type === 'REIMBURSEMENT' && (
                     <>
-                      <div className="bg-[#003366]/5 p-6 rounded-3xl border border-[#003366]/10 flex items-center justify-between">
+                      <div className="bg-[#003366]/5 p-6 rounded-xl border border-[#003366]/10 flex items-center justify-between">
                         <div>
-                          <p className="text-[10px] text-[#003366] uppercase font-black tracking-widest mb-1">Total Pengajuan</p>
-                          <p className="text-2xl font-black text-slate-900 font-mono tracking-tighter">{formatRupiah(detailData.total_amount)}</p>
+                          <p className="text-[10px] text-[#003366] uppercase font-semibold tracking-wide mb-1">Total Pengajuan</p>
+                          <p className="text-2xl font-semibold text-slate-900 font-mono tracking-tighter">{formatRupiah(detailData.total_amount)}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Nomor Klaim</p>
+                          <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide mb-1">Nomor Klaim</p>
                           <p className="text-base font-bold text-slate-800 font-mono">#{detailData.claim_number}</p>
                         </div>
                       </div>
 
                       <div className="space-y-4">
-                        <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">Rincian Pengeluaran</h3>
+                        <h3 className="font-semibold text-slate-800 text-xs uppercase tracking-wide">Rincian Pengeluaran</h3>
                         <div className="space-y-3">
                           {detailData.items?.map((item: any) => (
-                            <div key={item.id} className="group relative bg-white border border-slate-100 rounded-2xl p-4 hover:border-[#003366]/20 hover:shadow-sm transition-all">
+                            <div key={item.id} className="group relative bg-white border border-slate-100 rounded-xl p-4 hover:border-[#003366]/20 hover:shadow-sm transition-all">
                               <div className="flex justify-between items-start gap-4">
                                 <div className="space-y-1">
                                   <p className="font-bold text-slate-900">{item.description}</p>
                                   <div className="flex items-center gap-2">
-                                    <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg uppercase tracking-wider">
+                                    <span className="text-[9px] font-semibold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg uppercase tracking-wider">
                                       {item.account?.name || 'Kategori Lain'}
                                     </span>
                                     <span className="text-[10px] text-slate-400 font-mono">• {item.expense_date}</span>
                                   </div>
                                 </div>
                                 <div className="text-right space-y-2">
-                                  <p className="font-black text-[#003366] font-mono italic">{formatRupiah(item.amount)}</p>
+                                  <p className="font-semibold text-[#003366] font-mono italic">{formatRupiah(item.amount)}</p>
                                   {item.receipt_url && (
                                     <a 
                                       href={item.receipt_url} 
                                       target="_blank" 
                                       rel="noreferrer"
-                                      className="inline-flex items-center gap-1.5 text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                                      className="inline-flex items-center gap-1.5 text-[9px] font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 hover:bg-emerald-100 transition-colors"
                                     >
                                       \ud83d\udcf7 LIHAT NOTA
                                     </a>
@@ -480,34 +480,34 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                   {selectedReq.source_type === 'LEAVE_REQUEST' && (
                     <>
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-indigo-50 p-4 rounded-2xl">
-                          <p className="text-xs text-indigo-600 uppercase font-black mb-1">Karyawan</p>
-                          <p className="text-base font-black text-slate-900">
+                        <div className="bg-indigo-50 p-4 rounded-xl">
+                          <p className="text-xs text-indigo-600 uppercase font-semibold mb-1">Karyawan</p>
+                          <p className="text-base font-semibold text-slate-900">
                             {detailData.employee?.first_name} {detailData.employee?.last_name}
                           </p>
                           <p className="text-xs text-slate-500 mt-0.5">
                             {detailData.employee?.job_title || 'Staff'} • {detailData.employee?.nik || 'N/A'}
                           </p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Unit</p>
-                          <p className="text-base font-black text-slate-900">{detailData.branch?.name || 'Tanpa Unit'}</p>
+                        <div className="bg-slate-50 p-4 rounded-xl">
+                          <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Unit</p>
+                          <p className="text-base font-semibold text-slate-900">{detailData.branch?.name || 'Tanpa Unit'}</p>
                           {detailData.branch?.code && <p className="text-xs text-slate-500 mt-0.5">{detailData.branch.code}</p>}
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Jenis & Durasi</p>
-                          <p className="text-base font-black text-slate-900">{detailData.leave_type}</p>
+                        <div className="bg-slate-50 p-4 rounded-xl">
+                          <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Jenis & Durasi</p>
+                          <p className="text-base font-semibold text-slate-900">{detailData.leave_type}</p>
                           <p className="text-xs text-slate-500 mt-0.5">{detailData.days_taken} hari</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Periode Cuti</p>
-                          <p className="text-sm font-black text-slate-900">{formatDate(detailData.start_date)}</p>
+                        <div className="bg-slate-50 p-4 rounded-xl">
+                          <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Periode Cuti</p>
+                          <p className="text-sm font-semibold text-slate-900">{formatDate(detailData.start_date)}</p>
                           <p className="text-xs text-slate-500 mt-0.5">s/d {formatDate(detailData.end_date)}</p>
                         </div>
                       </div>
 
-                      <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                        <p className="text-[10px] text-amber-600 uppercase font-black mb-1">Alasan Pengajuan</p>
+                      <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                        <p className="text-[10px] text-amber-600 uppercase font-semibold mb-1">Alasan Pengajuan</p>
                         <p className="text-sm text-slate-700">{detailData.reason}</p>
                       </div>
                     </>
@@ -516,23 +516,23 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                     <>
                       {/* Header Info Grid */}
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-emerald-50 p-4 rounded-2xl">
-                          <p className="text-xs text-emerald-600 uppercase font-black mb-1">Customer</p>
-                          <p className="text-base font-black text-slate-900">{detailData.contacts?.name || 'Unknown'}</p>
+                        <div className="bg-emerald-50 p-4 rounded-xl">
+                          <p className="text-xs text-emerald-600 uppercase font-semibold mb-1">Customer</p>
+                          <p className="text-base font-semibold text-slate-900">{detailData.contacts?.name || 'Unknown'}</p>
                           {detailData.contacts?.phone && <p className="text-xs text-slate-500 mt-0.5">{detailData.contacts.phone}</p>}
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Nomor SO</p>
-                          <p className="text-base font-black text-[#003366]">{detailData.sale_number || '—'}</p>
+                        <div className="bg-slate-50 p-4 rounded-xl">
+                          <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Nomor SO</p>
+                          <p className="text-base font-semibold text-[#003366]">{detailData.sale_number || '—'}</p>
                           <p className="text-xs text-slate-500 mt-0.5">{detailData.sale_date ? new Date(detailData.sale_date).toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'}) : '—'}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Total Tagihan</p>
-                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.grand_total)}</p>
+                        <div className="bg-slate-50 p-4 rounded-xl">
+                          <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Total Tagihan</p>
+                          <p className="text-lg font-semibold text-slate-900">{formatRupiah(detailData.grand_total)}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Termin &amp; Jatuh Tempo</p>
-                          <p className="text-sm font-black text-slate-900">{detailData.payment_term || 'CASH'}</p>
+                        <div className="bg-slate-50 p-4 rounded-xl">
+                          <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Termin &amp; Jatuh Tempo</p>
+                          <p className="text-sm font-semibold text-slate-900">{detailData.payment_term || 'CASH'}</p>
                           {detailData.due_date && <p className="text-xs text-amber-600 mt-0.5">Due: {new Date(detailData.due_date).toLocaleDateString('id-ID', {day:'numeric',month:'short',year:'numeric'})}</p>}
                         </div>
                       </div>
@@ -541,15 +541,15 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                       {(detailData.tax_amount > 0 || detailData.discount_amount > 0) && (
                         <div className="grid grid-cols-3 gap-2 text-center">
                           <div className="bg-slate-50 p-3 rounded-xl">
-                            <p className="text-[10px] text-slate-400 uppercase font-black">Subtotal</p>
+                            <p className="text-[10px] text-slate-400 uppercase font-semibold">Subtotal</p>
                             <p className="text-sm font-bold text-slate-900">{formatRupiah(detailData.total_amount)}</p>
                           </div>
                           <div className="bg-rose-50 p-3 rounded-xl">
-                            <p className="text-[10px] text-rose-500 uppercase font-black">Diskon</p>
+                            <p className="text-[10px] text-rose-500 uppercase font-semibold">Diskon</p>
                             <p className="text-sm font-bold text-rose-600">- {formatRupiah(detailData.discount_amount)}</p>
                           </div>
                           <div className="bg-[#003366]/5 p-3 rounded-xl">
-                            <p className="text-[10px] text-[#003366] uppercase font-black">Pajak</p>
+                            <p className="text-[10px] text-[#003366] uppercase font-semibold">Pajak</p>
                             <p className="text-sm font-bold text-[#003366]">+ {formatRupiah(detailData.tax_amount)}</p>
                           </div>
                         </div>
@@ -557,15 +557,15 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
 
                       {/* Items */}
                       <div>
-                        <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest mb-3">Daftar Item Penjualan</h3>
-                        <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                        <h3 className="font-semibold text-slate-800 text-sm uppercase tracking-wide mb-3">Daftar Item Penjualan</h3>
+                        <div className="border border-slate-100 rounded-xl overflow-hidden">
                           <table className="w-full text-sm">
                             <thead className="bg-slate-50 border-b border-slate-100">
                               <tr>
-                                <th className="text-left px-4 py-2.5 text-[10px] text-slate-400 uppercase font-black">Produk</th>
-                                <th className="text-center px-4 py-2.5 text-[10px] text-slate-400 uppercase font-black">Qty</th>
-                                <th className="text-right px-4 py-2.5 text-[10px] text-slate-400 uppercase font-black">Harga</th>
-                                <th className="text-right px-4 py-2.5 text-[10px] text-slate-400 uppercase font-black">Total</th>
+                                <th className="text-left px-4 py-2.5 text-[10px] text-slate-400 uppercase font-semibold">Produk</th>
+                                <th className="text-center px-4 py-2.5 text-[10px] text-slate-400 uppercase font-semibold">Qty</th>
+                                <th className="text-right px-4 py-2.5 text-[10px] text-slate-400 uppercase font-semibold">Harga</th>
+                                <th className="text-right px-4 py-2.5 text-[10px] text-slate-400 uppercase font-semibold">Total</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
@@ -587,8 +587,8 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
 
                       {/* Notes */}
                       {detailData.notes && (
-                        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                          <p className="text-[10px] text-amber-600 uppercase font-black mb-1">Catatan dari Pembuat</p>
+                        <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                          <p className="text-[10px] text-amber-600 uppercase font-semibold mb-1">Catatan dari Pembuat</p>
                           <p className="text-sm text-slate-700">{detailData.notes}</p>
                         </div>
                       )}
@@ -597,24 +597,24 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                   {selectedReq.source_type === 'CONSTRUCTION_CHANGE_ORDER' && (
                     <>
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-amber-50 p-4 rounded-2xl">
-                          <p className="text-xs text-amber-600 uppercase font-black mb-1">Project</p>
-                          <p className="text-base font-black text-slate-900">{detailData.project_name}</p>
+                        <div className="bg-amber-50 p-4 rounded-xl">
+                          <p className="text-xs text-amber-600 uppercase font-semibold mb-1">Project</p>
+                          <p className="text-base font-semibold text-slate-900">{detailData.project_name}</p>
                           <p className="text-xs text-slate-500 mt-0.5">{detailData.project_code || 'Tanpa kode proyek'}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Tahap</p>
-                          <p className="text-base font-black text-slate-900">{detailData.stage_name || 'Semua Tahap'}</p>
+                        <div className="bg-slate-50 p-4 rounded-xl">
+                          <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Tahap</p>
+                          <p className="text-base font-semibold text-slate-900">{detailData.stage_name || 'Semua Tahap'}</p>
                           <p className="text-xs text-slate-500 mt-0.5">{detailData.branch_name || 'Tanpa unit'}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Jenis Perubahan</p>
-                          <p className="text-base font-black text-slate-900">{detailData.change_type}</p>
+                        <div className="bg-slate-50 p-4 rounded-xl">
+                          <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Jenis Perubahan</p>
+                          <p className="text-base font-semibold text-slate-900">{detailData.change_type}</p>
                           <p className="text-xs text-slate-500 mt-0.5">{detailData.reference_no || 'Tanpa referensi'}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Status Dokumen</p>
-                          <p className="text-base font-black text-slate-900">{detailData.status}</p>
+                        <div className="bg-slate-50 p-4 rounded-xl">
+                          <p className="text-xs text-slate-400 uppercase font-semibold mb-1">Status Dokumen</p>
+                          <p className="text-base font-semibold text-slate-900">{detailData.status}</p>
                           <p className="text-xs text-slate-500 mt-0.5">
                             {detailData.requested_date ? formatDate(detailData.requested_date) : 'Tanggal request belum diisi'}
                           </p>
@@ -622,37 +622,37 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                        <div className="bg-emerald-50 p-4 rounded-2xl">
-                          <p className="text-[10px] text-emerald-600 uppercase font-black mb-1">Delta Kontrak</p>
-                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.contract_value_delta || 0)}</p>
+                        <div className="bg-emerald-50 p-4 rounded-xl">
+                          <p className="text-[10px] text-emerald-600 uppercase font-semibold mb-1">Delta Kontrak</p>
+                          <p className="text-lg font-semibold text-slate-900">{formatRupiah(detailData.contract_value_delta || 0)}</p>
                         </div>
-                        <div className="bg-rose-50 p-4 rounded-2xl">
-                          <p className="text-[10px] text-rose-600 uppercase font-black mb-1">Delta Cost</p>
-                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.estimated_cost_delta || 0)}</p>
+                        <div className="bg-rose-50 p-4 rounded-xl">
+                          <p className="text-[10px] text-rose-600 uppercase font-semibold mb-1">Delta Cost</p>
+                          <p className="text-lg font-semibold text-slate-900">{formatRupiah(detailData.estimated_cost_delta || 0)}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Delta Waktu</p>
-                          <p className="text-lg font-black text-slate-900">{detailData.schedule_delta_days || 0} hari</p>
+                        <div className="bg-slate-50 p-4 rounded-xl">
+                          <p className="text-[10px] text-slate-400 uppercase font-semibold mb-1">Delta Waktu</p>
+                          <p className="text-lg font-semibold text-slate-900">{detailData.schedule_delta_days || 0} hari</p>
                         </div>
                       </div>
 
                       {detailData.reason && (
-                        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                          <p className="text-[10px] text-amber-600 uppercase font-black mb-1">Alasan Perubahan</p>
+                        <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                          <p className="text-[10px] text-amber-600 uppercase font-semibold mb-1">Alasan Perubahan</p>
                           <p className="text-sm text-slate-700">{detailData.reason}</p>
                         </div>
                       )}
 
                       {detailData.notes && (
-                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                          <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Catatan Tambahan</p>
+                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                          <p className="text-[10px] text-slate-400 uppercase font-semibold mb-1">Catatan Tambahan</p>
                           <p className="text-sm text-slate-700">{detailData.notes}</p>
                         </div>
                       )}
 
                       {(detailData.site_address || detailData.project_status) && (
-                        <div className="p-4 bg-[#003366]/5 rounded-2xl border border-[#003366]/10">
-                          <p className="text-[10px] text-[#003366] uppercase font-black mb-1">Konteks Project</p>
+                        <div className="p-4 bg-[#003366]/5 rounded-xl border border-[#003366]/10">
+                          <p className="text-[10px] text-[#003366] uppercase font-semibold mb-1">Konteks Project</p>
                           <p className="text-sm text-slate-700">
                             Status project: <span className="font-bold text-slate-900">{detailData.project_status || 'N/A'}</span>
                           </p>
@@ -666,7 +666,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
 
                   {/* APPROVAL LOGS / HISTORY */}
                   <div className="pt-6 border-t border-slate-100">
-                    <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <h3 className="font-semibold text-slate-800 text-xs uppercase tracking-wide mb-4 flex items-center gap-2">
                        <Clock size={14} className="text-slate-400" /> Riwayat Persetujuan (Internal Log)
                     </h3>
                     <div className="space-y-4">
@@ -686,7 +686,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                             
                             <div className="space-y-1">
                               <div className="flex items-center justify-between">
-                                <span className={`text-[10px] font-black uppercase tracking-wider ${
+                                <span className={`text-[10px] font-semibold uppercase tracking-wider ${
                                   log.status === 'APPROVED' ? 'text-emerald-600' : 
                                   log.status === 'REJECTED' ? 'text-rose-600' : 
                                   'text-blue-600'
@@ -738,13 +738,13 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
       {/* CONFIRMATION + NOTES MODAL */}
       {confirmOpen && confirmAction && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-md overflow-hidden">
             <div className={`p-6 flex items-center gap-4 ${confirmAction === 'APPROVED' ? 'bg-[#003366]' : 'bg-rose-600'}`}>
               <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
                 {confirmAction === 'APPROVED' ? <ShieldCheck size={24} className="text-white" /> : <AlertTriangle size={24} className="text-white" />}
               </div>
               <div>
-                <h2 className="text-lg font-black text-white">
+                <h2 className="text-lg font-semibold text-white">
                   {confirmAction === 'APPROVED' ? 'Konfirmasi Persetujuan' : 'Konfirmasi Penolakan'}
                 </h2>
                 <p className="text-sm text-white/80">
@@ -754,18 +754,18 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
             </div>
             <div className="p-6 space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Catatan / Alasan (Opsional)</label>
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Catatan / Alasan (Opsional)</label>
                 <textarea
                   value={confirmNotes}
                   onChange={e => setConfirmNotes(e.target.value)}
                   placeholder={confirmAction === 'APPROVED' ? 'Cth: Disetujui sesuai anggaran Q1...' : 'Cth: Nilai melebihi batas budget...'}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm outline-none resize-none min-h-[80px] focus:border-blue-300 transition-colors"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm outline-none resize-none min-h-[80px] focus:border-blue-300 transition-colors"
                 />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setConfirmOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-700 text-sm font-bold rounded-2xl hover:bg-slate-200">Batalkan</button>
+                <button onClick={() => setConfirmOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-200">Batalkan</button>
                 <button onClick={handleConfirmSubmit}
-                  className={`flex-1 py-3 text-white text-sm font-bold rounded-2xl flex items-center justify-center gap-2 shadow-lg ${confirmAction === 'APPROVED' ? 'bg-[#003366] hover:bg-[#002d5a] shadow-[#003366]/10' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'}`}>
+                  className={`flex-1 py-3 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg ${confirmAction === 'APPROVED' ? 'bg-[#003366] hover:bg-[#002d5a] shadow-[#003366]/10' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'}`}>
                   {confirmAction === 'APPROVED' ? <><QrCode size={16} /> Tanda Tangani &amp; Setujui</> : <><X size={16} /> Tolak Dokumen</>}
                 </button>
               </div>
@@ -777,12 +777,12 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
       {/* QR SIGNATURE MODAL */}
       {signOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl">
+          <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden shadow-md">
              <div className="bg-emerald-500 p-6 flex flex-col items-center justify-center text-white space-y-3">
                 <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
                    <ShieldCheck size={32} />
                 </div>
-                <h2 className="text-xl font-black">Dokumen Disetujui!</h2>
+                <h2 className="text-xl font-semibold">Dokumen Disetujui!</h2>
                 <p className="text-emerald-50 text-sm text-center">Tanda tangan digital Anda telah disematkan. QR ini adalah bukti verifikasi sah.</p>
              </div>
 
@@ -791,11 +791,11 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                     <QRCodeSVG value={signatureData} size={160} level="H" fgColor="#059669" />
                 </div>
                 <div className="text-center space-y-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID Verifikasi</p>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">ID Verifikasi</p>
                   <p className="text-xs text-slate-500 font-mono break-all px-4">{signatureData}</p>
                 </div>
                 <button onClick={() => setSignOpen(false)}
-                  className="w-full px-6 py-3 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 flex items-center justify-center gap-2">
+                  className="w-full px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 flex items-center justify-center gap-2">
                   <Check size={18} /> Selesai
                 </button>
              </div>

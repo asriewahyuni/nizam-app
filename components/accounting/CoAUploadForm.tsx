@@ -116,7 +116,7 @@ export function CoAUploadForm({ orgId, onSuccess }: Props) {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className="relative border-2 border-dashed border-slate-300 rounded-2xl p-8 transition-all hover:border-slate-400 cursor-pointer"
+        className="relative border-2 border-dashed border-slate-300 rounded-xl p-8 transition-all hover:border-slate-400 cursor-pointer"
         onClick={() => fileInputRef.current?.click()}
       >
         <input

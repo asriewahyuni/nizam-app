@@ -259,8 +259,8 @@ export function AssessmentTemplateEditor({
     }
   }
 
-  const sectionClass = 'rounded-2xl border border-slate-100 bg-white p-6 shadow-sm space-y-4'
-  const labelClass = 'text-[10px] font-bold uppercase tracking-widest text-slate-400'
+  const sectionClass = 'rounded-xl border border-slate-100 bg-white p-6 shadow-sm space-y-4'
+  const labelClass = 'text-[10px] font-bold uppercase tracking-wide text-slate-400'
   const inputClass = 'w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-200 outline-none transition-all'
 
   return (

@@ -99,7 +99,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
     <div className="flex flex-col gap-6">
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 border-b-4 border-blue-600 inline-block pb-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 border-b-4 border-blue-600 inline-block pb-1">
             Dashboard Syirkah
           </h1>
           <p className="text-sm text-slate-500 mt-2 font-medium">
@@ -117,13 +117,13 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
       {/* HERO SECTION */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Net Profit Hero */}
-        <div className="col-span-1 md:col-span-2 relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-900 via-blue-800 to-emerald-900 p-6 flex flex-col justify-between shadow-xl shadow-blue-900/20">
+        <div className="col-span-1 md:col-span-2 relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-900 via-blue-800 to-emerald-900 p-6 flex flex-col justify-between shadow-xl shadow-blue-900/20">
           <div className="absolute top-0 right-0 p-4 opacity-20">
             <TrendingUp size={100} />
           </div>
           <div className="relative z-10">
-            <h2 className="text-blue-200 text-sm font-black tracking-widest uppercase mb-1">Total Net Profit</h2>
-            <div className="text-4xl lg:text-5xl font-black text-white tracking-tighter">
+            <h2 className="text-blue-200 text-sm font-semibold tracking-wide uppercase mb-1">Total Net Profit</h2>
+            <div className="text-4xl lg:text-5xl font-semibold text-white tracking-tighter">
               {formatRupiah(netProfit)}
             </div>
             <p className="text-blue-100 text-sm mt-2 opacity-80 max-w-sm leading-tight">
@@ -133,16 +133,16 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
         </div>
 
         {/* Debt Exposure Hero */}
-        <div className="col-span-1 md:col-span-2 rounded-3xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+        <div className="col-span-1 md:col-span-2 rounded-xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-start mb-4">
-              <h2 className="text-slate-500 text-sm font-black tracking-widest uppercase">Alokasi Hutang Keseluruhan</h2>
+              <h2 className="text-slate-500 text-sm font-semibold tracking-wide uppercase">Alokasi Hutang Keseluruhan</h2>
               <div className="p-2 bg-rose-50 text-rose-500 rounded-full">
                 <AlertCircle size={18} />
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-slate-900 tracking-tighter">{formatRupiah(totalCurrentDebt)}</span>
+              <span className="text-3xl font-semibold text-slate-900 tracking-tighter">{formatRupiah(totalCurrentDebt)}</span>
               <span className="text-sm font-bold text-slate-400">/ {formatRupiah(totalDebtAllocation)}</span>
             </div>
           </div>
@@ -161,11 +161,11 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-bold text-slate-800">
-              <span className="rounded-2xl bg-blue-50 p-2 text-blue-600">
+              <span className="rounded-xl bg-blue-50 p-2 text-blue-600">
                 <PieChart size={18} />
               </span>
               Alokasi Bagi Hasil Syarik
@@ -176,9 +176,9 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
           </div>
           {profitSharingReferenceGroup && (
             <div className="flex items-center gap-3">
-              <div className="inline-flex rounded-2xl bg-blue-50 px-4 py-3 text-right">
+              <div className="inline-flex rounded-xl bg-blue-50 px-4 py-3 text-right">
                 <div>
-                  <span className="block text-[11px] font-black uppercase tracking-widest text-blue-500">Akad Acuan</span>
+                  <span className="block text-[11px] font-semibold uppercase tracking-wide text-blue-500">Akad Acuan</span>
                   <span className="block text-sm font-bold text-blue-800">{profitSharingReferenceGroup.contractTitle}</span>
                 </div>
               </div>
@@ -202,11 +202,11 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
 
         {profitSharingReferenceGroup ? (
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="rounded-3xl bg-slate-900 p-5 text-white shadow-lg">
+            <div className="rounded-xl bg-slate-900 p-5 text-white shadow-lg">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-300">Total Alokasi Bagi Hasil</p>
-                  <div className="mt-2 text-3xl font-black tracking-tight">{formatRupiah(totalProfitSharingReference)}</div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Total Alokasi Bagi Hasil</p>
+                  <div className="mt-2 text-3xl font-semibold tracking-tight">{formatRupiah(totalProfitSharingReference)}</div>
                 </div>
                 {!isEditingProfitSharing && (
                   <button
@@ -221,8 +221,8 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
               </div>
 
               {isEditingProfitSharing && (
-                <div className="mt-4 rounded-2xl bg-white/10 p-4">
-                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-300">
+                <div className="mt-4 rounded-xl bg-white/10 p-4">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-300">
                     Nominal Alokasi Baru
                   </label>
                   <input
@@ -259,7 +259,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
               )}
 
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-2xl bg-white/10 px-3 py-3">
+                <div className="rounded-xl bg-white/10 px-3 py-3">
                   <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-300">
                     {profitSharingReferenceGroup.distributionSource === 'MANUAL_ALLOCATION' ? 'Alokasi Manual' : 'Basis Laba'}
                   </span>
@@ -267,7 +267,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
                     {formatRupiah(Number(profitSharingReferenceGroup.estimatedNetProfit || 0))}
                   </span>
                 </div>
-                <div className="rounded-2xl bg-white/10 px-3 py-3">
+                <div className="rounded-xl bg-white/10 px-3 py-3">
                   <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-300">Total Nisbah</span>
                   <span className="mt-1 block font-bold text-white">{totalReferenceNisbah}%</span>
                 </div>
@@ -279,7 +279,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
                 {profitSharingReferenceMembers.map((member: any) => (
                   <div
                     key={member.id || member.member_name}
-                    className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 md:flex-row md:items-center md:justify-between"
+                    className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 md:flex-row md:items-center md:justify-between"
                   >
                     <div>
                       <p className="font-bold text-slate-800">{member.member_name}</p>
@@ -289,8 +289,8 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
                       </div>
                     </div>
                     <div className="text-left md:text-right">
-                      <span className="block text-[11px] font-black uppercase tracking-widest text-slate-400">Estimasi Diterima</span>
-                      <span className="block text-xl font-black tracking-tight text-blue-700">
+                      <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Estimasi Diterima</span>
+                      <span className="block text-xl font-semibold tracking-tight text-blue-700">
                         {formatRupiah(Number(member.estimatedProfitAmount || 0))}
                       </span>
                     </div>
@@ -300,7 +300,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
             </div>
           </div>
         ) : (
-          <div className="mt-6 rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-5 py-6">
+          <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-6">
             <p className="text-sm font-semibold text-slate-700">
               {distributionContext?.mode === 'MULTIPLE_ACTIVE_CONTRACTS'
                 ? 'Belum ada satu angka rujukan per syarik karena ada lebih dari satu akad ACTIVE atau COMPLETED. Sistem perlu laba bersih per akad agar alokasi tiap syarik akurat.'
@@ -314,7 +314,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
       </div>
 
       {/* SYIRKAH CONTRACTS */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
             <Briefcase size={20} className="text-blue-600" />
@@ -323,7 +323,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
         </div>
 
         {contracts.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
+          <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
             <Handshake size={48} className="mx-auto text-slate-300 mb-4" />
             <h4 className="text-slate-700 font-bold mb-1">Belum Ada Kemitraan</h4>
             <p className="text-sm text-slate-500">Tambahkan judul akad baru di atas untuk memulai syirkah.</p>
@@ -333,12 +333,12 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-400">
-                  <th className="pb-3 font-black pl-2">Judul Akad</th>
-                  <th className="pb-3 font-black">Jenis</th>
-                  <th className="pb-3 font-black">Status</th>
-                  <th className="pb-3 font-black text-right">Estimasi Pembagian</th>
-                  <th className="pb-3 font-black text-right">Hutang Berjalan</th>
-                  <th className="pb-3 font-black text-center pr-2">Aksi</th>
+                  <th className="pb-3 font-semibold pl-2">Judul Akad</th>
+                  <th className="pb-3 font-semibold">Jenis</th>
+                  <th className="pb-3 font-semibold">Status</th>
+                  <th className="pb-3 font-semibold text-right">Estimasi Pembagian</th>
+                  <th className="pb-3 font-semibold text-right">Hutang Berjalan</th>
+                  <th className="pb-3 font-semibold text-center pr-2">Aksi</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
