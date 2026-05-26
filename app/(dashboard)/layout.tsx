@@ -222,6 +222,13 @@ export default async function DashboardLayout({
     }
   }
 
+  // Halaman ESS karyawan (clock-in / self-service) — tampil full-screen tanpa sidebar & header
+  // HANYA saat karyawan belum clock-in. Setelah clock-in (router.refresh()), hasClockedInToday = true
+  // → isEssPage = false → sidebar & header muncul otomatis.
+  const isEssPage = (requestPathname === '/karyawan' || requestPathname.startsWith('/karyawan/'))
+    && requiresAttendanceGate
+    && !hasClockedInToday
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 print:block print:h-auto print:overflow-visible print:bg-white">
       <SentryUserContext
@@ -244,8 +251,8 @@ export default async function DashboardLayout({
         activeBranchId={activeBranch?.id || null}
       />
       <EduModeShell />
-      {/* Sidebar */}
-      <AppSidebar 
+      {/* Sidebar — disembunyikan di halaman ESS karyawan */}
+      {!isEssPage && <AppSidebar
         key={`sidebar:${orgData.org.id}:${activeBranch?.id || 'all'}`}
         orgId={orgData.org.id}
         activeBranchId={activeBranch?.id || null}
@@ -265,7 +272,7 @@ export default async function DashboardLayout({
         isStaffEmployee={isStaffEmployee}
         requiresAttendanceGate={requiresAttendanceGate}
         hasClockedInToday={hasClockedInToday}
-      />
+      />}
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden print:overflow-visible">
@@ -276,7 +283,8 @@ export default async function DashboardLayout({
           />
         )}
         {isDemo && <DemoBanner />}
-        <div className={isStaffEmployee ? 'hidden md:block' : ''}>
+        {/* Header — disembunyikan di halaman ESS karyawan */}
+        <div className={isEssPage ? 'hidden' : (isStaffEmployee ? 'hidden md:block' : '')}>
         <AppHeader
           key={`header:${orgData.org.id}:${activeBranch?.id || 'all'}`}
           user={{
@@ -296,16 +304,18 @@ export default async function DashboardLayout({
           runtimeDatabaseSource={runtimeDb.sourceKey}
         />
         </div>
-        {!isStaffEmployee && <StartupWizard isDemo={isDemo} enabled={startupWizardEnabled} />}
-        {!isStaffEmployee && <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />}
+        {!isEssPage && !isStaffEmployee && <StartupWizard isDemo={isDemo} enabled={startupWizardEnabled} />}
+        {!isEssPage && !isStaffEmployee && <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />}
         <main
           id="dashboard-scroll-root"
-          className={isStaffEmployee
-            ? 'flex-1 overflow-hidden print:overflow-visible'
-            : 'flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0'
+          className={isEssPage
+            ? 'flex-1 overflow-y-auto'
+            : isStaffEmployee
+              ? 'flex-1 overflow-hidden print:overflow-visible'
+              : 'flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0'
           }
         >
-          {isStaffEmployee ? children : (
+          {isEssPage ? children : isStaffEmployee ? children : (
             <div className="max-w-7xl mx-auto print:max-w-none">
               {allowAllBranchSelection && !activeBranch && (
                 <div className="mb-6 rounded-[28px] border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">
@@ -326,7 +336,7 @@ export default async function DashboardLayout({
             </div>
           )}
         </main>
-        {!isStaffEmployee && (
+        {!isEssPage && !isStaffEmployee && (
           <MobileBottomNav
             userRole={orgData.role}
             permissions={orgData.permissions}
@@ -335,7 +345,7 @@ export default async function DashboardLayout({
             hasClockedInToday={hasClockedInToday}
           />
         )}
-        {!isStaffEmployee && <FloatingPlanBadge planName={effectivePlanName} />}
+        {!isEssPage && !isStaffEmployee && <FloatingPlanBadge planName={effectivePlanName} />}
       </div>
     </div>
   )

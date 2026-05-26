@@ -865,11 +865,15 @@ export async function signInWithInternalAuth(input: {
   nik?: string | null
   password: string
   preferredOrgId?: string | null
+  /** Jika diisi, NIK HARUS terdaftar di org ini — dipakai saat login via slug karyawan */
+  strictOrgId?: string | null
 }) {
   const email = normalizeEmail(input.email)
   const nik = normalizeNik(input.nik)
   const password = normalizeInput(input.password)
-  const preferredOrgId = normalizeUuid(input.preferredOrgId)
+  const strictOrgId = normalizeUuid(input.strictOrgId)
+  // strictOrgId menggantikan preferredOrgId sebagai $3 agar preferred_org_match dihitung untuk org yang benar
+  const preferredOrgId = strictOrgId ?? normalizeUuid(input.preferredOrgId)
 
   if ((!email && !nik) || !password) {
     return { error: 'Kredensial login tidak lengkap.' as const }
@@ -1059,6 +1063,34 @@ export async function signInWithInternalAuth(input: {
       }
     }
     if (passwordMatched.length === 0) return { error: 'Email/NIK atau password salah.' as const }
+
+    // ── Enforcement: jika strictOrgId diisi, NIK HARUS ada di org tersebut ──
+    // Ini memastikan login via slug karyawan hanya bisa untuk karyawan org yang benar,
+    // bahkan jika NIK yang sama ada di org lain.
+    if (!email && nik && strictOrgId) {
+      const inStrictOrg = passwordMatched.filter((c) => c.preferred_org_match)
+      if (inStrictOrg.length === 0) {
+        return { error: 'NIK tidak terdaftar di organisasi ini. Pastikan Anda login melalui link yang benar.' as const }
+      }
+      if (inStrictOrg.length > 1) {
+        return { error: 'NIK terhubung ke lebih dari satu akun pada organisasi ini. Hubungi Admin HRD.' as const }
+      }
+      // Tepat 1 akun di org ini — buat session dan return langsung
+      const strictMatched = inStrictOrg[0]
+      const sessionId = await createSession(strictMatched.id)
+      await queryPostgres(
+        `update public.internal_auth_users set last_login_at = now() where id = $1::uuid`,
+        [strictMatched.id]
+      )
+      return {
+        success: true as const,
+        sessionId,
+        userId: strictMatched.id,
+        email: strictMatched.login_email,
+        nik: strictMatched.login_nik,
+        resolvedOrgId: strictOrgId,
+      }
+    }
 
     let matched: InternalCredentialRow | null = passwordMatched[0] || null
 

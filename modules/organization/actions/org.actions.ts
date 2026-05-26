@@ -3452,3 +3452,24 @@ export async function getInvitationByCode(code: string) {
     }
   }
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// resolveOrgBySlug — publik, tanpa auth — untuk login page ?org=slug
+// ─────────────────────────────────────────────────────────────────────────────
+export async function resolveOrgBySlug(slug: string): Promise<{
+  id: string
+  name: string
+  logo_url: string | null
+  slug: string
+} | null> {
+  if (!slug) return null
+  const db = await createClient()
+  const { data } = await (db as any)
+    .from('organizations')
+    .select('id, name, logo_url, slug')
+    .eq('slug', slug.toLowerCase().trim())
+    .eq('is_active', true)
+    .maybeSingle()
+  return data || null
+}

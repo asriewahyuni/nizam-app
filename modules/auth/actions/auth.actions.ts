@@ -1113,30 +1113,33 @@ export async function signInWithNik(formData: FormData) {
   let nik = (formData.get('nik') as string)?.trim()
   const password = (formData.get('password') as string)
   const redirectTo = (formData.get('redirectTo') as string)
-  const explicitOrgIdPreference = normalizeUuid(formData.get('orgId'))
+  // orgId dari slug page (strict) — NIK HARUS ada di org ini
+  const strictOrgId = normalizeUuid(formData.get('orgId'))
+  // orgSlug dikirim dari slug page agar error redirect kembali ke halaman yang benar
+  const orgSlug = (formData.get('orgSlug') as string)?.trim() || null
+
+  // Tentukan base URL untuk redirect error
+  const errorBase = orgSlug ? `/${orgSlug}` : '/login'
 
   if (!nik || !password) {
-     return redirect(`/login?error=${encodeURIComponent('NIK dan Password wajib diisi.')}&tab=karyawan`)
+     return redirect(`${errorBase}?error=${encodeURIComponent('NIK dan Password wajib diisi.')}`)
   }
 
   if (isInternalAuthProvider()) {
     const cookieStore = await cookies()
     const cookieOrgIdPreference = normalizeUuid(cookieStore.get(ACTIVE_ORG_COOKIE)?.value)
-    const preferredOrgId = explicitOrgIdPreference || cookieOrgIdPreference
 
     const result = await signInWithInternalAuth({
       nik,
       password,
-      preferredOrgId,
+      // strictOrgId: hard constraint dari slug — karyawan HARUS di org ini
+      strictOrgId,
+      // preferredOrgId: soft hint dari cookie (hanya dipakai jika tidak ada strictOrgId)
+      preferredOrgId: strictOrgId ? null : cookieOrgIdPreference,
     })
 
     if ('error' in result) {
-      const normalizedMessage = String(result.error || '').trim()
-      const loweredMessage = normalizedMessage.toLowerCase()
-      const redirectMessage = loweredMessage.includes('lebih dari satu') || loweredMessage.includes('organisasi')
-        ? normalizedMessage
-        : 'NIK atau password salah.'
-      return redirect(`/login?error=${encodeURIComponent(redirectMessage)}&tab=karyawan`)
+      return redirect(`${errorBase}?error=${encodeURIComponent(String(result.error))}`)
     }
 
     if (result.resolvedOrgId) {
