@@ -844,59 +844,69 @@ export function AppSidebar({
         })}
       </nav>
 
-      {/* Footer / Role */}
-      <div className={`p-3 mt-auto border-t border-slate-100 bg-white ${effectiveIsCollapsed ? 'flex flex-col items-center gap-3' : 'flex items-center justify-between w-full'}`}>
+      {/* Settings — nav item mandiri di atas footer */}
+      {(() => {
+        const settingsHref = isOwnerOrAdmin ? '/settings/business' : '/karyawan'
+        const settingsLabel = isOwnerOrAdmin ? 'Pengaturan' : 'Portal Karyawan'
+        const isSettingsActive = fullPath.startsWith('/settings') || (!isOwnerOrAdmin && fullPath.startsWith('/karyawan'))
+        return (
+          <div className="px-3 pb-2 border-t border-slate-100 pt-2">
+            <Link
+              href={settingsHref}
+              onMouseEnter={() => prefetchRoute(settingsHref)}
+              onFocus={() => prefetchRoute(settingsHref)}
+              onTouchStart={() => prefetchRoute(settingsHref)}
+              onPointerDown={() => prefetchRoute(settingsHref)}
+              onClick={() => {
+                prefetchRoute(settingsHref)
+                notifyRouteLoadingStart()
+                setIsMobileOpen(false)
+              }}
+              title={settingsLabel}
+              className={`flex items-center rounded-md text-sm font-medium transition-colors duration-150 group/settings
+                ${effectiveIsCollapsed ? 'justify-center p-2.5' : 'px-3 py-2 gap-3.5'}
+                ${isSettingsActive
+                  ? 'bg-[#003366] text-white'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+            >
+              <Settings
+                size={16}
+                strokeWidth={isSettingsActive ? 2 : 1.75}
+                className={`shrink-0 ${isSettingsActive ? 'text-white' : 'text-slate-400 group-hover/settings:text-slate-700'}`}
+              />
+              {!effectiveIsCollapsed && (
+                <span className="tracking-tight truncate">{settingsLabel}</span>
+              )}
+            </Link>
+          </div>
+        )
+      })()}
+
+      {/* Footer — hanya avatar + nama + logout */}
+      <div className={`p-3 border-t border-slate-100 bg-white ${effectiveIsCollapsed ? 'flex flex-col items-center gap-2' : 'flex items-center justify-between w-full gap-3'}`}>
         <div className={`flex items-center gap-3 ${effectiveIsCollapsed ? '' : 'min-w-0 flex-1'}`}>
           <div className="w-8 h-8 shrink-0 rounded-full bg-slate-700 overflow-hidden flex items-center justify-center text-xs font-semibold text-white relative" title={user?.fullName || userRole}>
             {user?.fullName?.slice(0, 1).toUpperCase() || userRole?.slice(0, 1).toUpperCase()}
             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-800" />
           </div>
-            {!effectiveIsCollapsed && (
-              <div className="flex flex-col overflow-hidden min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-800 truncate leading-tight">{user?.fullName || userRole}</p>
-                <p className="text-[11px] text-slate-500 truncate">{jobTitle || userRole} &middot; {planName}</p>
-              </div>
-            )}
-          </div>
-
-          <div className={`flex items-center shrink-0 ${effectiveIsCollapsed ? 'flex-col gap-2' : 'gap-1'}`}>
-            <Link
-              href={isOwnerOrAdmin ? '/settings/business' : '/karyawan'}
-              onMouseEnter={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/karyawan')}
-              onFocus={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/karyawan')}
-              onTouchStart={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/karyawan')}
-              onPointerDown={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/karyawan')}
-              onClick={() => {
-                prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/karyawan')
-                notifyRouteLoadingStart()
-                setIsMobileOpen(false)
-              }}
-              title={isOwnerOrAdmin ? 'Pengaturan Bisnis' : 'Portal Karyawan'}
-              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
-            >
-              <Settings size={18} strokeWidth={1.5} />
-            </Link>
-            <button 
-              type="button"
-              onClick={handleClientSignOut}
-              disabled={isSigningOut}
-              title={isDemo ? "Keluar & Reset Demo" : "Keluar"}
-              className={`p-2 rounded-md transition-colors cursor-pointer disabled:cursor-wait disabled:opacity-60 ${isDemo ? 'text-orange-500 hover:text-orange-600 hover:bg-orange-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
-            >
-              <LogOut size={18} strokeWidth={2} className={isSigningOut ? 'animate-pulse' : ''} />
-            </button>
-          </div>
-      {effectiveIsCollapsed && (
-        <div className="px-3 pb-3">
-          <Link href="/billing" onMouseEnter={() => prefetchRoute('/billing')} onFocus={() => prefetchRoute('/billing')} onTouchStart={() => prefetchRoute('/billing')} onPointerDown={() => prefetchRoute('/billing')} onClick={() => {
-            prefetchRoute('/billing')
-            notifyRouteLoadingStart()
-            setIsMobileOpen(false)
-          }} title="Langganan & Billing" className="flex items-center justify-center w-full p-2.5 rounded-xl bg-[#003366]/5 text-[#003366] hover:bg-[#003366] hover:text-white transition-all shadow-sm">
-            <Zap size={16} />
-          </Link>
+          {!effectiveIsCollapsed && (
+            <div className="flex flex-col overflow-hidden min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-800 truncate leading-tight">{user?.fullName || userRole}</p>
+              <p className="text-[11px] text-slate-500 truncate">{jobTitle || userRole} &middot; {planName}</p>
+            </div>
+          )}
         </div>
-      )}
+
+        <button
+          type="button"
+          onClick={handleClientSignOut}
+          disabled={isSigningOut}
+          title={isDemo ? 'Keluar & Reset Demo' : 'Keluar'}
+          className={`shrink-0 p-2 rounded-md transition-colors cursor-pointer disabled:cursor-wait disabled:opacity-60 ${isDemo ? 'text-orange-500 hover:text-orange-600 hover:bg-orange-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
+        >
+          <LogOut size={18} strokeWidth={2} className={isSigningOut ? 'animate-pulse' : ''} />
+        </button>
       </div>
     </aside>
     </>
