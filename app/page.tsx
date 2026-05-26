@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/modules/auth/actions/auth.actions'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { resolveDefaultAuthorizedRoute } from '@/modules/organization/lib/navigation-access'
 import OnboardingPage from './onboarding/page'
 
 export default async function HomePage() {
@@ -12,12 +13,20 @@ export default async function HomePage() {
   }
 
   const orgData = await getActiveOrg()
-  
+
   // Jika sudah login tapi belum punya organisasi, selesaikan Onboarding
   if (!orgData) {
     return <OnboardingPage />
   }
 
-  // Jika semua lengkap, masuk ke Dashboard
-  redirect('/dashboard')
+  // Arahkan user ke halaman pertama sesuai role & permission-nya
+  // — owner/admin → /dashboard
+  // — staff sales → /sales
+  // — kasir POS → /pos
+  // — dst. (lihat resolveDefaultAuthorizedRoute)
+  redirect(resolveDefaultAuthorizedRoute({
+    userRole: orgData.role,
+    permissions: orgData.permissions,
+    enabledModules: orgData.enabledModules,
+  }))
 }
