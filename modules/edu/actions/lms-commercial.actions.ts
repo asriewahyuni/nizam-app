@@ -407,3 +407,77 @@ export async function getLmsLessonsByCourseId(orgId: string, courseId: string) {
   if (error) return []
   return data
 }
+
+// ── Lesson CRUD ───────────────────────────────────────────────────────────────
+
+export async function createLmsLesson(formData: FormData) {
+  const orgData = await assertOrgAdmin()
+  const supabase = await createClient()
+
+  const courseId   = formData.get('courseId') as string
+  const title      = (formData.get('title') as string)?.trim()
+  const contentMd  = (formData.get('contentMd') as string)?.trim() || null
+  const lessonType = (formData.get('lessonType') as string) || 'TEXT'
+  const sortOrder  = Number(formData.get('sortOrder') || 0)
+  const isRequired = formData.get('isRequired') !== 'false'
+
+  if (!courseId || !title) throw new Error('courseId dan title wajib diisi.')
+
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now()
+
+  const { error } = await supabase.from('learning_lessons').insert({
+    org_id:      orgData.org.id,
+    course_id:   courseId,
+    title,
+    slug,
+    content_md:  contentMd,
+    lesson_type: lessonType,
+    sort_order:  sortOrder,
+    is_required: isRequired,
+  })
+
+  if (error) throw new Error(getErrorMessage(error))
+  revalidatePath('/lms')
+}
+
+export async function updateLmsLesson(formData: FormData) {
+  const orgData = await assertOrgAdmin()
+  const supabase = await createClient()
+
+  const lessonId   = formData.get('lessonId') as string
+  const title      = (formData.get('title') as string)?.trim()
+  const contentMd  = (formData.get('contentMd') as string)?.trim() || null
+  const lessonType = (formData.get('lessonType') as string) || 'TEXT'
+  const isRequired = formData.get('isRequired') !== 'false'
+
+  if (!lessonId || !title) throw new Error('lessonId dan title wajib diisi.')
+
+  const { error } = await supabase
+    .from('learning_lessons')
+    .update({
+      title,
+      content_md:  contentMd,
+      lesson_type: lessonType,
+      is_required: isRequired,
+      updated_at:  new Date().toISOString(),
+    })
+    .eq('id', lessonId)
+    .eq('org_id', orgData.org.id)
+
+  if (error) throw new Error(getErrorMessage(error))
+  revalidatePath('/lms')
+}
+
+export async function deleteLmsLesson(lessonId: string) {
+  const orgData = await assertOrgAdmin()
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('learning_lessons')
+    .delete()
+    .eq('id', lessonId)
+    .eq('org_id', orgData.org.id)
+
+  if (error) throw new Error(getErrorMessage(error))
+  revalidatePath('/lms')
+}

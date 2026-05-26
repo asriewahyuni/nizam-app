@@ -1236,7 +1236,7 @@ function BillingContent() {
               <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3">
                 <div className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700">Checkout Target</div>
                 <p className="mt-1 text-[11px] font-semibold text-indigo-700">
-                  {selectedCheckoutItem ? `${selectedCheckoutItem.label}: ${selectedCheckoutItem.name}` : 'Belum ada item dipilih dari builder.'}
+                  {selectedCheckoutItem ? `${selectedCheckoutItem?.label ?? ''}: ${selectedCheckoutItem?.name ?? ''}` : 'Belum ada item dipilih dari builder.'}
                 </p>
               </div>
               {selectedCheckoutItem ? (
@@ -1244,22 +1244,22 @@ function BillingContent() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="inline-flex rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-700">
-                        {selectedCheckoutItem.label}
+                        {selectedCheckoutItem?.label}
                       </div>
-                      <h4 className="mt-3 text-lg font-black tracking-tight text-slate-900">{selectedCheckoutItem.name}</h4>
+                      <h4 className="mt-3 text-lg font-black tracking-tight text-slate-900">{selectedCheckoutItem?.name}</h4>
                       <p className="mt-2 text-[11px] font-semibold leading-relaxed text-slate-600">
-                        {selectedCheckoutItem.description}
+                        {selectedCheckoutItem?.description}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Harga</p>
-                      <p className="mt-1 text-xl font-black tracking-tight text-slate-900">{formatRupiah(selectedCheckoutItem.price)}</p>
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">/{selectedCheckoutItem.billing}</p>
+                      <p className="mt-1 text-xl font-black tracking-tight text-slate-900">{formatRupiah(selectedCheckoutItem?.price ?? 0)}</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">/{selectedCheckoutItem?.billing}</p>
                     </div>
                   </div>
                   <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Catatan Aktivasi</p>
-                    <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-600">{selectedCheckoutItem.note}</p>
+                    <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-600">{selectedCheckoutItem?.note}</p>
                   </div>
                 </div>
               ) : (

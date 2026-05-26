@@ -2146,3 +2146,26 @@ export async function getSyirkahDashboardData(orgId: string) {
     }
   }
 }
+
+// ── Adendum: Alokasi Hutang ───────────────────────────────────────────────────
+
+export async function updateSyirkahDebtAllocation(
+  contractId: string,
+  orgId: string,
+  debtAllocation: number,
+  currentDebt: number
+) {
+  const supabase = await createClient()
+  const { error } = await (supabase as any)
+    .from('syirkah_contracts')
+    .update({
+      debt_allocation: debtAllocation,
+      current_debt:    currentDebt,
+      updated_at:      new Date().toISOString(),
+    })
+    .eq('id', contractId)
+    .eq('org_id', orgId)
+
+  if (error) throw new Error(error.message || 'Gagal menyimpan adendum hutang.')
+  revalidatePath(`/syirkah/${contractId}`)
+}
