@@ -12,7 +12,7 @@ type Course = {
 }
 
 export default function CreateBatchForm({ courses }: { courses: Course[] }) {
-  const [state, action, isPending] = useActionState(createLmsBatch, null)
+  const [state, action, isPending] = useActionState(createLmsBatch, {})
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {

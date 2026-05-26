@@ -93,7 +93,7 @@ export default async function AssessmentTemplatesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {courseList.map((course) => (
+              {courseList.map((course: any) => (
                 <tr
                   key={course.slug}
                   className="hover:bg-slate-50/50 transition-colors"

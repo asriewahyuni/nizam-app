@@ -40,7 +40,7 @@ type Session = {
 // ── Inline Batch Form ──────────────────────────────────────────────────────
 
 function InlineBatchForm({ courseId, onSuccess }: { courseId: string; onSuccess?: () => void }) {
-  const [state, action, isPending] = useActionState(createLmsBatch, null)
+  const [state, action, isPending] = useActionState(createLmsBatch, {})
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -121,7 +121,7 @@ function InlineBatchForm({ courseId, onSuccess }: { courseId: string; onSuccess?
 // ── Inline Session Form ────────────────────────────────────────────────────
 
 function InlineSessionForm({ batchId }: { batchId: string }) {
-  const [state, action, isPending] = useActionState(createLmsSession, null)
+  const [state, action, isPending] = useActionState(createLmsSession, {})
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {

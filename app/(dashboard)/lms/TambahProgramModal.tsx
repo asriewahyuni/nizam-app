@@ -74,13 +74,13 @@ export function TambahProgramModal({ open, onClose }: Props) {
     fd.set('levelCode', levelCode)
 
     startTransition(async () => {
-      try {
-        await createLmsCourse(fd)
+      const result = await createLmsCourse(undefined, fd)
+      if (result?.error) {
+        setError(result.error)
+        setStep(1)
+      } else {
         setDone(true)
         setTimeout(() => onClose(), 1800)
-      } catch (err: any) {
-        setError(err.message || 'Gagal membuat program.')
-        setStep(1)
       }
     })
   }

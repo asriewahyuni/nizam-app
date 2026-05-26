@@ -52,34 +52,42 @@ export async function getLmsCourseBySlug(orgId: string, slug: string) {
   return data
 }
 
-export async function createLmsCourse(formData: FormData) {
-  const orgData = await assertOrgAdmin()
+export async function createLmsCourse(
+  _prevState: unknown,
+  formData: FormData,
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
 
-  const title = formData.get('title') as string
-  const description = formData.get('description') as string
-  const levelCode = formData.get('levelCode') as string
+    const title = (formData.get('title') as string)?.trim()
+    const description = formData.get('description') as string
+    const levelCode = formData.get('levelCode') as string
 
-  if (!title) throw new Error('Judul course wajib diisi')
+    if (!title) return { error: 'Judul course wajib diisi' }
 
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now()
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now()
 
-  const supabase = await createClient()
-  const { error } = await supabase.from('learning_courses').insert({
-    org_id: orgData.org.id,
-    slug,
-    title,
-    description: description || null,
-    level_code: levelCode || 'ALL',
-    is_active: true,
-  })
+    const supabase = await createClient()
+    const { error } = await supabase.from('learning_courses').insert({
+      org_id: orgData.org.id,
+      slug,
+      title,
+      description: description || null,
+      level_code: levelCode || 'ALL',
+      is_active: true,
+    })
 
-  if (error) {
-    console.error('[createLmsCourse]', JSON.stringify(error))
-    throw new Error(getErrorMessage(error))
+    if (error) {
+      console.error('[createLmsCourse]', JSON.stringify(error))
+      return { error: getErrorMessage(error) }
+    }
+
+    revalidatePath('/lms/admin')
+    revalidatePath('/lms')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
   }
-
-  revalidatePath('/lms/admin')
-  revalidatePath('/lms')
 }
 
 export async function updateLmsCourse(formData: FormData) {
@@ -164,48 +172,68 @@ export async function getLmsBatches(orgId: string) {
   return data
 }
 
-export async function createLmsBatch(formData: FormData) {
-  const orgData = await assertOrgAdmin()
+export async function createLmsBatch(
+  _prevState: unknown,
+  formData: FormData,
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
 
-  const courseId = formData.get('courseId') as string
-  const name = formData.get('name') as string
-  const startDate = formData.get('startDate') as string
-  const endDate = formData.get('endDate') as string
-  const quota = Number(formData.get('quota') || 0)
-  const price = Number(formData.get('price') || 0)
-  const status = (formData.get('status') as string) || 'OPEN'
-  const taxRate = Number(formData.get('taxRate') || 0)
-  const isTaxIncluded = formData.get('isTaxIncluded') === 'on'
+    const courseId = formData.get('courseId') as string
+    const name = (formData.get('name') as string)?.trim()
+    const startDate = formData.get('startDate') as string
+    const endDate = formData.get('endDate') as string
+    const quota = Number(formData.get('quota') || 0)
+    const price = Number(formData.get('price') || 0)
+    const status = (formData.get('status') as string) || 'OPEN'
+    const mode = (formData.get('mode') as string) || 'OFFLINE'
+    const description = (formData.get('description') as string)?.trim() || null
+    const paymentInstructions = (formData.get('paymentInstructions') as string)?.trim() || null
+    const taxRate = Number(formData.get('taxRate') || 0)
+    const isTaxIncluded = formData.get('isTaxIncluded') === 'on'
 
-  const feeStructureStr = formData.get('feeStructure') as string
-  const feeStructure = feeStructureStr ? JSON.parse(feeStructureStr) : []
-  const costStructureStr = formData.get('costStructure') as string
-  const costStructure = costStructureStr ? JSON.parse(costStructureStr) : []
+    let feeStructure: unknown[] = []
+    let costStructure: unknown[] = []
+    try {
+      const feeStr = formData.get('feeStructure') as string
+      if (feeStr) feeStructure = JSON.parse(feeStr)
+      const costStr = formData.get('costStructure') as string
+      if (costStr) costStructure = JSON.parse(costStr)
+    } catch {
+      // biarkan kosong jika JSON tidak valid
+    }
 
-  if (!courseId || !name) throw new Error('Program dan Nama Batch wajib diisi')
+    if (!courseId || !name) return { error: 'Program dan Nama Batch wajib diisi' }
 
-  const supabase = await createClient()
-  const { error } = await supabase.from('lms_course_batches').insert({
-    org_id: orgData.org.id,
-    course_id: courseId,
-    name,
-    start_date: startDate || null,
-    end_date: endDate || null,
-    quota,
-    price,
-    fee_structure: feeStructure,
-    cost_structure: costStructure,
-    status,
-    tax_rate: taxRate,
-    is_tax_included: isTaxIncluded,
-  })
+    const supabase = await createClient()
+    const { error } = await supabase.from('lms_course_batches').insert({
+      org_id: orgData.org.id,
+      course_id: courseId,
+      name,
+      start_date: startDate || null,
+      end_date: endDate || null,
+      quota,
+      price,
+      mode,
+      description,
+      payment_instructions: paymentInstructions,
+      fee_structure: feeStructure,
+      cost_structure: costStructure,
+      status,
+      tax_rate: taxRate,
+      is_tax_included: isTaxIncluded,
+    })
 
-  if (error) {
-    console.error('[createLmsBatch]', JSON.stringify(error))
-    throw new Error(getErrorMessage(error))
+    if (error) {
+      console.error('[createLmsBatch]', JSON.stringify(error))
+      return { error: getErrorMessage(error) }
+    }
+
+    revalidatePath('/lms/admin')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
   }
-
-  revalidatePath('/lms/admin')
 }
 
 export async function updateLmsBatch(formData: FormData) {
@@ -306,37 +334,45 @@ export async function getLmsBatchSessions(orgId: string, batchId: string) {
   return data
 }
 
-export async function createLmsSession(formData: FormData) {
-  const orgData = await assertOrgAdmin()
+export async function createLmsSession(
+  _prevState: unknown,
+  formData: FormData,
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
 
-  const batchId = formData.get('batchId') as string
-  const title = formData.get('title') as string
-  const startTime = formData.get('startTime') as string
-  const endTime = formData.get('endTime') as string
-  const instructor = formData.get('instructorName') as string
-  const locationUrl = formData.get('locationUrl') as string
+    const batchId = formData.get('batchId') as string
+    const title = (formData.get('title') as string)?.trim()
+    const startTime = formData.get('startTime') as string
+    const endTime = formData.get('endTime') as string
+    const instructor = formData.get('instructorName') as string
+    const locationUrl = formData.get('locationUrl') as string
 
-  if (!batchId || !title || !startTime || !endTime) {
-    throw new Error('Batch, Judul, Waktu Mulai, dan Waktu Selesai wajib diisi')
+    if (!batchId || !title || !startTime || !endTime) {
+      return { error: 'Batch, Judul, Waktu Mulai, dan Waktu Selesai wajib diisi' }
+    }
+
+    const supabase = await createClient()
+    const { error } = await supabase.from('lms_batch_sessions').insert({
+      org_id: orgData.org.id,
+      batch_id: batchId,
+      title,
+      start_time: new Date(startTime).toISOString(),
+      end_time: new Date(endTime).toISOString(),
+      instructor_name: instructor || null,
+      location_url: locationUrl || null,
+    })
+
+    if (error) {
+      console.error('[createLmsSession]', JSON.stringify(error))
+      return { error: getErrorMessage(error) }
+    }
+
+    revalidatePath('/lms/admin')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
   }
-
-  const supabase = await createClient()
-  const { error } = await supabase.from('lms_batch_sessions').insert({
-    org_id: orgData.org.id,
-    batch_id: batchId,
-    title,
-    start_time: new Date(startTime).toISOString(),
-    end_time: new Date(endTime).toISOString(),
-    instructor_name: instructor || null,
-    location_url: locationUrl || null,
-  })
-
-  if (error) {
-    console.error('[createLmsSession]', JSON.stringify(error))
-    throw new Error(getErrorMessage(error))
-  }
-
-  revalidatePath('/lms/admin')
 }
 
 export async function updateLmsSession(formData: FormData) {

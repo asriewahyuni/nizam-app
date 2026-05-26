@@ -6,7 +6,7 @@ import { createLmsSession } from '@/modules/edu/actions/lms-commercial.actions'
 type Batch = { id: string; name: string; learning_courses?: { title?: string } | null }
 
 export default function CreateSessionForm({ batches }: { batches: Batch[] }) {
-  const [state, action, isPending] = useActionState(createLmsSession, null)
+  const [state, action, isPending] = useActionState(createLmsSession, {})
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {

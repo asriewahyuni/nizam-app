@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef } from 'react'
 import { createLmsCourse } from '@/modules/edu/actions/lms-commercial.actions'
 
 export default function CreateCourseForm() {
-  const [state, action, isPending] = useActionState(createLmsCourse, null)
+  const [state, action, isPending] = useActionState(createLmsCourse, {})
   const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
