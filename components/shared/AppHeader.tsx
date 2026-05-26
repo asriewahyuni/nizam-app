@@ -4,7 +4,7 @@ import { formatRupiah, getInitials } from '@/lib/utils'
 import type { RuntimeDatabaseMode, RuntimeDatabaseSourceKey } from '@/lib/db/runtime-target'
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
-import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Database, CircleDot } from 'lucide-react'
+import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Database, CircleDot, Zap } from 'lucide-react'
 import { VersionIntegrityButton } from '@/components/shared/VersionIntegrityButton'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
@@ -55,6 +55,7 @@ interface AppHeaderProps {
   branchCashSummaries?: Record<string, DeckCashSummary>
   runtimeDatabaseMode?: RuntimeDatabaseMode
   runtimeDatabaseSource?: RuntimeDatabaseSourceKey
+  planName?: string
 }
 
 type PendingContextSwitch =
@@ -307,6 +308,7 @@ export function AppHeader({
   branchCashSummaries = EMPTY_CASH_SUMMARIES,
   runtimeDatabaseMode = 'missing',
   runtimeDatabaseSource = 'missing',
+  planName = 'Trial',
 }: AppHeaderProps) {
   const router = useRouter()
   const [isCreatingBranch, startCreateBranchTransition] = useTransition()
@@ -1759,6 +1761,34 @@ export function AppHeader({
             </div>
           )}
         </div>
+
+        {/* Plan Badge — pindah dari floating ke header */}
+        {(() => {
+          const plan = planName.toUpperCase()
+          const isDemo = plan === 'DEMO'
+          const isTrial = plan === 'TRIAL'
+          const colorCls = isDemo
+            ? 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
+            : isTrial
+            ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+            : 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+          const iconCls = isDemo
+            ? 'text-orange-500'
+            : isTrial
+            ? 'text-amber-500'
+            : 'text-indigo-500'
+          return (
+            <Link
+              href="/billing"
+              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-semibold uppercase tracking-wide transition-colors ${colorCls}`}
+              title="Paket aktif — klik untuk kelola langganan"
+            >
+              <Zap size={11} className={iconCls} />
+              <span className="hidden md:inline">Paket</span>
+              <span>{planName}</span>
+            </Link>
+          )
+        })()}
 
         <div className="flex items-center gap-2 pr-6 border-r border-slate-100">
           <Link href="/accounting/approvals" className={`relative w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${hasRequests ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-white border-slate-100 text-slate-400'}`}>

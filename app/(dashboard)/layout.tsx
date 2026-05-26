@@ -12,7 +12,6 @@ import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonation
 import { DemoBanner } from '@/components/shared/DemoBanner'
 import { SentryUserContext } from '@/components/shared/SentryUserContext'
 import { StartupWizard } from '@/components/shared/StartupWizard'
-import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
 import { RouteProgressBar } from '@/components/shared/RouteProgressBar'
@@ -302,6 +301,7 @@ export default async function DashboardLayout({
           canManageBranches={isOwnerOrAdmin}
           runtimeDatabaseMode={runtimeDb.mode}
           runtimeDatabaseSource={runtimeDb.sourceKey}
+          planName={effectivePlanName}
         />
         </div>
         {!isEssPage && !isStaffEmployee && <StartupWizard isDemo={isDemo} enabled={startupWizardEnabled} />}
@@ -343,7 +343,7 @@ export default async function DashboardLayout({
             hasClockedInToday={hasClockedInToday}
           />
         )}
-        {!isEssPage && !isStaffEmployee && <FloatingPlanBadge planName={effectivePlanName} />}
+        {/* FloatingPlanBadge dihapus — plan info sudah ada di AppHeader */}
       </div>
     </div>
   )
