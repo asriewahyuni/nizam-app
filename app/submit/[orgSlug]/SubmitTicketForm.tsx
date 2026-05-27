@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
-import { createCrmTicketPublic, TICKET_TYPE_LABEL } from '@/modules/crm/actions/tickets.actions'
-import type { CrmTicketType } from '@/modules/crm/actions/tickets.actions'
+import { createCrmTicketPublic } from '@/modules/crm/actions/tickets.actions'
+import { TICKET_TYPE_LABEL } from '@/modules/crm/lib/ticket-constants'
+import type { CrmTicketType } from '@/modules/crm/lib/ticket-constants'
 import { CheckCircle, AlertCircle, Send, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 

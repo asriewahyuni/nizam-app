@@ -10,8 +10,8 @@ import {
   ArrowUpDown, Ticket
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { CrmTicket, CrmTicketStatus, CrmTicketType, CrmTicketPriority } from '@/modules/crm/actions/tickets.actions'
-import { TICKET_TYPE_LABEL, TICKET_STATUS_LABEL, TICKET_PRIORITY_LABEL } from '@/modules/crm/actions/tickets.actions'
+import type { CrmTicket, CrmTicketStatus, CrmTicketType, CrmTicketPriority } from '@/modules/crm/lib/ticket-constants'
+import { TICKET_TYPE_LABEL, TICKET_STATUS_LABEL, TICKET_PRIORITY_LABEL } from '@/modules/crm/lib/ticket-constants'
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 

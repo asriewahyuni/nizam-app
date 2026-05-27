@@ -10,11 +10,9 @@ import {
   ChevronDown, Save, RefreshCw
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { CrmTicket, CrmTicketNote, CrmTicketStatus } from '@/modules/crm/actions/tickets.actions'
-import {
-  TICKET_TYPE_LABEL, TICKET_STATUS_LABEL, TICKET_PRIORITY_LABEL,
-  updateCrmTicket, addCrmTicketNote
-} from '@/modules/crm/actions/tickets.actions'
+import type { CrmTicket, CrmTicketNote, CrmTicketStatus } from '@/modules/crm/lib/ticket-constants'
+import { TICKET_TYPE_LABEL, TICKET_STATUS_LABEL, TICKET_PRIORITY_LABEL } from '@/modules/crm/lib/ticket-constants'
+import { updateCrmTicket, addCrmTicketNote } from '@/modules/crm/actions/tickets.actions'
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
