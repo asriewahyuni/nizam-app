@@ -757,8 +757,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     }
 
     // 4. Akun piutang custom (12xx) yang tidak masuk daftar standar
-    //    Menangani org yang pakai akun piutang non-standar (mis. 1211, 1212, dll.)
-    const arStandardCodes = ['1201', '1202', '1203', '1204', '1205', '1206', '1207', '1208', '1209', '1404']
+    //    Hanya exclude kode yang SUDAH di-handle reconciliation di atas.
+    //    Akun lain (1202, 1210, 1211, dst.) di-discover di sini agar tidak hilang.
+    const arStandardCodes = ['1201', '1205', '1404']
     const customArRows = await getCustomAccountAgingRows(db, orgId, 'AR', arStandardCodes, today, branchId)
     results.push(...customArRows)
 
@@ -1046,8 +1047,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     }
 
     // 4. Akun hutang custom (2xxx) yang tidak masuk daftar standar
-    //    Menangani org yang pakai akun hutang non-standar (mis. 2209, 2213, dll.)
-    const apStandardCodes = ['2101', '2102', '2103', '2201', '2202', '2301', '2302', '2401', '2402', '2602', '2603']
+    //    Hanya exclude kode yang SUDAH di-handle reconciliation di atas.
+    //    Akun lain (2209, 2213, dst.) di-discover di sini agar tidak hilang.
+    const apStandardCodes = ['2101', '2201', '2301', '2401', '2602', '2603']
     const customApRows = await getCustomAccountAgingRows(db, orgId, 'AP', apStandardCodes, today, branchId)
     results.push(...customApRows)
   }
