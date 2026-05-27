@@ -8,6 +8,9 @@ import {
   SHARIAH_COA_SEEDS,
   SHARIAH_COA_ENABLEMENT_CODES,
   SHARIAH_SETUP_REQUIRED_ACCOUNTS,
+  filterSeedsByDominance,
+  filterRequiredByDominance,
+  type SyirkahDominance,
 } from '@/modules/accounting/lib/shariah-coa'
 import { revalidatePath } from 'next/cache'
 
@@ -49,7 +52,32 @@ function readOrgShariahFlagFromSettings(settings: unknown): boolean {
   return settings.is_shariah_enabled === true
 }
 
-function evaluateShariahSetup(accounts: Array<{ code?: string | null; name?: string | null; is_active?: boolean | null }>) {
+async function detectOrgSyirkahDominance(supabase: any, orgId: string): Promise<SyirkahDominance> {
+  const { data } = await supabase
+    .from('syirkah_contracts')
+    .select('contract_type')
+    .eq('org_id', orgId)
+    .neq('status', 'CANCELLED')
+
+  const contracts = (data || []) as Array<{ contract_type?: string | null }>
+  if (contracts.length === 0) return 'MIXED'
+
+  const hasMudharabah = contracts.some((c) =>
+    String(c.contract_type || '').toLowerCase().includes('mudharabah')
+  )
+  const hasInan = contracts.some((c) =>
+    String(c.contract_type || '').toLowerCase().includes('inan')
+  )
+
+  if (hasMudharabah && !hasInan) return 'MUDHARABAH'
+  if (hasInan && !hasMudharabah) return 'INAN'
+  return 'MIXED'
+}
+
+function evaluateShariahSetup(
+  accounts: Array<{ code?: string | null; name?: string | null; is_active?: boolean | null }>,
+  requiredAccounts = SHARIAH_SETUP_REQUIRED_ACCOUNTS
+) {
   const rowsByCode = new Map<string, Array<{ code?: string | null; name?: string | null; is_active?: boolean | null }>>()
 
   for (const account of accounts) {
@@ -60,7 +88,7 @@ function evaluateShariahSetup(accounts: Array<{ code?: string | null; name?: str
     rowsByCode.set(code, currentRows)
   }
 
-  const checks: ShariahSetupCheck[] = SHARIAH_SETUP_REQUIRED_ACCOUNTS.map((requiredAccount) => {
+  const checks: ShariahSetupCheck[] = requiredAccounts.map((requiredAccount) => {
     const matchedRows = rowsByCode.get(requiredAccount.code) || []
     const activeMatch = matchedRows.find((row) => row?.is_active === true) || null
     const anyMatch = matchedRows[0] || null
@@ -96,6 +124,9 @@ function evaluateShariahSetup(accounts: Array<{ code?: string | null; name?: str
 export async function getShariahSetupSummary(orgId: string, providedSupabase?: any): Promise<ShariahSetupSummary> {
   const supabase = providedSupabase || await createClient()
 
+  const dominance = await detectOrgSyirkahDominance(supabase, orgId)
+  const filteredRequired = filterRequiredByDominance(SHARIAH_SETUP_REQUIRED_ACCOUNTS, dominance)
+
   const [{ data: org }, { count: shariahCount }, { data: shariahSetupAccounts }] = await Promise.all([
     (supabase as any)
       .from('organizations')
@@ -112,14 +143,15 @@ export async function getShariahSetupSummary(orgId: string, providedSupabase?: a
       .from('accounts')
       .select('code, name, is_active')
       .eq('org_id', orgId)
-      .in('code', SHARIAH_SETUP_REQUIRED_ACCOUNTS.map((account) => account.code)),
+      .in('code', filteredRequired.map((account) => account.code)),
   ])
 
   const orgLevelShariahEnabled = readOrgShariahFlagFromSettings(org?.settings)
   const activeShariahAccountCount = shariahCount || 0
   const hasActiveShariahAccounts = activeShariahAccountCount > 0
   const evaluation = evaluateShariahSetup(
-    (shariahSetupAccounts as Array<{ code?: string | null; name?: string | null; is_active?: boolean | null }>) || []
+    (shariahSetupAccounts as Array<{ code?: string | null; name?: string | null; is_active?: boolean | null }>) || [],
+    filteredRequired
   )
 
   let status: ShariahSetupStatus = 'INACTIVE'
@@ -193,9 +225,12 @@ export async function injectShariahPack(orgId: string) {
   }
 
   try {
+    const dominance = await detectOrgSyirkahDominance(supabase, orgId)
+    const seedsToApply = filterSeedsByDominance(SHARIAH_COA_SEEDS, dominance)
+
     const lookupCodes = Array.from(
       new Set(
-        SHARIAH_COA_SEEDS.flatMap((account) => [
+        seedsToApply.flatMap((account) => [
           account.code,
           account.parentCode,
           ...(account.fallbackParentCodes || []),
@@ -231,7 +266,7 @@ export async function injectShariahPack(orgId: string) {
         .eq('id', acc.id)
     }
 
-    for (const account of SHARIAH_COA_SEEDS) {
+    for (const account of seedsToApply) {
       const parentId = [account.parentCode, ...(account.fallbackParentCodes || [])]
         .map((code) => accountIdByCode[code])
         .find((value): value is string => Boolean(value)) || null

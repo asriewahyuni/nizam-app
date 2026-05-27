@@ -60,3 +60,18 @@ export const SHARIAH_SETUP_REQUIRED_ACCOUNTS: ShariahSetupRequiredAccount[] = [
   { code: '1404', name: 'Piutang Salam Vendor', module: 'PURCHASING' },
   { code: '1205', name: 'Aset / Piutang Barang Istishna (Pembelian)', module: 'PURCHASING' },
 ]
+
+export type SyirkahDominance = 'MUDHARABAH' | 'INAN' | 'MIXED'
+
+// Mudharabah org tidak butuh 3120 (Inan); Inan org tidak butuh 3110 (Mudharabah).
+export function filterSeedsByDominance(seeds: ShariahAccountSeed[], dominance: SyirkahDominance): ShariahAccountSeed[] {
+  if (dominance === 'MUDHARABAH') return seeds.filter((s) => s.code !== '3120')
+  if (dominance === 'INAN') return seeds.filter((s) => s.code !== '3110')
+  return seeds
+}
+
+export function filterRequiredByDominance(accounts: ShariahSetupRequiredAccount[], dominance: SyirkahDominance): ShariahSetupRequiredAccount[] {
+  if (dominance === 'MUDHARABAH') return accounts.filter((a) => a.code !== '3120')
+  if (dominance === 'INAN') return accounts.filter((a) => a.code !== '3110')
+  return accounts
+}
