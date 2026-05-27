@@ -13,7 +13,9 @@ export type ShariahSetupRequiredAccount = {
   module: 'SYIRKAH' | 'SALES' | 'PURCHASING'
 }
 
+// 3100 adalah kode ekuitas syariah generasi lama — dinonaktifkan saat migrasi ke 3110/3120.
 export const LEGACY_SHARIAH_EQUITY_CODE = '3100'
+// 3130 bernormal DEBIT karena merupakan kontra-ekuitas: menampung distribusi bagi hasil keluar.
 export const SYIRKAH_PROFIT_SHARING_EQUITY_CODE = '3130'
 
 export const SHARIAH_COA_SEEDS: ShariahAccountSeed[] = [
@@ -61,6 +63,7 @@ export const SHARIAH_SETUP_REQUIRED_ACCOUNTS: ShariahSetupRequiredAccount[] = [
   { code: '1205', name: 'Aset / Piutang Barang Istishna (Pembelian)', module: 'PURCHASING' },
 ]
 
+// Dominance ditentukan dari syirkah_contracts aktif org. MIXED = belum ada kontrak atau tipe campuran.
 export type SyirkahDominance = 'MUDHARABAH' | 'INAN' | 'MIXED'
 
 // Mudharabah org tidak butuh 3120 (Inan); Inan org tidak butuh 3110 (Mudharabah).

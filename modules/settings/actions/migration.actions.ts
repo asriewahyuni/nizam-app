@@ -608,11 +608,13 @@ function resolveCoaNormalBalance(value: string): NormalBalance | null {
   return null
 }
 
+// Jika kolom arus_kas kosong di spreadsheet, infer dari prefix kode akun standar Indonesia.
+// Akun 11xx (kas/bank) dan akun header sengaja tidak dikategorikan — bukan arus kas itu sendiri.
+// Lihat docs/syirkah-accounting.md §6 untuk tabel lengkap.
 function resolveCoaCashFlowCategory(value: string, code?: string): CashFlowCategory | null {
   const normalized = String(value || '').trim().toUpperCase()
   if (normalized === 'OPERATING' || normalized === 'INVESTING' || normalized === 'FINANCING') return normalized
   if (!code) return null
-  // Auto-infer dari prefix kode akun standar Indonesia
   if (code.startsWith('15') || code.startsWith('16')) return 'INVESTING'
   if (code.startsWith('3') || code.startsWith('25') || code.startsWith('26')) return 'FINANCING'
   if (['4', '5', '6', '9'].some((d) => code.startsWith(d))) return 'OPERATING'
@@ -2745,6 +2747,8 @@ export async function importFixedAssetsMigration(
     [...accounts].filter((account) => account.type === 'EXPENSE').sort((a, b) => a.code.localeCompare(b.code))[0]
 
   // Pemetaan akun per kategori aset tetap (standar CoA Nizam)
+  // Per-kategori account mapping — lihat docs/syirkah-accounting.md §5 untuk tabel lengkap.
+  // TANAH tidak memiliki akun akumulasi penyusutan karena tanah tidak disusutkan.
   const CATEGORY_ASSET_CODE: Record<string, string> = {
     TANAH: '1501', KENDARAAN: '1502', BANGUNAN: '1503',
     INTERIOR: '1504', ELEKTRONIK: '1505', MESIN: '1506',

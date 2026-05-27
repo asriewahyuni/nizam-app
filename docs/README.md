@@ -20,6 +20,7 @@ Folder `docs/` adalah pusat dokumentasi teknis yang lebih ringkas, terstruktur, 
 | [`modules.md`](./modules.md) | Peta modul bisnis, route dashboard, folder terkait, dan tanggung jawab per domain |
 | [`ecommerce-implementation.md`](./ecommerce-implementation.md) | Kondisi implementasi e-commerce saat ini, flow bisnis yang sudah hidup, route penting, dan batas yang masih ada |
 | [`ecommerce-next-steps.md`](./ecommerce-next-steps.md) | Urutan kerja berikutnya yang disarankan setelah fondasi e-commerce dan theme builder selesai |
+| [`syirkah-accounting.md`](./syirkah-accounting.md) | Model akuntansi syirkah (Mudharabah vs Inan), struktur CoA, aturan migrasi aset tetap, dan konvensi cash flow |
 
 ## Referensi Tambahan Di Root Repo
 

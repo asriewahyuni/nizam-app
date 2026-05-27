@@ -52,6 +52,9 @@ function readOrgShariahFlagFromSettings(settings: unknown): boolean {
   return settings.is_shariah_enabled === true
 }
 
+// Menentukan tipe syirkah dominan org dari kontrak aktif.
+// Digunakan untuk suppress akun yang tidak relevan saat inject CoA syariah:
+// org Mudharabah tidak perlu 3120, org Inan tidak perlu 3110.
 async function detectOrgSyirkahDominance(supabase: any, orgId: string): Promise<SyirkahDominance> {
   const { data } = await supabase
     .from('syirkah_contracts')
