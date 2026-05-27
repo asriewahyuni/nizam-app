@@ -13,6 +13,7 @@ import { getResetRequestsCount } from '@/modules/organization/actions/hris.actio
 import { getUnpostedJournalsCount } from '@/modules/accounting/actions/journal.actions'
 import { getPendingPurchaseRequestsCount } from '@/modules/purchasing/actions/purchasing.actions'
 import { getPendingCoaRequestCount } from '@/modules/accounting/actions/coa-request.actions'
+import { getNewCrmTicketsCount } from '@/modules/crm/actions/tickets.actions'
 import { getBranches, getChildOrgs, getMyOrganizations } from '@/modules/organization/actions/org.actions'
 import type { AccessibleOrganization, BranchSummary } from '@/modules/organization/lib/org-context'
 
@@ -22,6 +23,7 @@ export type SidebarChromeMetrics = {
   pendingPurchaseRequests: number
   hrisNotifications: number
   pendingCoaRequests: number
+  newCrmTickets: number
 }
 
 export type HeaderNavigationData = {
@@ -52,12 +54,14 @@ export async function getSidebarChromeMetrics(
     pendingPurchaseRequests,
     hrisNotifications,
     pendingCoaRequests,
+    newCrmTickets,
   ] = await Promise.all([
     resolveWithFallback('pending approvals', 0, () => getPendingApprovalsCount(orgId, branchId)),
     resolveWithFallback('unposted journals', 0, () => getUnpostedJournalsCount(orgId, branchId)),
     resolveWithFallback('pending purchase requests', 0, () => getPendingPurchaseRequestsCount(orgId, branchId)),
     resolveWithFallback('hris reset requests', 0, () => getResetRequestsCount(orgId, branchId)),
     resolveWithFallback('pending coa requests', 0, () => getPendingCoaRequestCount(orgId)),
+    resolveWithFallback('new crm tickets', 0, () => getNewCrmTicketsCount(orgId, branchId)),
   ])
 
   return {
@@ -66,6 +70,7 @@ export async function getSidebarChromeMetrics(
     pendingPurchaseRequests,
     hrisNotifications,
     pendingCoaRequests,
+    newCrmTickets,
   }
 }
 

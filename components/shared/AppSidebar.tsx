@@ -51,6 +51,7 @@ import {
   Fingerprint,
   ClipboardCheck,
   Rocket,
+  MessageSquare,
   type LucideIcon
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
@@ -118,6 +119,7 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Marketing & Sales',
     items: [
       { label: 'Pelanggan (CRM)', href: '/contacts', icon: Users, permission_key: 'crm', module_key: 'CRM' },
+      { label: 'Keluhan & Permintaan', href: '/crm/tickets', icon: MessageSquare, permission_key: 'crm', module_key: 'CRM' },
       { label: 'POS (Kasir)', href: '/pos', icon: Store, permission_key: 'pos', module_key: 'POS' },
       { label: 'Penawaran (Quotation)', href: '/sales/quotations', icon: FileText, permission_key: 'quotation', module_key: 'Sales' },
       { label: 'Penjualan', href: '/sales', icon: TrendingUp, permission_key: 'sales', module_key: 'Sales' },
@@ -266,6 +268,7 @@ interface AppSidebarProps {
   pendingPurchaseRequests?: number
   hrisNotifications?: number
   pendingCoaRequests?: number
+  newCrmTickets?: number
   isDemo?: boolean
   planName?: string
   canManageSubOrganizations?: boolean
@@ -289,6 +292,7 @@ export function AppSidebar({
   pendingPurchaseRequests = 0,
   hrisNotifications = 0,
   pendingCoaRequests = 0,
+  newCrmTickets = 0,
   isDemo = false,
   planName = 'Trial',
   canManageSubOrganizations = true,
@@ -313,6 +317,7 @@ export function AppSidebar({
     pendingPurchaseRequests,
     hrisNotifications,
     pendingCoaRequests,
+    newCrmTickets,
   }))
 
   // Route yang bebas diakses meskipun belum clock-in
@@ -702,6 +707,7 @@ export function AppSidebar({
                       if (item.href === '/purchasing') badgeCount = badgeMetrics.pendingPurchaseRequests
                       if (item.href === '/hris') badgeCount = badgeMetrics.hrisNotifications
                       if (item.href === '/cash') badgeCount = badgeMetrics.pendingCoaRequests
+                      if (item.href === '/crm/tickets') badgeCount = badgeMetrics.newCrmTickets
 
                       const locked = isLockedByAttendance(item.href)
                       return (
@@ -794,6 +800,7 @@ export function AppSidebar({
                     if (item.href === '/purchasing') badgeCount = badgeMetrics.pendingPurchaseRequests
                     if (item.href === '/hris') badgeCount = badgeMetrics.hrisNotifications
                     if (item.href === '/cash') badgeCount = badgeMetrics.pendingCoaRequests
+                    if (item.href === '/crm/tickets') badgeCount = badgeMetrics.newCrmTickets
 
                     const locked = isLockedByAttendance(item.href)
                     return (
