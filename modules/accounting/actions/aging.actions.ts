@@ -345,6 +345,156 @@ async function getSettlementAccounts(
   }, {})
 }
 
+/**
+ * Menemukan semua akun custom (di luar daftar standar) yang punya saldo GL
+ * dari jurnal POSTED, lalu mengembalikannya sebagai baris aging.
+ *
+ * Ini menangani kasus di mana org memakai akun piutang/hutang non-standar
+ * seperti 1211 "Piutang Pak Rohmad" atau 2209 "Hutang Pembelian Tanah".
+ *
+ * contact_name = nama akun (karena tidak ada contact_id di jurnal manual lama)
+ * Jika ada journal entry dengan contact_id → pakai nama contact.
+ */
+async function getCustomAccountAgingRows(
+  db: any,
+  orgId: string,
+  type: 'AR' | 'AP',
+  standardCodes: string[],
+  today: string,
+  branchId?: BranchFilter
+): Promise<AgingReportRow[]> {
+  // Temukan akun custom: ASSET kode 12xx untuk AR, LIABILITY kode 2xxx untuk AP
+  const codePrefix = type === 'AR' ? '12' : '2'
+  const accountType = type === 'AR' ? 'ASSET' : 'LIABILITY'
+
+  const { data: accounts, error: accError } = await db
+    .from('accounts')
+    .select('id, code, name')
+    .eq('org_id', orgId)
+    .eq('type', accountType)
+    .like('code', `${codePrefix}%`)
+    .not('code', 'in', `(${standardCodes.map(c => `"${c}"`).join(',')})`)
+
+  if (accError || !Array.isArray(accounts) || accounts.length === 0) return []
+
+  // Ambil semua POSTED entry IDs
+  const entryIds = await getPostedEntryIds(db, orgId, branchId)
+  if (entryIds.length === 0) return []
+
+  const accountIds = accounts.map((a: any) => a.id)
+  const accountById: Record<string, { code: string; name: string }> = {}
+  for (const a of accounts) accountById[a.id] = { code: a.code, name: a.name }
+
+  // Ambil semua journal lines yang menyentuh akun custom ini
+  const { data: lines, error: lineError } = await (db
+    .from('journal_lines')
+    .select('entry_id, account_id, debit, credit')
+    .in('entry_id', entryIds)
+    .in('account_id', accountIds) as any)
+
+  if (lineError || !Array.isArray(lines) || lines.length === 0) return []
+
+  // Hitung net per account_id
+  const netByAccount: Record<string, number> = {}
+  // Juga ambil entry_id per account untuk cek contact
+  const entryByAccount: Record<string, string[]> = {}
+
+  for (const line of lines) {
+    const net = type === 'AR'
+      ? Number(line.debit || 0) - Number(line.credit || 0)
+      : Number(line.credit || 0) - Number(line.debit || 0)
+    netByAccount[line.account_id] = (netByAccount[line.account_id] || 0) + net
+    if (!entryByAccount[line.account_id]) entryByAccount[line.account_id] = []
+    if (!entryByAccount[line.account_id].includes(line.entry_id)) {
+      entryByAccount[line.account_id].push(line.entry_id)
+    }
+  }
+
+  // Coba ambil contact_id dari journal entries yang menyentuh akun ini
+  const allRelatedEntryIds = [...new Set(Object.values(entryByAccount).flat())]
+  const entryContactMap: Record<string, { contactId: string | null; dueDate: string | null; entryDate: string }> = {}
+
+  if (allRelatedEntryIds.length > 0) {
+    const { data: entryRows } = await db
+      .from('journal_entries')
+      .select('id, contact_id, due_date, entry_date')
+      .in('id', allRelatedEntryIds)
+
+    for (const e of (entryRows || [])) {
+      entryContactMap[e.id] = {
+        contactId: e.contact_id || null,
+        dueDate: e.due_date ? String(e.due_date).slice(0, 10) : null,
+        entryDate: String(e.entry_date || '').slice(0, 10),
+      }
+    }
+  }
+
+  // Ambil nama contact jika ada
+  const contactIds = [...new Set(
+    Object.values(entryContactMap)
+      .map(e => e.contactId)
+      .filter(Boolean) as string[]
+  )]
+  const contactNameMap: Record<string, string> = {}
+  if (contactIds.length > 0) {
+    const { data: contacts } = await db
+      .from('contacts')
+      .select('id, name')
+      .in('id', contactIds)
+    for (const c of (contacts || [])) contactNameMap[c.id] = c.name
+  }
+
+  const rows: AgingReportRow[] = []
+
+  for (const [accountId, net] of Object.entries(netByAccount)) {
+    if (net <= 0.01) continue
+
+    const account = accountById[accountId]
+    if (!account) continue
+
+    // Cari entry paling relevan (pertama dengan contact_id, fallback ke entry terbaru)
+    const relatedEntries = entryByAccount[accountId] || []
+    let contactId: string | null = null
+    let contactName = account.name // default: pakai nama akun
+    let dueDateStr = today
+
+    for (const eid of relatedEntries) {
+      const ec = entryContactMap[eid]
+      if (!ec) continue
+      if (ec.contactId && !contactId) {
+        contactId = ec.contactId
+        contactName = contactNameMap[ec.contactId] || account.name
+      }
+      if (ec.dueDate && dueDateStr === today) {
+        dueDateStr = ec.dueDate
+      } else if (!ec.dueDate && ec.entryDate && dueDateStr === today) {
+        dueDateStr = ec.entryDate
+      }
+    }
+
+    rows.push({
+      id: `custom-${type.toLowerCase()}-${account.code}`,
+      contact_id: contactId,
+      contact_name: contactName,
+      doc_number: `GL-${account.code}`,
+      doc_href: null,
+      due_date: dueDateStr,
+      grand_total: net,
+      paid_amount: 0,
+      returned_amount: 0,
+      outstanding: net,
+      days_overdue: Math.max(0, diffDateOnlyStrings(today, dueDateStr)),
+      aging_bucket: agingBucket(dueDateStr, today),
+      source_type: 'JOURNAL',
+      source_label: `${account.name} (${account.code})`,
+      source_account_code: account.code,
+      settlement_account_id: null,
+    })
+  }
+
+  return rows
+}
+
 export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?: BranchFilter) {
   const supabase = await createClient()
   const db = supabase as any
@@ -605,6 +755,12 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         settlement_account_id: settlementAccounts['1205'] || null,
       })
     }
+
+    // 4. Akun piutang custom (12xx) yang tidak masuk daftar standar
+    //    Menangani org yang pakai akun piutang non-standar (mis. 1211, 1212, dll.)
+    const arStandardCodes = ['1201', '1202', '1203', '1204', '1205', '1206', '1207', '1208', '1209', '1404']
+    const customArRows = await getCustomAccountAgingRows(db, orgId, 'AR', arStandardCodes, today, branchId)
+    results.push(...customArRows)
 
   } else {
     // 1. Trade AP from Purchases Module
@@ -888,6 +1044,12 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         settlement_account_id: settlementAccounts[liability.code] || null,
       })
     }
+
+    // 4. Akun hutang custom (2xxx) yang tidak masuk daftar standar
+    //    Menangani org yang pakai akun hutang non-standar (mis. 2209, 2213, dll.)
+    const apStandardCodes = ['2101', '2102', '2103', '2201', '2202', '2301', '2302', '2401', '2402', '2602', '2603']
+    const customApRows = await getCustomAccountAgingRows(db, orgId, 'AP', apStandardCodes, today, branchId)
+    results.push(...customApRows)
   }
 
   return results.sort((a, b) => b.days_overdue - a.days_overdue)
