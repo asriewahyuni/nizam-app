@@ -1274,7 +1274,7 @@ export async function importOpeningStockMigration(
 
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
   if ('error' in branchSelection) {
-    return { success: false, error: branchSelection.error }
+    return { success: false, error: branchSelection.error! }
   }
 
   const effectiveBranchId = branchSelection.branchId
@@ -1696,7 +1696,7 @@ export async function importOpeningStockMigration(
         throw new Error('Gagal membuat stock movement opening stock.')
       }
 
-      ;(insertedMovements || []).forEach((movement) => {
+      ;(insertedMovements || []).forEach((movement: { id: string }) => {
         createdMovementIds.push(movement.id)
       })
 
@@ -1839,7 +1839,7 @@ export async function importOpeningArMigration(
 
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
   if ('error' in branchSelection) {
-    return { success: false, error: branchSelection.error }
+    return { success: false, error: branchSelection.error! }
   }
 
   const [
@@ -2125,7 +2125,7 @@ export async function importOpeningApMigration(
 
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
   if ('error' in branchSelection) {
-    return { success: false, error: branchSelection.error }
+    return { success: false, error: branchSelection.error! }
   }
 
   const [
@@ -2412,7 +2412,7 @@ export async function importOpeningCashBankMigration(
 
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
   if ('error' in branchSelection) {
-    return { success: false, error: branchSelection.error }
+    return { success: false, error: branchSelection.error! }
   }
 
   const [
@@ -2686,7 +2686,7 @@ export async function importFixedAssetsMigration(
 
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
   if ('error' in branchSelection) {
-    return { success: false, error: branchSelection.error }
+    return { success: false, error: branchSelection.error! }
   }
 
   const [
@@ -3273,7 +3273,7 @@ export async function importEmployeesMigration(
 
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
   if ('error' in branchSelection) {
-    return { success: false, error: branchSelection.error }
+    return { success: false, error: branchSelection.error! }
   }
 
   const { data: branchesData, error: branchesError } = await supabase
@@ -3361,6 +3361,16 @@ export async function importEmployeesMigration(
       bank_account_holder: null,
       basic_salary: Number(basicSalary.toFixed(2)),
       registration_status: 'PENDING',
+      user_id: null,
+      date_of_birth: null,
+      gender: null,
+      marital_status: null,
+      tax_status: null,
+      department_id: null,
+      end_date: null,
+      license_number: null,
+      license_expiry: null,
+      blood_type: null,
     }
 
     const { error: employeeError } = await supabase.from('employees').insert(employeeInsert)
