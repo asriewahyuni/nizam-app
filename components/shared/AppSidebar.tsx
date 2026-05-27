@@ -50,6 +50,7 @@ import {
   GraduationCap,
   Fingerprint,
   ClipboardCheck,
+  Rocket,
   type LucideIcon
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
@@ -76,6 +77,7 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Utama',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission_key: 'dashboard' },
+      { label: 'Panduan Memulai', href: '/quick-start', icon: Rocket, permission_key: 'dashboard' },
       { label: 'Modul Marketplace', href: '/marketplace', icon: Store, permission_key: 'config', admin_only: true },
       { label: 'Approval Center', href: '/accounting/approvals', icon: ClipboardCheck, permission_key: 'approval', module_key: 'Accounting' },
       { label: 'Audit Integritas', href: '/accounting/audit', icon: ShieldCheck, permission_key: 'audit', module_key: 'Audit' },
