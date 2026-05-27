@@ -608,9 +608,16 @@ function resolveCoaNormalBalance(value: string): NormalBalance | null {
   return null
 }
 
-function resolveCoaCashFlowCategory(value: string): CashFlowCategory | null {
+function resolveCoaCashFlowCategory(value: string, code?: string): CashFlowCategory | null {
   const normalized = String(value || '').trim().toUpperCase()
   if (normalized === 'OPERATING' || normalized === 'INVESTING' || normalized === 'FINANCING') return normalized
+  if (!code) return null
+  // Auto-infer dari prefix kode akun standar Indonesia
+  if (code.startsWith('15') || code.startsWith('16')) return 'INVESTING'
+  if (code.startsWith('3') || code.startsWith('25') || code.startsWith('26')) return 'FINANCING'
+  if (['4', '5', '6', '9'].some((d) => code.startsWith(d))) return 'OPERATING'
+  const c2 = code.substring(0, 2)
+  if (['12', '13', '14', '21', '22', '23', '24'].includes(c2)) return 'OPERATING'
   return null
 }
 
@@ -718,7 +725,7 @@ export async function importCoaMigration(
       const description = String(row.values.deskripsi || '').trim() || null
       const accountType = resolveCoaAccountType(categoryLabel)
       const normalBalance = resolveCoaNormalBalance(row.values.saldo_normal)
-      const cashFlowCategory = resolveCoaCashFlowCategory(row.values.arus_kas)
+      const cashFlowCategory = resolveCoaCashFlowCategory(row.values.arus_kas, code)
       const isActive = parseBoolean(row.values.aktif, true)
 
       if (!code || !name || !accountType || !normalBalance || !Number.isFinite(level) || level < 1) {
@@ -2720,21 +2727,58 @@ export async function importFixedAssetsMigration(
     accounts.find((account) => account.code === '3001') ||
     [...accounts].filter((account) => account.type === 'EQUITY').sort((a, b) => a.code.localeCompare(b.code))[0]
 
+  // Fallback global (dipakai jika kategori tidak diisi di template)
   const assetAccount =
     accounts.find((account) => account.code === '1500') ||
     [...accounts]
       .filter((account) => account.type === 'ASSET' && account.code.startsWith('15') && !normalizeLookup(account.name).includes('akumulasi'))
       .sort((a, b) => a.code.localeCompare(b.code))[0]
 
-  const accumDepAccount =
-    accounts.find((account) => ['1503', '1505', '1507'].includes(account.code)) ||
+  const fallbackAccumDepAccount =
     [...accounts]
       .filter((account) => account.type === 'ASSET' && normalizeLookup(account.name).includes('akumulasi'))
       .sort((a, b) => a.code.localeCompare(b.code))[0]
 
-  const depExpenseAccount =
-    accounts.find((account) => account.code === '6009') ||
+  const fallbackDepExpenseAccount =
+    [...accounts].filter((account) => account.type === 'EXPENSE' && normalizeLookup(account.name).includes('penyusutan'))
+      .sort((a, b) => a.code.localeCompare(b.code))[0] ||
     [...accounts].filter((account) => account.type === 'EXPENSE').sort((a, b) => a.code.localeCompare(b.code))[0]
+
+  // Pemetaan akun per kategori aset tetap (standar CoA Nizam)
+  const CATEGORY_ASSET_CODE: Record<string, string> = {
+    TANAH: '1501', KENDARAAN: '1502', BANGUNAN: '1503',
+    INTERIOR: '1504', ELEKTRONIK: '1505', MESIN: '1506',
+  }
+  const CATEGORY_ACCUM_CODE: Record<string, string> = {
+    KENDARAAN: '1507', BANGUNAN: '1508', INTERIOR: '1509',
+    ELEKTRONIK: '1510', MESIN: '1511',
+  }
+  const CATEGORY_DEP_EXP_CODE: Record<string, string> = {
+    MESIN: '6050', KENDARAAN: '6051', ELEKTRONIK: '6052',
+    TANAH: '6053', BANGUNAN: '6054',
+  }
+
+  const CATEGORY_ALIASES: Record<string, string> = {
+    TANAH: 'TANAH', LAND: 'TANAH',
+    KENDARAAN: 'KENDARAAN', VEHICLE: 'KENDARAAN', MOBIL: 'KENDARAAN', MOTOR: 'KENDARAAN',
+    BANGUNAN: 'BANGUNAN', GEDUNG: 'BANGUNAN', BUILDING: 'BANGUNAN',
+    ELEKTRONIK: 'ELEKTRONIK', ELECTRONIC: 'ELEKTRONIK', PERALATAN: 'ELEKTRONIK',
+    MESIN: 'MESIN', MACHINE: 'MESIN',
+    INTERIOR: 'INTERIOR',
+  }
+
+  const accountByCode = new Map(accounts.map((a) => [a.code, a]))
+
+  function resolveAssetAccounts(category: string | null) {
+    const assetCode = category ? CATEGORY_ASSET_CODE[category] : null
+    const accumCode = category ? CATEGORY_ACCUM_CODE[category] : null
+    const depExpCode = category ? CATEGORY_DEP_EXP_CODE[category] : null
+    return {
+      assetAccountId: (assetCode ? accountByCode.get(assetCode)?.id : null) ?? assetAccount?.id ?? null,
+      accumDepAccountId: (accumCode ? accountByCode.get(accumCode)?.id : null) ?? fallbackAccumDepAccount?.id ?? null,
+      depExpenseAccountId: (depExpCode ? accountByCode.get(depExpCode)?.id : null) ?? fallbackDepExpenseAccount?.id ?? null,
+    }
+  }
 
   if (!assetAccount?.id) {
     return { success: false, error: 'Akun aset tetap tidak ditemukan. Pastikan akun 1500 atau akun aset tetap lain tersedia.' }
@@ -2748,14 +2792,8 @@ export async function importFixedAssetsMigration(
   if (branches.length > 1) {
     warnings.push('Template fixed_assets belum memiliki mapping cabang yang wajib. Jika branch_name kosong, sistem akan memakai unit aktif/default saat import dijalankan.')
   }
-  if (assetAccount.code !== '1500') {
-    warnings.push(`Akun aset tetap pembuka memakai fallback ${assetAccount.code} karena akun 1500 belum ditemukan.`)
-  }
-  if (!accumDepAccount?.id) {
+  if (!fallbackAccumDepAccount?.id) {
     warnings.push('Akun akumulasi penyusutan tidak ditemukan. Baris dengan accumulated_depreciation > 0 akan diblok agar jurnal opening tetap sehat.')
-  }
-  if (!depExpenseAccount?.id) {
-    warnings.push('Akun biaya penyusutan tidak ditemukan. Aset tetap tetap bisa diimport, tetapi akun biaya penyusutannya belum otomatis terhubung.')
   }
 
   const reservedCodes = new Set(existingAssets.map((asset) => normalizeCode(asset.code)).filter(Boolean))
@@ -2771,6 +2809,8 @@ export async function importFixedAssetsMigration(
     const accumulatedDepreciation = Number(String(row.values.accumulated_depreciation || '').trim() || '0')
     const residualValue = Number(String(row.values.residual_value || '').trim() || '0')
     const usefulLifeInput = Number(String(row.values.useful_life_months || '').trim() || '0')
+    const categoryRaw = String(row.values.asset_category || row.values.category || '').trim().toUpperCase()
+    const category = CATEGORY_ALIASES[categoryRaw] ?? null
 
     if (!assetName) {
       summary.skipped += 1
@@ -2822,10 +2862,32 @@ export async function importFixedAssetsMigration(
       continue
     }
 
-    if (accumulatedDepreciation > 0 && !accumDepAccount?.id) {
+    // Resolve akun per kategori; fallback ke akun global jika kategori kosong
+    const resolvedAccounts = resolveAssetAccounts(category)
+
+    if (accumulatedDepreciation > 0 && !resolvedAccounts.accumDepAccountId) {
       summary.skipped += 1
       summary.errors.push(`Baris ${row.rowNumber}: akun akumulasi penyusutan belum tersedia sehingga aset dengan nilai akumulasi tidak bisa diimport.`)
       continue
+    }
+
+    // Peringatan: aset baru (beli dalam 2 bulan terakhir) tidak seharusnya punya accumulated_depreciation > 0
+    // karena depresiasi baru mulai bulan berikutnya setelah perolehan
+    const acquisitionDateParsed = acquisitionDate ? new Date(acquisitionDate) : null
+    const twoMonthsAgo = new Date()
+    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2)
+    if (acquisitionDateParsed && acquisitionDateParsed > twoMonthsAgo && accumulatedDepreciation > 0) {
+      warnings.push(
+        `Baris ${row.rowNumber}: aset "${assetName}" baru diperoleh (${acquisitionDate}) tetapi accumulated_depreciation > 0. ` +
+        `Untuk aset baru, depresiasi umumnya mulai bulan berikutnya — pastikan nilai ini benar atau isi 0.`
+      )
+    }
+
+    if (!category) {
+      warnings.push(
+        `Baris ${row.rowNumber}: kolom asset_category kosong untuk "${assetName}". ` +
+        `Sistem memakai akun fallback. Isi kategori (TANAH/BANGUNAN/KENDARAAN/MESIN/ELEKTRONIK/INTERIOR) agar akun aset dan akumulasi terpetakan dengan benar.`
+      )
     }
 
     const usefulLifeMonths = Number.isFinite(usefulLifeInput) && usefulLifeInput > 0
@@ -2841,23 +2903,23 @@ export async function importFixedAssetsMigration(
 
     const assetInsert: Database['public']['Tables']['fixed_assets']['Insert'] = {
       org_id: orgId,
-      branch_id: branchId,
+      branch_id: branchId as string,
       code: assetCode,
       name: assetName,
       description: notes || null,
-      category: null,
+      category: category,
       purchase_date: acquisitionDate,
       purchase_price: Number(acquisitionCost.toFixed(2)),
       salvage_value: Number(residualValue.toFixed(2)),
       useful_life_months: usefulLifeMonths,
-      asset_account_id: assetAccount.id,
-      accum_dep_account_id: accumDepAccount?.id || null,
-      dep_expense_account_id: depExpenseAccount?.id || null,
+      asset_account_id: resolvedAccounts.assetAccountId,
+      accum_dep_account_id: resolvedAccounts.accumDepAccountId,
+      dep_expense_account_id: resolvedAccounts.depExpenseAccountId,
       depreciation_method: 'STRAIGHT_LINE',
       status: 'ACTIVE',
       accumulated_depreciation: Number(accumulatedDepreciation.toFixed(2)),
       current_book_value: currentBookValue,
-      last_depreciation_date: accumulatedDepreciation > 0 ? journalDate : null,
+      last_depreciation_date: accumulatedDepreciation > 0 ? acquisitionDate : null,
     }
 
     const { data: asset, error: assetError } = await supabase
@@ -2875,17 +2937,17 @@ export async function importFixedAssetsMigration(
     const journalLines: Database['public']['Tables']['journal_lines']['Insert'][] = [
       {
         entry_id: '',
-        account_id: assetAccount.id,
+        account_id: resolvedAccounts.assetAccountId,
         debit: Number(acquisitionCost.toFixed(2)),
         credit: 0,
         memo: `Saldo Awal Aset ${assetCode}`,
       },
     ]
 
-    if (accumulatedDepreciation > 0 && accumDepAccount?.id) {
+    if (accumulatedDepreciation > 0 && resolvedAccounts.accumDepAccountId) {
       journalLines.push({
         entry_id: '',
-        account_id: accumDepAccount.id,
+        account_id: resolvedAccounts.accumDepAccountId,
         debit: 0,
         credit: Number(accumulatedDepreciation.toFixed(2)),
         memo: `Akumulasi Penyusutan Awal ${assetCode}`,
