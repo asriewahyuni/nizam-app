@@ -731,6 +731,18 @@ class PostgresQueryBuilder {
     return rows
   }
 
+  // pg serializes plain JS arrays as PostgreSQL array literals ({item1,item2}), not JSON
+  // arrays ([item1,item2]). For JSONB columns this causes "invalid input syntax for type json".
+  // Explicitly JSON.stringify any array or plain object so the JSONB column always receives
+  // a valid JSON string regardless of the target column type.
+  private _serializeDbParam(value: unknown): unknown {
+    if (value == null) return null
+    if (value instanceof Date) return value.toISOString()
+    if (Buffer.isBuffer(value)) return value
+    if (Array.isArray(value) || (typeof value === 'object')) return JSON.stringify(value)
+    return value
+  }
+
   private async _executeInsert(table: string, params: unknown[]): Promise<QueryResult> {
     const payloads = Array.isArray(this._payload) ? this._payload : [this._payload!]
     if (payloads.length === 0) return { data: [], error: null }
@@ -740,7 +752,7 @@ class PostgresQueryBuilder {
 
     const valueSets = payloads.map((p) => {
       const vals = allKeys.map((k) => {
-        params.push((p as Record<string, unknown>)[k] ?? null)
+        params.push(this._serializeDbParam((p as Record<string, unknown>)[k] ?? null))
         return `$${params.length}`
       })
       return `(${vals.join(', ')})`
@@ -758,7 +770,7 @@ class PostgresQueryBuilder {
     }
 
     const setClauses = Object.entries(payload).map(([k, v]) => {
-      params.push(v)
+      params.push(this._serializeDbParam(v))
       return `"${k.replace(/"/g, '""')}" = $${params.length}`
     })
 
@@ -777,7 +789,7 @@ class PostgresQueryBuilder {
 
     const valueSets = payloads.map((p) => {
       const vals = allKeys.map((k) => {
-        params.push((p as Record<string, unknown>)[k] ?? null)
+        params.push(this._serializeDbParam((p as Record<string, unknown>)[k] ?? null))
         return `$${params.length}`
       })
       return `(${vals.join(', ')})`
