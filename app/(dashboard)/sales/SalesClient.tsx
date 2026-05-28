@@ -389,7 +389,7 @@ export default function SalesClient({
   const [dueDate, setDueDate] = useState('')
   const [notes, setNotes] = useState('')
   const [resellerId, setResellerId] = useState('')
-  const [paymentTerm, setPaymentTerm] = useState<'TEMPO' | 'LUNAS'>('TEMPO')
+  const [paymentTerm, setPaymentTerm] = useState<'TEMPO' | 'LUNAS'>('LUNAS')
   const [paymentAccountId, setPaymentAccountId] = useState('')
   const [customGlobalDiscount, setCustomGlobalDiscount] = useState<number | null>(null)
   const [customGlobalDiscountMode, setCustomGlobalDiscountMode] = useState<HeaderDiscountMode>('FIXED')
