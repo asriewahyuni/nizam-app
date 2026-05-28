@@ -52,6 +52,7 @@ import {
   saveOrganizationRole,
 } from '@/modules/organization/actions/roles.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import {
   PageHeader,
@@ -195,6 +196,8 @@ export default function HrisClient({
   const [viewingRun, setViewingRun] = useState<any>(null)
   const [viewingRunData, setViewingRunData] = useState<any[]>([])
   const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false)
+  const [payrollComponentAccountId, setPayrollComponentAccountId] = useState('')
+  const [payAccountId, setPayAccountId] = useState('')
   const [resettingId, setResettingId] = useState<string | null>(null)
   const [resetModalEmp, setResetModalEmp] = useState<any>(null)
   const [resetModalPwd, setResetModalPwd] = useState('nizam123')
@@ -383,6 +386,7 @@ export default function HrisClient({
     if (res.error) showToast(res.error, 'error')
     else {
       setIsPayrollModalOpen(false)
+      setPayrollComponentAccountId('')
     }
     setLoading(false)
   }
@@ -1964,15 +1968,15 @@ export default function HrisClient({
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1 flex items-center gap-2">
-                      General Ledger Mapping
-                    </label>
-                    <select name="account_id" required className="w-full px-6 py-4 bg-white border-2 border-indigo-50 shadow-[0_10px_20px_-5px_rgba(99,102,241,0.1)] rounded-xl text-sm font-semibold text-indigo-700 outline-none focus:border-indigo-500 transition-all">
-                      <option value="">-- UNMAPPED (REQUIRED) --</option>
-                      {accounts.map((acc: any) => (
-                        <option key={acc.account_id} value={acc.account_id}>{acc.code} - {acc.name}</option>
-                      ))}
-                    </select>
+                    <input type="hidden" name="account_id" value={payrollComponentAccountId} />
+                    <SearchableSelect
+                      label="General Ledger Mapping"
+                      options={accounts.map((a: any) => ({ id: a.account_id, code: a.code, name: a.name }))}
+                      value={payrollComponentAccountId}
+                      onChange={setPayrollComponentAccountId}
+                      placeholder="-- UNMAPPED (REQUIRED) --"
+                      required={true}
+                    />
                   </div>
 
                   <div className="flex items-center gap-4 pt-4 bg-slate-50/50 p-6 rounded-[32px] border border-slate-100">
@@ -2322,13 +2326,15 @@ export default function HrisClient({
                 </div>
 
                 <div className="space-y-2 text-left bg-slate-50/50 p-8 rounded-[32px] border border-slate-100">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Funding Account (Bank/Cash)</label>
-                  <select id="pay-account" className="w-full px-6 py-4 rounded-xl border border-slate-200 font-semibold text-slate-800 outline-none focus:border-emerald-500 transition-all bg-white shadow-sm appearance-none">
-                    <option value="">-- SELECT SOURCE ACCOUNT --</option>
-                    {accounts.filter((a: any) => a.code.startsWith('11')).map((acc: any) => (
-                      <option key={acc.account_id} value={acc.account_id}>{acc.code} - {acc.name} ({formatRupiah(acc.balance)})</option>
-                    ))}
-                  </select>
+                  <SearchableSelect
+                    label="Funding Account (Bank/Cash)"
+                    options={accounts
+                      .filter((a: any) => a.code.startsWith('11'))
+                      .map((a: any) => ({ id: a.account_id, code: a.code, name: a.name, balance: a.balance }))}
+                    value={payAccountId}
+                    onChange={setPayAccountId}
+                    placeholder="-- SELECT SOURCE ACCOUNT --"
+                  />
                   <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 mt-4">
                     <p className="text-[9px] text-amber-700 leading-relaxed font-semibold uppercase tracking-wide text-center">Auto-Journaling: This will create a Bank Credit & Salary Expense entry.</p>
                   </div>
@@ -2337,7 +2343,7 @@ export default function HrisClient({
                 <div className="flex flex-col gap-4">
                   <SafeButton
                     onClick={async () => {
-                      const accId = (document.getElementById('pay-account') as HTMLSelectElement).value
+                      const accId = payAccountId
                       if (!accId) return showToast('Please select a source account.', 'error')
                       setLoading(true)
                       const res = await payPayrollRun(isPayModalOpen.id, orgId, accId)
@@ -2352,7 +2358,7 @@ export default function HrisClient({
                   >
                     CONFIRM & DISBURSE
                   </SafeButton>
-                  <button onClick={() => setIsPayModalOpen(null)} className="text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:text-slate-500 transition-all">ABORT OPERATION</button>
+                  <button onClick={() => { setIsPayModalOpen(null); setPayAccountId('') }} className="text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:text-slate-500 transition-all">ABORT OPERATION</button>
                 </div>
               </div>
             </motion.div>

@@ -3,17 +3,17 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Plus, 
-  Search, 
-  Truck, 
-  CheckCircle2, 
-  AlertCircle, 
-  Trash2, 
-  CheckSquare, 
-  XCircle, 
-  CreditCard, 
-  RotateCcw, 
+import {
+  Plus,
+  Search,
+  Truck,
+  CheckCircle2,
+  AlertCircle,
+  Trash2,
+  CheckSquare,
+  XCircle,
+  CreditCard,
+  RotateCcw,
   ArrowRight,
   TrendingUp,
   Clock,
@@ -23,7 +23,8 @@ import {
   X,
   Pencil,
   Wrench,
-  ShieldCheck
+  ShieldCheck,
+  FileSpreadsheet
 } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createPurchaseEntry, receivePurchase, voidPurchase, createPurchasePayment, createPurchaseReturn, getPurchaseById, repairReceivedPurchaseStock } from '@/modules/purchasing/actions/purchasing.actions'
@@ -31,6 +32,8 @@ import { createContact } from '@/modules/contacts/actions/contact.actions'
 import type { Product } from '@/types/database.types'
 
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { BulkImportModal } from '@/components/bulk-import/BulkImportModal'
+import { BulkImportSection } from '@/components/bulk-import/BulkImportSection'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import {
   getDocumentHeaderDiscountAmount,
@@ -79,6 +82,7 @@ export default function PurchasingClient({
      website: orgSettings.website || '',
    }
   const [showModal, setShowModal] = useState(false)
+  const [showBulkImport, setShowBulkImport] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
    const [loading, setLoading] = useState(false)
    useEffect(() => {
@@ -734,7 +738,7 @@ export default function PurchasingClient({
             >
               Vendor Baru
             </SafeButton>
-            <SafeButton 
+            <SafeButton
               variant="danger"
               icon={<Plus size={18} />}
               onClick={() => {
@@ -780,6 +784,8 @@ export default function PurchasingClient({
           href="/contacts?type=SUPPLIER"
         />
       </div>
+
+      <BulkImportSection orgId={orgId} type="purchase" onSuccess={() => router.refresh()} />
 
       <div className="flex bg-slate-100/50 p-1.5 rounded-xl w-fit border border-slate-100">
          <button
@@ -2034,6 +2040,15 @@ export default function PurchasingClient({
           )}
         </AnimatePresence>
       </div>
+
+      {showBulkImport && (
+        <BulkImportModal
+          orgId={orgId}
+          type="purchase"
+          onClose={() => setShowBulkImport(false)}
+          onSuccess={() => router.refresh()}
+        />
+      )}
     </motion.div>
   )
 }

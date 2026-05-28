@@ -22,6 +22,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react'
 import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { submitReimbursement, approveReimbursement, rejectReimbursement, payReimbursement, uploadReceipt } from '@/modules/accounting/actions/reimburse.actions'
 import { detectReceiptDetails } from '@/modules/ai/actions/vision.actions'
 
@@ -416,19 +417,12 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                         </div>
                                         <div className="col-span-12 md:col-span-3 space-y-2 text-[10px] font-semibold uppercase text-slate-400 tracking-wide">
                                             Kategori Biaya
-                                            <select
+                                            <SearchableSelect
+                                              options={expenseAccounts}
                                               value={it.category_account_id}
-                                              onChange={(e) => handleItemChange(idx, 'category_account_id', e.target.value)}
-                                              className="w-full bg-white border border-slate-200 p-3 rounded-xl text-slate-900 font-bold"
-                                            >
-                                              <option value="">— Pilih Kategori —</option>
-                                              {SIMPLE_CATEGORIES.map(cat => {
-                                                const matched = expenseAccounts.find((a: any) => a.name.toUpperCase().includes(cat.keyword))
-                                                return matched ? (
-                                                  <option key={cat.keyword} value={matched.id}>{cat.emoji} {cat.label}</option>
-                                                ) : null
-                                              })}
-                                            </select>
+                                              onChange={(val) => handleItemChange(idx, 'category_account_id', val)}
+                                              placeholder="— Pilih Kategori —"
+                                            />
                                         </div>
                                         <div className="col-span-12 md:col-span-4 space-y-2 text-[10px] font-semibold uppercase text-slate-400 tracking-wide">
                                             Uraian

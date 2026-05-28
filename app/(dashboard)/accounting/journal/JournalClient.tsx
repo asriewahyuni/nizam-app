@@ -6,6 +6,7 @@ import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButt
 import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries, getAccountLedger } from '@/modules/accounting/actions/journal.actions'
 import type { AccountLedgerResult } from '@/modules/accounting/actions/journal.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatRupiah } from '@/lib/utils'
 import { format } from 'date-fns'
@@ -942,10 +943,13 @@ export default function JournalClient({
                                {lines.map((line) => (
                                  <tr key={line.id}>
                                     <td className="px-6 py-4">
-                                       <select required value={line.account_id} onChange={(e) => handleLineChange(line.id, 'account_id', e.target.value)} className="w-full text-xs font-bold border border-slate-100 rounded-xl px-4 py-3 bg-slate-50 outline-none focus:bg-white focus:border-blue-400 transition-all">
-                                          <option value="">-- Select CoA --</option>
-                                          {accounts.map((acc: any) => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                                       </select>
+                                       <SearchableSelect
+                                         options={accounts}
+                                         value={line.account_id}
+                                         onChange={(val) => handleLineChange(line.id, 'account_id', val)}
+                                         placeholder="-- Select CoA --"
+                                         required={true}
+                                       />
                                     </td>
                                     <td className="px-4 py-4">
                                        <CurrencyInput

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil } from 'lucide-react'
+import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil, FileSpreadsheet } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createSaleEntry, createSaleFulfillmentDrafts, deliverSale, voidSale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
@@ -12,6 +12,8 @@ import type { ProductWithStock } from '@/modules/inventory/actions/inventory.act
 import { QRCodeSVG } from 'qrcode.react'
 
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { BulkImportModal } from '@/components/bulk-import/BulkImportModal'
+import { BulkImportSection } from '@/components/bulk-import/BulkImportSection'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { getEditableLineDiscountAmount, getStoredLineDiscountAmount, inferStoredLineDiscountMode } from '@/lib/commerce/discounts'
 import { formatDate, formatRupiah } from '@/lib/utils'
@@ -315,6 +317,7 @@ export default function SalesClient({
   activeBranchName,
 }: any) {
   const [showModal, setShowModal] = useState(false)
+  const [showBulkImport, setShowBulkImport] = useState(false)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
    const [loading, setLoading] = useState(false)
    const searchParams = useSearchParams()
@@ -1026,7 +1029,7 @@ export default function SalesClient({
             >
               Customer Baru
             </SafeButton>
-            <SafeButton 
+            <SafeButton
               variant="primary"
               icon={<Plus size={18} />}
               onClick={() => {
@@ -1072,8 +1075,10 @@ export default function SalesClient({
         />
       </div>
 
+      <BulkImportSection orgId={orgId} type="sales" onSuccess={() => router.refresh()} />
+
       <SectionCard>
-        <SectionHeader 
+        <SectionHeader
           title="Histori Penjualan"
           subtitle="Daftar seluruh transaksi invoice dan pesanan pelanggan."
           actions={
@@ -1887,17 +1892,13 @@ export default function SalesClient({
 
                           {refundMode === 'CASH' && (
                             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-1.5 pt-2">
-                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1">Keluar dari Akun Kas/Bank</label>
-                              <select 
+                              <SearchableSelect
+                                label="Keluar dari Akun Kas/Bank"
+                                options={coa.filter((a: any) => a.code.startsWith('11'))}
                                 value={refundAccountId}
-                                onChange={(e) => setRefundAccountId(e.target.value)}
-                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold text-slate-700 focus:border-amber-400 transition-all appearance-none"
-                              >
-                                <option value="">-- Pilih Akun Kas/Bank --</option>
-                                {coa.filter((a: any) => a.code.startsWith('11')).map((a: any) => (
-                                  <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                                ))}
-                              </select>
+                                onChange={setRefundAccountId}
+                                placeholder="-- Pilih Akun Kas/Bank --"
+                              />
                             </motion.div>
                           )}
                         </>
@@ -2235,17 +2236,13 @@ export default function SalesClient({
 
                    <div className="space-y-4">
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-400 uppercase ml-1">Terima ke Akun</label>
-                        <select 
+                        <SearchableSelect
+                          label="Terima ke Akun"
+                          options={coa.filter((a: any) => a.code.startsWith('11'))}
                           value={collectionAccountId}
-                          onChange={(e) => setCollectionAccountId(e.target.value)}
-                          className="w-full mt-1.5 px-5 py-4 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 ring-emerald-100 text-sm font-bold text-slate-700 appearance-none"
-                        >
-                          <option value="">-- Pilih Kas/Bank --</option>
-                          {coa.filter((a: any) => a.code.startsWith('11')).map((a: any) => (
-                            <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                          ))}
-                        </select>
+                          onChange={setCollectionAccountId}
+                          placeholder="-- Pilih Kas/Bank --"
+                        />
                       </div>
 
                       <div>
@@ -2297,6 +2294,15 @@ export default function SalesClient({
           )}
         </AnimatePresence>
       </div>
+
+      {showBulkImport && (
+        <BulkImportModal
+          orgId={orgId}
+          type="sales"
+          onClose={() => setShowBulkImport(false)}
+          onSuccess={() => router.refresh()}
+        />
+      )}
     </motion.div>
   )
 }

@@ -43,6 +43,7 @@ import { createBankAccount, createBankTransaction, createInterOrgCapitalTransfer
 import { processBankCSV } from '@/modules/cash/actions/reconcile.actions'
 import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import type {
   CashAccountOption,
@@ -172,6 +173,9 @@ export function CashClient({
   const [success, setSuccess] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'overview' | 'reconcile'>('overview')
   const [selectedBankId, setSelectedBankId] = useState<string | null>(null)
+
+  // Form state for account creation GL mapping
+  const [glAccountId, setGlAccountId] = useState('')
 
   // Form states for transaction
   const [txType, setTxType] = useState<'IN' | 'OUT' | 'TRANSFER'>('OUT')
@@ -313,6 +317,7 @@ export function CashClient({
     else {
       setSuccess('Rekening bank berhasil ditambahkan.')
       setShowAccountModal(false)
+      setGlAccountId('')
       setTimeout(() => setSuccess(null), 3000)
     }
     setLoading(false)
@@ -1112,14 +1117,15 @@ export function CashClient({
                  )}
 
                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Mapped GL Account (CoA)</label>
-                    <div className="relative">
-                      <select name="account_id" required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner">
-                         <option value="">Select Asset Account...</option>
-                         {dynamicGlAccounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
-                      </select>
-                      <ChevronRight className="absolute right-5 top-1/2 -translate-y-1/2 rotate-90 text-slate-300 pointer-events-none" size={16} />
-                    </div>
+                    <input type="hidden" name="account_id" value={glAccountId} />
+                    <SearchableSelect
+                      label="Mapped GL Account (CoA)"
+                      options={dynamicGlAccounts}
+                      value={glAccountId}
+                      onChange={setGlAccountId}
+                      placeholder="Select Asset Account..."
+                      required={true}
+                    />
                  </div>
 
                  <div className="flex gap-4 pt-6 border-t border-slate-50">
@@ -1260,19 +1266,14 @@ export function CashClient({
                           </>
                         ) : (
                           <>
-                            {isCategoryLocked && <input type="hidden" name="category_id" value={txCategoryId} />}
-                            <select name="category_id" value={txCategoryId} onChange={(e) => setTxCategoryId(e.target.value)} required disabled={isCategoryLocked} className="w-full px-6 py-4 bg-slate-900 text-white rounded-xl text-xs font-semibold uppercase tracking-wide outline-none shadow-xl border border-slate-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
-                               <option value="">Select Ledger Account...</option>
-                               {['EXPENSE', 'LIABILITY', 'ASSET', 'REVENUE', 'EQUITY'].map(type => {
-                                 const group = categoryAccounts.filter(a => a.type === type);
-                                 if (group.length === 0) return null;
-                                 return (
-                                   <optgroup key={type} className="text-slate-400" label={type}>
-                                      {group.map(a => <option key={a.id} value={a.id} className="text-white">{a.code} - {a.name}</option>)}
-                                   </optgroup>
-                                 )
-                               })}
-                            </select>
+                            <input type="hidden" name="category_id" value={txCategoryId} />
+                            <SearchableSelect
+                              dark
+                              options={categoryAccounts}
+                              value={txCategoryId}
+                              onChange={(val) => { if (!isCategoryLocked) setTxCategoryId(val) }}
+                              placeholder="Select Ledger Account..."
+                            />
                             {isCategoryLocked && (
                               <p className="text-[10px] font-bold text-indigo-500 ml-1">Akun lawan dikunci dari shortcut aging agar settlement tetap masuk ke akun piutang/hutang yang benar.</p>
                             )}
@@ -1284,23 +1285,15 @@ export function CashClient({
                  {txType === 'TRANSFER' && isInterOrgTransfer && (
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div className="space-y-1">
-                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.1em] ml-1">
-                         Akun Investasi Induk (OUT)
-                       </label>
-                       <select
-                         name="source_counter_account_id"
-                         required
+                       <input type="hidden" name="source_counter_account_id" value={effectiveSourceCounterAccountId} />
+                       <SearchableSelect
+                         label="Akun Investasi Induk (OUT)"
+                         dark
+                         options={sourceInterOrgCounterAccounts}
                          value={effectiveSourceCounterAccountId}
-                         onChange={(e) => setTxSourceCounterAccountId(e.target.value)}
-                         className="w-full px-6 py-4 bg-slate-900 text-white rounded-xl text-xs font-semibold uppercase tracking-wide outline-none shadow-xl border border-slate-800 transition-all"
-                       >
-                         <option value="">Select Source Investment Account...</option>
-                         {sourceInterOrgCounterAccounts.map((account) => (
-                           <option key={account.id} value={account.id} className="text-white">
-                             {account.code} - {account.name}
-                           </option>
-                         ))}
-                       </select>
+                         onChange={setTxSourceCounterAccountId}
+                         placeholder="Select Source Investment Account..."
+                       />
                        {sourceInterOrgCounterAccounts.length > 0 ? (
                          <p className="text-[10px] font-bold text-blue-500 ml-1">
                            Gunakan akun investasi organisasi induk, idealnya 1601 Investasi pada Entitas Anak / Unit.
@@ -1312,27 +1305,15 @@ export function CashClient({
                        )}
                      </div>
                      <div className="space-y-1">
-                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.1em] ml-1">
-                         Akun Modal/Pendanaan Entitas Tujuan (IN)
-                       </label>
-                       <select
-                         name="target_counter_account_id"
-                         required
+                       <input type="hidden" name="target_counter_account_id" value={effectiveTargetCounterAccountId} />
+                       <SearchableSelect
+                         label="Akun Modal/Pendanaan Entitas Tujuan (IN)"
+                         dark
+                         options={targetFinancingAccounts}
                          value={effectiveTargetCounterAccountId}
-                         onChange={(e) => setTxTargetCounterAccountId(e.target.value)}
-                         className="w-full px-6 py-4 bg-slate-900 text-white rounded-xl text-xs font-semibold uppercase tracking-wide outline-none shadow-xl border border-slate-800 transition-all"
-                       >
-                         <option value="">Select Target Financing Account...</option>
-                         {['EQUITY', 'LIABILITY'].map(type => {
-                           const group = targetFinancingAccounts.filter(a => a.type === type)
-                           if (group.length === 0) return null
-                           return (
-                             <optgroup key={`target-${type}`} className="text-slate-400" label={type}>
-                               {group.map(a => <option key={a.id} value={a.id} className="text-white">{a.code} - {a.name}</option>)}
-                             </optgroup>
-                           )
-                         })}
-                       </select>
+                         onChange={setTxTargetCounterAccountId}
+                         placeholder="Select Target Financing Account..."
+                       />
                        <p className="text-[10px] font-bold text-blue-500 ml-1">
                          Gunakan akun pendanaan/modal milik penerima, biasanya 3001 Modal Disetor.
                        </p>
