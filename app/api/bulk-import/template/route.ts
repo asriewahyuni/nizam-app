@@ -257,6 +257,112 @@ function buildPurchaseTemplate(wb: ExcelJS.Workbook) {
   })
 }
 
+function buildJournalTemplate(wb: ExcelJS.Workbook) {
+  // ── Sheet PETUNJUK ────────────────────────────────────────────────────────
+  const guide = wb.addWorksheet('PETUNJUK')
+  guide.getColumn(1).width = 90
+  const lines = [
+    ['TEMPLATE BULK IMPORT — JURNAL MANUAL (Akuntansi)'],
+    [''],
+    ['CARA PENGGUNAAN:'],
+    ['1. Isi sheet JURNAL_MANUAL — satu baris = satu baris jurnal (debit atau kredit).'],
+    ['2. Baris-baris dengan no_jurnal yang SAMA akan digabung menjadi satu entri jurnal.'],
+    ['3. Kolom berwarna ORANYE = WAJIB diisi.'],
+    ['4. Kolom berwarna HIJAU = Contoh data yang bisa dihapus.'],
+    [''],
+    ['ATURAN PENTING:'],
+    ['• no_jurnal harus angka unik per entri jurnal (tidak harus urut, bebas pilih angka).'],
+    ['• Setiap no_jurnal WAJIB BALANCE: total debit = total kredit. Jika tidak, baris dilewati.'],
+    ['• tanggal format: YYYY-MM-DD, contoh: 2025-01-15'],
+    ['• kode_akun diisi dengan KODE akun dari CoA, contoh: 1101 (Kas), 4001 (Pendapatan).'],
+    ['• debit dan kredit dalam Rupiah tanpa titik/koma, contoh: 1500000'],
+    ['• Minimal 2 baris per no_jurnal (minimal satu debit dan satu kredit).'],
+    ['• Kolom deskripsi dan tanggal cukup diisi pada baris pertama setiap no_jurnal,'],
+    ['  tapi boleh juga diisi di semua baris (sistem ambil dari baris pertama).'],
+    ['• Semua jurnal akan disimpan sebagai DRAFT. Posting manual dari halaman Jurnal.'],
+    [''],
+    ['CONTOH JURNAL YANG BENAR:'],
+    ['  no_jurnal=1: Dr Kas (1101) Rp10.000.000 vs Cr Modal (3001) Rp10.000.000 → BALANCE ✓'],
+    ['  no_jurnal=2: Dr Beban Sewa (5201) Rp2.000.000 vs Cr Kas (1101) Rp2.000.000 → BALANCE ✓'],
+  ]
+  lines.forEach(([text], i) => {
+    const row = guide.getRow(i + 1)
+    row.getCell(1).value = text
+    if (i === 0) {
+      row.getCell(1).font = { bold: true, size: 14, color: { argb: 'FF1E293B' } }
+      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }
+    } else if (i === 2 || i === 8) {
+      row.getCell(1).font = { bold: true, size: 10, color: { argb: 'FF1E293B' } }
+    } else {
+      row.getCell(1).font = { size: 10, color: { argb: 'FF475569' } }
+    }
+    row.height = i === 0 ? 30 : 18
+  })
+
+  // ── Sheet JURNAL_MANUAL ───────────────────────────────────────────────────
+  const js = wb.addWorksheet('JURNAL_MANUAL')
+  const cols = [
+    { key: 'no_jurnal',  width: 12,  label: 'no_jurnal*',  required: true  },
+    { key: 'tanggal',    width: 14,  label: 'tanggal*',    required: true  },
+    { key: 'deskripsi',  width: 36,  label: 'deskripsi*',  required: true  },
+    { key: 'kode_akun',  width: 12,  label: 'kode_akun*',  required: true  },
+    { key: 'debit',      width: 18,  label: 'debit*',      required: true  },
+    { key: 'kredit',     width: 18,  label: 'kredit*',     required: true  },
+    { key: 'memo_baris', width: 28,  label: 'memo_baris',  required: false },
+    { key: 'catatan',    width: 28,  label: 'catatan',     required: false },
+  ]
+
+  // Title row
+  const tRow = js.getRow(1)
+  tRow.height = 28
+  const tCell = tRow.getCell(1)
+  tCell.value = 'JURNAL MANUAL — Satu baris = Satu baris jurnal. Baris dengan no_jurnal sama = Satu entri jurnal.'
+  tCell.fill = HEADER_FILL
+  tCell.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } }
+  tCell.alignment = { vertical: 'middle' }
+  js.mergeCells(1, 1, 1, cols.length)
+
+  // Column headers (row 2)
+  cols.forEach((c, i) => {
+    js.getColumn(i + 1).width = c.width
+    applyHeaderStyle(js.getRow(2).getCell(i + 1), c.label, c.required)
+  })
+  js.getRow(2).height = 22
+
+  // Example rows
+  const DEBIT_FILL: ExcelJS.Fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }
+  const CREDIT_FILL: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } }
+
+  const examples = [
+    // no_jurnal, tanggal, deskripsi, kode_akun, debit, kredit, memo_baris, catatan
+    [1, '2025-01-01', 'Setoran Modal Awal', '1101', 10000000, 0,        'Kas masuk dari pemilik', 'Opening balance'],
+    [1, '2025-01-01', '',                  '3001', 0,         10000000, 'Modal disetor',           ''],
+    [2, '2025-01-02', 'Beli Perlengkapan Kantor', '5201', 500000, 0,   'Beban perlengkapan',      ''],
+    [2, '2025-01-02', '',                  '1101', 0,         500000,   'Keluar kas',              ''],
+    [3, '2025-01-03', 'Pendapatan Jasa', '1101', 2000000, 0,            'Terima dari pelanggan',   ''],
+    [3, '2025-01-03', '',                  '4001', 0,         2000000,  'Pendapatan jasa desain',  ''],
+  ]
+  examples.forEach((data, i) => {
+    const r = js.getRow(3 + i)
+    r.values = ['', ...data]
+    const isDebit = Number(data[4]) > 0
+    r.eachCell(cell => {
+      cell.fill = isDebit ? DEBIT_FILL : CREDIT_FILL
+      cell.font = { size: 9, color: { argb: isDebit ? 'FF166534' : 'FF991B1B' }, italic: true }
+    })
+    r.height = 18
+  })
+
+  // Number format for debit/kredit columns
+  for (let r = 3; r <= 1000; r++) {
+    js.getCell(r, 5).numFmt = '#,##0'
+    js.getCell(r, 6).numFmt = '#,##0'
+  }
+
+  // Freeze header rows
+  js.views = [{ state: 'frozen', xSplit: 0, ySplit: 2 }]
+}
+
 export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get('type') ?? 'sales'
 
@@ -266,6 +372,8 @@ export async function GET(req: NextRequest) {
 
   if (type === 'purchase') {
     buildPurchaseTemplate(wb)
+  } else if (type === 'journal') {
+    buildJournalTemplate(wb)
   } else {
     buildSalesTemplate(wb)
   }
@@ -273,7 +381,9 @@ export async function GET(req: NextRequest) {
   const buffer = await wb.xlsx.writeBuffer()
   const filename = type === 'purchase'
     ? 'template-bulk-pembelian.xlsx'
-    : 'template-bulk-penjualan.xlsx'
+    : type === 'journal'
+      ? 'template-bulk-jurnal-manual.xlsx'
+      : 'template-bulk-penjualan.xlsx'
 
   return new NextResponse(buffer, {
     headers: {

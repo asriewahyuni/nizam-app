@@ -7,6 +7,7 @@ import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraft
 import type { AccountLedgerResult } from '@/modules/accounting/actions/journal.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { BulkJournalSection } from '@/components/bulk-import/BulkJournalSection'
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatRupiah } from '@/lib/utils'
 import { format } from 'date-fns'
@@ -520,8 +521,10 @@ export default function JournalClient({
         />
       </div>
 
+      <BulkJournalSection orgId={orgId} onSuccess={() => window.location.reload()} />
+
       <SectionCard>
-        <SectionHeader 
+        <SectionHeader
           title="Buku Besar Umum"
           subtitle={
             activeSearch
