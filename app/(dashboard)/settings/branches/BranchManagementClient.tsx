@@ -531,7 +531,7 @@ export function BranchManagementClient({
         )}
       </AnimatePresence>
 
+      {ConfirmUI}
     </motion.div>
-  {ConfirmUI}
   )
 }

@@ -976,7 +976,7 @@ export default function POSClient({
       setShowCloseShiftModal(true)
    }
 
-   async const handleExitPos = () => {
+   const handleExitPos = async () => {
       if (cart.length > 0) {
          alert('Selesaikan atau kosongkan keranjang terlebih dahulu sebelum keluar dari POS.')
          return

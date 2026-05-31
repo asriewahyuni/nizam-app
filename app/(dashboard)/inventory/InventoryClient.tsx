@@ -1636,7 +1636,7 @@ export default function InventoryClient({
            </motion.div>
         </div>
       )}
+      {ConfirmUI}
     </motion.div>
-  {ConfirmUI}
   )
 }

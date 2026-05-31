@@ -16,8 +16,8 @@ export const runtime = 'nodejs'
  * Route publik untuk logo yang disimpan private di bucket Railway.
  * Browser diarahkan ke signed URL agar file tetap diambil langsung dari bucket.
  */
-export async function GET(_request: NextRequest, context: {
-  try { params: Promise<{ key?: string[] }> }) {
+export async function GET(_request: NextRequest, context: { params: Promise<{ key?: string[] }> }) {
+  try {
   if (!isObjectStorageConfigured()) {
     return NextResponse.json({ error: 'Bucket Railway belum dikonfigurasi.' }, { status: 404 })
   }

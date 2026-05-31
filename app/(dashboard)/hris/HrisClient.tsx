@@ -487,7 +487,7 @@ export default function HrisClient({
     setLoading(false)
   }
 
-  async const handleImpersonateHrisUser = (candidate: HrisImpersonationTarget) => {
+  const handleImpersonateHrisUser = async (candidate: HrisImpersonationTarget) => {
     const targetUserId = String(candidate?.targetUserId || '').trim()
     const displayName = String(candidate?.displayName || 'akun target').trim()
     const rawUserId = String(candidate?.rawUserId || '').trim()

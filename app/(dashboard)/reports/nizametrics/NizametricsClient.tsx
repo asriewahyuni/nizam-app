@@ -352,8 +352,8 @@ export function NizametricsClient({
   const todayDate = getDateInTimeZone('Asia/Jakarta')
 
   // ── State ──
-  const [ikhtiyyarTargets, setIkhtiyyarTargets] = useState<Record<BSCPerspective, number>>({
   const { confirm, ConfirmUI } = useConfirm()
+  const [ikhtiyyarTargets, setIkhtiyyarTargets] = useState<Record<BSCPerspective, number>>({
     FINANCIAL: DOMAIN_CONFIG.FINANCIAL.ikhtiyyar.targetDefault,
     CUSTOMER: DOMAIN_CONFIG.CUSTOMER.ikhtiyyar.targetDefault,
     INTERNAL_PROCESS: DOMAIN_CONFIG.INTERNAL_PROCESS.ikhtiyyar.targetDefault,
@@ -415,7 +415,7 @@ export function NizametricsClient({
   }
 
   // ── Lock / Unlock ──
-  async const handleLockCycle = () => {
+  const handleLockCycle = async () => {
     if (!canManageSetup) { window.alert('Pilih unit aktif terlebih dahulu.'); return }
     if (sortedKpis.length === 0) {
       window.alert('Tambahkan minimal 1 parameter sebelum mengunci bulan ini.')
@@ -430,7 +430,7 @@ export function NizametricsClient({
     })
   }
 
-  async const handleUnlockCycle = () => {
+  const handleUnlockCycle = async () => {
     if (!canManageSetup) { window.alert('Pilih unit aktif terlebih dahulu.'); return }
     if (!await confirm('Buka kunci? Anda bisa mengubah parameter lagi, tapi pengukuran yang sudah diisi tidak akan terhapus.')) return
     startTransition(async () => {
@@ -478,7 +478,7 @@ export function NizametricsClient({
     })
   }
 
-  async const handleRemoveParam = (kpiId: string) => {
+  const handleRemoveParam = async (kpiId: string) => {
     if (!canManageSetup) { window.alert('Pilih unit aktif terlebih dahulu.'); return }
     if (cycleIsLocked) { window.alert('Siklus dikunci. Buka kunci dulu untuk menghapus parameter.'); return }
     if (!await confirm('Hapus parameter ini dari bulan ini?')) return
