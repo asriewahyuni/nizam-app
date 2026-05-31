@@ -383,7 +383,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                 </div>
                 <div>
                   <span className="block text-xs font-bold text-slate-400">Dimodifikasi Tanggal</span>
-                  <p className="font-medium text-slate-700">{new Date(contract.updated_at).toLocaleDateString('id-ID')}</p>
+                  <p className="font-medium text-slate-700">{formatDate(contract.updated_at)}</p>
                 </div>
                 <div>
                   <span className="block text-xs font-bold text-slate-400">Limit Alokasi Hutang</span>
@@ -511,7 +511,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                         Tersinkron ke Core
                       </span>
                       <p className="text-xs font-medium text-slate-600">
-                        {coreJournal?.entry_number || 'Jurnal Core'} • {coreJournal?.entry_date ? new Date(coreJournal.entry_date).toLocaleDateString('id-ID') : 'Tanggal belum tersedia'}
+                        {coreJournal?.entry_number || 'Jurnal Core'} • {coreJournal?.entry_date ? formatDate(coreJournal.entry_date) : 'Tanggal belum tersedia'}
                       </p>
                     </div>
                   ) : contract.core_journal_entry_id ? (
@@ -614,7 +614,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                         Sudah Diposting
                       </span>
                       <p className="text-xs font-medium text-slate-600">
-                        {profitSharingJournal?.entry_number || 'Jurnal Bagi Hasil'} • {profitSharingJournal?.entry_date ? new Date(profitSharingJournal.entry_date).toLocaleDateString('id-ID') : 'Tanggal belum tersedia'}
+                        {profitSharingJournal?.entry_number || 'Jurnal Bagi Hasil'} • {profitSharingJournal?.entry_date ? formatDate(profitSharingJournal.entry_date) : 'Tanggal belum tersedia'}
                       </p>
                     </div>
                   ) : contract.profit_sharing_journal_entry_id ? (

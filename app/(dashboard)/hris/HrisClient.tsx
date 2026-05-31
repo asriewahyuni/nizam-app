@@ -1674,7 +1674,7 @@ export default function HrisClient({
                            <tr key={inv.id} className="hover:bg-slate-50 transition-all group">
                               <td className="px-8 py-6">
                                  <div className="font-semibold text-slate-900 text-[13px] tracking-tight">{inv.label}</div>
-                                 <div className="text-[9px] text-slate-400 font-bold uppercase mt-1">Dibuat: {new Date(inv.created_at).toLocaleDateString()}</div>
+                                 <div className="text-[9px] text-slate-400 font-bold uppercase mt-1">Dibuat: {formatDate(inv.created_at)}</div>
                               </td>
                               <td className="px-8 py-6">
                                  <div className="flex flex-col gap-2">
@@ -1682,7 +1682,7 @@ export default function HrisClient({
                                        <ShieldCheck size={12} className="text-slate-400" /> {inv.roles?.name || 'Staff Umum'}
                                     </div>
                                     <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5 ml-1">
-                                       <Clock size={10} /> Expired: {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '∞ Unlimited'}
+                                       <Clock size={10} /> Expired: {inv.expires_at ? formatDate(inv.expires_at) : '∞ Unlimited'}
                                     </div>
                                  </div>
                               </td>
@@ -2875,7 +2875,7 @@ export default function HrisClient({
                                                    Jabatan: ${slip.employee?.job_title}
                                                  </div>
                                                  <div style="text-align:right">
-                                                    Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}<br/>
+                                                    Tanggal Cetak: ${formatDate(new Date())}<br/>
                                                     Status: ${viewingRun.status}
                                                  </div>
                                                </div>

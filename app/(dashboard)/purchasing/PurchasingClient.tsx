@@ -2095,7 +2095,7 @@ export default function PurchasingClient({
           onSuccess={() => router.refresh()}
         />
       )}
+      {ConfirmUI}
     </motion.div>
-  {ConfirmUI}
   )
 }

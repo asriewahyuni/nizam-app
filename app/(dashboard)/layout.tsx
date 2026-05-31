@@ -200,7 +200,7 @@ export default async function DashboardLayout({
       : orgData.enabledModules.some((m: string) => allNames.some((candidate) => moduleNameMatches(m, candidate)))
 
     if (!isModulePaid && !isSaasAssessorRouteAccess) {
-      console.log(`[ACL] Redirecting - Module not paid: ${requiredModule} (checked aliases: ${allNames.join(', ')}) for path: ${requestPathname}`)
+      console.warn(`[ACL] Redirecting - Module not paid: ${requiredModule} (checked aliases: ${allNames.join(', ')}) for path: ${requestPathname}`)
       return redirect('/dashboard')
     }
 
@@ -215,7 +215,7 @@ export default async function DashboardLayout({
         (permission) => permissionKeys.some((permissionKey) => permission.includes(permissionKey.toLowerCase()))
       )
       if (!hasPermission) {
-        console.log(`[ACL] Redirecting - No permission for: ${requiredModule} for path: ${requestPathname}`)
+        console.warn(`[ACL] Redirecting - No permission for: ${requiredModule} for path: ${requestPathname}`)
         return redirect('/dashboard')
       }
     }

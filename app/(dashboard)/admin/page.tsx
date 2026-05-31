@@ -929,7 +929,7 @@ export default function SaaSAdminPage() {
     setPackages(packages.map(p => p.id === pkgId ? { ...p, active: !p.active } : p))
     try {
        await db.from('saas_packages').update({ is_active: !currentStatus }).eq('id', pkgId)
-    } catch (err) {}
+    } catch (err) { console.warn('[Admin] Fetch error:', err) }
   }
 
   const handleDeletePackage = (id: string) => {

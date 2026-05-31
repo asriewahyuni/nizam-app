@@ -55,7 +55,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
               setGeoLocName(geoJson.address.city || geoJson.address.county)
             } else { setGeoLocName(`GPS ${lat.toFixed(2)},${lng.toFixed(2)}`) }
           }
-        } catch(e) {}
+        } catch(e) { console.warn('[Zakat] Background sync error:', e) }
       }, () => {})
     }
   }, [])

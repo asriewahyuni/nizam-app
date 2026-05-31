@@ -2644,12 +2644,12 @@ export function ApiSettingsClient({
                       </span>
                       {key.last_used_at && (
                         <span className="text-[10px] text-slate-400 font-bold">
-                          Terakhir: {new Date(key.last_used_at).toLocaleDateString('id-ID')}
+                          Terakhir: {formatDate(key.last_used_at)}
                         </span>
                       )}
                       {key.expires_at && (
                         <span className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
-                          <AlertCircle size={10} /> Expires: {new Date(key.expires_at).toLocaleDateString('id-ID')}
+                          <AlertCircle size={10} /> Expires: {formatDate(key.expires_at)}
                         </span>
                       )}
                     </div>

@@ -357,7 +357,7 @@ export function KaryawanClient({
       ])
       setPrayers(prayerData)
       setWeather(weatherData)
-    } catch {}
+    } catch (e) { console.warn('[Karyawan] Prayer/weather fetch error:', e) }
     finally { setPrayerLoading(false) }
   }, [])
 

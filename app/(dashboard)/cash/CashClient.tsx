@@ -1367,7 +1367,7 @@ export function CashClient({
           )}
         </AnimatePresence>
       </div>
+      {ConfirmUI}
     </motion.div>
-  {ConfirmUI}
   )
 }

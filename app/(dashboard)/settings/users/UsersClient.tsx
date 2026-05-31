@@ -325,7 +325,7 @@ export default function UsersClient({
                         </div>
                         <div>
                           <p className="font-bold text-slate-900 text-sm">User ID: {member.user_id.substring(0, 8)}...</p>
-                          <p className="text-xs text-slate-500">Mulai: {new Date(member.joined_at).toLocaleDateString()}</p>
+                          <p className="text-xs text-slate-500">Mulai: {formatDate(member.joined_at)}</p>
                         </div>
                       </div>
                     </td>
@@ -432,7 +432,7 @@ export default function UsersClient({
                   <div className="space-y-1">
                     <p className="font-bold text-slate-900">{invite.label}</p>
                     <p className="text-xs text-slate-500">
-                      Role: {invite.roles?.name || 'Staff Umum'} • Expired: {invite.expires_at ? new Date(invite.expires_at).toLocaleDateString() : 'Tanpa batas'}
+                      Role: {invite.roles?.name || 'Staff Umum'} • Expired: {invite.expires_at ? formatDate(invite.expires_at) : 'Tanpa batas'}
                     </p>
                     <p className="text-xs text-slate-400 font-mono">{getInvitationUrl(invite.invitation_code)}</p>
                   </div>

@@ -978,7 +978,7 @@ export async function signInWithInternalAuth(input: {
                 [password, legacyUser.id]
               )
               isValid = fallbackPlainCheck.rows[0]?.valid || false
-            } catch (err) {}
+            } catch (err) { console.warn('[Auth] Cleanup error:', err) }
           }
 
           if (isValid) {

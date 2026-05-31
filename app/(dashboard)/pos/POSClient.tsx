@@ -2322,7 +2322,7 @@ export default function POSClient({
                   <div className="border-b border-dashed border-black mb-2" />
                   <div className="flex justify-between mb-1">
                      <span>No: {successData.saleId.split('-')[0].toUpperCase()}</span>
-                     <span>{new Date().toLocaleDateString('id-ID')}</span>
+                     <span>{formatDate(new Date())}</span>
                   </div>
                   <div className="mb-2">
                      <span>Pelanggan: {successData.customerName || 'Umum (Walk-In)'}</span>
@@ -2381,7 +2381,7 @@ export default function POSClient({
                   </div>
                </div>
             )}
+      {ConfirmUI}
       </div>
-   {ConfirmUI}
   )
 }
