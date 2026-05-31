@@ -2847,7 +2847,7 @@ export default function HrisClient({
                                   const printWindow = window.open('', '_blank');
                                   if (!printWindow) return;
                                   printWindow.document.write(`
-                                           <html>
+                                           <html lang="id">
                                              <head>
                                                <title>Slip Gaji - ${slip.employee?.first_name}</title>
                                                <style>

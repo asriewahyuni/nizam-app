@@ -558,7 +558,7 @@ export default function SaasDocumentView({
     const card = document.getElementById('saas-document-card')
     if (!card) return
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${documentLabel} ${invoice.invoice_number}</title><style>body{font-family:Arial,sans-serif;background:#fff;color:#0f172a;padding:24px}*{box-sizing:border-box}article{max-width:960px;margin:0 auto;border:1px solid #e2e8f0;border-radius:24px;overflow:hidden}section,header,footer{padding:24px}table{width:100%;border-collapse:collapse}th,td{padding:12px 0;border-bottom:1px solid #e2e8f0;text-align:left}th:last-child,td:last-child{text-align:right}</style></head><body>${card.outerHTML}</body></html>`
+    const html = `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"/><title>${documentLabel} ${invoice.invoice_number}</title><style>body{font-family:Arial,sans-serif;background:#fff;color:#0f172a;padding:24px}*{box-sizing:border-box}article{max-width:960px;margin:0 auto;border:1px solid #e2e8f0;border-radius:24px;overflow:hidden}section,header,footer{padding:24px}table{width:100%;border-collapse:collapse}th,td{padding:12px 0;border-bottom:1px solid #e2e8f0;text-align:left}th:last-child,td:last-child{text-align:right}</style></head><body>${card.outerHTML}</body></html>`
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
