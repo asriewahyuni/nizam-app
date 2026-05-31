@@ -24,7 +24,9 @@ import {
   Pencil,
   Wrench,
   ShieldCheck,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createPurchaseEntry, receivePurchase, voidPurchase, createPurchasePayment, createPurchaseReturn, getPurchaseById, repairReceivedPurchaseStock } from '@/modules/purchasing/actions/purchasing.actions'
@@ -72,6 +74,12 @@ export default function PurchasingClient({
      return purchaseRequests.some((request: { status?: unknown }) => request?.status === 'PENDING') ? 'REQUESTS' : 'PURCHASES'
    })
    const [purchaseRows, setPurchaseRows] = useState<any[]>(() => purchases || [])
+   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+   const sortedPurchaseRows = [...purchaseRows].sort((a, b) => {
+     const da = String(a.purchase_date || a.created_at || '')
+     const db = String(b.purchase_date || b.created_at || '')
+     return sortOrder === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+   })
    const orgSettings = org?.settings || {}
    const companyProfile = {
      name: orgSettings.brand_name || orgName || 'Perusahaan',
@@ -824,7 +832,17 @@ export default function PurchasingClient({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">No PO</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                  <button
+                    type="button"
+                    onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+                    className="inline-flex items-center gap-1.5 hover:text-slate-700 transition-colors cursor-pointer"
+                    title={sortOrder === 'desc' ? 'Terbaru ke Terlama' : 'Terlama ke Terbaru'}
+                  >
+                    No PO & Tanggal
+                    {sortOrder === 'desc' ? <ArrowDown size={12} className="text-blue-500" /> : <ArrowUp size={12} className="text-blue-500" />}
+                  </button>
+                </th>
                 <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Keterangan Transaksi</th>
                 <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Nilai Faktur</th>
                 <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-center">Status</th>
@@ -835,7 +853,7 @@ export default function PurchasingClient({
               {purchaseRows.length === 0 ? (
                 <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Belum ada data pembelian.</td></tr>
               ) : (
-                purchaseRows.map((p: any) => {
+                sortedPurchaseRows.map((p: any) => {
                   const receiveBlockedByPayment = p.status === 'ORDERED' && isReceiveBlockedByPayment(p)
                   const receiveButtonTitle = receiveBlockedByPayment
                     ? 'Akad SALAM: lakukan pembayaran lunas terlebih dahulu sebelum penerimaan barang'

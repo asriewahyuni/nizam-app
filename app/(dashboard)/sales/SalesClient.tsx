@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil, FileSpreadsheet } from 'lucide-react'
+import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil, FileSpreadsheet, ArrowUp, ArrowDown } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createSaleEntry, createSaleFulfillmentDrafts, deliverSale, voidSale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
@@ -319,6 +319,12 @@ export default function SalesClient({
   const [showModal, setShowModal] = useState(false)
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+  const sortedSales = [...(sales || [])].sort((a, b) => {
+    const da = String(a.sale_date || a.created_at || '')
+    const db = String(b.sale_date || b.created_at || '')
+    return sortOrder === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+  })
    const [loading, setLoading] = useState(false)
    const searchParams = useSearchParams()
    const router = useRouter()
@@ -1093,7 +1099,17 @@ export default function SalesClient({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">No Invoice</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                  <button
+                    type="button"
+                    onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+                    className="inline-flex items-center gap-1.5 hover:text-slate-700 transition-colors cursor-pointer"
+                    title={sortOrder === 'desc' ? 'Terbaru ke Terlama' : 'Terlama ke Terbaru'}
+                  >
+                    No Invoice & Tanggal
+                    {sortOrder === 'desc' ? <ArrowDown size={12} className="text-blue-500" /> : <ArrowUp size={12} className="text-blue-500" />}
+                  </button>
+                </th>
                 <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Pelanggan & Item</th>
                 <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Nilai Tagihan</th>
                 <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-center">Status</th>
@@ -1104,7 +1120,7 @@ export default function SalesClient({
               {sales.length === 0 ? (
                 <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Belum ada data penjualan.</td></tr>
               ) : (
-                sales.map((s: any) => (
+                sortedSales.map((s: any) => (
                   <tr key={s.id} className="group hover:bg-slate-50 transition-colors">
                     <td className="px-8 py-6">
                        <button onClick={() => setViewSale(s)} className="text-xs font-semibold text-blue-600 tracking-tighter hover:underline">
