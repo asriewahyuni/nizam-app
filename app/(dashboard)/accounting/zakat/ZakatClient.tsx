@@ -2,12 +2,28 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Zap, Settings2, Coins, ChevronRight, AlertCircle, Info, Wallet,
-  Building2, TrendingUp, History, Scale, ShieldCheck, Timer, RefreshCw,
-  CheckCircle2, XCircle, Play, RotateCcw, Sunset, Globe, MapPin
+import {
+  Zap,
+  Settings2,
+  Coins,
+  AlertCircle,
+  Info,
+  Wallet,
+  Building2,
+  TrendingUp,
+  History,
+  Scale,
+  ShieldCheck,
+  Timer,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Play,
+  RotateCcw,
+  Sunset,
+  Globe
 } from 'lucide-react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah } from '@/lib/utils'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis, AreaChart, Area, ReferenceLine } from 'recharts'
 import { getLivePreciousMetalsPrices } from '@/modules/accounting/actions/price.actions'

@@ -3,10 +3,23 @@
 import React, { useState, useEffect, Suspense, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Zap, CreditCard, History, Package, Plus, CheckCircle2,
-  Building2, Warehouse, Users,
-  ArrowUpRight, Clock, Truck, Edit3, Megaphone,
-  Copy, Check, Layers3, ShieldCheck,
+  Zap,
+  CreditCard,
+  History,
+  Package,
+  Plus,
+  CheckCircle2,
+  Building2,
+  Warehouse,
+  Users,
+  ArrowUpRight,
+  Clock,
+  Truck,
+  Edit3,
+  Megaphone,
+  Copy,
+  Check,
+  Layers3,
   type LucideIcon
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
@@ -1350,7 +1363,6 @@ function BillingContent() {
         </div>
       </section>
       )}
-
 
       {/* History Penagihan */}
       <section id="billing-history" className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">

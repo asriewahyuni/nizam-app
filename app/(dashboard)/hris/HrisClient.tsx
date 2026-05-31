@@ -3,9 +3,8 @@
 import React, { startTransition, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  requestPasswordReset,
   resetEmployeePassword,
-  signInAsTenantHrisUser,
+  signInAsTenantHrisUser
 } from '@/modules/auth/actions/auth.actions'
 import { uploadEmployeeAvatar } from '@/modules/hris/actions/employee.actions'
 import {
@@ -24,12 +23,10 @@ import {
   ArrowRightLeft,
   Briefcase,
   Clock,
-  ChevronRight,
   Search,
   Filter,
   ArrowUpRight,
   TrendingUp,
-  CreditCard,
   Wallet,
   AlertTriangle,
   ClipboardList,
@@ -39,7 +36,7 @@ import {
   FileText,
   MessageCircle,
   ArrowUp,
-  ArrowDown,
+  ArrowDown
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
@@ -63,8 +60,9 @@ import {
   SectionHeader,
   StatusBadge,
   SafeButton,
-  ConfirmDialog,
-  EmptyState, useConfirm} from '@/components/ui/NizamUI'
+  EmptyState,
+  useConfirm
+} from '@/components/ui/NizamUI'
 
 type AdminImpersonationInfo = {
   email?: string | null

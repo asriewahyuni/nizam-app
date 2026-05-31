@@ -3,18 +3,15 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  FileText, 
-  Plus, 
-  Send, 
-  Trash2, 
-  CheckCircle, 
-  XOctagon, 
-  Clock, 
+import {
+  FileText,
+  Plus,
+  Send,
+  Trash2,
+  CheckCircle,
+  XOctagon,
+  Clock,
   Wallet,
-  Calendar,
-  ChevronRight,
-  Info,
   CreditCard,
   Building2,
   DollarSign,

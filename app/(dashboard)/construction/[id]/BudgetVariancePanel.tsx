@@ -3,14 +3,11 @@
 import React, { useState, useMemo } from 'react'
 import {
   TrendingUp,
-  TrendingDown,
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Filter,
   Eye,
-  EyeOff,
+  EyeOff
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import type { ConstructionBudgetItemRecord } from '@/modules/construction/lib/construction'

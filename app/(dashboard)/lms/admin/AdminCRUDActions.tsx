@@ -4,7 +4,7 @@
 // Each entity has its own modal for editing and a shareable delete confirmation.
 
 import { useState, useTransition } from 'react'
-import { Edit3, Trash2, Loader2, X, CheckCircle2, ChevronRight, Plus, Banknote } from 'lucide-react'
+import { Edit3, Trash2, Loader2, X, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   updateLmsCourse,

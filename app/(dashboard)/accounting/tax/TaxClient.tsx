@@ -2,25 +2,22 @@
 
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  ShieldCheck, 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  Wallet, 
-  Calendar, 
-  Download, 
-  Printer, 
+import {
+  ShieldCheck,
+  ArrowUpRight,
+  ArrowDownRight,
+  Wallet,
+  Calendar,
+  Download,
+  Printer,
   ArrowRight,
   TrendingUp,
-  TrendingDown,
   Info,
-  Filter,
-  CheckCircle2,
   FileText
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRupiah, formatDate } from '@/lib/utils'
-import { PieChart, Pie, Cell, Tooltip as ReTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip as ReTooltip } from 'recharts'
 import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
 
 interface TaxClientProps {

@@ -11,17 +11,12 @@ import {
   GraduationCap,
   LayoutGrid,
   Layers,
-  PlayCircle,
   PlusCircle,
-  Settings,
   ShieldCheck,
-  Users,
+  Users
 } from 'lucide-react'
 import {
-  TRAINING_TRACKS,
-  TRAINING_COURSES,
-  getTrainingCenterSummary,
-  getTrainingLessonsForCourse,
+  getTrainingCenterSummary
 } from '@/modules/edu/lib/training-center-mvp'
 import { getActiveOrg, getBranches } from '@/modules/organization/actions/org.actions'
 import { getCompetencyManagementDashboard } from '@/modules/edu/lib/competency-management.server'
@@ -135,8 +130,6 @@ export default async function LearningPage(props: {
 
   return (
     <div className="space-y-6">
-
-
 
       {/* ══ MANAJEMEN PELATIHAN INTERNAL (HRIS) ══ */}
       <div className="rounded-[32px] border-2 border-dashed border-slate-200 p-1">

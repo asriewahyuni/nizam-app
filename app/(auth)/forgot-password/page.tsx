@@ -2,9 +2,8 @@
 
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShieldCheck, ArrowLeft, Mail, CheckCircle2, AlertCircle, Building2 } from 'lucide-react'
+import { ShieldCheck, ArrowLeft, Mail, CheckCircle2, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
-import { SafeButton } from '@/components/ui/NizamUI'
 import { sendPasswordResetEmail } from '@/modules/auth/actions/auth.actions'
 
 export default function ForgotPasswordPage() {

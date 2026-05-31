@@ -2,29 +2,23 @@
 
 import React, { useEffect, useState, useTransition } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  ShieldCheck, 
-  Users, 
+import {
+  ShieldCheck,
+  Users,
   Building2,
-  Package, 
-  Plus, 
-  Search, 
-  Settings2, 
-  CheckCircle2, 
+  Package,
+  Plus,
+  Search,
+  Settings2,
+  CheckCircle2,
   Edit3,
   Loader2,
   RefreshCw,
   X,
   Trash2,
-  ReceiptText,
   Filter,
-  LayoutGrid,
-  List,
-  MoreVertical,
-  Edit2,
   XCircle,
   Mail,
-  Database,
   Zap,
   ExternalLink,
   Coins,
@@ -32,7 +26,7 @@ import {
   ChevronDown,
   ChevronRight
 } from 'lucide-react'
-import { PageHeader, SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
+import { SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
 import { createClient } from '@/lib/supabase/client'
 import { deleteInactiveTenantByPlatformAdmin, signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
 import {
@@ -528,7 +522,6 @@ export default function SaaSAdminPage() {
     if (candidates.length === 0) return null
     return candidates.find((pkg) => pkg.name === preferredPlanName) || candidates[0] || null
   }
-
 
   const fetchOrganizations = async () => {
     try {

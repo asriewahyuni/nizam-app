@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
-import { CheckCircle2, Wrench, Settings, Zap } from 'lucide-react'
+import { CheckCircle2, Settings, Zap } from 'lucide-react'
 import { SimpleSettingsForm, CompleteOnboardingButton, type SettingsField } from '@/components/shared/ModuleOnboardingActions'
 
 const MODULE_KEY = 'Workshop'

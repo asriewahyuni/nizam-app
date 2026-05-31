@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { CheckCircle2, XCircle, Clock, LogIn, LogOut } from 'lucide-react'
+import { XCircle, Clock, LogIn, LogOut } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { clockByQRScan } from '@/modules/hris/actions/self-service.actions'
 

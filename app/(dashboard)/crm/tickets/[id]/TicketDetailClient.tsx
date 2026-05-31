@@ -4,14 +4,21 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowLeft, MessageSquare, AlertTriangle, HelpCircle, Lightbulb,
-  ClipboardList, Clock, CheckCircle2, XCircle, ArrowUpDown,
-  User, Mail, Phone, Calendar, Link2, Send, Lock, Unlock,
-  ChevronDown, Save, RefreshCw
+  ArrowLeft,
+  AlertTriangle,
+  HelpCircle,
+  Lightbulb,
+  ClipboardList,
+  User,
+  Mail,
+  Phone,
+  Link2,
+  Send,
+  Save
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CrmTicket, CrmTicketNote, CrmTicketStatus } from '@/modules/crm/lib/ticket-constants'
-import { TICKET_TYPE_LABEL, TICKET_STATUS_LABEL, TICKET_PRIORITY_LABEL } from '@/modules/crm/lib/ticket-constants'
+import { TICKET_TYPE_LABEL, TICKET_PRIORITY_LABEL } from '@/modules/crm/lib/ticket-constants'
 import { updateCrmTicket, addCrmTicketNote } from '@/modules/crm/actions/tickets.actions'
 
 // ─── Config ──────────────────────────────────────────────────────────────────

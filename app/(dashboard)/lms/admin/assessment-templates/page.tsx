@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { unstable_noStore as noStore } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { ClipboardCheck, Plus, ArrowRight, FileEdit, Trash2 } from 'lucide-react'
+import { ClipboardCheck, Plus, FileEdit } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.server'
 import { getLmsCourses } from '@/modules/edu/actions/lms-commercial.actions'

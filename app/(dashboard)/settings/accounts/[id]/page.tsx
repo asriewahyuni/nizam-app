@@ -3,13 +3,12 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  ArrowLeft, 
-  Save, 
-  AlertCircle, 
-  CheckCircle2, 
-  Layers, 
-  Tag, 
+import {
+  ArrowLeft,
+  AlertCircle,
+  CheckCircle2,
+  Layers,
+  Tag,
   FileText,
   Activity,
   ChevronDown

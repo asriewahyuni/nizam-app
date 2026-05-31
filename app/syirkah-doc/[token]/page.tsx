@@ -1,5 +1,5 @@
 import { getSyirkahContractByToken } from '@/modules/syirkah/actions/syirkah.actions'
-import { CheckCircle, AlertOctagon, Briefcase, Handshake, Users, ShieldCheck } from 'lucide-react'
+import { AlertOctagon, Handshake, Users, ShieldCheck } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import PrintButton from './PrintButton'
 import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'

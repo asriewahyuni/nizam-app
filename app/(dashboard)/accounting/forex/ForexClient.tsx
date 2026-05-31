@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TrendingUp, TrendingDown, Globe, DollarSign, Calendar, FileText, Trash2, ExternalLink } from 'lucide-react'
-import { EmptyState, SafeButton, useConfirm} from '@/components/ui/NizamUI'
+import { TrendingUp, TrendingDown, Globe, DollarSign, FileText, Trash2 } from 'lucide-react'
+import { EmptyState, useConfirm } from '@/components/ui/NizamUI'
 import { deleteFxGainLoss } from '@/modules/accounting/actions/forex.actions'
 import { formatRupiah, formatDate } from '@/lib/utils'
 

@@ -2,22 +2,14 @@
 
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Plus, 
-  Briefcase, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
+import {
+  Plus,
+  Briefcase,
   X,
-  Search,
-  User,
   MoreVertical,
-  ChevronRight,
-  ClipboardList,
-  Wrench,
-  Stethoscope
+  ClipboardList
 } from 'lucide-react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah } from '@/lib/utils'
 import { createServiceOrder, updateServiceStatus } from '@/modules/services/actions/service.actions'
 
 interface ServiceOrderClientProps {

@@ -1,19 +1,17 @@
 'use client'
 
 import React, { useState } from 'react'
-import { 
-  ShieldAlert, 
-  Scale, 
-  PackageSearch, 
-  History, 
-  Zap, 
-  AlertCircle, 
-  CheckCircle2, 
-  ArrowRight,
+import {
+  ShieldAlert,
+  Scale,
+  PackageSearch,
+  History,
+  Zap,
+  AlertCircle,
+  CheckCircle2,
   RefreshCcw,
   Landmark,
   Calculator,
-  Search,
   ArrowUpRight
 } from 'lucide-react'
 import Link from 'next/link'

@@ -4,13 +4,35 @@ import React, { startTransition, useCallback, useEffect, useRef, useState } from
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Home, Fingerprint, CalendarDays, ReceiptText, Wallet,
-  CheckCircle2, XCircle, LogIn, LogOut,
-  ChevronDown, ChevronUp, Trash2,
-  Image as ImageIcon, MapPin, Moon, Sun,
-  Cloud, CloudRain, CloudDrizzle, CloudLightning,
-  Navigation, AlertTriangle, LocateFixed,
-  Settings, User, Lock, Eye, EyeOff, X, Camera,
+  Home,
+  Fingerprint,
+  CalendarDays,
+  ReceiptText,
+  Wallet,
+  CheckCircle2,
+  XCircle,
+  LogIn,
+  LogOut,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  Image as ImageIcon,
+  Moon,
+  Sun,
+  Cloud,
+  CloudRain,
+  CloudDrizzle,
+  CloudLightning,
+  Navigation,
+  AlertTriangle,
+  LocateFixed,
+  Settings,
+  User,
+  Lock,
+  Eye,
+  EyeOff,
+  X,
+  Camera
 } from 'lucide-react'
 import {
   clockMyAttendance,
@@ -277,7 +299,6 @@ const STARS = [
   { cx: 256, cy:  68, r: 0.6, op: 0.52 }, { cx: 320, cy:  78, r: 0.8, op: 0.56 },
   { cx: 382, cy:  70, r: 0.7, op: 0.54 },
 ]
-
 
 // ─── Input style helper ───────────────────────────────────────────────────────
 const inputCls = 'w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-blue-400 dark:focus:border-blue-500'

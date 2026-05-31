@@ -1,15 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-  History, 
-  Search, 
-  Filter, 
+import {
+  History,
+  Search,
   Calendar,
   Clock,
   ExternalLink,
-  Table,
-  Trash2,
   Building2,
   ShieldCheck,
   Activity,

@@ -1,4 +1,4 @@
-import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
 import { getFinancialRatios } from '@/modules/accounting/actions/ratios.actions'
 import RatioClient from '@/app/(dashboard)/accounting/ratios/RatioClient'

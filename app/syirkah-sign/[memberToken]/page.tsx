@@ -1,6 +1,5 @@
-import { getSyirkahMemberBySignToken, signSyirkahMember } from '@/modules/syirkah/actions/syirkah.actions'
-import { AlertOctagon, CheckCircle, Handshake, ShieldCheck, Users, FileText } from 'lucide-react'
-import { redirect } from 'next/navigation'
+import { getSyirkahMemberBySignToken } from '@/modules/syirkah/actions/syirkah.actions'
+import { AlertOctagon, CheckCircle, ShieldCheck, Users, FileText } from 'lucide-react'
 import SignConfirmButton from './SignConfirmButton'
 
 export const metadata = {

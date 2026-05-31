@@ -1,17 +1,29 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  MessageSquare, Plus, Search, Filter, Copy, CheckCheck,
-  AlertTriangle, HelpCircle, Lightbulb, ClipboardList,
-  Clock, CheckCircle2, XCircle, ChevronRight, ExternalLink,
-  ArrowUpDown, Ticket
+  MessageSquare,
+  Search,
+  Filter,
+  Copy,
+  CheckCheck,
+  AlertTriangle,
+  HelpCircle,
+  Lightbulb,
+  ClipboardList,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  ChevronRight,
+  ExternalLink,
+  ArrowUpDown,
+  Ticket
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CrmTicket, CrmTicketStatus, CrmTicketType, CrmTicketPriority } from '@/modules/crm/lib/ticket-constants'
-import { TICKET_TYPE_LABEL, TICKET_STATUS_LABEL, TICKET_PRIORITY_LABEL } from '@/modules/crm/lib/ticket-constants'
+import { TICKET_TYPE_LABEL, TICKET_STATUS_LABEL } from '@/modules/crm/lib/ticket-constants'
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 

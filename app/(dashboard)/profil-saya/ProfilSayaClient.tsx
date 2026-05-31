@@ -3,7 +3,7 @@
 import React, { startTransition, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { Camera, Lock, CheckCircle, AlertCircle, Eye, EyeOff, Phone, User, Briefcase, Shield, X, Clock, CalendarDays, ReceiptText, Trash2, Image as ImageIcon } from 'lucide-react'
+import { Camera, Lock, CheckCircle, AlertCircle, Eye, EyeOff, Phone, User, Shield, X, Clock, CalendarDays, ReceiptText, Trash2, Image as ImageIcon } from 'lucide-react'
 import { uploadEmployeeAvatar, updateEmployeeProfile } from '@/modules/hris/actions/employee.actions'
 import { uploadReceipt } from '@/modules/accounting/actions/reimburse.actions'
 import { cancelMyLeaveRequest, clockMyAttendance, deleteMyExpenseClaim, submitMyExpenseClaim, submitMyLeaveRequest } from '@/modules/hris/actions/self-service.actions'

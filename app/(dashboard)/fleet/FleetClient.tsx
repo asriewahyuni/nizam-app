@@ -3,24 +3,22 @@
 import React, { startTransition, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { 
-  Plus, 
-  Truck, 
-  Car, 
-  Bike, 
-  Bus, 
-  Calendar, 
-  CheckCircle2, 
-  Clock, 
-  Wrench, 
+import {
+  Plus,
+  Truck,
+  Car,
+  Bike,
+  Bus,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Wrench,
   MoreVertical,
   X,
-  Search,
   ChevronRight,
   User,
   MapPin,
   CircleDollarSign,
-  AlertCircle,
   UserCheck,
   ShieldAlert,
   FileBadge,
@@ -30,7 +28,7 @@ import {
   Navigation
 } from 'lucide-react'
 import { formatRupiah, formatDate } from '@/lib/utils'
-import { createAsset, createBooking, updateBookingStatus, createRoute, createSchedule, createTicket, createMedicalRecord, createCrew, recordCrewAttendance } from '@/modules/fleet/actions/fleet.actions'
+import { createAsset, createBooking, createRoute, createSchedule, createTicket, createMedicalRecord, createCrew, recordCrewAttendance } from '@/modules/fleet/actions/fleet.actions'
 import { Html5Qrcode } from 'html5-qrcode'
 
 interface FleetClientProps {

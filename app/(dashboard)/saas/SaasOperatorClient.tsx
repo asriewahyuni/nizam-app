@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState, useSyncExternalStore, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, BadgeDollarSign, CheckCircle2, ClipboardList, Download, Receipt, RefreshCcw, UserCheck, XCircle } from 'lucide-react'
+import { BadgeDollarSign, CheckCircle2, ClipboardList, Download, Receipt, RefreshCcw, UserCheck, XCircle } from 'lucide-react'
 import {
   convertQuotationToSale,
   createOperatorQuotation,
@@ -20,14 +20,11 @@ import {
   OPERATOR_ADDON_OPTIONS,
   getOperatorAddonById,
   getOperatorMarketplaceCompatibility,
-  getOperatorMarketplaceKind,
-  getOperatorMarketplaceLabel,
-  getOperatorMarketplaceMinCoreFamily,
+  getOperatorMarketplaceKind
 } from '@/lib/saas/operator-pricing'
 import {
-  getSaasCoreFamilyLabel,
   getSaasPackageArchitecture,
-  normalizeSaasEntitlementList,
+  normalizeSaasEntitlementList
 } from '@/lib/saas/module-catalog'
 import { CORE_MODULES, MINIMUM_CORE_MODULES, OPERATIONAL_MODULES } from '@/modules/marketplace/lib/module-registry'
 import { OPERATOR_GROWTH_ADDON_OPTIONS } from '@/lib/saas/operator-pricing'

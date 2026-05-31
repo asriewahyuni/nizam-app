@@ -5,18 +5,16 @@ import { motion } from 'framer-motion'
 import {
   Activity,
   TrendingUp,
-  TrendingDown,
   AlertTriangle,
   CheckCircle2,
   CalendarRange,
   DollarSign,
   CreditCard,
-  Percent,
   Scale,
   Droplets,
   Zap,
   Eye,
-  BarChart3,
+  BarChart3
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import {

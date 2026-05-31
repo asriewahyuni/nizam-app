@@ -1,33 +1,23 @@
 'use client'
 
 import React, { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  LineChart as LucideLineChart, 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  DollarSign, 
-  AlertTriangle, 
-  Filter, 
-  Calendar, 
-  Info,
-  CheckCircle,
-  TrendingDown,
+import {
+  LineChart as LucideLineChart,
+  ArrowUpRight,
+  ArrowDownRight,
+  DollarSign,
   Activity,
   Zap,
   LayoutGrid
 } from 'lucide-react'
 import { formatRupiah, formatDate } from '@/lib/utils'
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  BarChart,
-  Bar,
-  Legend,
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ReferenceLine
 } from 'recharts'
 import { useRouter, useSearchParams } from 'next/navigation'

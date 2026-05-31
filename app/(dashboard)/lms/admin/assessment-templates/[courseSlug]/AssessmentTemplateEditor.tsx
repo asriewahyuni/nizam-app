@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Save, Plus, Trash2, Loader2, GripVertical } from 'lucide-react'
+import { Save, Plus, Trash2, Loader2 } from 'lucide-react'
 import { saveAssessmentTemplate } from '@/modules/edu/actions/training-assessment-template.actions'
 import type { TrainingAssessmentTemplate, TrainingAssessmentTask } from '@/modules/edu/lib/training-assessment-mvp'
 

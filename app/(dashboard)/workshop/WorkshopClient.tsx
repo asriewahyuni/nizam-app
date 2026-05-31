@@ -11,7 +11,6 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
   Package,
   ChevronDown,
   ChevronRight,
@@ -20,7 +19,7 @@ import {
   User,
   Gauge,
   ArrowUp,
-  ArrowDown,
+  ArrowDown
 } from 'lucide-react'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import {
@@ -981,7 +980,6 @@ function InvoiceList({ invoices, workOrders }: {
 }
 
 // ─── Shared UI ────────────────────────────────────────────────────────────────
-
 
 const inputCls =
   'w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-[#003366]/20'

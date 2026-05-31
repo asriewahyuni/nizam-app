@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { unstable_noStore as noStore } from 'next/cache'
 import { notFound, redirect } from 'next/navigation'
-import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.server'
 import { getTrainingCourseBySlug } from '@/modules/edu/lib/training-center-mvp'

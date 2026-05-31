@@ -4,12 +4,26 @@ import { useState, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
-  BarChart3, CircleDollarSign, Users, Settings,
-  Save, Plus, Trash2, RefreshCcw, Zap,
-  Lock, LockOpen, Star, Lightbulb,
-  ChevronDown, ChevronUp, ShoppingCart,
-  CheckCircle2, AlertCircle, BookOpen, X, Pencil,
-  ListTodo,
+  BarChart3,
+  CircleDollarSign,
+  Users,
+  Settings,
+  Save,
+  Plus,
+  Trash2,
+  RefreshCcw,
+  Zap,
+  Lock,
+  LockOpen,
+  Star,
+  Lightbulb,
+  ChevronDown,
+  ChevronUp,
+  ShoppingCart,
+  CheckCircle2,
+  X,
+  Pencil,
+  ListTodo
 } from 'lucide-react'
 import { formatRupiah, getDateInTimeZone } from '@/lib/utils'
 import {
@@ -27,14 +41,13 @@ import {
   generateBSCKpisFromExistingData,
   syncBSCKpisFromExistingData,
   applyBscKpiSuggestedIndicator,
-  seedDefaultBSCKpis,
   lockBSCCycle,
   unlockBSCCycle,
   type BSCPerspective,
   type BSCDirection,
   type BSCWeightMap,
   type BSCSetupPayload,
-  type BSCKPIItem,
+  type BSCKPIItem
 } from '@/modules/accounting/actions/bsc.actions'
 
 // ─── Types ──────────────────────────────────────────────────────────────────

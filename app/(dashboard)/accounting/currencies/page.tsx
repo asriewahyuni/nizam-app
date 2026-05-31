@@ -1,4 +1,4 @@
-import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
 import { getOrgCurrencies, getAllowedCurrencies, getExchangeRates } from '@/modules/accounting/actions/currencies.actions'
 import { POPULAR_CURRENCIES } from '@/lib/currency'

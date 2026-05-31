@@ -3,7 +3,7 @@ import { unstable_noStore as noStore } from 'next/cache'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getModuleInstanceStatus, completeModuleOnboarding } from '@/modules/marketplace/actions/marketplace.actions'
 import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
-import { CheckCircle2, BookOpen, Settings, Zap, ArrowRight, GraduationCap } from 'lucide-react'
+import { CheckCircle2, BookOpen, Settings, Zap, GraduationCap } from 'lucide-react'
 import { InstallCoaButton, SettingsForm } from './OnboardingClient'
 
 const MODULE_KEY = 'LMS'

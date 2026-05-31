@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { Check, X, Bell, FileText, View, QrCode, ShieldCheck, AlertTriangle, Clock, Shield, ArrowUp, ArrowDown, Search } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { decideApproval, getApprovalDetail, getApprovalHistory, getPendingApprovals } from '@/modules/organization/actions/approval.actions'
 import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
 import { getDocumentHeaderDiscountAmount, getDocumentLineDiscountsForDisplay, getDocumentLineDiscountTotal } from '@/lib/commerce/discounts'

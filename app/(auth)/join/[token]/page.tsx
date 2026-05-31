@@ -2,7 +2,7 @@
 
 import React, { useState, use } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShieldCheck, UserCheck, Key, ArrowRight, CheckCircle2, AlertCircle, Users, Building2, Lock } from 'lucide-react'
+import { ShieldCheck, UserCheck, Key, ArrowRight, CheckCircle2, AlertCircle, Lock } from 'lucide-react'
 import { verifyEmployeeNikByToken, registerEmployeeAccount } from '@/modules/auth/actions/auth.actions'
 import { useRouter } from 'next/navigation'
 

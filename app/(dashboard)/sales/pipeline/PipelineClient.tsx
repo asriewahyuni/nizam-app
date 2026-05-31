@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Activity, PlayCircle, CircleDashed, CheckCircle2, TrendingUp, DollarSign, Maximize2, Minimize2, Plus, Phone, Mail, Bell, Edit2, Trash2, ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react'
+import { Activity, PlayCircle, CircleDashed, CheckCircle2, TrendingUp, Maximize2, Minimize2, Plus, Phone, Mail, Bell, Edit2, Trash2, ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react'
 import { PageHeader, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { formatRupiah } from '@/lib/utils'
 import { updateSaleStatus, createQuickKanbanCard, deleteSalesCard, updateSalesCard } from '@/modules/sales/actions/sales.actions'

@@ -7,8 +7,14 @@
 import { useState, useTransition, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Plus, X, Loader2, CheckCircle2, GripVertical,
-  BookOpen, FileText, Video, Edit3, Trash2, ChevronDown,
+  Plus,
+  X,
+  Loader2,
+  BookOpen,
+  FileText,
+  Video,
+  Edit3,
+  Trash2
 } from 'lucide-react'
 import { createLmsLesson, updateLmsLesson, deleteLmsLesson } from '@/modules/edu/actions/lms-commercial.actions'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'

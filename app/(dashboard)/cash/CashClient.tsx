@@ -3,24 +3,19 @@
 import React, { startTransition, useState, useEffect } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Plus, 
-  ArrowUpRight, 
-  ArrowDownRight, 
+import {
+  Plus,
+  ArrowUpRight,
+  ArrowDownRight,
   ArrowRightLeft,
   ChevronDown,
   ChevronRight,
-  MoreVertical,
   AlertCircle,
   X,
-  PlusCircle,
-  Calendar,
-  CreditCard,
   Building,
   Building2,
   Upload,
   FileText,
-  Filter,
   Trash,
   Trash2,
   PiggyBank,
@@ -28,12 +23,10 @@ import {
   MoreHorizontal,
   TrendingUp,
   CheckCircle2,
-  Search,
   History,
   TrendingDown,
   Activity,
   Download,
-  CheckCircle,
   Hash,
   User,
   ExternalLink

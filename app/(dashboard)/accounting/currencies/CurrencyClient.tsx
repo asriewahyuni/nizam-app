@@ -3,9 +3,7 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  RefreshCw,
   Plus,
-  Trash2,
   X,
   CheckCircle,
   AlertCircle,
@@ -18,9 +16,9 @@ import {
   Save,
   Loader2,
   ChevronDown,
-  ChevronUp,
+  ChevronUp
 } from 'lucide-react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah } from '@/lib/utils'
 
 type OrgCurrency = {
   org_id: string

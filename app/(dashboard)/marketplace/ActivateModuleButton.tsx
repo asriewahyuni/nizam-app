@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { ArrowRight, Loader2, X, CreditCard, Tag, CheckCircle2, Sparkles, Shield } from 'lucide-react'
+import { Loader2, X, CreditCard, Tag, CheckCircle2, Sparkles, Shield } from 'lucide-react'
 import { activateModule } from '@/modules/marketplace/actions/marketplace.actions'
 import { motion, AnimatePresence } from 'framer-motion'
 

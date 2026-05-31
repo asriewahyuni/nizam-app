@@ -2,20 +2,18 @@
 
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Lock, 
-  Unlock, 
-  Plus, 
-  AlertTriangle, 
-  Calendar, 
-  ShieldAlert, 
+import {
+  Lock,
+  Unlock,
+  Plus,
+  AlertTriangle,
+  Calendar,
+  ShieldAlert,
   Info,
-  CheckCircle,
-  XCircle,
   GanttChartSquare,
   History
 } from 'lucide-react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { createFiscalPeriod, closeFiscalPeriod, openFiscalPeriod } from '@/modules/accounting/actions/closing.actions'
 
 interface ClosingClientProps {

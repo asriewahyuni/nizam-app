@@ -3,10 +3,24 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  LayoutDashboard, ShoppingCart, Package, Wallet, Store,
-  BarChart3, Users, Settings, BookOpen, CheckCircle2,
-  Circle, ChevronRight, AlertTriangle, Info, Sparkles,
-  ArrowRight, X, Rocket, BookMarked,
+  LayoutDashboard,
+  ShoppingCart,
+  Package,
+  Wallet,
+  Store,
+  BarChart3,
+  Users,
+  Settings,
+  CheckCircle2,
+  Circle,
+  ChevronRight,
+  AlertTriangle,
+  Info,
+  Sparkles,
+  ArrowRight,
+  X,
+  Rocket,
+  BookMarked
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { QuickStartData } from '@/modules/onboarding/actions/quick-start.actions'

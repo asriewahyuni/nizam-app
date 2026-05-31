@@ -1,15 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-  History, 
-  Search, 
-  Filter, 
+import {
+  History,
+  Search,
   Calendar,
-  AlertCircle,
   Clock,
   ExternalLink,
-  Table,
+  Table
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'

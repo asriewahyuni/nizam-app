@@ -2,10 +2,15 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Zap, ShieldCheck, Trophy, Users, CheckCircle2, 
-  ArrowRight, Gift, Timer, Building2, ExternalLink,
-  Award, Star, Sparkles, Ticket, QrCode
+import {
+  Users,
+  CheckCircle2,
+  ArrowRight,
+  Timer,
+  Building2,
+  Sparkles,
+  Ticket,
+  QrCode
 } from 'lucide-react'
 import Link from 'next/link'
 import type { VoucherStatus } from './page'

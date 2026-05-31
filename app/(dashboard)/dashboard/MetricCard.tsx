@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { TrendingUp, TrendingDown, Wallet, type LucideIcon } from 'lucide-react'
+import { TrendingUp, TrendingDown, type LucideIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { ReactNode } from 'react'
 

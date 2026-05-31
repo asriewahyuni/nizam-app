@@ -1,30 +1,26 @@
 'use client'
 
 import React from 'react'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Line, 
+import {
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Line,
   ComposedChart,
   Cell
 } from 'recharts'
-import { 
-  Trophy, 
-  Target, 
-  BarChart3, 
-  ArrowUpRight, 
-  Package, 
-  ChevronRight,
+import {
+  Trophy,
+  Target,
+  BarChart3,
+  Package,
   TrendingUp,
   Lightbulb,
   AlertTriangle
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
-import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
 
