@@ -139,7 +139,7 @@ export default async function LmsRegistrasiPage() {
                           </td>
                           <td className="px-6 py-4 text-sm font-bold text-slate-700">
                             {reg.amount_paid
-                              ? `Rp${Number(reg.amount_paid).toLocaleString('id-ID')}`
+                              ? formatRupiah(reg.amount_paid)
                               : <span className="text-slate-300">—</span>}
                             {reg.payment_method && (
                               <p className="text-[10px] text-slate-400 font-normal">{reg.payment_method}</p>

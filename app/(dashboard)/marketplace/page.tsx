@@ -21,7 +21,7 @@ function moduleNameMatches(enabled: string, key: string): boolean {
 }
 
 function formatRp(n: number) {
-  return 'Rp ' + n.toLocaleString('id-ID')
+  return formatRupiah(n)
 }
 
 type ModuleState = 'active_ready' | 'active_pending' | 'inactive' | 'locked' | 'available'

@@ -724,7 +724,7 @@ function SpkCard({
                                 <option value="">— Pilih tarif atau isi manual —</option>
                                 {serviceRates.map(r => (
                                   <option key={r.id} value={r.id}>
-                                    {r.name} — {r.unitPrice.toLocaleString('id-ID')}
+                                    {r.name} — {formatRupiah(r.unitPrice)}
                                   </option>
                                 ))}
                               </select>

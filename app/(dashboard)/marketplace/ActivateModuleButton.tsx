@@ -15,7 +15,7 @@ type Props = {
 }
 
 function formatRp(n: number) {
-  return 'Rp ' + n.toLocaleString('id-ID')
+  return formatRupiah(n)
 }
 
 export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, moduleColor, price, disabled }: Props) {

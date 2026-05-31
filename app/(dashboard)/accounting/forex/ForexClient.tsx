@@ -147,7 +147,7 @@ export function ForexClient({ orgId, history }: { orgId: string; history: ForexR
                       </td>
                       <td className="px-6 py-4 text-right">
                         <span className={`text-xs font-mono font-bold ${item.is_gain ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {item.is_gain ? '+' : '-'}Rp {Number(item.fx_gain_loss).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+                          {item.is_gain ? '+' : '-'}{formatRupiah(item.fx_gain_loss)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">

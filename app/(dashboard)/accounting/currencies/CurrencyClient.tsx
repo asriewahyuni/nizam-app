@@ -373,7 +373,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
                   </div>
                   <div className="flex items-center gap-6">
                     <div className="text-right">
-                      <p className="font-semibold text-lg text-slate-900 font-mono">Rp {latest.rate.toLocaleString('id-ID')}</p>
+                      <p className="font-semibold text-lg text-slate-900 font-mono">{formatRupiah(latest.rate)}</p>
                       <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1 justify-end">
                         <Calendar size={10} />
                         {latest.rate_date}
@@ -407,7 +407,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
                                   {rate.source}
                                 </span>
                               </div>
-                              <span className="font-semibold text-slate-900 font-mono">Rp {rate.rate.toLocaleString('id-ID')}</span>
+                              <span className="font-semibold text-slate-900 font-mono">{formatRupiah(rate.rate)}</span>
                             </div>
                           ))}
                         </div>

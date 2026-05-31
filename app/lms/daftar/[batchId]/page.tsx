@@ -89,7 +89,7 @@ export default async function PublicRegistrationPage({
                 <p className="text-xl font-black text-slate-900">
                   {Number(batch.price) === 0
                     ? 'Gratis'
-                    : `Rp${Number(batch.price).toLocaleString('id-ID')}`}
+                    : formatRupiah(batch.price)}
                 </p>
               </div>
 

@@ -93,7 +93,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
       // agar selaras dengan angka global. Fitur 'Sync' ini akan menyelaraskan database di belakang layar.
       await syncActiveHaulPrices(orgId, res.data.gold, res.data.silver)
 
-      setMsg({ type: 'ok', text: `Riwayat Haul & Harga Global sukses disinkronisasi: Emas (Rp ${res.data.gold.toLocaleString('id-ID')}) & Perak (Rp ${res.data.silver.toLocaleString('id-ID')}).` })
+      setMsg({ type: 'ok', text: `Riwayat Haul & Harga Global sukses disinkronisasi: Emas (${formatRupiah(res.data.gold)}) & Perak (${formatRupiah(res.data.silver)}).` })
     } else {
       setMsg({ type: 'err', text: res.error || 'Gagal sinkronisasi harga global.' })
     }
@@ -121,7 +121,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
   }
 
   const handleStartHaul = async () => {
-    if (!await confirm(`Mulai Haul baru dengan harga Emas Rp ${goldPrice.toLocaleString('id-ID')}/gr dan Perak Rp ${silverPrice.toLocaleString('id-ID')}/gr? Harga ini akan DIKUNCI sebagai acuan nishab sepanjang tahun haul.`)) return
+    if (!await confirm(`Mulai Haul baru dengan harga Emas ${formatRupiah(goldPrice)}/gr dan Perak ${formatRupiah(silverPrice)}/gr? Harga ini akan DIKUNCI sebagai acuan nishab sepanjang tahun haul.`)) return
     setLoading(true)
     const res = await startZakatHaul(orgId, goldPrice, silverPrice)
     if ('error' in res && res.error) setMsg({ type: 'err', text: res.error as string })
@@ -148,8 +148,8 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
 
   const chartData = [
     { name: 'Total Aset Zakat', value: summary.totalAssets, color: '#6366f1' },
-    { name: `Nishab Perak\n(200 Dirham × ${summary.fiqh.gramsPerDirham}gr × Rp ${hauledPrices.silverPerGram.toLocaleString('id-ID')})`, value: nishabSilver, color: '#94a3b8' },
-    { name: `Nishab Emas\n(20 Dinar × ${summary.fiqh.gramsPerDinar}gr × Rp ${hauledPrices.goldPerGram.toLocaleString('id-ID')})`, value: nishabGold, color: '#eab308' },
+    { name: `Nishab Perak\n(200 Dirham × ${summary.fiqh.gramsPerDirham}gr × ${formatRupiah(hauledPrices.silverPerGram)})`, value: nishabSilver, color: '#94a3b8' },
+    { name: `Nishab Emas\n(20 Dinar × ${summary.fiqh.gramsPerDinar}gr × ${formatRupiah(hauledPrices.goldPerGram)})`, value: nishabGold, color: '#eab308' },
   ]
 
   const haulStatusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -259,8 +259,8 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
           {summary.haulStatus === 'ACTIVE' && (
             <div className="space-y-0.5 pl-4 border-l border-emerald-200">
               <p className="text-[9px] font-semibold text-emerald-600 uppercase tracking-wide">Harga Dikunci (Awal Haul)</p>
-              <p className="text-xs font-bold text-slate-700">Emas: Rp {summary.hauledPrices.goldPerGram.toLocaleString('id-ID')}/gr</p>
-              <p className="text-xs font-bold text-slate-700">Perak: Rp {summary.hauledPrices.silverPerGram.toLocaleString('id-ID')}/gr</p>
+              <p className="text-xs font-bold text-slate-700">Emas: {formatRupiah(summary.hauledPrices.goldPerGram)}/gr</p>
+              <p className="text-xs font-bold text-slate-700">Perak: {formatRupiah(summary.hauledPrices.silverPerGram)}/gr</p>
             </div>
           )}
           {(summary.haulStatus === 'BATAL') && (
@@ -443,7 +443,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                     </div>
                   </div>
                   <p className="text-white/40 text-[8px] font-bold italic">
-                    * Harga acuan: Emas Rp {hauledPrices.goldPerGram.toLocaleString('id-ID')}/gr, Perak Rp {hauledPrices.silverPerGram.toLocaleString('id-ID')}/gr
+                    * Harga acuan: Emas {formatRupiah(hauledPrices.goldPerGram)}/gr, Perak {formatRupiah(hauledPrices.silverPerGram)}/gr
                     {summary.haulStatus === 'ACTIVE' ? ' (Dikunci sejak awal haul)' : ' (Harga hari ini)'}
                   </p>
                 </motion.div>
@@ -594,8 +594,8 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                       <span className="font-semibold text-slate-700">{h.haul_start_date}</span>
                       <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${h.status === 'ACTIVE' ? 'bg-emerald-200 text-emerald-800' : h.status === 'BATAL' ? 'bg-rose-200 text-rose-800' : 'bg-slate-200 text-slate-600'}`}>{h.status}</span>
                     </div>
-                    <p className="text-slate-500 font-medium">Emas: Rp {Number(h.gold_price_per_gram).toLocaleString('id-ID')}/gr</p>
-                    <p className="text-slate-500 font-medium">Perak: Rp {Number(h.silver_price_per_gram).toLocaleString('id-ID')}/gr</p>
+                    <p className="text-slate-500 font-medium">Emas: {formatRupiah(h.gold_price_per_gram)}/gr</p>
+                    <p className="text-slate-500 font-medium">Perak: {formatRupiah(h.silver_price_per_gram)}/gr</p>
                     {h.batal_reason && <p className="text-rose-500 text-[9px] mt-1 italic">{h.batal_reason}</p>}
                   </div>
                 ))

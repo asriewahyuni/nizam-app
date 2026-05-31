@@ -163,7 +163,7 @@ export default function PlanClient({ packages }: { packages: Package[] }) {
                   )}
                   <span className={cn('text-sm font-black', isActive ? meta.textColor : 'text-slate-500')}>{n}</span>
                   <span className={cn('text-[10px] font-black whitespace-nowrap', isActive ? meta.textColor : 'text-slate-400')}>
-                    Rp {pkg.price.toLocaleString('id-ID')}
+                    {formatRupiah(pkg.price)}
                   </span>
                 </button>
               )
@@ -182,7 +182,7 @@ export default function PlanClient({ packages }: { packages: Package[] }) {
                   </div>
                   <div className="text-right">
                     <p className={cn('text-lg font-black whitespace-nowrap', activeMeta.textColor)}>
-                      Rp {activePkg.price.toLocaleString('id-ID')}
+                      {formatRupiah(activePkg.price)}
                     </p>
                     <p className="text-[10px] text-slate-400">/ {activePkg.billing}</p>
                   </div>
@@ -278,11 +278,11 @@ export default function PlanClient({ packages }: { packages: Package[] }) {
                         <span className={cn('inline-block px-3 py-1 rounded-full text-xs font-black text-white', meta.badgeBg)}>{n}</span>
                         <p className="text-[10px] text-slate-400 font-medium leading-tight">{meta.tagline}</p>
                         <p className={cn('text-lg font-black whitespace-nowrap', meta.textColor)}>
-                          Rp {pkg.price.toLocaleString('id-ID')}
+                          {formatRupiah(pkg.price)}
                           <span className="text-xs font-semibold text-slate-400 ml-1">/ {pkg.billing}</span>
                         </p>
                         {pricePerUser && (
-                          <p className="text-[10px] text-slate-400 whitespace-nowrap">≈ Rp {pricePerUser.toLocaleString('id-ID')}/user</p>
+                          <p className="text-[10px] text-slate-400 whitespace-nowrap">≈ {formatRupiah(pricePerUser)}/user</p>
                         )}
                       </div>
                     </th>

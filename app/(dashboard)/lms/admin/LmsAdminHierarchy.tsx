@@ -204,7 +204,7 @@ function BatchSection({ batch, sessions }: { batch: Batch; sessions: Session[] }
             {batch.price != null && (
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
                 <Banknote className="h-3 w-3" />
-                Rp{Number(batch.price).toLocaleString('id-ID')}
+                {formatRupiah(batch.price)}
               </span>
             )}
           </div>

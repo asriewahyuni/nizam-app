@@ -35,7 +35,7 @@ export default function RegistrationForm({ batchId, price, paymentInstructions }
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm text-blue-700">Total yang harus dibayar:</span>
               <span className="text-xl font-black text-blue-900">
-                Rp{price.toLocaleString('id-ID')}
+                {formatRupiah(price)}
               </span>
             </div>
             {paymentInstructions ? (

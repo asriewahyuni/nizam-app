@@ -17,7 +17,7 @@ type FeeItem = {
 const COMMON_TAX_RATES = [0, 1.1, 2.5, 5, 10, 11, 12]
 
 function formatRp(n: number) {
-  return 'Rp ' + Math.round(n).toLocaleString('id-ID')
+  return formatRupiah(Math.round(n))
 }
 
 export default function BatchStructureBuilder() {

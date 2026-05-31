@@ -311,7 +311,7 @@ export default async function LearningAdminPage() {
                       </td>
                       <td className="px-3 py-3.5 text-xs text-slate-500">{b.mode ?? 'OFFLINE'}</td>
                       <td className="px-3 py-3.5 text-right text-sm font-medium tabular-nums text-slate-700">
-                        {b.price ? `Rp${Number(b.price).toLocaleString('id-ID')}` : <span className="text-slate-400">—</span>}
+                        {b.price ? formatRupiah(b.price) : <span className="text-slate-400">—</span>}
                       </td>
                       <td className="px-3 py-3.5 text-right text-sm tabular-nums text-slate-500">
                         {b.quota === 0 ? '∞' : b.quota}
