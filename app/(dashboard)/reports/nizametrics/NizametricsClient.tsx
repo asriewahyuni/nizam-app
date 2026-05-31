@@ -1621,7 +1621,7 @@ export function NizametricsClient({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             if (!canManageSetup) return
                             if (!await confirm('Nonaktifkan KPI ini?')) return
                             startTransition(async () => {
