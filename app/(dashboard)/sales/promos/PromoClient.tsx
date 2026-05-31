@@ -13,7 +13,7 @@ import {
   Trash2,
   Clock3,
 } from 'lucide-react'
-import { PageHeader, StatCard, SectionCard, SectionHeader, SafeButton } from '@/components/ui/NizamUI'
+import { PageHeader, StatCard, SectionCard, SectionHeader, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { formatDate } from '@/lib/utils'
 import { createSalesPromo, deleteSalesPromo } from '@/modules/sales/actions/promo.actions'
 import type { SalesPromoRecord } from '@/modules/sales/lib/sales-promos'
@@ -25,6 +25,7 @@ type PromoClientProps = {
 
 export default function PromoClient({ orgId, initialPromos }: PromoClientProps) {
   const [showModal, setShowModal] = useState(false)
+  const { confirm, ConfirmUI } = useConfirm()
   const [promos, setPromos] = useState<SalesPromoRecord[]>(initialPromos)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -79,7 +80,7 @@ export default function PromoClient({ orgId, initialPromos }: PromoClientProps) 
 
   const handleDeletePromo = async (promo: SalesPromoRecord) => {
     resetFlash()
-    if (!confirm(`Hapus promo ${promo.code} secara permanen?`)) return
+    if (!await confirm(`Hapus promo ${promo.code} secara permanen?`)) return
 
     setIsSaving(true)
     const result = await deleteSalesPromo(orgId, promo.id)
@@ -298,6 +299,7 @@ export default function PromoClient({ orgId, initialPromos }: PromoClientProps) 
           </div>
         </div>
       )}
+      {ConfirmUI}
     </div>
   )
 }

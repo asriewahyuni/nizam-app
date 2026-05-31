@@ -26,6 +26,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
   
   // Prices for CURRENT market rates (for display & new haul start)
   const [goldPrice, setGoldPrice] = useState(summary.currentPrices.goldPerGram)
+  const { confirm, ConfirmUI } = useConfirm()
   const [silverPrice, setSilverPrice] = useState(summary.currentPrices.silverPerGram)
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err', text: string } | null>(null)
@@ -120,7 +121,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
   }
 
   const handleStartHaul = async () => {
-    if (!confirm(`Mulai Haul baru dengan harga Emas Rp ${goldPrice.toLocaleString('id-ID')}/gr dan Perak Rp ${silverPrice.toLocaleString('id-ID')}/gr? Harga ini akan DIKUNCI sebagai acuan nishab sepanjang tahun haul.`)) return
+    if (!await confirm(`Mulai Haul baru dengan harga Emas Rp ${goldPrice.toLocaleString('id-ID')}/gr dan Perak Rp ${silverPrice.toLocaleString('id-ID')}/gr? Harga ini akan DIKUNCI sebagai acuan nishab sepanjang tahun haul.`)) return
     setLoading(true)
     const res = await startZakatHaul(orgId, goldPrice, silverPrice)
     if ('error' in res && res.error) setMsg({ type: 'err', text: res.error as string })
@@ -668,6 +669,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
           </div>
         </div>
       </div>
+      {ConfirmUI}
     </div>
   )
 }

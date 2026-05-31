@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil, FileSpreadsheet, ArrowUp, ArrowDown } from 'lucide-react'
-import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
+import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { createSaleEntry, createSaleFulfillmentDrafts, deliverSale, voidSale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
 import { createContact } from '@/modules/contacts/actions/contact.actions'
@@ -317,6 +317,7 @@ export default function SalesClient({
   activeBranchName,
 }: any) {
   const [showModal, setShowModal] = useState(false)
+  const { confirm, ConfirmUI } = useConfirm()
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
@@ -772,7 +773,7 @@ export default function SalesClient({
     if (res?.code === 'DELIVERY_STOCK_SHORTAGE') {
       setError(res.error)
 
-      const wantsDrafts = confirm(`${res.error}\n\n${buildDeliveryShortagePrompt(res.shortages || [])}`)
+      const wantsDrafts = await confirm(`${res.error}\n\n${buildDeliveryShortagePrompt(res.shortages || [])}`)
       if (!wantsDrafts) {
         setLoading(false)
         return
@@ -819,7 +820,7 @@ export default function SalesClient({
     const requiresInventorySync = (sale.sales_items || []).some((item: any) => (item?.products?.type || 'INVENTORY') === 'INVENTORY')
 
     if (!requiresInventorySync) {
-      if (!confirm('Tandai pesanan jasa/non-stok ini sebagai selesai?')) return
+      if (!await confirm('Tandai pesanan jasa/non-stok ini sebagai selesai?')) return
       await executeDelivery(sale.id, null)
       return
     }
@@ -827,7 +828,7 @@ export default function SalesClient({
     const selectedWarehouse = warehouses.find((warehouse: any) => warehouse.id === sale.warehouse_id)
 
     if (selectedWarehouse) {
-      if (!confirm(`Tandai barang sudah dikirim dari gudang "${selectedWarehouse.name}"?`)) return
+      if (!await confirm(`Tandai barang sudah dikirim dari gudang "${selectedWarehouse.name}"?`)) return
       await executeDelivery(sale.id, selectedWarehouse.id)
       return
     }
@@ -838,7 +839,7 @@ export default function SalesClient({
     }
 
     if (warehouses.length === 1) {
-      if (!confirm(`Tandai barang sudah dikirim dari gudang "${warehouses[0].name}"?`)) return
+      if (!await confirm(`Tandai barang sudah dikirim dari gudang "${warehouses[0].name}"?`)) return
       await executeDelivery(sale.id, warehouses[0].id)
       return
     }
@@ -849,7 +850,7 @@ export default function SalesClient({
   }
 
   const handleVoidPO = async (id: string) => {
-    if (!confirm('Anda yakin ingin membatalkan Penjualan ini?')) return
+    if (!await confirm('Anda yakin ingin membatalkan Penjualan ini?')) return
     setLoading(true)
     const res: any = await voidSale(orgId, id)
     if (res?.error) setError(res.error)
@@ -1244,7 +1245,7 @@ export default function SalesClient({
                          {String(s?.shariah_mode || '').trim().toUpperCase() === 'ISTISHNA' && s.status === 'ORDERED' && (
                            <button 
                              onClick={async () => {
-                               const proceed = confirm('Sistem akan otomatis membuat BoM baru dan mem-publish SPK (Work Order) untuk pesanan ini dengan tenggat waktu mengikuti Jatuh Tempo pengiriman. Lanjutkan?');
+                               const proceed = await confirm('Sistem akan otomatis membuat BoM baru dan mem-publish SPK (Work Order) untuk pesanan ini dengan tenggat waktu mengikuti Jatuh Tempo pengiriman. Lanjutkan?');
                                if (!proceed) return;
                                setLoading(true);
                                const { generateProductionFromSO } = await import('@/modules/factory/actions/soToBom.actions');
@@ -2347,5 +2348,6 @@ export default function SalesClient({
         />
       )}
     </motion.div>
+  {ConfirmUI}
   )
 }

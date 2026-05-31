@@ -24,6 +24,7 @@ type Reg = {
 export function RegistrasiActions({ reg }: { reg: Reg }) {
   const [isPending, startTransition] = useTransition()
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const { confirm, ConfirmUI } = useConfirm()
   const [error, setError] = useState<string | null>(null)
 
   function handleConfirm() {
@@ -37,8 +38,8 @@ export function RegistrasiActions({ reg }: { reg: Reg }) {
     })
   }
 
-  function handleCancel() {
-    if (!confirm(`Batalkan pendaftaran ${reg.full_name}?`)) return
+  async function handleCancel() {
+    if (!await confirm(`Batalkan pendaftaran ${reg.full_name}?`)) return
     setError(null)
     startTransition(async () => {
       try {
@@ -197,6 +198,7 @@ function PaymentModal({ reg, onClose }: { reg: Reg; onClose: () => void }) {
           </div>
         )}
       </div>
+      {ConfirmUI}
     </div>
   )
 }

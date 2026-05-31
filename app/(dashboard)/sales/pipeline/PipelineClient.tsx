@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Activity, PlayCircle, CircleDashed, CheckCircle2, TrendingUp, DollarSign, Maximize2, Minimize2, Plus, Phone, Mail, Bell, Edit2, Trash2, ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react'
-import { PageHeader, SafeButton } from '@/components/ui/NizamUI'
+import { PageHeader, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { formatRupiah } from '@/lib/utils'
 import { updateSaleStatus, createQuickKanbanCard, deleteSalesCard, updateSalesCard } from '@/modules/sales/actions/sales.actions'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -62,6 +62,7 @@ function getStageIndex(stageId: PipelineStageId) {
 export default function PipelineClient({ orgId, sales }: PipelineClientProps) {
   const router = useRouter()
   const [draggedId, setDraggedId] = useState<string | null>(null)
+  const { confirm, ConfirmUI } = useConfirm()
   const [isUpdating, setIsUpdating] = useState(false)
   const [movingSaleId, setMovingSaleId] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -202,7 +203,7 @@ export default function PipelineClient({ orgId, sales }: PipelineClientProps) {
   }
 
   const handleDeleteCard = async (id: string) => {
-    if (!confirm('Hapus card ink permanen?')) return
+    if (!await confirm('Hapus card ink permanen?')) return
     setIsUpdating(true)
     const res = await deleteSalesCard(orgId, id)
     if (res?.error) showToast(res.error, 'info')
@@ -465,6 +466,7 @@ export default function PipelineClient({ orgId, sales }: PipelineClientProps) {
           </motion.div>
         )}
       </AnimatePresence>
+      {ConfirmUI}
     </div>
   )
 }

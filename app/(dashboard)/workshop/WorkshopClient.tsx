@@ -91,6 +91,7 @@ const STATUS_TRANSITIONS: Record<WorkshopStatus, WorkshopStatus[]> = {
 
 export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices, serviceRates, partProducts }: Props) {
   const [tab, setTab] = useState<Tab>('spk')
+  const { confirm, ConfirmUI } = useConfirm()
   const [search, setSearch] = useState('')
   const [sortOrderW, setSortOrderW] = useState<'desc' | 'asc'>('desc')
   const [filterStatusW, setFilterStatusW] = useState<'ALL' | 'ANTRI' | 'DIKERJAKAN' | 'SELESAI' | 'DISERAHKAN'>('ALL')
@@ -545,7 +546,7 @@ function SpkCard({
   }
 
   async function handleDeleteItem(itemId: string) {
-    if (!confirm('Hapus item ini?')) return
+    if (!await confirm('Hapus item ini?')) return
     const res = await deleteWorkOrderItem(orgId, order.id, itemId)
     if (res.error) alert(res.error)
     else window.location.reload()
@@ -1001,6 +1002,7 @@ function InfoCell({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
       <p className="text-sm font-medium text-slate-700 mt-0.5">{value}</p>
+      {ConfirmUI}
     </div>
   )
 }
@@ -1039,7 +1041,7 @@ function CreateInvoiceButton({ orderId, orgId: _orgId }: { orderId: string; orgI
   const [loading, setLoading] = React.useState(false)
 
   async function handleCreateInvoice() {
-    if (!confirm('Buat Sales Invoice dari SPK ini? Invoice akan otomatis dibuat berdasarkan item yang ada.')) return
+    if (!await confirm('Buat Sales Invoice dari SPK ini? Invoice akan otomatis dibuat berdasarkan item yang ada.')) return
     setLoading(true)
     const result = await createInvoiceFromWorkOrder(orderId)
     if ('error' in result && result.error) {

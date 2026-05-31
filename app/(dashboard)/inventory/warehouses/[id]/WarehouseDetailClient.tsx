@@ -149,6 +149,7 @@ export function WarehouseDetailClient({
     ? 'Mode Semua Unit hanya untuk baca. Pilih unit aktif untuk mengelola bin gudang.'
     : null
   const [bins, setBins] = useState<WarehouseBin[]>(() => initialBins.map((bin) => normalizeBin(bin)))
+  const { confirm, ConfirmUI } = useConfirm()
   const [showModal, setShowModal] = useState(() => shouldAutoOpenCreateBin && isAdmin && Boolean(activeBranchId))
   const [submitting, setSubmitting] = useState(false)
   const [search, setSearch] = useState('')
@@ -192,7 +193,7 @@ export function WarehouseDetailClient({
       return
     }
 
-    if (!confirm('Yakin ingin menghapus Bin ini? Data terkait stok mungkin terpengaruh.')) return
+    if (!await confirm('Yakin ingin menghapus Bin ini? Data terkait stok mungkin terpengaruh.')) return
 
     const res = await deleteWarehouseBin(orgId, binId)
     if (!('error' in res) || !res.error) {
@@ -624,6 +625,7 @@ export function WarehouseDetailClient({
           </div>
         </div>
       )}
+      {ConfirmUI}
     </div>
   )
 }

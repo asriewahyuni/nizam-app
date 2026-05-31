@@ -25,6 +25,7 @@ interface ClosingClientProps {
 
 export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const { confirm, ConfirmUI } = useConfirm()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Form State
@@ -47,7 +48,7 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
 
   const handleToggleClose = async (period: any) => {
     const action = period.is_closed ? 'BUKA KEMBALI' : 'TUTUP BUKU'
-    if (!confirm(`Apakah Anda yakin ingin melakukan ${action} periode ${period.name}?`)) return
+    if (!await confirm(`Apakah Anda yakin ingin melakukan ${action} periode ${period.name}?`)) return
     
     setIsSubmitting(true)
     if (period.is_closed) {
@@ -232,6 +233,7 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
             </div>
         )}
       </AnimatePresence>
+      {ConfirmUI}
     </div>
   )
 }

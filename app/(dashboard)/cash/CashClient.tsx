@@ -44,7 +44,7 @@ import { processBankCSV } from '@/modules/cash/actions/reconcile.actions'
 import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
-import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
+import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import type {
   CashAccountOption,
   CashBankAccount,
@@ -149,6 +149,7 @@ export function CashClient({
 }: CashClientProps) {
   const router = useRouter()
   const [showTransactionModal, setShowTransactionModal] = useState(false)
+  const { confirm, ConfirmUI } = useConfirm()
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [loading, setLoading] = useState(false)
   
@@ -399,7 +400,7 @@ export function CashClient({
   }
 
   const handleDeleteAccount = async (id: string, name: string) => {
-    if (!confirm(`Hapus rekening "${name}"? Tindakan ini tidak bisa dibatalkan jika rekeing masih kosong.`)) return
+    if (!await confirm(`Hapus rekening "${name}"? Tindakan ini tidak bisa dibatalkan jika rekeing masih kosong.`)) return
 
     setLoading(true)
     const res = await deleteBankAccount(orgId, id)
@@ -412,7 +413,7 @@ export function CashClient({
   }
 
   const handleDeleteTransaction = async (id: string) => {
-    if (!confirm('Void transaksi ini? Mutasi sumber tetap disimpan untuk audit dan jurnal terkait akan ikut di-void.')) return
+    if (!await confirm('Void transaksi ini? Mutasi sumber tetap disimpan untuk audit dan jurnal terkait akan ikut di-void.')) return
     setLoading(true)
     const res = await deleteBankTransaction(orgId, id)
     if (res?.error) setError(res.error)
@@ -1367,5 +1368,6 @@ export function CashClient({
         </AnimatePresence>
       </div>
     </motion.div>
+  {ConfirmUI}
   )
 }

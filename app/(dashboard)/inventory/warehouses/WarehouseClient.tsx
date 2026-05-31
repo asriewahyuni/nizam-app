@@ -4,7 +4,7 @@ import React, { startTransition, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, CheckCircle2, MapPin, Package, Pencil, Plus, Search, Trash2, Warehouse } from 'lucide-react'
-import { PageHeader, SafeButton, SectionCard, SectionHeader, StatusBadge } from '@/components/ui/NizamUI'
+import { PageHeader, SafeButton, SectionCard, SectionHeader, StatusBadge, useConfirm} from '@/components/ui/NizamUI'
 import { createWarehouse, deleteWarehouse, updateWarehouse } from '@/modules/inventory/actions/warehouse.actions'
 
 type WarehouseRecord = {
@@ -68,6 +68,7 @@ export function WarehouseClient({
 }: WarehouseClientProps) {
   const router = useRouter()
   const [warehouses, setWarehouses] = useState<WarehouseRecord[]>(() => sortWarehouses((initialWarehouses || []).map(normalizeWarehouse)))
+  const { confirm, ConfirmUI } = useConfirm()
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editingWarehouse, setEditingWarehouse] = useState<WarehouseRecord | null>(null)
@@ -181,7 +182,7 @@ export function WarehouseClient({
   }
 
   const handleDelete = async (warehouse: WarehouseRecord) => {
-    if (!confirm(`Hapus gudang "${warehouse.name}"? Data gudang akan dinonaktifkan dari daftar aktif.`)) return
+    if (!await confirm(`Hapus gudang "${warehouse.name}"? Data gudang akan dinonaktifkan dari daftar aktif.`)) return
 
     setSubmitting(true)
     setError(null)
@@ -413,6 +414,7 @@ export function WarehouseClient({
           </div>
         </div>
       )}
+      {ConfirmUI}
     </div>
   )
 }

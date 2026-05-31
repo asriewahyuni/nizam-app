@@ -28,7 +28,7 @@ import {
   ArrowUp,
   ArrowDown,
 } from 'lucide-react'
-import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
+import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { createPurchaseEntry, receivePurchase, voidPurchase, createPurchasePayment, createPurchaseReturn, getPurchaseById, repairReceivedPurchaseStock } from '@/modules/purchasing/actions/purchasing.actions'
 import { createContact } from '@/modules/contacts/actions/contact.actions'
 import type { Product } from '@/types/database.types'
@@ -69,6 +69,7 @@ export default function PurchasingClient({
    const payId = searchParams.get('pay')
    const requestedTab = String(searchParams.get('tab') || '').trim().toUpperCase()
    const [activeTab, setActiveTab] = useState<PurchasingTab>(() => {
+  const { confirm, ConfirmUI } = useConfirm()
      if (requestedTab === 'REQUESTS') return 'REQUESTS'
      if (requestedTab === 'PURCHASES' || payId) return 'PURCHASES'
      return purchaseRequests.some((request: { status?: unknown }) => request?.status === 'PENDING') ? 'REQUESTS' : 'PURCHASES'
@@ -532,7 +533,7 @@ export default function PurchasingClient({
       setError('Akad SALAM pembelian wajib lunas terlebih dahulu sebelum penerimaan barang.')
       return
     }
-    if (!confirm('Tandai bahwa barang sudah diterima (Status -> RECEIVED)?')) return
+    if (!await confirm('Tandai bahwa barang sudah diterima (Status -> RECEIVED)?')) return
     setLoading(true)
     const res = await receivePurchase(orgId, purchase.id)
     if (res?.error) {
@@ -560,7 +561,7 @@ export default function PurchasingClient({
   }
 
   const handleVoidPO = async (id: string) => {
-    if (!confirm('Anda yakin ingin membatalkan PO yang sedang berstatus ORDERED ini?')) return
+    if (!await confirm('Anda yakin ingin membatalkan PO yang sedang berstatus ORDERED ini?')) return
     setLoading(true)
     const res = await voidPurchase(orgId, id)
     if (res?.error) setError(res.error)
@@ -2095,5 +2096,6 @@ export default function PurchasingClient({
         />
       )}
     </motion.div>
+  {ConfirmUI}
   )
 }

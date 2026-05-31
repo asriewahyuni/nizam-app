@@ -22,6 +22,7 @@ export default function UsersClient({
   initialInvitations = [],
 }: UsersClientProps) {
   const [members, setMembers] = useState(initialMembers)
+  const { confirm, ConfirmUI } = useConfirm()
   const [invitations, setInvitations] = useState(initialInvitations)
   const [loading, setLoading] = useState(false)
   const [inviteLabel, setInviteLabel] = useState('')
@@ -92,7 +93,7 @@ export default function UsersClient({
   }
 
   const handleDelete = async (memberId: string) => {
-    if (!confirm('Hapus pengguna ini dari organisasi?')) return
+    if (!await confirm('Hapus pengguna ini dari organisasi?')) return
 
     setLoading(true)
     const { error } = await (supabase as any).from('org_members').delete().eq('id', memberId)
@@ -107,7 +108,7 @@ export default function UsersClient({
   }
 
   const handleDeleteInvitation = async (invitationId: string) => {
-    if (!confirm('Hapus link aktivasi ini?')) return
+    if (!await confirm('Hapus link aktivasi ini?')) return
 
     setLoading(true)
     const { deleteInvitation } = await import('@/modules/organization/actions/org.actions')
@@ -532,6 +533,7 @@ export default function UsersClient({
           </div>
         </div>
       )}
+      {ConfirmUI}
     </div>
   )
 }

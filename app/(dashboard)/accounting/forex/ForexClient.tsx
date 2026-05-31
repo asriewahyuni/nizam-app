@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TrendingUp, TrendingDown, Globe, DollarSign, Calendar, FileText, Trash2, ExternalLink } from 'lucide-react'
-import { EmptyState, SafeButton } from '@/components/ui/NizamUI'
+import { EmptyState, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { deleteFxGainLoss } from '@/modules/accounting/actions/forex.actions'
 import { formatRupiah, formatDate } from '@/lib/utils'
 
@@ -23,6 +23,7 @@ type ForexRecord = {
 
 export function ForexClient({ orgId, history }: { orgId: string; history: ForexRecord[] }) {
   const [items, setItems] = useState(history)
+  const { confirm, ConfirmUI } = useConfirm()
   const [deleting, setDeleting] = useState<string | null>(null)
 
   const totalGain = items.filter(i => i.is_gain).reduce((s, i) => s + Number(i.fx_gain_loss), 0)
@@ -30,7 +31,7 @@ export function ForexClient({ orgId, history }: { orgId: string; history: ForexR
   const netFx = totalGain - totalLoss
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Hapus catatan selisih kurs ini? Jurnal terkait juga akan dihapus.')) return
+    if (!await confirm('Hapus catatan selisih kurs ini? Jurnal terkait juga akan dihapus.')) return
     setDeleting(id)
     const result = await deleteFxGainLoss(id)
     if (result.success) setItems(prev => prev.filter(i => i.id !== id))
@@ -198,6 +199,7 @@ export function ForexClient({ orgId, history }: { orgId: string; history: ForexR
           </div>
         </div>
       </div>
+      {ConfirmUI}
     </div>
   )
 }

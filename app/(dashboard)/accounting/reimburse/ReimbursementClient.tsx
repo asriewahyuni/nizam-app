@@ -52,6 +52,7 @@ const SIMPLE_CATEGORIES = [
 export default function ReimbursementClient({ reimbursements, bankAccounts, expenseAccounts, orgId, currentUserId }: ReimbursementClientProps) {
   const router = useRouter()
   const [sortOrderR, setSortOrderR] = useState<'desc' | 'asc'>('desc')
+  const { confirm, ConfirmUI } = useConfirm()
   const [filterStatusR, setFilterStatusR] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAID'>('ALL')
   const [searchR, setSearchR] = useState('')
   const sortedReimbursements = [...reimbursements]
@@ -213,7 +214,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
   }
 
   const handleApprove = async (id: string) => {
-    if (!confirm('Setujui pengajuan ini?')) return
+    if (!await confirm('Setujui pengajuan ini?')) return
     const result = await approveReimbursement(id, orgId)
     if ('error' in result) {
       alert(result.error)
@@ -732,6 +733,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; border: 2px solid white; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
       `}</style>
+      {ConfirmUI}
     </div>
   )
 }

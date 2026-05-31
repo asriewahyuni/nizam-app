@@ -340,6 +340,7 @@ export function NizametricsClient({
 
   // ── State ──
   const [ikhtiyyarTargets, setIkhtiyyarTargets] = useState<Record<BSCPerspective, number>>({
+  const { confirm, ConfirmUI } = useConfirm()
     FINANCIAL: DOMAIN_CONFIG.FINANCIAL.ikhtiyyar.targetDefault,
     CUSTOMER: DOMAIN_CONFIG.CUSTOMER.ikhtiyyar.targetDefault,
     INTERNAL_PROCESS: DOMAIN_CONFIG.INTERNAL_PROCESS.ikhtiyyar.targetDefault,
@@ -401,13 +402,13 @@ export function NizametricsClient({
   }
 
   // ── Lock / Unlock ──
-  const handleLockCycle = () => {
+  async const handleLockCycle = () => {
     if (!canManageSetup) { window.alert('Pilih unit aktif terlebih dahulu.'); return }
     if (sortedKpis.length === 0) {
       window.alert('Tambahkan minimal 1 parameter sebelum mengunci bulan ini.')
       return
     }
-    if (!window.confirm('Kunci parameter bulan ini? Setelah dikunci, Anda tidak bisa menambah/menghapus parameter — hanya bisa mengisi pengukuran.')) return
+    if (!await confirm('Kunci parameter bulan ini? Setelah dikunci, Anda tidak bisa menambah/menghapus parameter — hanya bisa mengisi pengukuran.')) return
     startTransition(async () => {
       const result = await lockBSCCycle(orgId, activeBranchId) as { error?: string; success?: boolean }
       if (result.error) { window.alert(result.error); return }
@@ -416,9 +417,9 @@ export function NizametricsClient({
     })
   }
 
-  const handleUnlockCycle = () => {
+  async const handleUnlockCycle = () => {
     if (!canManageSetup) { window.alert('Pilih unit aktif terlebih dahulu.'); return }
-    if (!window.confirm('Buka kunci? Anda bisa mengubah parameter lagi, tapi pengukuran yang sudah diisi tidak akan terhapus.')) return
+    if (!await confirm('Buka kunci? Anda bisa mengubah parameter lagi, tapi pengukuran yang sudah diisi tidak akan terhapus.')) return
     startTransition(async () => {
       const result = await unlockBSCCycle(orgId, activeBranchId) as { error?: string; success?: boolean }
       if (result.error) { window.alert(result.error); return }
@@ -464,10 +465,10 @@ export function NizametricsClient({
     })
   }
 
-  const handleRemoveParam = (kpiId: string) => {
+  async const handleRemoveParam = (kpiId: string) => {
     if (!canManageSetup) { window.alert('Pilih unit aktif terlebih dahulu.'); return }
     if (cycleIsLocked) { window.alert('Siklus dikunci. Buka kunci dulu untuk menghapus parameter.'); return }
-    if (!window.confirm('Hapus parameter ini dari bulan ini?')) return
+    if (!await confirm('Hapus parameter ini dari bulan ini?')) return
     startTransition(async () => {
       const result = await archiveBSCKPI(orgId, kpiId, activeBranchId) as { error?: string }
       if (result.error) { window.alert(result.error); return }
@@ -1609,7 +1610,7 @@ export function NizametricsClient({
                           type="button"
                           onClick={() => {
                             if (!canManageSetup) return
-                            if (!window.confirm('Nonaktifkan KPI ini?')) return
+                            if (!await confirm('Nonaktifkan KPI ini?')) return
                             startTransition(async () => {
                               const result = await archiveBSCKPI(orgId, kpi.id, activeBranchId) as { error?: string }
                               if (result.error) { window.alert(result.error); return }
@@ -1709,6 +1710,7 @@ export function NizametricsClient({
           </div>
         </div>
       )}
+      {ConfirmUI}
     </div>
   )
 }

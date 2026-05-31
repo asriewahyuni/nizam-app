@@ -72,6 +72,7 @@ export function BranchManagementClient({
 }: BranchManagementClientProps) {
   const router = useRouter()
   const [branches, setBranches] = useState<Branch[]>(initialBranches)
+  const { confirm, ConfirmUI } = useConfirm()
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -178,7 +179,7 @@ export function BranchManagementClient({
 
   /* ─── DELETE (optimistic) ─── */
   const handleDelete = async (branch: Branch) => {
-    const agreed = window.confirm(
+    const agreed = await confirm(
       `Hapus unit "${branch.name}"?\nTindakan ini permanen.`
     )
     if (!agreed) return
@@ -531,5 +532,6 @@ export function BranchManagementClient({
       </AnimatePresence>
 
     </motion.div>
+  {ConfirmUI}
   )
 }

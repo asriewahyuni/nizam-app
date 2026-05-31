@@ -64,8 +64,7 @@ import {
   StatusBadge,
   SafeButton,
   ConfirmDialog,
-  EmptyState
-} from '@/components/ui/NizamUI'
+  EmptyState, useConfirm} from '@/components/ui/NizamUI'
 
 type AdminImpersonationInfo = {
   email?: string | null
@@ -134,6 +133,7 @@ export default function HrisClient({
 }) {
   const router = useRouter()
   const [employees, setEmployees] = useState(initialEmployees)
+  const { confirm, ConfirmUI } = useConfirm()
   const [searchEmp, setSearchEmp] = useState('')
   const [filterStatusEmp, setFilterStatusEmp] = useState<'ALL' | 'FULL_TIME' | 'CONTRACT' | 'PROBATION' | 'INTERN' | 'RESIGNED' | 'TERMINATED'>('ALL')
   const [sortOrderEmp, setSortOrderEmp] = useState<'asc' | 'desc'>('asc')
@@ -467,21 +467,21 @@ export default function HrisClient({
 
   const handleDeletePosition = async (id: string, isSystem: boolean) => {
     if (isSystem) return showToast('Role sistem ini tidak dapat dihapus.', 'error')
-    if (!confirm('Yakin ingin menghapus Posisi/Jabatan ini?')) return
+    if (!await confirm('Yakin ingin menghapus Posisi/Jabatan ini?')) return
     const { error } = await deleteOrganizationRole(orgId, id)
     if (error) showToast(error, 'error')
     else fetchRoles()
   }
 
   const handleDeleteInvite = async (id: string) => {
-    if (!confirm('Hapus link aktivasi ini?')) return
+    if (!await confirm('Hapus link aktivasi ini?')) return
     const { deleteInvitation } = await import('@/modules/organization/actions/org.actions')
     const res = await deleteInvitation(id)
     if (res.success) setInvitations(invitations.filter((i: any) => i.id !== id))
   }
 
   const handleDeletePayrollComponent = async (id: string) => {
-    if (!confirm('Yakin ingin menghapus komponen ini? Semua keterkaitan karyawan dengan tunjangan/potongan ini bisa terpengaruh.')) return
+    if (!await confirm('Yakin ingin menghapus komponen ini? Semua keterkaitan karyawan dengan tunjangan/potongan ini bisa terpengaruh.')) return
     setLoading(true)
     const res = await deletePayrollComponent(id)
     if (res.error) showToast(res.error, 'error')
@@ -489,7 +489,7 @@ export default function HrisClient({
     setLoading(false)
   }
 
-  const handleImpersonateHrisUser = (candidate: HrisImpersonationTarget) => {
+  async const handleImpersonateHrisUser = (candidate: HrisImpersonationTarget) => {
     const targetUserId = String(candidate?.targetUserId || '').trim()
     const displayName = String(candidate?.displayName || 'akun target').trim()
     const rawUserId = String(candidate?.rawUserId || '').trim()
@@ -505,7 +505,7 @@ export default function HrisClient({
       return
     }
 
-    if (!window.confirm(`Sesi tenant saat ini akan diganti menjadi ${displayName}. Lanjutkan impersonation HRIS?`)) {
+    if (!await confirm(`Sesi tenant saat ini akan diganti menjadi ${displayName}. Lanjutkan impersonation HRIS?`)) {
       return
     }
 
@@ -522,7 +522,7 @@ export default function HrisClient({
   }
 
   const handleDeleteEmployee = async (emp: any) => {
-    if (!confirm(`Yakin ingin menghapus karyawan ${emp.first_name} ${emp.last_name || ''}?`)) return
+    if (!await confirm(`Yakin ingin menghapus karyawan ${emp.first_name} ${emp.last_name || ''}?`)) return
     setLoading(true)
     const res = await deleteEmployee(emp.id, orgId)
     if (res.error) {
@@ -542,7 +542,7 @@ export default function HrisClient({
       return
     }
 
-    if (!confirm(`Tandai ${emp.first_name} ${emp.last_name || ''} sebagai RESIGNED?`)) return
+    if (!await confirm(`Tandai ${emp.first_name} ${emp.last_name || ''} sebagai RESIGNED?`)) return
 
     const reasonInput = window.prompt('Alasan resign (opsional):', '') || ''
     const effectiveDateInput = window.prompt('Tanggal efektif resign (YYYY-MM-DD, kosongkan untuk hari ini):', '') || ''
@@ -630,7 +630,7 @@ export default function HrisClient({
       ? 'Hapus & Batalkan (Void) Gaji? Tindakan ini akan menghapus slip gaji dan mematikan jurnal akuntansi terkait.'
       : 'Yakin ingin menghapus draf penggajian ini?'
 
-    if (!confirm(msg)) return
+    if (!await confirm(msg)) return
 
     setLoading(true)
     const res = isPaid ? await voidPayrollRun(id, orgId) : await deletePayrollRun(id, orgId)
@@ -2980,6 +2980,7 @@ export default function HrisClient({
           </motion.div>
         )}
       </AnimatePresence>
+      {ConfirmUI}
     </div>
   )
 }

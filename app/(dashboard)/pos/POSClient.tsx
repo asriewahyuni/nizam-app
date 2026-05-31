@@ -190,6 +190,7 @@ export default function POSClient({
       return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(6).replace(/\.?0+$/, '')
    }
    const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
+  const { confirm, ConfirmUI } = useConfirm()
    const [loading, setLoading] = useState(false)
    const [shiftBusy, setShiftBusy] = useState(false)
    const [successData, setSuccessData] = useState<PosSuccessData | null>(null)
@@ -975,7 +976,7 @@ export default function POSClient({
       setShowCloseShiftModal(true)
    }
 
-   const handleExitPos = () => {
+   async const handleExitPos = () => {
       if (cart.length > 0) {
          alert('Selesaikan atau kosongkan keranjang terlebih dahulu sebelum keluar dari POS.')
          return
@@ -993,7 +994,7 @@ export default function POSClient({
             : `Shift ${latestClosedShift.registerCode} sudah ditutup. Pastikan laporan shift harian sudah dicek. Logout POS sekarang?`
          : 'Logout dari POS sekarang?'
 
-      if (!window.confirm(confirmMessage)) return
+      if (!await confirm(confirmMessage)) return
       window.location.assign('/auth/signout')
    }
 
@@ -2381,5 +2382,6 @@ export default function POSClient({
                </div>
             )}
       </div>
-   )
+   {ConfirmUI}
+  )
 }

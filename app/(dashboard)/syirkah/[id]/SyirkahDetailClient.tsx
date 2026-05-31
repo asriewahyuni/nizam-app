@@ -57,6 +57,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
   const canEstimateProfit = typeof netProfit === 'number' && Number.isFinite(netProfit)
   const hasManualProfitSharingAllocation = Number(contract.profit_sharing_allocation || 0) > 0
   const [isEditingContract, setIsEditingContract] = useState(false)
+  const { confirm, ConfirmUI } = useConfirm()
   const [contractData, setContractData] = useState({
     title: contract.title || '',
     description: contract.description || '',
@@ -243,7 +244,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
   }
 
   const handleDeleteMember = async (id: string) => {
-    if (!confirm('Yakin hapus?')) return
+    if (!await confirm('Yakin hapus?')) return
     try {
       await deleteSyirkahMember(id, contract.id)
       await runCoreSync(false)
@@ -846,6 +847,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
           </div>
         </div>
       )}
+      {ConfirmUI}
     </div>
   )
 }

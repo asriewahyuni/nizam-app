@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, Package, X, Edit, Trash2, AlertTriangle, Info, History as HistoryIcon, Search, TrendingUp, Wallet, Box } from 'lucide-react'
-import { PageHeader, StatCard, SectionCard, SectionHeader, SafeButton } from '@/components/ui/NizamUI'
+import { PageHeader, StatCard, SectionCard, SectionHeader, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { createProduct, updateProduct, deleteProduct, createInventoryAdjustment, createInventoryTransfer, getWarehouseStocks, getProductByBarcode } from '@/modules/inventory/actions/inventory.actions'
 import { BarcodeScanner } from '@/components/shared/BarcodeScanner'
 import type { InventoryMutationRow, InventoryWarehouseStockRow, ProductWithStock } from '@/modules/inventory/actions/inventory.actions'
@@ -278,6 +278,7 @@ export default function InventoryClient({
   warehouses = [],
 }: InventoryClientProps) {
   const [products, setProducts] = useState<ProductWithStock[]>(initialProducts)
+  const { confirm, ConfirmUI } = useConfirm()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isWriteOffModalOpen, setIsWriteOffModalOpen] = useState(false)
   const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false)
@@ -500,7 +501,7 @@ export default function InventoryClient({
   }
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Hapus produk "${name}"?`)) return
+    if (!await confirm(`Hapus produk "${name}"?`)) return
     try {
       await deleteProduct(id, orgId)
       setProducts((current) => current.filter((p) => p.id !== id))
@@ -1636,5 +1637,6 @@ export default function InventoryClient({
         </div>
       )}
     </motion.div>
+  {ConfirmUI}
   )
 }

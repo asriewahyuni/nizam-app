@@ -5,7 +5,7 @@
  */
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import Link, { type LinkProps } from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, CheckCircle2, AlertTriangle, X } from 'lucide-react'
@@ -373,4 +373,62 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
       </motion.div>
     </div>
   )
+}
+
+// ============================================================
+// 8. useConfirm HOOK
+// Drop-in replacement untuk window.confirm().
+// Usage:
+//   const { confirm, ConfirmUI } = useConfirm()
+//   ...
+//   if (!await confirm({ title: 'Hapus?', message: 'Tidak bisa dikembalikan.' })) return
+//   ...
+//   return <>{ConfirmUI}</>
+// ============================================================
+interface ConfirmOptions {
+  title?: string
+  message: string
+  confirmLabel?: string
+  variant?: 'danger' | 'primary'
+}
+
+export function useConfirm() {
+  const [open, setOpen] = useState(false)
+  const [opts, setOpts] = useState<ConfirmOptions>({ message: '' })
+  const resolveRef = useRef<((val: boolean) => void) | null>(null)
+
+  const confirm = useCallback((options: ConfirmOptions | string): Promise<boolean> => {
+    const normalized: ConfirmOptions = typeof options === 'string' ? { message: options } : options
+    return new Promise((resolve) => {
+      resolveRef.current = resolve
+      setOpts(normalized)
+      setOpen(true)
+    })
+  }, [])
+
+  const handleConfirm = useCallback(async () => {
+    setOpen(false)
+    resolveRef.current?.(true)
+    resolveRef.current = null
+  }, [])
+
+  const handleClose = useCallback(() => {
+    setOpen(false)
+    resolveRef.current?.(false)
+    resolveRef.current = null
+  }, [])
+
+  const ConfirmUI = (
+    <ConfirmDialog
+      isOpen={open}
+      onClose={handleClose}
+      onConfirm={handleConfirm}
+      title={opts.title ?? 'Konfirmasi'}
+      message={opts.message}
+      confirmLabel={opts.confirmLabel}
+      variant={opts.variant ?? 'danger'}
+    />
+  )
+
+  return { confirm, ConfirmUI }
 }

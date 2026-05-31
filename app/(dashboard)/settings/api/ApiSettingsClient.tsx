@@ -549,6 +549,7 @@ export function ApiSettingsClient({
   baseUrl,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'keys' | 'cashin' | 'cashout' | 'webhook' | 'tryout' | 'history'>('keys')
+  const { confirm, ConfirmUI } = useConfirm()
   const [activeDoc, setActiveDoc] = useState<'cash-read' | 'inventory-read' | 'inventory-movements-read' | 'inventory-reconciliation-read' | 'general-ledger-read' | 'sales-read' | 'sales-detail-read' | 'purchases-read' | 'bank-transactions-read' | 'contacts-read' | 'contacts-upsert' | 'cash-create'>('cash-read')
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>(initialApiKeys)
   const [loading, setLoading] = useState(false)
@@ -2131,7 +2132,7 @@ export function ApiSettingsClient({
   }
 
   const handleRevoke = async (keyId: string, keyName: string) => {
-    if (!confirm(`Nonaktifkan API key "${keyName}"? Integrasi yang menggunakan key ini akan langsung berhenti berfungsi.`)) return
+    if (!await confirm(`Nonaktifkan API key "${keyName}"? Integrasi yang menggunakan key ini akan langsung berhenti berfungsi.`)) return
     setLoading(true)
     const res = await revokeApiKey(orgId, keyId)
     setLoading(false)
@@ -4113,6 +4114,7 @@ if (signature !== expected) {
           </div>
         )}
       </AnimatePresence>
+      {ConfirmUI}
     </div>
   )
 }

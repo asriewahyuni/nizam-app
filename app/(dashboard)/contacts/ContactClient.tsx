@@ -20,7 +20,7 @@ import {
   UserCircle,
   Users,
 } from 'lucide-react'
-import { PageHeader, SectionCard, SectionHeader, SafeButton, StatCard } from '@/components/ui/NizamUI'
+import { PageHeader, SectionCard, SectionHeader, SafeButton, StatCard, useConfirm} from '@/components/ui/NizamUI'
 import { createContact, deleteContact, updateContact } from '@/modules/contacts/actions/contact.actions'
 import { formatRupiah } from '@/lib/utils'
 
@@ -120,6 +120,7 @@ export default function ContactClient({
 }: ContactClientProps) {
   const router = useRouter()
   const [contactItems, setContactItems] = useState<ContactRecord[]>(() => sortContacts((contacts || []).map(normalizeContact)))
+  const { confirm, ConfirmUI } = useConfirm()
   const [activeType, setActiveType] = useState<ContactFilter>(initialTypeFilter)
   const [searchQuery, setSearchQuery] = useState('')
   const [showFormModal, setShowFormModal] = useState(false)
@@ -236,7 +237,7 @@ export default function ContactClient({
 
   const handleDelete = async (contact: ContactRecord) => {
     const label = contact.type === 'SUPPLIER' ? 'vendor' : 'kontak'
-    if (!confirm(`Hapus ${label} "${contact.name}"? Riwayat transaksi lama tetap aman, data ini hanya disembunyikan dari daftar aktif.`)) return
+    if (!await confirm(`Hapus ${label} "${contact.name}"? Riwayat transaksi lama tetap aman, data ini hanya disembunyikan dari daftar aktif.`)) return
 
     setLoading(true)
     setError(null)
@@ -584,6 +585,7 @@ export default function ContactClient({
           </div>
         </div>
       )}
+      {ConfirmUI}
     </div>
   )
 }

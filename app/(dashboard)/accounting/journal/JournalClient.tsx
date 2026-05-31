@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2, Calculator, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
+import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries, getAccountLedger } from '@/modules/accounting/actions/journal.actions'
 import type { AccountLedgerResult } from '@/modules/accounting/actions/journal.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
@@ -86,6 +86,7 @@ export default function JournalClient({
   }
 
   const [entries, setEntries] = useState<JournalEntryItem[]>(initialEntries)
+  const { confirm, ConfirmUI } = useConfirm()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [filterStatus, setFilterStatus] = useState<JournalStatusFilter>(initialFilterStatus)
@@ -406,7 +407,7 @@ export default function JournalClient({
   }
 
   const handlePost = async (id: string) => {
-    if (!confirm("Posting jurnal ini? Jurnal tidak bisa diubah setelah di-posting.")) return
+    if (!await confirm("Posting jurnal ini? Jurnal tidak bisa diubah setelah di-posting.")) return
     const res = await postJournalEntry(id, orgId)
     if (res.error) alert(res.error)
     else window.location.reload()
@@ -873,7 +874,7 @@ export default function JournalClient({
 	                              </SafeButton>
 	                              <button 
 	                                onClick={async () => {
-	                                  if (!confirm("Hapus draft jurnal ini secara permanen?")) return
+	                                  if (!await confirm("Hapus draft jurnal ini secara permanen?")) return
 	                                  const res = await hardDeleteDraftJournal(entry.id, orgId)
 	                                  if (res.error) alert(res.error)
 	                                  else window.location.reload()
@@ -1055,6 +1056,7 @@ export default function JournalClient({
           </div>
         )}
       </AnimatePresence>
+      {ConfirmUI}
     </motion.div>
   )
 }

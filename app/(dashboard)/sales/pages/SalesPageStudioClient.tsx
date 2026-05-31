@@ -15,7 +15,7 @@ import {
   Trash2,
   Wand2,
 } from 'lucide-react'
-import { EmptyState, PageHeader, SafeButton, SectionCard, SectionHeader, StatCard, StatusBadge } from '@/components/ui/NizamUI'
+import { EmptyState, PageHeader, SafeButton, SectionCard, SectionHeader, StatCard, StatusBadge, useConfirm} from '@/components/ui/NizamUI'
 import { formatDate, formatRupiah } from '@/lib/utils'
 import {
   createSalesPage,
@@ -455,6 +455,7 @@ export default function SalesPageStudioClient({
   const [, startTransition] = useTransition()
 
   const [selectedPageId, setSelectedPageId] = useState<string | null>(pages[0]?.id || null)
+  const { confirm, ConfirmUI } = useConfirm()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingPageId, setEditingPageId] = useState<string | null>(null)
   const [profileSnapshot, setProfileSnapshot] = useState<SalesPageAiProfileView>(aiProfile)
@@ -755,7 +756,7 @@ export default function SalesPageStudioClient({
   }
 
   const handleDelete = async (page: SalesPageView) => {
-    if (!window.confirm(`Hapus sales page "${page.title}"? Lead yang terkait juga akan ikut terhapus.`)) return
+    if (!await confirm(`Hapus sales page "${page.title}"? Lead yang terkait juga akan ikut terhapus.`)) return
 
     setError(null)
     setBusyAction('delete')
@@ -2321,6 +2322,7 @@ Laporan & rekomendasi`}
           </div>
         </div>
       )}
+      {ConfirmUI}
     </div>
   )
 }

@@ -20,6 +20,7 @@ interface AssetClientProps {
 // Sub-component for Searchable Select
 function SearchableSelect({ label, options, value, onChange, placeholder, required = false }: any) {
   const [searchTerm, setSearchTerm] = useState('')
+  const { confirm, ConfirmUI } = useConfirm()
   const [isOpen, setIsOpen] = useState(false)
 
   const filtered = options.filter((o: any) => 
@@ -283,7 +284,7 @@ export function AssetClient({
        alert(branchGuardMessage)
        return
      }
-     if (!confirm(`Hapus aset "${asset.name}"? Data ini tidak bisa dikembalikan.`)) return
+     if (!await confirm(`Hapus aset "${asset.name}"? Data ini tidak bisa dikembalikan.`)) return
      const res = await deleteFixedAsset(asset.id, orgId)
      if (res.error) alert(res.error)
      else setAssets(assets.filter(a => a.id !== asset.id))
@@ -348,7 +349,7 @@ export function AssetClient({
       return
     }
     if (!disposalForm.cashAccountId) return alert('Pilih Akun Penerimaan Kas/Bank terlebih dahulu!')
-    if (!confirm(`Konfirmasi Jual/Lepas Aset "${selectedAssetForDisposal?.name}"?\nTindakan ini tidak bisa dibatalkan, status aset akan berubah ke SOLD.`)) return
+    if (!await confirm(`Konfirmasi Jual/Lepas Aset "${selectedAssetForDisposal?.name}"?\nTindakan ini tidak bisa dibatalkan, status aset akan berubah ke SOLD.`)) return
 
     setDisposeLoading(true)
     const res = await disposeFixedAsset(orgId, {
@@ -422,7 +423,7 @@ export function AssetClient({
           <button 
             disabled={!activeBranchId || depProcessing}
             onClick={async () => {
-              if (!confirm("Jalankan Posting Jurnal Penyusutan Otomatis sekarang?")) return
+              if (!await confirm("Jalankan Posting Jurnal Penyusutan Otomatis sekarang?")) return
               setDepProcessing(true)
               const res = await runOrganizationDepreciation(orgId, activeBranchId)
               setDepProcessing(false)
@@ -864,7 +865,7 @@ export function AssetClient({
                  <button onClick={() => setShowPreview(false)} className="flex-1 py-4 bg-white border-2 border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-all"> Tutup </button>
                  <button 
                    onClick={async () => {
-                      if (!confirm("Konfirmasi posting jurnal di atas?")) return
+                      if (!await confirm("Konfirmasi posting jurnal di atas?")) return
                       setShowPreview(false)
                       setDepProcessing(true)
                       const res = await runOrganizationDepreciation(orgId, activeBranchId)
@@ -1025,6 +1026,7 @@ export function AssetClient({
            </div>
         </div>
       )}
+      {ConfirmUI}
     </div>
   )
 }

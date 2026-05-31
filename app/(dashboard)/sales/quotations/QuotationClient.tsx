@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FileText, Send, AlertCircle, Trash2, Printer, ArrowRight, XCircle, Search, ArrowUp, ArrowDown } from 'lucide-react'
-import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
+import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { createQuotation, convertQuotationToOrder } from '@/modules/sales/actions/sales.actions'
 import { createContact } from '@/modules/contacts/actions/contact.actions'
 import { getUsableSalesPromoByCode } from '@/modules/sales/actions/promo.actions'
@@ -171,6 +171,7 @@ export default function QuotationClient({
   products,
 }: QuotationClientProps) {
   const [showModal, setShowModal] = useState(false)
+  const { confirm, ConfirmUI } = useConfirm()
   const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [savingCustomer, setSavingCustomer] = useState(false)
@@ -387,7 +388,7 @@ export default function QuotationClient({
   }
 
   const handleConvert = async (id: string) => {
-    if (!confirm('Ubah penawaran ini menjadi Pesanan Penjualan (Order) resmi?')) return
+    if (!await confirm('Ubah penawaran ini menjadi Pesanan Penjualan (Order) resmi?')) return
     setLoading(true)
     setError(null)
     setSuccess(null)
@@ -1133,6 +1134,7 @@ export default function QuotationClient({
           </div>
         )}
       </AnimatePresence>
+      {ConfirmUI}
     </div>
   )
 }

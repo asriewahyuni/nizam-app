@@ -32,6 +32,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
   )
   const router = useRouter()
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const { confirm, ConfirmUI } = useConfirm()
   const [isEditingProfitSharing, setIsEditingProfitSharing] = useState(false)
   const [isSavingProfitSharing, setIsSavingProfitSharing] = useState(false)
   const [profitSharingDraft, setProfitSharingDraft] = useState(0)
@@ -52,7 +53,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
   }, [profitSharingReferenceContract, profitSharingReferenceGroup])
 
   const handleDelete = async (contractId: string, title: string) => {
-    if (!confirm(`Hapus akad "${title}"? Tindakan ini tidak dapat dibatalkan.`)) return
+    if (!await confirm(`Hapus akad "${title}"? Tindakan ini tidak dapat dibatalkan.`)) return
     setDeletingId(contractId)
     try {
       const result = await deleteSyirkahContract(contractId, orgId)
@@ -409,6 +410,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
         )}
       </div>
 
+      {ConfirmUI}
     </div>
   )
 }

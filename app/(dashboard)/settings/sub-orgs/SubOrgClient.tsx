@@ -110,6 +110,7 @@ export default function SubOrgClient({
   limits,
 }: Props) {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
+  const { confirm, ConfirmUI } = useConfirm()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -282,7 +283,7 @@ export default function SubOrgClient({
   }
 
   const handleDeleteChild = async (childId: string, childName: string) => {
-    const agreed = window.confirm(
+    const agreed = await confirm(
       `Hapus anak perusahaan "${childName}"?\nTindakan ini permanen dan seluruh data organisasi akan ikut terhapus.`
     )
     if (!agreed) return
@@ -316,7 +317,7 @@ export default function SubOrgClient({
   ) => {
     if (nextMode === currentMode || updatingCoAModeChildId === childId) return
 
-    const agreed = window.confirm(
+    const agreed = await confirm(
       nextMode === 'LOCAL'
         ? `Aktifkan CoA lokal untuk "${childName}"?\n\nEntitas anak nanti bisa mengelola rekening CoA sendiri saat berada di konteks Unit Utama.`
         : `Kembalikan "${childName}" ke mode CoA holding?\n\nPastikan akun aktif child sudah selaras dengan holding sebelum melanjutkan.`
@@ -1061,6 +1062,7 @@ export default function SubOrgClient({
           </motion.div>
         </div>
       )}
+      {ConfirmUI}
     </div>
   )
 }

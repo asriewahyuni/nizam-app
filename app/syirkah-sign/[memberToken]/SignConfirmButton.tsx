@@ -9,11 +9,12 @@ export default function SignConfirmButton({ memberToken, memberName }: {
   memberName: string
 }) {
   const [loading, setLoading] = useState(false)
+  const { confirm, ConfirmUI } = useConfirm()
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
 
   const handleSign = async () => {
-    if (!confirm(`Anda akan menandatangani akad syirkah ini sebagai ${memberName}.\n\nYakin melanjutkan?`)) return
+    if (!await confirm(`Anda akan menandatangani akad syirkah ini sebagai ${memberName}.\n\nYakin melanjutkan?`)) return
     setLoading(true)
     setError('')
     try {
@@ -61,6 +62,7 @@ export default function SignConfirmButton({ memberToken, memberName }: {
       <p className="text-xs text-center text-slate-400">
         Tanda tangan ini bersifat sah secara digital dan dicatat di sistem Nizam ERP.
       </p>
+      {ConfirmUI}
     </div>
   )
 }
