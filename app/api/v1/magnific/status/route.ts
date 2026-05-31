@@ -12,20 +12,25 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { checkTaskStatus } from '@/lib/magnific/service'
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const taskId = searchParams.get('taskId')
+  try {
+    const { searchParams } = new URL(request.url)
+    const taskId = searchParams.get('taskId')
 
-  if (!taskId) {
-    return NextResponse.json(
-      { success: false, error: 'Parameter "taskId" wajib diisi.' },
-      { status: 400 }
-    )
+    if (!taskId) {
+      return NextResponse.json(
+        { success: false, error: 'Parameter "taskId" wajib diisi.' },
+        { status: 400 }
+      )
+    }
+
+    const result = await checkTaskStatus(taskId)
+    if (!result.success) {
+      return NextResponse.json(result, { status: 500 })
+    }
+
+    return NextResponse.json(result)
+  } catch (err) {
+    console.warn('[magnific/status] Unexpected error:', err)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
-
-  const result = await checkTaskStatus(taskId)
-  if (!result.success) {
-    return NextResponse.json(result, { status: 500 })
-  }
-
-  return NextResponse.json(result)
 }

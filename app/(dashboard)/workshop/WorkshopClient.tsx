@@ -626,7 +626,7 @@ function SpkCard({
                   )}
                 </div>
 
-                {order.items.length === 0 ? (
+                {(order.items ?? []).length === 0 ? (
                   <p className="text-sm text-slate-400 italic text-center py-4 border-2 border-dashed border-slate-100 rounded-xl">
                     Belum ada item. Tambahkan jasa atau spare part.
                   </p>
@@ -644,7 +644,7 @@ function SpkCard({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {order.items.map(item => (
+                        {(order.items ?? []).map(item => (
                           <tr key={item.id} className="hover:bg-slate-50/50">
                             <td className="px-4 py-3 font-medium text-slate-700">{item.name}</td>
                             <td className="px-4 py-3 text-center">

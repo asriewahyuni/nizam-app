@@ -364,31 +364,36 @@ function buildJournalTemplate(wb: ExcelJS.Workbook) {
 }
 
 export async function GET(req: NextRequest) {
-  const type = req.nextUrl.searchParams.get('type') ?? 'sales'
+  try {
+    const type = req.nextUrl.searchParams.get('type') ?? 'sales'
 
-  const wb = new ExcelJS.Workbook()
-  wb.creator = 'Nizam ERP'
-  wb.created = new Date()
+    const wb = new ExcelJS.Workbook()
+    wb.creator = 'Nizam ERP'
+    wb.created = new Date()
 
-  if (type === 'purchase') {
-    buildPurchaseTemplate(wb)
-  } else if (type === 'journal') {
-    buildJournalTemplate(wb)
-  } else {
-    buildSalesTemplate(wb)
+    if (type === 'purchase') {
+      buildPurchaseTemplate(wb)
+    } else if (type === 'journal') {
+      buildJournalTemplate(wb)
+    } else {
+      buildSalesTemplate(wb)
+    }
+
+    const buffer = await wb.xlsx.writeBuffer()
+    const filename = type === 'purchase'
+      ? 'template-bulk-pembelian.xlsx'
+      : type === 'journal'
+        ? 'template-bulk-jurnal-manual.xlsx'
+        : 'template-bulk-penjualan.xlsx'
+
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    })
+  } catch (err) {
+    console.warn('[bulk-import/template] Error generating template:', err)
+    return NextResponse.json({ error: 'Gagal generate template' }, { status: 500 })
   }
-
-  const buffer = await wb.xlsx.writeBuffer()
-  const filename = type === 'purchase'
-    ? 'template-bulk-pembelian.xlsx'
-    : type === 'journal'
-      ? 'template-bulk-jurnal-manual.xlsx'
-      : 'template-bulk-penjualan.xlsx'
-
-  return new NextResponse(buffer, {
-    headers: {
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-    },
-  })
 }

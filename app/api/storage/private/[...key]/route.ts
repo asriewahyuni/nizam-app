@@ -17,7 +17,8 @@ export const runtime = 'nodejs'
 /**
  * Route private untuk file export agar hanya member organisasi yang bisa mengunduh.
  */
-export async function GET(_request: NextRequest, context: { params: Promise<{ key?: string[] }> }) {
+export async function GET(_request: NextRequest, context: {
+  try { params: Promise<{ key?: string[] }> }) {
   if (!isObjectStorageConfigured()) {
     return NextResponse.json({ error: 'Bucket Railway belum dikonfigurasi.' }, { status: 404 })
   }
@@ -73,4 +74,8 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ke
 function extractOrgIdFromStorageKey(key: string): string | null {
   const parts = key.split('/').filter(Boolean)
   return parts.length >= 2 ? parts[1] : null
+  } catch (err) {
+    console.warn("[storage/private] Error:", err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }

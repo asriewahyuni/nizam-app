@@ -37,26 +37,32 @@ function resolveClientIp(request: NextRequest) {
 }
 
 export async function GET() {
-  const session = await getInternalAuthSession()
+  try {
+    const session = await getInternalAuthSession()
 
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!isPlatformAdminEmail(session.user.email)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const snapshot = await getUserActivitySnapshot()
+
+    return NextResponse.json(snapshot, {
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    })
+  } catch (err) {
+    console.warn('[user-activity GET] Error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  if (!isPlatformAdminEmail(session.user.email)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  const snapshot = await getUserActivitySnapshot()
-
-  return NextResponse.json(snapshot, {
-    headers: {
-      'Cache-Control': 'no-store',
-    },
-  })
 }
 
 export async function POST(request: NextRequest) {
+  try {
   const session = await getInternalAuthSession()
 
   if (!session?.user) {
@@ -92,4 +98,8 @@ export async function POST(request: NextRequest) {
       'Cache-Control': 'no-store',
     },
   })
+  } catch (err) {
+    console.warn('[user-activity POST] Error:', err)
+    return NextResponse.json({ ok: false, error: 'Internal server error' }, { status: 500 })
+  }
 }

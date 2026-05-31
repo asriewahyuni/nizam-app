@@ -622,7 +622,7 @@ export default function POSClient({
       return buildPosWhatsappReceiptMessage({
          customerName: data.customerName,
          saleId: data.saleId,
-         items: data.items.map((item) => ({
+         items: (data.items ?? []).map((item) => ({
             name: item.name,
             qty: item.qty,
             price: item.price,
