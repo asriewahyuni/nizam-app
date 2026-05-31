@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2, Calculator, ArrowRightLeft } from 'lucide-react'
+import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2, Calculator, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries, getAccountLedger } from '@/modules/accounting/actions/journal.actions'
 import type { AccountLedgerResult } from '@/modules/accounting/actions/journal.actions'
@@ -89,6 +89,7 @@ export default function JournalClient({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [filterStatus, setFilterStatus] = useState<JournalStatusFilter>(initialFilterStatus)
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [searchText, setSearchText] = useState('')
   const [activeSearch, setActiveSearch] = useState('')
   const [searchResults, setSearchResults] = useState<JournalEntryItem[] | null>(null)
@@ -225,9 +226,10 @@ export default function JournalClient({
     await loadAccountLedgerPage(accountId, { reset: true })
   }
 
-  const loadJournalEntriesPage = async (options?: { reset?: boolean; search?: string }) => {
+  const loadJournalEntriesPage = async (options?: { reset?: boolean; search?: string; sortOrder?: 'asc' | 'desc' }) => {
     const reset = Boolean(options?.reset)
     const search = String(options?.search ?? activeSearch).trim()
+    const effectiveSortOrder = options?.sortOrder ?? sortOrder
     const offset = reset
       ? 0
       : search
@@ -242,6 +244,7 @@ export default function JournalClient({
         search: search || undefined,
         limit: JOURNAL_PAGE_SIZE,
         offset,
+        sortOrder: effectiveSortOrder,
       })
 
       setActiveSearch(search)
@@ -292,6 +295,15 @@ export default function JournalClient({
   const handleResetSearch = async () => {
     setSearchText('')
     await loadJournalEntriesPage({ reset: true, search: '' })
+  }
+
+  const handleToggleSort = async () => {
+    const next = sortOrder === 'desc' ? 'asc' : 'desc'
+    setSortOrder(next)
+    setEntries([])
+    setSearchResults(null)
+    setLoadedCountByStatus((c) => ({ ...c, [filterStatus]: 0 }))
+    await loadJournalEntriesPage({ reset: true, sortOrder: next })
   }
 
   const stats = {
@@ -640,7 +652,20 @@ export default function JournalClient({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-100">
-                    <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Tanggal & No</th>
+                    <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                  <button
+                    type="button"
+                    onClick={handleToggleSort}
+                    className="inline-flex items-center gap-1.5 hover:text-slate-700 transition-colors cursor-pointer"
+                    title={sortOrder === 'desc' ? 'Terbaru ke Terlama (klik untuk balik)' : 'Terlama ke Terbaru (klik untuk balik)'}
+                  >
+                    Tanggal & No
+                    {sortOrder === 'desc'
+                      ? <ArrowDown size={12} className="text-blue-500" />
+                      : <ArrowUp size={12} className="text-blue-500" />
+                    }
+                  </button>
+                </th>
                     <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Keterangan</th>
                     <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Lawan Akun</th>
                     <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Debit</th>
@@ -705,7 +730,20 @@ export default function JournalClient({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Tanggal & No</th>
+                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                  <button
+                    type="button"
+                    onClick={handleToggleSort}
+                    className="inline-flex items-center gap-1.5 hover:text-slate-700 transition-colors cursor-pointer"
+                    title={sortOrder === 'desc' ? 'Terbaru ke Terlama (klik untuk balik)' : 'Terlama ke Terbaru (klik untuk balik)'}
+                  >
+                    Tanggal & No
+                    {sortOrder === 'desc'
+                      ? <ArrowDown size={12} className="text-blue-500" />
+                      : <ArrowUp size={12} className="text-blue-500" />
+                    }
+                  </button>
+                </th>
                 <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Deskripsi & Ref</th>
                 <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Detail Transaksi</th>
                 <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Status</th>

@@ -1482,6 +1482,7 @@ export async function getJournalEntries(
     toDate?: string
     limit?: number
     offset?: number
+    sortOrder?: 'asc' | 'desc'
   }
 ) {
   const { queryPostgres } = await import('@/lib/db/postgres')
@@ -1546,7 +1547,7 @@ export async function getJournalEntries(
       SELECT je.*
       FROM   public.journal_entries je
       WHERE  ${whereClauses.join(' AND ')}
-      ORDER  BY je.entry_date DESC, je.created_at DESC
+      ORDER  BY je.entry_date ${filters?.sortOrder === 'asc' ? 'ASC' : 'DESC'}, je.created_at ${filters?.sortOrder === 'asc' ? 'ASC' : 'DESC'}
       LIMIT  $${limitParam}
       OFFSET $${offsetParam}
     `, params)
