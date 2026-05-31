@@ -21,7 +21,7 @@ export default function SessionQRClient({
 
   return (
     <>
-      <button
+      <button type="button"
         onClick={handleOpen}
         className="inline-flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
       >
@@ -38,7 +38,7 @@ export default function SessionQRClient({
                 <h3 className="text-lg font-semibold text-slate-900">Docking Presensi</h3>
                 <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-wide">{sessionTitle}</p>
               </div>
-              <button
+              <button type="button"
                 onClick={() => setIsOpen(false)}
                 className="rounded-full bg-slate-50 p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
               >
@@ -68,7 +68,7 @@ export default function SessionQRClient({
             </div>
 
             <div className="bg-slate-50 p-6 flex justify-center border-t border-slate-100">
-              <button 
+              <button type="button" 
                 onClick={() => document.documentElement.requestFullscreen()}
                 className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-blue-600 transition-colors"
               >

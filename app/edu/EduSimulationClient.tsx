@@ -92,7 +92,7 @@ export default function EduSimulationClient({
           </div>
 
           <div className="flex items-center gap-8 mt-8 border-b-2 border-slate-100">
-            <button
+            <button type="button"
               onClick={() => setActiveTab('board')}
               className={`pb-4 px-2 font-bold text-sm tracking-wide transition-colors ${
                 activeTab === 'board' ? 'text-blue-600 border-b-2 border-blue-600 -mb-[2px]' : 'text-slate-400 hover:text-slate-600'
@@ -100,7 +100,7 @@ export default function EduSimulationClient({
             >
               LEADERBOARD
             </button>
-            <button
+            <button type="button"
               onClick={() => setActiveTab('curriculum')}
               className={`pb-4 px-2 font-bold text-sm tracking-wide transition-colors ${
                 activeTab === 'curriculum' ? 'text-blue-600 border-b-2 border-blue-600 -mb-[2px]' : 'text-slate-400 hover:text-slate-600'
@@ -136,7 +136,7 @@ export default function EduSimulationClient({
                         placeholder="Misalnya Tim Alpha"
                         className="h-12 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition-colors focus:border-blue-400"
                       />
-                      <button
+                      <button type="button"
                         onClick={handleCreateTeam}
                         disabled={isPending}
                         className="h-12 rounded-2xl bg-slate-900 px-5 text-sm font-black uppercase tracking-[0.14em] text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
@@ -206,7 +206,7 @@ export default function EduSimulationClient({
                             </td>
                             {canManage && (
                               <td className="p-4 text-right">
-                                <button
+                                <button type="button"
                                   onClick={() => handleStartSession(team.id)}
                                   disabled={isPending}
                                   className="inline-flex items-center rounded-2xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-fuchsia-700 transition-colors hover:border-fuchsia-300 hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-60"

@@ -224,14 +224,14 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between border-b border-slate-100">
            <div className="flex gap-8">
-              <button 
+              <button type="button" 
                 onClick={() => setActiveTab('PENDING')}
                 className={`pb-4 text-sm font-semibold uppercase tracking-wide transition-all relative ${activeTab === 'PENDING' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 Menunggu ({approvals.length})
                 {activeTab === 'PENDING' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-[#003366] rounded-t-full" />}
               </button>
-              <button 
+              <button type="button" 
                 onClick={() => setActiveTab('HISTORY')}
                 className={`pb-4 text-sm font-semibold uppercase tracking-wide transition-all relative ${activeTab === 'HISTORY' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
               >
@@ -288,15 +288,15 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
               </div>
 
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                 <button disabled={submitting === req.id} onClick={() => handleDetail(req)}
+                 <button type="button" disabled={submitting === req.id} onClick={() => handleDetail(req)}
                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all">
                     <View size={18} /> Detail
                  </button>
-                 <button disabled={submitting === req.id} onClick={() => openConfirm(req.id, 'REJECTED')}
+                 <button type="button" disabled={submitting === req.id} onClick={() => openConfirm(req.id, 'REJECTED')}
                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-rose-600 bg-white border border-rose-100 rounded-xl hover:bg-rose-50 transition-all">
                     <X size={18} /> Tolak
                  </button>
-                 <button disabled={submitting === req.id} onClick={() => openConfirm(req.id, 'APPROVED')}
+                 <button type="button" disabled={submitting === req.id} onClick={() => openConfirm(req.id, 'APPROVED')}
                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-3 text-sm font-bold text-white bg-[#003366] rounded-xl hover:bg-[#002d5a] shadow-lg shadow-[#003366]/10 transition-all">
                     {submitting === req.id ? '⏳ Memproses...' : <><QrCode size={18} /> Setujui &amp; TTD</>}
                  </button>
@@ -331,7 +331,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                         <p className="text-sm text-slate-500">Oleh: <span className="font-bold text-slate-700">{getApproverDisplayText(req)}</span></p>
                      </div>
                   </div>
-                  <button onClick={() => handleDetail(req)}
+                  <button type="button" onClick={() => handleDetail(req)}
                     className="flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-[#003366] bg-[#003366]/5 rounded-xl hover:bg-[#003366]/10 transition-all">
                      <View size={18} /> Lihat Log &amp; Dokumen
                   </button>
@@ -351,7 +351,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                 <h2 className="text-xl font-bold flex items-center gap-2"><FileText className="text-[#003366]" /> Detail {selectedReq.source_type}</h2>
                 <p className="text-sm text-slate-500">{selectedReq.reason}</p>
               </div>
-              <button onClick={() => setDetailOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button>
+              <button type="button" onClick={() => setDetailOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button>
             </div>
 
             <div className="p-6">
@@ -748,11 +748,11 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
               )}
             </div>
             <div className="p-6 bg-slate-50 border-t flex flex-wrap justify-end gap-3 rounded-b-3xl">
-              <button onClick={() => setDetailOpen(false)} className="px-6 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50">Tutup</button>
-              <button onClick={() => openConfirm(selectedReq.id, 'REJECTED')} className="px-6 py-2 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl font-bold hover:bg-rose-100 flex items-center gap-2">
+              <button type="button" onClick={() => setDetailOpen(false)} className="px-6 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50">Tutup</button>
+              <button type="button" onClick={() => openConfirm(selectedReq.id, 'REJECTED')} className="px-6 py-2 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl font-bold hover:bg-rose-100 flex items-center gap-2">
                 <X size={16} /> Tolak
               </button>
-              <button onClick={() => openConfirm(selectedReq.id, 'APPROVED')}
+              <button type="button" onClick={() => openConfirm(selectedReq.id, 'APPROVED')}
                 className="px-6 py-2 bg-[#003366] text-white rounded-xl font-bold hover:bg-[#002d5a] flex items-center gap-2 shadow-lg shadow-[#003366]/10">
                 <QrCode size={16} /> Setujui &amp; Tandatangani
               </button>
@@ -789,8 +789,8 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                 />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setConfirmOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-200">Batalkan</button>
-                <button onClick={handleConfirmSubmit}
+                <button type="button" onClick={() => setConfirmOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-200">Batalkan</button>
+                <button type="button" onClick={handleConfirmSubmit}
                   className={`flex-1 py-3 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg ${confirmAction === 'APPROVED' ? 'bg-[#003366] hover:bg-[#002d5a] shadow-[#003366]/10' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'}`}>
                   {confirmAction === 'APPROVED' ? <><QrCode size={16} /> Tanda Tangani &amp; Setujui</> : <><X size={16} /> Tolak Dokumen</>}
                 </button>
@@ -820,7 +820,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">ID Verifikasi</p>
                   <p className="text-xs text-slate-500 font-mono break-all px-4">{signatureData}</p>
                 </div>
-                <button onClick={() => setSignOpen(false)}
+                <button type="button" onClick={() => setSignOpen(false)}
                   className="w-full px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 flex items-center justify-center gap-2">
                   <Check size={18} /> Selesai
                 </button>

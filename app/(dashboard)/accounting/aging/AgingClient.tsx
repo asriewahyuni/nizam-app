@@ -389,7 +389,7 @@ export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProp
                            </span>
                         </td>
                         <td className="px-10 py-6 text-right">
-                           <button 
+                           <button type="button" 
                              onClick={() => openRowAction(row)}
                              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-semibold uppercase transition-all shadow-sm ${
                                activeView === 'AR' 

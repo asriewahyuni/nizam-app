@@ -308,10 +308,10 @@ export default function PipelineClient({ orgId, sales }: PipelineClientProps) {
                             ) : (
                               <span className="bg-blue-100 text-blue-700 text-[8px] px-2 py-0.5 rounded-full font-bold">Quotation</span>
                             )}
-                            <button onClick={() => handleEditClick(item)} className="p-1 text-slate-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100">
+                            <button type="button" onClick={() => handleEditClick(item)} className="p-1 text-slate-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100">
                               <Edit2 size={12} />
                             </button>
-                            <button onClick={() => handleDeleteCard(item.id)} className="p-1 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">
+                            <button type="button" onClick={() => handleDeleteCard(item.id)} className="p-1 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">
                               <Trash2 size={12} />
                             </button>
                           </div>

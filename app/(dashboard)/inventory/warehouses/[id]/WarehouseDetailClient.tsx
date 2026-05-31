@@ -350,7 +350,7 @@ export function WarehouseDetailClient({
             </div>
 
             {isAdmin && (
-              <button
+              <button type="button"
                 onClick={() => setShowModal(true)}
                 disabled={Boolean(binMutationGuardMessage)}
                 title={binMutationGuardMessage || 'Tambah bin baru'}
@@ -395,7 +395,7 @@ export function WarehouseDetailClient({
                     </div>
 
                     {isAdmin && (
-                      <button
+                      <button type="button"
                         onClick={() => handleDelete(bin.id)}
                         disabled={Boolean(binMutationGuardMessage)}
                         title={binMutationGuardMessage || 'Hapus bin'}
@@ -567,7 +567,7 @@ export function WarehouseDetailClient({
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Maximize size={20} className="text-emerald-600" /> Pembuatan Bin Lokasi
               </h2>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button type="button" onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
                 &times;
               </button>
             </div>

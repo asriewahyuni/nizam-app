@@ -241,7 +241,7 @@ export function BudgetVariancePanel({
         </div>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
           {categorySummaries.map((cat) => (
-            <button
+            <button type="button"
               key={cat.category}
               onClick={() =>
                 setExpandedCategory(expandedCategory === cat.category ? 'ALL' : (cat.category as FilterCategory))
@@ -296,7 +296,7 @@ export function BudgetVariancePanel({
           </select>
 
           {/* Show Only Over-Budget Toggle */}
-          <button
+          <button type="button"
             onClick={() => setShowOnlyOver(!showOnlyOver)}
             className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
               showOnlyOver
@@ -380,7 +380,7 @@ export function BudgetVariancePanel({
               {/* Action Button */}
               {onEditItem && (
                 <div className="mt-3 flex justify-end gap-2">
-                  <button
+                  <button type="button"
                     onClick={() => onEditItem(item)}
                     className="rounded-lg border border-current/30 bg-current/5 px-3 py-1.5 text-xs font-bold transition hover:bg-current/10"
                   >

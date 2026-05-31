@@ -164,7 +164,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
             <DollarSign size={20} className="text-blue-500" />
             <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-tight">Mata Uang Dasar</h3>
           </div>
-          <button
+          <button type="button"
             onClick={handleSaveSettings}
             disabled={loading}
             className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all text-sm disabled:opacity-40"
@@ -215,7 +215,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
             <Globe size={20} className="text-blue-500" />
             <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-tight">Mata Uang Asing Aktif</h3>
           </div>
-          <button
+          <button type="button"
             onClick={() => setShowAddCurrency(!showAddCurrency)}
             className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all text-sm"
           >
@@ -227,7 +227,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
         {showAddCurrency && (
           <div className="grid grid-cols-3 md:grid-cols-5 gap-2 p-4 bg-slate-50 rounded-xl">
             {unselectedCurrencies.map(c => (
-              <button
+              <button type="button"
                 key={c.code}
                 onClick={() => handleAddCurrency(c.code)}
                 disabled={loading}
@@ -253,7 +253,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
                   <p className="font-semibold text-sm text-slate-900">{c.currency_code}</p>
                   <p className="text-[10px] font-medium text-slate-400">{info?.name || ''}</p>
                 </div>
-                <button
+                <button type="button"
                   onClick={() => handleRemoveCurrency(c.currency_code)}
                   className="ml-2 p-1.5 hover:bg-red-50 rounded-xl text-slate-300 hover:text-red-500 transition-all"
                 >
@@ -275,7 +275,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
             <TrendingUp size={20} className="text-blue-500" />
             <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-tight">Kurs Valuta Asing</h3>
           </div>
-          <button
+          <button type="button"
             onClick={() => setShowAddRate(true)}
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all text-sm"
           >
@@ -296,7 +296,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
               <div className="p-6 bg-slate-50 rounded-xl border border-slate-100 space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="font-semibold text-sm text-slate-700">Input Kurs Baru</p>
-                  <button onClick={() => setShowAddRate(false)} className="text-slate-400 hover:text-slate-600">
+                  <button type="button" onClick={() => setShowAddRate(false)} className="text-slate-400 hover:text-slate-600">
                     <X size={16} />
                   </button>
                 </div>
@@ -334,7 +334,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
                     />
                   </div>
                 </div>
-                <button
+                <button type="button"
                   onClick={handleAddRate}
                   disabled={loading || !rateValue}
                   className="flex items-center gap-2 px-5 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all text-sm disabled:opacity-40"
@@ -360,7 +360,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
 
             return (
               <div key={currency} className="border border-slate-100 rounded-xl overflow-hidden">
-                <button
+                <button type="button"
                   onClick={() => setExpandedCurrency(isExpanded ? null : currency)}
                   className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all"
                 >
@@ -435,7 +435,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
           }`}>
             {message.type === 'success' ? <CheckCircle size={20} className="text-emerald-500" /> : <AlertCircle size={20} className="text-red-500" />}
             <span className="font-bold text-sm">{message.text}</span>
-            <button onClick={() => setMessage(null)} className="ml-2 opacity-50 hover:opacity-100">
+            <button type="button" onClick={() => setMessage(null)} className="ml-2 opacity-50 hover:opacity-100">
               <X size={16} />
             </button>
           </div>

@@ -239,7 +239,7 @@ function RequestCard({
               </div>
 
               <div className="flex gap-2 flex-wrap">
-                <button
+                <button type="button"
                   onClick={() => { setShowRejectForm(false); onApprove(req.id, reviewNotes) }}
                   className="flex-1 min-w-[120px] py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-1.5"
                 >
@@ -248,7 +248,7 @@ function RequestCard({
                   </svg>
                   Setujui & Buat Rekening
                 </button>
-                <button
+                <button type="button"
                   onClick={() => setShowRejectForm(v => !v)}
                   className="flex-1 min-w-[100px] py-2.5 bg-red-50 text-red-700 text-sm font-semibold rounded-lg border border-red-200 hover:bg-red-100 transition-colors"
                 >
@@ -265,7 +265,7 @@ function RequestCard({
                     rows={3}
                     className="w-full text-sm border border-red-200 rounded-lg p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-red-400"
                   />
-                  <button
+                  <button type="button"
                     onClick={() => reviewNotes.trim() && onReject(req.id, reviewNotes)}
                     disabled={!reviewNotes.trim()}
                     className="w-full py-2.5 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -356,7 +356,7 @@ function MyRequestCard({
           )}
 
           {req.status === 'pending' && (
-            <button
+            <button type="button"
               onClick={() => onCancel(req.id)}
               className="text-sm text-red-600 hover:text-red-800 font-medium underline underline-offset-2"
             >
@@ -570,7 +570,7 @@ function SubmitRequestForm({
         </div>
       )}
 
-      <button
+      <button type="button"
         onClick={handleSubmit}
         disabled={isPending}
         className="w-full py-3 text-sm font-bold text-white rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed"
@@ -757,7 +757,7 @@ export function CoaRequestClient({
         {/* Tabs */}
         <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
           {tabs.map(tab => (
-            <button
+            <button type="button"
               key={tab.id}
               onClick={() => { setActiveTab(tab.id); setStatusFilter('all') }}
               className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-2 ${
@@ -780,7 +780,7 @@ export function CoaRequestClient({
         {activeTab !== 'new-request' && (
           <div className="flex items-center gap-2 flex-wrap">
             {(['all', 'pending', 'approved', 'rejected', 'cancelled'] as const).map(s => (
-              <button
+              <button type="button"
                 key={s}
                 onClick={() => setStatusFilter(s)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
@@ -841,7 +841,7 @@ export function CoaRequestClient({
             {filteredMy.length === 0 ? (
               <div className="bg-white border border-dashed border-gray-200 rounded-xl p-6 text-center">
                 <p className="text-gray-400 text-sm">Belum ada pengajuan rekening yang dibuat</p>
-                <button
+                <button type="button"
                   onClick={() => setActiveTab('new-request')}
                   className="mt-4 text-sm text-blue-600 font-semibold hover:underline"
                 >

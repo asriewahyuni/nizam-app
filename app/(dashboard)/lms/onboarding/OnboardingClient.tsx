@@ -29,7 +29,7 @@ export function InstallCoaButton({ moduleKey }: { moduleKey: string }) {
 
   return (
     <>
-      <button
+      <button type="button"
         onClick={handleInstall}
         disabled={isPending}
         className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-70"

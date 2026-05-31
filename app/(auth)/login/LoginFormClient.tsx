@@ -75,7 +75,7 @@ function LoginFormInner({ orgContext }: LoginFormProps) {
       {/* Tab Switcher — sembunyikan saat orgContext aktif (selalu karyawan) */}
       {!orgContext && (
         <div className="flex gap-2 p-1.5 bg-slate-950/50 border border-white/5 rounded-2xl mb-8 shadow-inner">
-          <button
+          <button type="button"
             onClick={() => setTab('bisnis')}
             className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
               tab === 'bisnis'
@@ -86,7 +86,7 @@ function LoginFormInner({ orgContext }: LoginFormProps) {
             <Building2 size={14} />
             Pemilik Bisnis
           </button>
-          <button
+          <button type="button"
             onClick={() => setTab('karyawan')}
             className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
               tab === 'karyawan'

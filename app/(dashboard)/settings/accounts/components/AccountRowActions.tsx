@@ -39,7 +39,7 @@ export default function AccountRowActions({ accountId, orgId, accountCode, accou
         <Edit2 size={16} />
       </a>
       
-      <button 
+      <button type="button" 
         onClick={() => setIsConfirmOpen(true)}
         className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
         title="Hapus Akun"
@@ -76,14 +76,14 @@ export default function AccountRowActions({ accountId, orgId, accountCode, accou
                 </div>
 
                 <div className="flex flex-col w-full gap-2 pt-4">
-                  <button 
+                  <button type="button" 
                     disabled={loading}
                     onClick={handleDelete}
                     className="w-full py-3.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-rose-700 transition shadow-xl shadow-rose-200/50 disabled:opacity-50"
                   >
                     {loading ? <Loader2 className="animate-spin" size={20}/> : 'Ya, Hapus Permanen'}
                   </button>
-                  <button 
+                  <button type="button" 
                     disabled={loading}
                     onClick={() => setIsConfirmOpen(false)}
                     className="w-full py-3 text-slate-500 font-bold rounded-xl hover:bg-slate-50 transition"

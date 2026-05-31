@@ -204,13 +204,13 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
           </p>
         </div>
         <div className="flex gap-3">
-          <button
+          <button type="button"
             onClick={() => setShowVehicleModal(true)}
             className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-200 transition-all"
           >
             <Car size={16} /> Daftarkan Kendaraan
           </button>
-          <button
+          <button type="button"
             onClick={() => setShowSpkModal(true)}
             className="flex items-center gap-2 px-5 py-2.5 bg-[#003366] text-white text-sm font-bold rounded-xl hover:bg-[#002d5a] shadow-xl shadow-[#003366]/10 transition-all"
           >
@@ -238,7 +238,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
           {(['spk', 'invoices', 'vehicles'] as Tab[]).map(t => (
-            <button
+            <button type="button"
               key={t}
               onClick={() => { setTab(t); setSearch('') }}
               className={`px-5 py-2 text-sm font-semibold rounded-xl transition-all ${
@@ -274,7 +274,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
       {tab === 'spk' && (
         <div className="flex gap-1.5 flex-wrap px-1">
           {([['ALL','Semua'],['ANTRI','Antri'],['DIKERJAKAN','Dikerjakan'],['SELESAI','Selesai'],['DISERAHKAN','Diserahkan']] as const).map(([val, label]) => (
-            <button key={val} onClick={() => setFilterStatusW(val)}
+            <button type="button" key={val} onClick={() => setFilterStatusW(val)}
               className={`px-3 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatusW === val ? 'bg-[#003366] text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
               {label}
               {val !== 'ALL' && <span className="ml-1 opacity-70">({workOrders.filter(o=>o.status===val).length})</span>}
@@ -557,7 +557,7 @@ function SpkCard({
   return (
     <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden">
       {/* Card header — selalu terlihat */}
-      <button
+      <button type="button"
         onClick={onToggle}
         className="w-full flex items-center gap-4 p-6 text-left hover:bg-slate-50/50 transition-colors"
       >
@@ -618,7 +618,7 @@ function SpkCard({
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Item Pekerjaan</p>
                   {!['SELESAI','DISERAHKAN','CANCEL'].includes(order.status) && (
-                    <button
+                    <button type="button"
                       onClick={() => setShowItemForm(v => !v)}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200 transition"
                     >
@@ -662,7 +662,7 @@ function SpkCard({
                             <td className="px-4 py-3 text-right font-bold text-slate-900">{formatRupiah(item.subtotal)}</td>
                             <td className="px-4 py-3">
                               {!['SELESAI','DISERAHKAN','CANCEL'].includes(order.status) && (
-                                <button onClick={() => handleDeleteItem(item.id)} className="text-slate-300 hover:text-rose-500 transition">
+                                <button type="button" onClick={() => handleDeleteItem(item.id)} className="text-slate-300 hover:text-rose-500 transition">
                                   <Trash2 size={14} />
                                 </button>
                               )}
@@ -823,7 +823,7 @@ function SpkCard({
                     {transitions.map(nextStatus => {
                       const nextCfg = STATUS_CONFIG[nextStatus]
                       return (
-                        <button
+                        <button type="button"
                           key={nextStatus}
                           onClick={() => onStatusChange(order, nextStatus)}
                           className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border transition-all hover:opacity-80 ${nextCfg.color}`}
@@ -1025,7 +1025,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       >
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <button onClick={onClose} className="p-2 text-slate-300 hover:text-slate-600 rounded-xl transition">
+          <button type="button" onClick={onClose} className="p-2 text-slate-300 hover:text-slate-600 rounded-xl transition">
             <X size={20} />
           </button>
         </div>
@@ -1054,7 +1054,7 @@ function CreateInvoiceButton({ orderId, orgId: _orgId }: { orderId: string; orgI
   }
 
   return (
-    <button
+    <button type="button"
       onClick={handleCreateInvoice}
       disabled={loading}
       className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 transition-all disabled:opacity-50 ml-auto"

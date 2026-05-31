@@ -377,7 +377,7 @@ export default function UsersClient({
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {!['owner', 'admin'].includes(member.role) && (
-                          <button
+                          <button type="button"
                             onClick={() => openUnitAccessModal(member)}
                             className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
                             title="Atur Akses Unit"
@@ -385,14 +385,14 @@ export default function UsersClient({
                             <Shield size={16} />
                           </button>
                         )}
-                        <button
+                        <button type="button"
                           onClick={() => handleUpdateRole(member.id, member.role)}
                           className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
                           title="Ubah Peran"
                         >
                           <Edit2 size={16} />
                         </button>
-                        <button
+                        <button type="button"
                           onClick={() => handleDelete(member.id)}
                           className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
                           title="Hapus User"

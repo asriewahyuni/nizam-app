@@ -279,7 +279,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
             </h1>
             <p className="text-slate-500 font-medium text-lg">Kelola pengajuan biaya operasional (klaim) karyawan secara transparan.</p>
         </div>
-        <button 
+        <button type="button" 
             onClick={() => setIsSubmitModalOpen(true)}
             className="flex items-center gap-3 px-8 py-4 bg-[#003366] text-white rounded-xl font-semibold shadow-xl shadow-[#003366]/10 hover:bg-[#002d5a] transition-all hover:scale-[1.02] active:scale-[0.98]"
         >
@@ -293,7 +293,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
         <div className="px-8 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
           <div className="flex gap-1.5 flex-wrap">
             {([['ALL','Semua'],['PENDING','Menunggu'],['APPROVED','Disetujui'],['REJECTED','Ditolak'],['PAID','Dibayar']] as const).map(([val, label]) => (
-              <button key={val} onClick={() => setFilterStatusR(val)}
+              <button type="button" key={val} onClick={() => setFilterStatusR(val)}
                 className={`px-3 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatusR === val ? 'bg-[#003366] text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
                 {label}
                 {val !== 'ALL' && <span className="ml-1 opacity-70">({reimbursements.filter(r=>r.status===val).length})</span>}
@@ -367,16 +367,16 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                 <div className="flex items-center justify-center gap-2">
                                     {re.status === 'PENDING' && (
                                         <>
-                                            <button onClick={() => handleApprove(re.id)} className="p-3 bg-white border border-slate-200 text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all shadow-sm" title="Approve">
+                                            <button type="button" onClick={() => handleApprove(re.id)} className="p-3 bg-white border border-slate-200 text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all shadow-sm" title="Approve">
                                                 <CheckCircle size={18}/>
                                             </button>
-                                            <button onClick={() => handleReject(re.id)} className="p-3 bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm" title="Reject">
+                                            <button type="button" onClick={() => handleReject(re.id)} className="p-3 bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm" title="Reject">
                                                 <XOctagon size={18}/>
                                             </button>
                                         </>
                                     )}
                                     {re.status === 'APPROVED' && (
-                                        <button 
+                                        <button type="button" 
                                             onClick={() => { setSelectedReimbursement(re); setIsPayModalOpen(true); }}
                                             className="px-5 py-2.5 bg-emerald-600 text-white text-[10px] font-semibold rounded-xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center gap-2"
                                         >
@@ -435,7 +435,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                             </h3>
                             <p className="text-slate-400 text-sm font-medium italic">Silahkan isi detail pengeluaran yang ingin di-reimburse.</p>
                         </div>
-                        <button onClick={() => setIsSubmitModalOpen(false)} className="p-3 hover:bg-white rounded-xl transition-all shadow-sm group">
+                        <button type="button" onClick={() => setIsSubmitModalOpen(false)} className="p-3 hover:bg-white rounded-xl transition-all shadow-sm group">
                             <XOctagon size={24} className="text-slate-300 group-hover:text-rose-500 transition-colors" />
                         </button>
                     </div>
@@ -453,7 +453,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                         <div className="space-y-6">
                             <div className="flex items-center justify-between ml-4">
                                 <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Detail Item Pengeluaran</label>
-                                <button onClick={addItem} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-slate-100 rounded-xl text-[10px] font-semibold text-slate-600 hover:border-blue-400 hover:text-[#003366] transition-all">
+                                <button type="button" onClick={addItem} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-slate-100 rounded-xl text-[10px] font-semibold text-slate-600 hover:border-blue-400 hover:text-[#003366] transition-all">
                                     <Plus size={14} /> TAMBAH BARIS
                                 </button>
                             </div>
@@ -621,7 +621,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                             </div>
                                         </div>
                                         <div className="col-span-12 md:col-span-1 pb-1">
-                                            <button onClick={() => removeItem(idx)} className="p-3 text-rose-300 hover:text-rose-500 transition-colors">
+                                            <button type="button" onClick={() => removeItem(idx)} className="p-3 text-rose-300 hover:text-rose-500 transition-colors">
                                                 <Trash2 size={20} />
                                             </button>
                                         </div>
@@ -638,7 +638,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                                 {formatRupiah(items.reduce((s, it) => s + (it.amount || 0), 0))}
                             </span>
                         </div>
-                        <button 
+                        <button type="button" 
                             disabled={isSubmitting}
                             onClick={handleSubmit} 
                             className="flex items-center gap-3 px-12 py-5 bg-[#003366] disabled:bg-slate-300 text-white rounded-xl font-semibold shadow-md shadow-[#003366]/10 transition-all active:scale-95"
@@ -685,7 +685,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                             <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-4">Sumber Dana (Bank/Kas)</label>
                             <div className="grid grid-cols-1 gap-3">
                                 {bankAccounts.map((bank) => (
-                                    <button 
+                                    <button type="button" 
                                         key={bank.id} 
                                         onClick={() => setSelectedBankId(bank.id)}
                                         className={`flex items-center justify-between p-5 rounded-xl border-2 transition-all group ${selectedBankId === bank.id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 hover:border-slate-300 bg-white'}`}
@@ -710,14 +710,14 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                         </div>
 
                         <div className="flex flex-col gap-3 pt-4">
-                            <button 
+                            <button type="button" 
                                 disabled={isSubmitting}
                                 onClick={handlePay}
                                 className="w-full py-5 bg-emerald-600 disabled:bg-slate-300 text-white rounded-xl font-semibold text-sm shadow-xl shadow-emerald-200 flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98]"
                             >
                                 {isSubmitting ? 'MEMPROSES TRANSAKSI...' : <><DollarSign size={18} /> KONFIRMASI PEMBAYARAN</>}
                             </button>
-                            <button onClick={() => setIsPayModalOpen(false)} className="w-full py-5 bg-white border border-slate-200 text-slate-400 rounded-xl font-semibold text-xs hover:text-slate-600 transition-all">
+                            <button type="button" onClick={() => setIsPayModalOpen(false)} className="w-full py-5 bg-white border border-slate-200 text-slate-400 rounded-xl font-semibold text-xs hover:text-slate-600 transition-all">
                                 BATALKAN
                             </button>
                         </div>

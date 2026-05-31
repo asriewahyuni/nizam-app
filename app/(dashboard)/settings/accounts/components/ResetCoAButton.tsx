@@ -90,14 +90,14 @@ export default function ResetCoAButton() {
                 </div>
 
                 <div className="flex flex-col w-full gap-2 pt-2">
-                  <button
+                  <button type="button"
                     disabled={loading || !isConfirmed}
                     onClick={handleReset}
                     className="w-full py-3.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-rose-700 transition shadow-xl shadow-rose-200/50 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {loading ? <Loader2 className="animate-spin" size={20} /> : <><RotateCcw size={16} /> Reset & Seed Ulang PSAK</>}
                   </button>
-                  <button
+                  <button type="button"
                     disabled={loading}
                     onClick={handleClose}
                     className="w-full py-3 text-slate-500 font-bold rounded-xl hover:bg-slate-50 transition"

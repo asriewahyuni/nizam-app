@@ -436,13 +436,13 @@ export function CashClient({
           <>
             {canUseHoldingView ? (
               <div className="flex bg-blue-50 p-1 rounded-xl border border-blue-100 mr-2 shadow-inner">
-                <button
+                <button type="button"
                   onClick={() => handleCashViewChange('parent')}
                   className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${!isHoldingView ? 'bg-white text-blue-700 shadow-md' : 'text-blue-400 hover:text-blue-600'}`}
                 >
                   Kas Induk
                 </button>
-                <button
+                <button type="button"
                   onClick={() => handleCashViewChange('holding')}
                   className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${isHoldingView ? 'bg-white text-blue-700 shadow-md' : 'text-blue-400 hover:text-blue-600'}`}
                 >
@@ -451,13 +451,13 @@ export function CashClient({
               </div>
             ) : null}
             <div className="flex bg-slate-100/60 p-1 rounded-xl border border-slate-100 mr-2 shadow-inner">
-               <button
+               <button type="button"
                   onClick={() => setActiveTab('overview')}
                   className={`px-6 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${activeTab === 'overview' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                >
                  Overview
                </button>
-               <button
+               <button type="button"
                   onClick={() => setActiveTab('reconcile')}
                   className={`px-6 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${activeTab === 'reconcile' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                >
@@ -662,7 +662,7 @@ export function CashClient({
                             Belum ada mutasi
                           </span>
                         ) : (
-                          <button
+                          <button type="button"
                             onClick={() => {
                               setFilterAccountId(acc.id)
                               setExpandedTransactionId(null)
@@ -679,12 +679,12 @@ export function CashClient({
                           </button>
                         )}
                         <div className="relative group/menu">
-                          <button className="p-3 text-slate-300 hover:text-slate-900 transition-colors bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100">
+                          <button type="button" className="p-3 text-slate-300 hover:text-slate-900 transition-colors bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100">
                             <MoreHorizontal size={18} />
                           </button>
                           <div className="absolute right-0 bottom-full mb-3 w-52 bg-white rounded-xl border border-slate-100 shadow-md opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-30 overflow-hidden ring-4 ring-slate-900/5">
                             {isOwner && !isCrossEntity && (
-                              <button
+                              <button type="button"
                                 onClick={() => handleDeleteAccount(acc.id, acc.bank_name)}
                                 className="w-full flex items-center gap-3 px-5 py-4 text-[10px] font-semibold uppercase tracking-wide text-rose-500 hover:bg-rose-50 transition-colors"
                               >
@@ -714,7 +714,7 @@ export function CashClient({
                     actions={
                       <div className="flex items-center gap-2">
                         {filterAccountId && (
-                          <button
+                          <button type="button"
                             onClick={() => {
                               setFilterAccountId(null)
                               setExpandedTransactionId(null)
@@ -725,7 +725,7 @@ export function CashClient({
                           </button>
                         )}
                         <div className="flex bg-white/50 p-1 rounded-xl border border-slate-100 shadow-sm">
-                         <button
+                         <button type="button"
                             onClick={() => {
                               setFilterStatus('POSTED')
                               setExpandedTransactionId(null)
@@ -733,7 +733,7 @@ export function CashClient({
                             className={`px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-lg transition-all ${filterStatus === 'POSTED' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
                             POSTED
                          </button>
-                         <button
+                         <button type="button"
                             onClick={() => {
                               setFilterStatus('VOIDED')
                               setExpandedTransactionId(null)
@@ -831,7 +831,7 @@ export function CashClient({
                                           <ChevronDown size={12} className={isExpanded ? 'rotate-180 transition-transform' : 'transition-transform'} />
                                         </button>
                                         {isOwner && tx.status === 'POSTED' && (
-                                          <button
+                                          <button type="button"
                                             onClick={() => handleDeleteTransaction(tx.id)}
                                             className="p-2.5 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
                                             title="Void Transaksi"
@@ -941,8 +941,8 @@ export function CashClient({
                     </div>
                     <p className="text-xs text-slate-400 font-medium">Download mutasi kas dalam format PDF atau Excel untuk keperluan audit dan arsip.</p>
                     <div className="grid grid-cols-2 gap-3">
-                       <button className="py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-semibold uppercase tracking-wide transition-all">Format PDF</button>
-                       <button className="py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-semibold uppercase tracking-wide transition-all">Format XLSX</button>
+                       <button type="button" className="py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-semibold uppercase tracking-wide transition-all">Format PDF</button>
+                       <button type="button" className="py-4 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-semibold uppercase tracking-wide transition-all">Format XLSX</button>
                     </div>
                  </SectionCard>
               </div>
@@ -967,7 +967,7 @@ export function CashClient({
                   <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Pilih Rekening Target</label>
                   <div className="grid grid-cols-1 gap-3">
                     {bankAccounts.map(acc => (
-                      <button
+                      <button type="button"
                         key={acc.id}
                         onClick={() => setSelectedBankId(acc.id)}
                         className={`flex items-center gap-4 px-6 py-5 rounded-xl border-2 text-left transition-all group ${selectedBankId === acc.id ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-md shadow-emerald-100' : 'bg-white border-slate-100 hover:border-slate-200'}`}
@@ -1056,7 +1056,7 @@ export function CashClient({
                     <h3 className="text-2xl font-semibold tracking-tight flex items-center gap-3"><Building2 /> Add Bank Account</h3>
                     <p className="text-xs text-emerald-100 mt-1 font-medium italic">Define a new ledger account for your cash or bank assets.</p>
                   </div>
-                  <button onClick={() => setShowAccountModal(false)} className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition"><X size={20} /></button>
+                  <button type="button" onClick={() => setShowAccountModal(false)} className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition"><X size={20} /></button>
                </div>
 
                <form onSubmit={handleCreateAccount} className="p-5 space-y-6">

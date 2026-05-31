@@ -292,7 +292,7 @@ export function SetupClient({
                     <p className="text-sm font-bold text-emerald-700">Chart of Accounts sudah terpasang sebelumnya.</p>
                   </div>
                 ) : (
-                  <button
+                  <button type="button"
                     onClick={handleInstallCoa}
                     disabled={isPending}
                     className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-600/25"
@@ -348,14 +348,14 @@ export function SetupClient({
                 )}
 
                 <div className="flex gap-3">
-                  <button
+                  <button type="button"
                     onClick={handleSkipSettings}
                     disabled={isPending}
                     className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all disabled:opacity-50"
                   >
                     <SkipForward className="w-4 h-4" /> Lewati
                   </button>
-                  <button
+                  <button type="button"
                     onClick={handleSaveSettings}
                     disabled={isPending || settingsSaved}
                     className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 shadow-lg shadow-blue-600/20"
@@ -412,7 +412,7 @@ export function SetupClient({
                   >
                     Kembali ke Marketplace
                   </a>
-                  <button
+                  <button type="button"
                     onClick={handleComplete}
                     disabled={isPending}
                     className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shadow-emerald-600/25"

@@ -391,7 +391,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
 	                          >
                             <Eye size={18} />
                           </Link>
-                          <button
+                          <button type="button"
                             onClick={() => handleDelete(c.id, c.title)}
                             disabled={deletingId === c.id}
                             className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"

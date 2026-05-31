@@ -780,7 +780,7 @@ function BillingContent() {
                   </div>
 
                   <div className="flex flex-col justify-between gap-3">
-                    <button
+                    <button type="button"
                       disabled={processing || !proofFile}
                       onClick={handleManualPayment}
                       className="min-w-[240px] rounded-xl bg-slate-900 px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
@@ -914,7 +914,7 @@ function BillingContent() {
                          </div>
                        )}
                      </div>
-                     <button
+                     <button type="button"
                        disabled={applyingVoucher || !voucherCode}
                        onClick={handleApplyVoucher}
                        className="rounded-xl bg-slate-900 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-indigo-600 disabled:opacity-50 shadow-xl"
@@ -1413,7 +1413,7 @@ function BillingContent() {
                                  Kelola via Holding
                                </span>
                              ) : (
-                               <button
+                               <button type="button"
                                  onClick={() => openCheckout(inv)}
                                  className="text-[9px] font-semibold text-rose-500 hover:text-rose-600 uppercase tracking-[0.1em] flex items-center gap-1 animate-pulse"
                                >

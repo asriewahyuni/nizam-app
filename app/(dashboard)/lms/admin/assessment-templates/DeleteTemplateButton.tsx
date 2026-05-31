@@ -29,7 +29,7 @@ export function DeleteTemplateButton({ courseSlug }: { courseSlug: string }) {
   if (confirming) {
     return (
       <div className="inline-flex items-center gap-1.5">
-        <button
+        <button type="button"
           onClick={handleDelete}
           disabled={loading}
           className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-red-700 disabled:opacity-50"
@@ -37,7 +37,7 @@ export function DeleteTemplateButton({ courseSlug }: { courseSlug: string }) {
           {loading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
           {loading ? '...' : 'Yakin'}
         </button>
-        <button
+        <button type="button"
           onClick={() => setConfirming(false)}
           className="text-[10px] text-slate-500 hover:text-slate-700"
         >
@@ -49,7 +49,7 @@ export function DeleteTemplateButton({ courseSlug }: { courseSlug: string }) {
   }
 
   return (
-    <button
+    <button type="button"
       onClick={() => setConfirming(true)}
       className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1.5 text-[10px] font-bold text-red-600 hover:bg-red-50 transition-colors"
     >

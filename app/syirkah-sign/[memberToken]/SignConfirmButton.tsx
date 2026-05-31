@@ -48,7 +48,7 @@ export default function SignConfirmButton({ memberToken, memberName }: {
           {error}
         </div>
       )}
-      <button
+      <button type="button"
         onClick={handleSign}
         disabled={loading}
         className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-blue-600 text-white font-black text-lg rounded-2xl hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-60 shadow-lg shadow-blue-600/20"

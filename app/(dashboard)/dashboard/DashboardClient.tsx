@@ -388,7 +388,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
             </div>
 
             <div className="flex items-center gap-2">
-               <button className="bg-white border border-slate-200 p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer">
+               <button type="button" className="bg-white border border-slate-200 p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer">
                   <Search size={18} />
                </button>
             </div>

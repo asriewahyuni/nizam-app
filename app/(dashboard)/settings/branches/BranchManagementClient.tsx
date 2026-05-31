@@ -235,7 +235,7 @@ export function BranchManagementClient({
                 Pemakaian Kuota: <span className="text-slate-800">{limits.currentBranches}</span> / {limits.maxBranches === null ? '∞' : limits.maxBranches} Unit
               </div>
             )}
-            <button
+            <button type="button"
               onClick={() => setShowModal(true)}
               disabled={limits?.maxBranches !== null && limits!.currentBranches >= limits!.maxBranches}
               title={limits?.maxBranches !== null && limits!.currentBranches >= limits!.maxBranches ? 'Batas unit tercapai. Upgrade paket SaaS Anda.' : ''}
@@ -287,7 +287,7 @@ export function BranchManagementClient({
                   </span>
                   {isAdmin && (
                     <>
-                      <button
+                      <button type="button"
                         onClick={() => setEditingBranch(branch)}
                         title="Edit Unit"
                         className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-blue-600 transition"
@@ -295,7 +295,7 @@ export function BranchManagementClient({
                         <Pencil size={14} />
                       </button>
                       {canDeleteUnit && (
-                        <button
+                        <button type="button"
                           onClick={() => handleDelete(branch)}
                           title="Hapus Unit"
                           className="p-2 rounded-xl border border-rose-100 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition"
@@ -415,7 +415,7 @@ export function BranchManagementClient({
                   </div>
                   Tambah Unit
                 </h3>
-                <button onClick={() => setShowModal(false)} className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-colors">
+                <button type="button" onClick={() => setShowModal(false)} className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-colors">
                   <X size={20} />
                 </button>
               </div>
@@ -464,7 +464,7 @@ export function BranchManagementClient({
                   </div>
                   Edit Unit
                 </h3>
-                <button onClick={() => setEditingBranch(null)} className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-colors">
+                <button type="button" onClick={() => setEditingBranch(null)} className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-colors">
                   <X size={20} />
                 </button>
               </div>
@@ -520,7 +520,7 @@ export function BranchManagementClient({
               <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 mb-6">
                 <p className="text-sm text-rose-800 font-medium whitespace-pre-line leading-relaxed">{errorModal}</p>
               </div>
-              <button
+              <button type="button"
                 onClick={() => setErrorModal(null)}
                 className="w-full py-4 rounded-xl bg-slate-900 text-white font-semibold text-xs uppercase tracking-wide hover:bg-black transition-all"
               >

@@ -975,7 +975,7 @@ export default function InventoryClient({
                     </td>
                     <td className="px-8 py-6">
                        <div className="flex items-center justify-end gap-2">
-                          <button 
+                          <button type="button" 
                             onClick={() => {
                               setSelectedPrintProduct(product)
                               setIsPrintModalOpen(true)
@@ -992,7 +992,7 @@ export default function InventoryClient({
                           >
                              <HistoryIcon size={16} />
                           </Link>
-                         <button 
+                         <button type="button" 
                            onClick={() => handleOpenWriteOff(product)} 
                            disabled={Boolean(physicalStockGuardMessage)}
                            className="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-rose-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-rose-50 disabled:hover:text-rose-600" 
@@ -1000,10 +1000,10 @@ export default function InventoryClient({
                          >
                             <Trash2 size={16} />
                          </button>
-                         <button onClick={() => handleOpenEdit(product)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Edit Produk">
+                         <button type="button" onClick={() => handleOpenEdit(product)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Edit Produk">
                             <Edit size={16} />
                          </button>
-                         <button onClick={() => handleDelete(product.id, product.name)} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-slate-100" title="Hapus">
+                         <button type="button" onClick={() => handleDelete(product.id, product.name)} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-slate-100" title="Hapus">
                             <X size={16} />
                          </button>
                        </div>
@@ -1426,7 +1426,7 @@ export default function InventoryClient({
                       </h3>
                       <p className="text-xs text-rose-100 mt-1 font-medium italic">Hapus stok yang rusak dan akui sebagai Beban Kerugian.</p>
                     </div>
-                    <button onClick={() => setIsWriteOffModalOpen(false)} className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition">
+                    <button type="button" onClick={() => setIsWriteOffModalOpen(false)} className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition">
                       <X size={20} />
                     </button>
                 </div>
@@ -1595,7 +1595,7 @@ export default function InventoryClient({
            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-sm bg-white rounded-[32px] shadow-md overflow-hidden p-8 flex flex-col">
               <div className="flex justify-between items-center mb-6">
                  <h3 className="text-lg font-semibold text-slate-900 uppercase tracking-tight">Cetak Label</h3>
-                 <button onClick={() => setIsPrintModalOpen(false)} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
+                 <button type="button" onClick={() => setIsPrintModalOpen(false)} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
               </div>
 
               <div className="space-y-4 mb-8">
@@ -1617,7 +1617,7 @@ export default function InventoryClient({
                  </div>
               </div>
 
-              <button 
+              <button type="button" 
                 onClick={() => window.print()} 
                 className="w-full py-4 bg-blue-600 text-white font-semibold rounded-xl shadow-xl shadow-blue-100 flex items-center justify-center gap-2 hover:bg-blue-700 transition-all"
               >

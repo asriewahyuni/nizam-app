@@ -158,7 +158,7 @@ export function KelolaMateri({ courseSlug, courseId, lessons: initialLessons }: 
           <h3 className="text-lg font-semibold text-slate-900 tracking-tight">Materi Pembelajaran</h3>
           <p className="text-xs text-slate-500">{lessons.length} materi</p>
         </div>
-        <button
+        <button type="button"
           onClick={openAdd}
           className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
         >
@@ -173,7 +173,7 @@ export function KelolaMateri({ courseSlug, courseId, lessons: initialLessons }: 
             <span className="text-sm font-semibold text-slate-900">
               {isAdding ? 'Materi Baru' : 'Edit Materi'}
             </span>
-            <button
+            <button type="button"
               onClick={() => { setIsAdding(false); setEditingId(null); resetForm() }}
               className="p-1 hover:bg-blue-100 rounded-lg"
             >
@@ -247,7 +247,7 @@ export function KelolaMateri({ courseSlug, courseId, lessons: initialLessons }: 
           )}
 
           <div className="flex gap-3 pt-1">
-            <button
+            <button type="button"
               onClick={handleSave}
               disabled={formPending}
               className="flex-1 rounded-xl bg-blue-600 py-2.5 text-xs font-semibold text-white hover:bg-blue-700 transition-all disabled:opacity-50 inline-flex items-center justify-center gap-2"
@@ -288,14 +288,14 @@ export function KelolaMateri({ courseSlug, courseId, lessons: initialLessons }: 
                 </div>
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
+                <button type="button"
                   onClick={() => openEdit(lesson)}
                   className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
                   title="Edit"
                 >
                   <Edit3 className="h-3.5 w-3.5" />
                 </button>
-                <button
+                <button type="button"
                   onClick={() => setDeleteTarget(lesson)}
                   className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all"
                   title="Hapus"

@@ -176,7 +176,7 @@ export function SaasSettingsForm({
             {isSuccess && (
               <span className="text-sm font-bold text-emerald-600">Berhasil disimpan!</span>
             )}
-            <button
+            <button type="button"
               onClick={handleSave}
               disabled={isPending}
               className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50"

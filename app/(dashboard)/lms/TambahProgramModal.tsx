@@ -108,7 +108,7 @@ export function TambahProgramModal({ open, onClose }: Props) {
             {/* ── Header ── */}
             <div className="relative bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-7 pt-7 pb-8">
               <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500 rounded-full blur-3xl opacity-15 -mr-16 -mt-16 pointer-events-none" />
-              <button
+              <button type="button"
                 onClick={onClose}
                 className="absolute top-5 right-5 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 hover:text-white transition-all"
               >
@@ -244,13 +244,13 @@ export function TambahProgramModal({ open, onClose }: Props) {
                     )}
 
                     <div className="flex gap-3 pt-1">
-                      <button
+                      <button type="button"
                         onClick={onClose}
                         className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
                       >
                         Batal
                       </button>
-                      <button
+                      <button type="button"
                         onClick={handleNext}
                         disabled={!title.trim()}
                         className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-bold text-white hover:bg-blue-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-slate-200"
@@ -305,14 +305,14 @@ export function TambahProgramModal({ open, onClose }: Props) {
                     )}
 
                     <div className="flex gap-3 pt-1">
-                      <button
+                      <button type="button"
                         onClick={() => setStep(1)}
                         disabled={isPending}
                         className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-40"
                       >
                         <ArrowLeft size={14} /> Edit
                       </button>
-                      <button
+                      <button type="button"
                         onClick={handleSubmit}
                         disabled={isPending}
                         className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 shadow-lg shadow-blue-200"

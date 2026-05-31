@@ -1441,7 +1441,7 @@ export default function POSClient({
                   ) : (
                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 auto-rows-max overflow-visible">
                         {filteredProducts.map((p: any) => (
-                           <button
+                           <button type="button"
                               key={p.id}
                               onClick={() => addToCart(p)}
                               className="bg-white p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm hover:border-blue-500 hover:shadow-xl hover:-translate-y-1 transition-all text-left group flex flex-col min-h-[140px] md:h-44 relative z-0"
@@ -1478,14 +1478,14 @@ export default function POSClient({
                   {/* Mobile Cart Header */}
                   <div className="md:hidden p-5 flex items-center justify-between bg-[#003366] text-white">
                      <h2 className="font-semibold uppercase tracking-wide text-sm">Pesanan Saya</h2>
-                     <button onClick={() => setIsMobileCartOpen(false)} className="p-2 bg-white/10 rounded-lg"><X size={18} /></button>
+                     <button type="button" onClick={() => setIsMobileCartOpen(false)} className="p-2 bg-white/10 rounded-lg"><X size={18} /></button>
                   </div>
 
                   {/* Customer Selection */}
                   <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50">
                      <div className="flex justify-between items-center mb-3">
                         <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 block">Database Pelanggan</label>
-                        <button 
+                        <button type="button" 
                            onClick={() => setShowAddCustomer(!showAddCustomer)} 
                            className={`px-3 py-1.5 rounded-full border-2 text-[11px] font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
                               showAddCustomer 
@@ -1536,12 +1536,12 @@ export default function POSClient({
                               </div>
 
                               <div className="flex items-center gap-1.5 bg-slate-50 rounded-xl p-1 border border-slate-100">
-                                 <button onClick={() => updateQty(item.id, -1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-white text-slate-600 shadow-sm"><Minus size={12} /></button>
+                                 <button type="button" onClick={() => updateQty(item.id, -1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-white text-slate-600 shadow-sm"><Minus size={12} /></button>
                                  <span className="w-5 text-center font-semibold text-xs">{item.qty}</span>
-                                 <button onClick={() => updateQty(item.id, +1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-100 text-blue-600 shadow-sm"><Plus size={12} /></button>
+                                 <button type="button" onClick={() => updateQty(item.id, +1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-100 text-blue-600 shadow-sm"><Plus size={12} /></button>
                               </div>
 
-                              <button onClick={() => removeLine(item.id)} className="w-8 h-8 flex items-center justify-center rounded-lg text-rose-300 hover:bg-rose-50 hover:text-rose-500">
+                              <button type="button" onClick={() => removeLine(item.id)} className="w-8 h-8 flex items-center justify-center rounded-lg text-rose-300 hover:bg-rose-50 hover:text-rose-500">
                                  <Trash2 size={14} />
                               </button>
                            </motion.div>
@@ -1567,7 +1567,7 @@ export default function POSClient({
                            <div className="flex justify-between items-center text-[10px] text-blue-400">
                               <span className="font-semibold uppercase tracking-wide flex items-center gap-1">
                                  Kupon <Tag size={10}/> {appliedPromo.code}
-                                 <button onClick={() => setAppliedPromo(null)} className="ml-1 text-rose-400 hover:text-rose-300"><X size={12}/></button>
+                                 <button type="button" onClick={() => setAppliedPromo(null)} className="ml-1 text-rose-400 hover:text-rose-300"><X size={12}/></button>
                               </span>
                               <span className="font-bold">-{formatRupiah(promoDiscount)}</span>
                            </div>
@@ -1615,7 +1615,7 @@ export default function POSClient({
                                     className="w-full h-8 pl-7 pr-3 bg-black/20 border border-white/10 rounded-lg text-[10px] font-bold text-white placeholder-slate-500 outline-none focus:border-blue-500 shadow-inner" 
                                  />
                               </div>
-                              <button onClick={() => void handleApplyPromo()} className="h-8 px-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-semibold text-[10px] tracking-wide uppercase transition-colors">CEK</button>
+                              <button type="button" onClick={() => void handleApplyPromo()} className="h-8 px-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-semibold text-[10px] tracking-wide uppercase transition-colors">CEK</button>
                            </div>
                         )}
                      </div>
@@ -1632,7 +1632,7 @@ export default function POSClient({
                            </div>
                         )}
 
-                        <button
+                        <button type="button"
                            disabled={!activeBranchId || cart.length === 0 || (shouldEnforceShift && !activeShiftSession?.id)}
                            onClick={() => setShowPayment(true)}
                            className="w-full h-14 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl md:rounded-xl font-semibold text-xs md:text-base tracking-wide uppercase transition-colors flex items-center justify-center gap-3 shadow-lg"
@@ -1647,7 +1647,7 @@ export default function POSClient({
 
          {/* Mobile Bottom Bar (Always Visible on Catalog) */}
          <div className={`md:hidden fixed bottom-6 left-4 right-4 z-40 ${isMobileCartOpen || showPayment ? 'hidden' : 'block'}`}>
-            <button
+            <button type="button"
                onClick={() => setIsMobileCartOpen(true)}
                className="w-full h-16 bg-[#003366] text-white rounded-xl shadow-md flex items-center justify-between px-6 border border-white/10 relative overflow-hidden group"
             >
@@ -1689,7 +1689,7 @@ export default function POSClient({
                            <h3 className="text-lg md:text-xl font-semibold text-slate-900">Buka Shift POS</h3>
                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-1">Unit {activeBranchName || 'Aktif'}</p>
                         </div>
-                        <button onClick={() => setShowOpenShiftModal(false)} className="p-2 rounded-full hover:bg-white text-slate-400 hover:text-slate-700">
+                        <button type="button" onClick={() => setShowOpenShiftModal(false)} className="p-2 rounded-full hover:bg-white text-slate-400 hover:text-slate-700">
                            <X size={20} />
                         </button>
                      </div>
@@ -1804,7 +1804,7 @@ export default function POSClient({
                      </div>
 
                      <div className="px-5 md:px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
-                        <button
+                        <button type="button"
                            onClick={() => {
                               setShowOpenShiftModal(false)
                               setOpenShiftCashierPassword('')
@@ -1813,7 +1813,7 @@ export default function POSClient({
                         >
                            Batal
                         </button>
-                        <button
+                        <button type="button"
                            onClick={handleOpenShift}
                            disabled={shiftBusy}
                            className="px-6 py-3 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-50"
@@ -1844,7 +1844,7 @@ export default function POSClient({
                               <p className="text-xs font-semibold text-slate-500 mt-0.5">Kasir Aktif: {activeShiftCashierLabel}</p>
                            )}
                         </div>
-                        <button onClick={() => setShowCloseShiftModal(false)} className="p-2 rounded-full hover:bg-white text-slate-400 hover:text-slate-700">
+                        <button type="button" onClick={() => setShowCloseShiftModal(false)} className="p-2 rounded-full hover:bg-white text-slate-400 hover:text-slate-700">
                            <X size={20} />
                         </button>
                      </div>
@@ -1922,7 +1922,7 @@ export default function POSClient({
                      </div>
 
                      <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
-                        <button
+                        <button type="button"
                            onClick={() => {
                               setShowCloseShiftModal(false)
                               setCloseShiftCashierPassword('')
@@ -1931,7 +1931,7 @@ export default function POSClient({
                         >
                            Batal
                         </button>
-                        <button
+                        <button type="button"
                            onClick={handleCloseShift}
                            disabled={shiftBusy}
                            className="px-6 py-3 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50"
@@ -1960,7 +1960,7 @@ export default function POSClient({
                            <p className="text-xs font-semibold text-slate-500 mt-1">Buka Shift: {formatShiftTimestamp(latestClosedShift.openedAt)}</p>
                            <p className="text-xs font-semibold text-slate-500 mt-0.5">Tutup Shift: {formatShiftTimestamp(latestClosedShift.closedAt)}</p>
                         </div>
-                        <button onClick={() => setShowSettlementModal(false)} className="p-2 rounded-full hover:bg-white text-slate-400 hover:text-slate-700">
+                        <button type="button" onClick={() => setShowSettlementModal(false)} className="p-2 rounded-full hover:bg-white text-slate-400 hover:text-slate-700">
                            <X size={20} />
                         </button>
                      </div>
@@ -2058,7 +2058,7 @@ export default function POSClient({
                      </div>
 
                      <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
-                        <button
+                        <button type="button"
                            onClick={() => {
                               setShowSettlementModal(false)
                               setSettlementAuthorizerPassword('')
@@ -2067,7 +2067,7 @@ export default function POSClient({
                         >
                            Batal
                         </button>
-                        <button
+                        <button type="button"
                            onClick={handleSettlement}
                            disabled={shiftBusy || settlementRemaining <= 0}
                            className="px-6 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
@@ -2098,7 +2098,7 @@ export default function POSClient({
                                  <Receipt size={24} className="text-white md:hidden" />
                                  <Receipt size={32} className="text-white hidden md:block" />
                               </div>
-                              <button onClick={() => setShowPayment(false)} className="md:hidden p-2 bg-white/10 rounded-lg"><X size={18} /></button>
+                              <button type="button" onClick={() => setShowPayment(false)} className="md:hidden p-2 bg-white/10 rounded-lg"><X size={18} /></button>
                            </div>
                            <h2 className="text-2xl md:text-3xl font-semibold mb-1 md:mb-2 tracking-tight">Pembayaran</h2>
                            <p className="text-white/60 font-bold text-xs md:text-sm mb-6 md:mb-12">Total {cart.reduce((a, c) => a + c.qty, 0)} Items Terpilih.</p>
@@ -2159,29 +2159,29 @@ export default function POSClient({
                               </div>
 
                               <div className="grid grid-cols-2 gap-3 w-full max-w-sm mb-3">
-                                 <button onClick={() => window.print()} className="py-4 bg-white border border-slate-200 text-slate-600 font-semibold tracking-wide uppercase text-[10px] rounded-xl hover:bg-slate-100 shadow-sm w-full">Struk Fisik</button>
-                                 <button onClick={sendWaReceipt} className="py-4 bg-emerald-50 border border-emerald-200 text-emerald-600 font-semibold tracking-wide uppercase text-[10px] rounded-xl hover:bg-emerald-100 shadow-sm w-full flex items-center justify-center gap-1.5"><MessageCircle size={14} /> WhatsApp</button>
+                                 <button type="button" onClick={() => window.print()} className="py-4 bg-white border border-slate-200 text-slate-600 font-semibold tracking-wide uppercase text-[10px] rounded-xl hover:bg-slate-100 shadow-sm w-full">Struk Fisik</button>
+                                 <button type="button" onClick={sendWaReceipt} className="py-4 bg-emerald-50 border border-emerald-200 text-emerald-600 font-semibold tracking-wide uppercase text-[10px] rounded-xl hover:bg-emerald-100 shadow-sm w-full flex items-center justify-center gap-1.5"><MessageCircle size={14} /> WhatsApp</button>
                               </div>
-                              <button onClick={resetPOS} className="w-full max-w-sm py-5 bg-blue-600 text-white font-semibold tracking-wide uppercase text-xs rounded-xl hover:bg-blue-500 shadow-lg shadow-blue-500/20 mt-2">PESANAN BERIKUTNYA</button>
+                              <button type="button" onClick={resetPOS} className="w-full max-w-sm py-5 bg-blue-600 text-white font-semibold tracking-wide uppercase text-xs rounded-xl hover:bg-blue-500 shadow-lg shadow-blue-500/20 mt-2">PESANAN BERIKUTNYA</button>
                            </div>
                         ) : (
                            <div className="flex flex-col h-full">
                               <div className="hidden md:flex justify-between items-center mb-4">
                                  <h3 className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Penyelesaian Transaksi</h3>
-                                 <button onClick={() => setShowPayment(false)} className="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg"><X size={18} /></button>
+                                 <button type="button" onClick={() => setShowPayment(false)} className="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg"><X size={18} /></button>
                               </div>
 
                               <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Metode Pembayaran</label>
                               <div className="grid grid-cols-3 gap-2 md:gap-3 mb-8">
-                                 <button onClick={() => setPaymentMethod('CASH')} className={`p-3 md:p-4 rounded-xl md:rounded-xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'CASH' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
+                                 <button type="button" onClick={() => setPaymentMethod('CASH')} className={`p-3 md:p-4 rounded-xl md:rounded-xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'CASH' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
                                     <Banknote size={20} className="md:w-[24px]" />
                                     <span className="text-[8px] md:text-[10px] font-semibold uppercase tracking-wide">Tunai</span>
                                  </button>
-                                 <button onClick={() => setPaymentMethod('QRIS')} className={`p-3 md:p-4 rounded-xl md:rounded-xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'QRIS' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
+                                 <button type="button" onClick={() => setPaymentMethod('QRIS')} className={`p-3 md:p-4 rounded-xl md:rounded-xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'QRIS' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
                                     <QrCode size={20} className="md:w-[24px]" />
                                     <span className="text-[8px] md:text-[10px] font-semibold uppercase tracking-wide">QRIS / EDC</span>
                                  </button>
-                                 <button onClick={() => setPaymentMethod('TRANSFER')} className={`p-3 md:p-4 rounded-xl md:rounded-xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'TRANSFER' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
+                                 <button type="button" onClick={() => setPaymentMethod('TRANSFER')} className={`p-3 md:p-4 rounded-xl md:rounded-xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all ${paymentMethod === 'TRANSFER' ? 'border-[#003366] bg-blue-50 text-[#003366]' : 'border-slate-100 bg-white text-slate-300'}`}>
                                     <CreditCard size={20} className="md:w-[24px]" />
                                     <span className="text-[8px] md:text-[10px] font-semibold uppercase tracking-wide">Transfer</span>
                                  </button>
@@ -2283,7 +2283,7 @@ export default function POSClient({
                               </div>
 
                               <div className="pt-6 mt-auto">
-                                 <button disabled={loading || !activeBranchId || (requiresWarehouseSelection && !selectedWarehouseId)} onClick={handlePay} className="w-full h-16 md:h-[72px] bg-[#003366] hover:bg-[#002244] text-white flex flex-col items-center justify-center gap-1 rounded-xl md:rounded-[20px] shadow-xl transition-all font-semibold text-[11px] md:text-xs tracking-wide disabled:opacity-50">
+                                 <button type="button" disabled={loading || !activeBranchId || (requiresWarehouseSelection && !selectedWarehouseId)} onClick={handlePay} className="w-full h-16 md:h-[72px] bg-[#003366] hover:bg-[#002244] text-white flex flex-col items-center justify-center gap-1 rounded-xl md:rounded-[20px] shadow-xl transition-all font-semibold text-[11px] md:text-xs tracking-wide disabled:opacity-50">
                                     {loading ? (
                                        <span className="animate-spin border-2 border-white/20 border-t-white rounded-full w-5 h-5 mb-0.5" />
                                     ) : (

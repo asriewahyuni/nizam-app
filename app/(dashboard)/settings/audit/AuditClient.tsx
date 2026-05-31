@@ -86,7 +86,7 @@ export function AuditClient({ logs, orgName, orgId }: { logs: AuditLog[], orgNam
         </div>
 
         <div className="flex items-center gap-3">
-            <button 
+            <button type="button" 
               onClick={async () => {
                 if (confirm('⚠️ PERHATIAN: Semua transaksi untuk organisasi ini akan dihapus permanen. Data master utama tetap dipertahankan.')) {
                    const check = prompt('Ketik "RESET TRANSAKSI" untuk konfirmasi:')
@@ -107,7 +107,7 @@ export function AuditClient({ logs, orgName, orgId }: { logs: AuditLog[], orgNam
               RESET TRANSAKSI
             </button>
 
-            <button 
+            <button type="button" 
               onClick={async () => {
                 if (confirm('💣 NUCLEAR OPTION: Ini akan menghapus SELURUH ORGANISASI.\n\nLanjutkan?')) {
                    const check = prompt('Ketik "HAPUS" (huruf besar) untuk menghapus total organisasi:')
@@ -183,7 +183,7 @@ export function AuditClient({ logs, orgName, orgId }: { logs: AuditLog[], orgNam
              </div>
              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {['ALL', 'CREATE', 'UPDATE', 'DELETE', 'VOID'].map(t => (
-                  <button key={t} onClick={() => setFilterType(t)} className={cn("px-3 py-2 rounded-xl text-[9px] font-semibold tracking-wide uppercase border transition-all shrink-0", filterType === t ? "bg-[#003366] text-white border-transparent" : "bg-white text-slate-400 border-slate-200")}>
+                  <button type="button" key={t} onClick={() => setFilterType(t)} className={cn("px-3 py-2 rounded-xl text-[9px] font-semibold tracking-wide uppercase border transition-all shrink-0", filterType === t ? "bg-[#003366] text-white border-transparent" : "bg-white text-slate-400 border-slate-200")}>
                     {t}
                   </button>
                 ))}
@@ -236,7 +236,7 @@ export function AuditClient({ logs, orgName, orgId }: { logs: AuditLog[], orgNam
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Metadata Breakdown</p>
                     </div>
                  </div>
-                 <button onClick={() => setSelectedLog(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20}/></button>
+                 <button type="button" onClick={() => setSelectedLog(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20}/></button>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar-dark">
@@ -282,7 +282,7 @@ export function AuditClient({ logs, orgName, orgId }: { logs: AuditLog[], orgNam
                  <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-2">
                     <History size={12}/> Full History Available
                  </span>
-                 <button className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide hover:text-blue-300 transition-all flex items-center gap-2 group">
+                 <button type="button" className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide hover:text-blue-300 transition-all flex items-center gap-2 group">
                     View Associated Entry <ExternalLink size={12} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                  </button>
               </div>

@@ -225,7 +225,7 @@ function BatchSection({ batch, sessions }: { batch: Batch; sessions: Session[] }
           >
             🔗 Daftar
           </Link>
-          <button
+          <button type="button"
             onClick={() => setShowSessions(!showSessions)}
             className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
           >
@@ -241,7 +241,7 @@ function BatchSection({ batch, sessions }: { batch: Batch; sessions: Session[] }
         <div className="mt-4 border-t border-slate-100 pt-4">
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Jadwal Sesi</span>
-            <button
+            <button type="button"
               onClick={() => setShowAddSession(!showAddSession)}
               className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors"
             >
@@ -327,7 +327,7 @@ function CourseSection({
           >
             <GraduationCap className="h-3 w-3" /> Lihat
           </Link>
-          <button
+          <button type="button"
             onClick={() => setShowBatches(!showBatches)}
             className="flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-200 transition-colors"
           >
@@ -343,7 +343,7 @@ function CourseSection({
         <div className="mt-5 border-t border-slate-100 pt-5">
           <div className="flex items-center justify-between mb-4">
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Batch / Angkatan</span>
-            <button
+            <button type="button"
               onClick={() => setShowAddBatch(!showAddBatch)}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition-colors"
             >
@@ -397,7 +397,7 @@ export default function LmsAdminHierarchy({
               Tambahkan materi baru ke katalog training organisasi.
             </p>
           </div>
-          <button
+          <button type="button"
             onClick={() => setShowCreateCourse(!showCreateCourse)}
             className="inline-flex items-center gap-2 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-xl hover:bg-blue-100 transition-colors"
           >

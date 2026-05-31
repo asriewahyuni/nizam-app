@@ -67,7 +67,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
   return (
     <>
       <div className="flex flex-col gap-2">
-        <button
+        <button type="button"
           onClick={() => setShowPayment(true)}
           disabled={disabled || isPending}
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-slate-200 hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -101,7 +101,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
               {/* Header */}
               <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 px-6 pt-6 pb-8 text-white">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 rounded-full blur-3xl opacity-20 -mr-8 -mt-8" />
-                <button
+                <button type="button"
                   onClick={() => { setShowPayment(false); setError(null) }}
                   className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:bg-white/20 transition-colors"
                 >
@@ -173,7 +173,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
                       }}
                       className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold placeholder-slate-300 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all uppercase"
                     />
-                    <button
+                    <button type="button"
                       onClick={handleApplyVoucher}
                       disabled={!voucher.trim() || voucherApplied}
                       className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-blue-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
@@ -208,14 +208,14 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
 
                 {/* CTA Buttons */}
                 <div className="flex gap-3 pt-1">
-                  <button
+                  <button type="button"
                     onClick={() => { setShowPayment(false); setError(null) }}
                     disabled={isPending}
                     className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
                   >
                     Batal
                   </button>
-                  <button
+                  <button type="button"
                     onClick={handleActivate}
                     disabled={isPending}
                     className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25"

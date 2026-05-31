@@ -31,7 +31,7 @@ export default function DashboardError({
           </p>
         )}
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-          <button
+          <button type="button"
             onClick={reset}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-all shadow-sm"
           >

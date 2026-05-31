@@ -137,7 +137,7 @@ export default function DemoClient() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
-              <button
+              <button type="button"
                 onClick={() => setStep('setup')}
                 className="group relative px-10 py-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-lg rounded-2xl shadow-2xl shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-3 mx-auto"
               >

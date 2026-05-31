@@ -104,14 +104,14 @@ export default function QuickBillDocument({
       <div className="min-h-screen bg-slate-50 px-4 py-10 print:bg-white print:p-0">
         <div className="mx-auto max-w-5xl space-y-5">
           <div className="quick-bill-no-print flex items-center justify-between">
-            <button
+            <button type="button"
               onClick={() => router.back()}
               className="flex items-center gap-2 font-bold text-slate-500 transition-colors hover:text-slate-900"
             >
               <ArrowLeft size={18} />
               Kembali
             </button>
-            <button
+            <button type="button"
               onClick={() => window.print()}
               className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-emerald-600"
             >

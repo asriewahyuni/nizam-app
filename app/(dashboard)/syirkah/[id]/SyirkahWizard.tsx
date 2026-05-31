@@ -324,7 +324,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               const active = step === s.id
               return (
                 <React.Fragment key={s.id}>
-                  <button
+                  <button type="button"
                     onClick={() => s.id < step && setStep(s.id)}
                     disabled={s.id > step}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
@@ -498,7 +498,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                           </select>
                         )}
                         {members.length > 2 && (
-                          <button onClick={() => removeMember(index)} className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg">
+                          <button type="button" onClick={() => removeMember(index)} className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg">
                             <Trash2 size={14} />
                           </button>
                         )}
@@ -537,7 +537,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                 ))}
               </div>
 
-              <button onClick={addMember} className="flex items-center gap-2 w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-blue-400 hover:text-blue-600 transition text-sm font-bold justify-center">
+              <button type="button" onClick={addMember} className="flex items-center gap-2 w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-blue-400 hover:text-blue-600 transition text-sm font-bold justify-center">
                 <Plus size={16} /> Tambah Pihak Lain
               </button>
             </StepCard>
@@ -602,7 +602,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                         {witness.gender === 'LAKI-LAKI' ? '♂ L (×1)' : '♀ P (×½)'}
                       </span>
                       {witnesses.length > 2 && (
-                        <button onClick={() => removeWitness(index)} className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg">
+                        <button type="button" onClick={() => removeWitness(index)} className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg">
                           <Trash2 size={14} />
                         </button>
                       )}
@@ -635,7 +635,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               ))}
             </div>
 
-            <button onClick={addWitness} className="flex items-center gap-2 w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-blue-400 hover:text-blue-600 transition text-sm font-bold justify-center">
+            <button type="button" onClick={addWitness} className="flex items-center gap-2 w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-blue-400 hover:text-blue-600 transition text-sm font-bold justify-center">
               <Plus size={16} /> Tambah Saksi
             </button>
 
@@ -790,7 +790,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                 <FileText size={48} className="mx-auto text-slate-300 mb-4" />
                 <h4 className="font-bold text-slate-700 mb-2">Pasal belum digenerate</h4>
                 <p className="text-sm text-slate-500 mb-6">Klik tombol di bawah untuk generate pasal-pasal akad berdasarkan data yang telah Anda masukkan.</p>
-                <button
+                <button type="button"
                   onClick={handleGenerateClauses}
                   className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition"
                 >
@@ -801,7 +801,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <p className="text-sm text-slate-500">{clauses.length} pasal digenerate berdasarkan jenis <strong className="text-slate-700">{contractType}</strong></p>
-                  <button onClick={handleGenerateClauses} className="text-xs text-blue-600 hover:underline font-bold">Regenerate</button>
+                  <button type="button" onClick={handleGenerateClauses} className="text-xs text-blue-600 hover:underline font-bold">Regenerate</button>
                 </div>
                 {clauses.map((clause, idx) => (
                   <div key={idx} className="bg-white border border-slate-200 rounded-xl p-5">
@@ -887,10 +887,10 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
             </div>
 
             <div className="flex justify-between pt-4">
-              <button onClick={handleBack} className="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition flex items-center gap-2">
+              <button type="button" onClick={handleBack} className="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition flex items-center gap-2">
                 <ChevronLeft size={16} /> Kembali
               </button>
-              <button
+              <button type="button"
                 onClick={() => router.push(`/syirkah/${contractId}`)}
                 className="px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition flex items-center gap-2"
               >
@@ -906,7 +906,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
       {step < 9 && (
         <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-4 shadow-lg">
           <div className="max-w-4xl mx-auto flex justify-between items-center">
-            <button
+            <button type="button"
               onClick={handleBack}
               disabled={step === 1 || saving}
               className="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition flex items-center gap-2 disabled:opacity-40"
@@ -914,7 +914,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               <ChevronLeft size={16} /> Kembali
             </button>
             <span className="text-xs text-slate-400 font-medium">Langkah {step} dari {STEPS.length}</span>
-            <button
+            <button type="button"
               onClick={handleNext}
               disabled={saving || (step === 6 && totalNisbah !== 100) || (step === 5 && !witnessQuorumMet)}
               className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"

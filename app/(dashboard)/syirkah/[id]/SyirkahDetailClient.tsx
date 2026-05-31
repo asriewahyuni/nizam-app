@@ -304,7 +304,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
 	              <Handshake size={18} /> Lanjutkan Wizard
 	            </Link>
 	          )}
-	          <button
+	          <button type="button"
 	            onClick={() => setShowQR(true)}
 	            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold shadow hover:bg-slate-800 transition"
           >
@@ -320,11 +320,11 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-slate-800">Detail Akad</h3>
               {!isEditingContract ? (
-                <button onClick={() => setIsEditingContract(true)} className="text-blue-600 p-1 hover:bg-blue-50 rounded text-sm font-bold aspect-square">
+                <button type="button" onClick={() => setIsEditingContract(true)} className="text-blue-600 p-1 hover:bg-blue-50 rounded text-sm font-bold aspect-square">
                   <Edit2 size={16} />
                 </button>
               ) : (
-                <button onClick={handleSaveContract} disabled={isSavingContract} className="text-emerald-600 p-1 hover:bg-emerald-50 rounded text-sm font-bold flex gap-1 items-center">
+                <button type="button" onClick={handleSaveContract} disabled={isSavingContract} className="text-emerald-600 p-1 hover:bg-emerald-50 rounded text-sm font-bold flex gap-1 items-center">
                   <Save size={16} /> {isSavingContract ? '...' : 'Simpan'}
                 </button>
               )}
@@ -651,7 +651,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-6">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">Pihak Bersyirkah</h3>
-              <button onClick={openNewMemberForm} className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 font-bold text-xs rounded-lg hover:bg-blue-100 transition">
+              <button type="button" onClick={openNewMemberForm} className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 font-bold text-xs rounded-lg hover:bg-blue-100 transition">
                 <Plus size={14} /> Tambah Anggota
               </button>
             </div>
@@ -698,8 +698,8 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                              {renderEstimatedProfit(m)}
                           </div>
                           <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => editMember(m)} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"><Edit2 size={14} /></button>
-                            <button onClick={() => handleDeleteMember(m.id)} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg"><Trash2 size={14} /></button>
+                            <button type="button" onClick={() => editMember(m)} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"><Edit2 size={14} /></button>
+                            <button type="button" onClick={() => handleDeleteMember(m.id)} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg"><Trash2 size={14} /></button>
                           </div>
                         </div>
                       </div>
@@ -735,8 +735,8 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
 	                             {renderEstimatedProfit(m)}
 	                          </div>
 	                          <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-	                            <button onClick={() => editMember(m)} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"><Edit2 size={14} /></button>
-	                            <button onClick={() => handleDeleteMember(m.id)} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg"><Trash2 size={14} /></button>
+	                            <button type="button" onClick={() => editMember(m)} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"><Edit2 size={14} /></button>
+	                            <button type="button" onClick={() => handleDeleteMember(m.id)} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg"><Trash2 size={14} /></button>
 	                          </div>
 	                        </div>
 	                      </div>
@@ -768,8 +768,8 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                              {renderEstimatedProfit(m)}
                           </div>
                           <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => editMember(m)} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"><Edit2 size={14} /></button>
-                            <button onClick={() => handleDeleteMember(m.id)} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg"><Trash2 size={14} /></button>
+                            <button type="button" onClick={() => editMember(m)} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"><Edit2 size={14} /></button>
+                            <button type="button" onClick={() => handleDeleteMember(m.id)} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg"><Trash2 size={14} /></button>
                           </div>
                         </div>
                       </div>
@@ -818,8 +818,8 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-8">
-              <button onClick={() => setIsMemberFormOpen(false)} className="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition">Batal</button>
-              <button onClick={handleSaveMember} className="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition">Simpan Anggota</button>
+              <button type="button" onClick={() => setIsMemberFormOpen(false)} className="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition">Batal</button>
+              <button type="button" onClick={handleSaveMember} className="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition">Simpan Anggota</button>
             </div>
           </div>
         </div>
@@ -829,7 +829,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
       {showQR && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex justify-center items-center p-4">
           <div className="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-md relative">
-            <button onClick={() => setShowQR(false)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 hover:bg-slate-200">X</button>
+            <button type="button" onClick={() => setShowQR(false)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 hover:bg-slate-200">X</button>
             <div className="text-center mb-6">
               <Handshake size={48} className="mx-auto text-blue-600 mb-3" />
               <h3 className="font-semibold text-2xl tracking-tight text-slate-900">Validasi Digital</h3>

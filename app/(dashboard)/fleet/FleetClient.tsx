@@ -279,7 +279,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
              { id: 'BOOKINGS', label: 'Pesanan (Rental)', icon: Calendar },
              { id: 'LABS', label: 'Perawatan (Labs)', icon: Wrench },
            ].map(tab => (
-             <button
+             <button type="button"
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex-1 flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-bold rounded-xl transition-all ${activeTab === tab.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
@@ -303,7 +303,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                   { id: 'CREW', label: 'Daftar Kru', icon: UserCheck },
                   { id: 'ATTENDANCE', label: 'Presensi', icon: Scan },
                 ].map(st => (
-                  <button
+                  <button type="button"
                     key={st.id}
                     onClick={() => setPoSubTab(st.id as any)}
                     className={`pb-4 px-2 text-[11px] font-semibold uppercase tracking-wide flex items-center gap-2 border-b-2 transition-all ${poSubTab === st.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
@@ -317,7 +317,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                 <div className="space-y-6">
                    <div className="flex justify-between items-center">
                       <h3 className="text-xl font-semibold text-slate-900">Jadwal Keberangkatan</h3>
-                      <button onClick={() => setShowScheduleModal(true)} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-100">
+                      <button type="button" onClick={() => setShowScheduleModal(true)} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-100">
                          <Plus size={18} /> Buat Jadwal
                       </button>
                    </div>
@@ -345,7 +345,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                 <div className="text-[10px] font-semibold uppercase tracking-tighter text-slate-400">
                                    {sc.tickets?.count || 0} / {sc.asset?.capacity || 40} Kursi Terjual
                                 </div>
-                                <button 
+                                <button type="button" 
                                   onClick={() => {
                                     setSelectedSchedule(sc)
                                     setShowTicketModal(true)
@@ -366,7 +366,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                 <div className="space-y-6">
                    <div className="flex justify-between items-center">
                       <h3 className="text-xl font-semibold text-slate-900">Master Rute & Trayek</h3>
-                      <button onClick={() => setShowRouteModal(true)} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-100">
+                      <button type="button" onClick={() => setShowRouteModal(true)} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-100">
                          <Plus size={18} /> Tambah Rute
                       </button>
                    </div>
@@ -392,7 +392,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                    <td className="px-6 py-5 text-xs text-slate-500 font-bold uppercase">{r.origin}</td>
                                    <td className="px-6 py-5 text-xs text-slate-500 font-bold uppercase">{r.destination}</td>
                                    <td className="px-6 py-5 text-right font-semibold text-slate-900 text-sm">{formatRupiah(r.base_price)}</td>
-                                   <td className="px-8 py-5 text-right"><button className="text-blue-600 font-bold text-xs">Edit</button></td>
+                                   <td className="px-8 py-5 text-right"><button type="button" className="text-blue-600 font-bold text-xs">Edit</button></td>
                                 </tr>
                               ))
                             )}
@@ -451,7 +451,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                 <div className="space-y-6">
                    <div className="flex justify-between items-center px-1">
                       <h3 className="text-xl font-semibold text-slate-900">Daftar Kru (Sopir & Kernet)</h3>
-                      <button onClick={() => setShowCrewModal(true)} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-100">
+                      <button type="button" onClick={() => setShowCrewModal(true)} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-100">
                          <Plus size={18} /> Daftarkan Kru
                       </button>
                    </div>
@@ -507,10 +507,10 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">{new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                       </div>
                       <div className="flex gap-3 w-full md:w-auto">
-                         <button onClick={() => { setScanType('IN'); setShowScanModal(true) }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 shadow-xl shadow-emerald-100 transition-all">
+                         <button type="button" onClick={() => { setScanType('IN'); setShowScanModal(true) }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 shadow-xl shadow-emerald-100 transition-all">
                             <QrCode size={18} /> Clock In (Mulai)
                          </button>
-                         <button onClick={() => { setScanType('OUT'); setShowScanModal(true) }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-rose-600 text-white text-sm font-semibold rounded-xl hover:bg-rose-700 shadow-xl shadow-rose-100 transition-all">
+                         <button type="button" onClick={() => { setScanType('OUT'); setShowScanModal(true) }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-rose-600 text-white text-sm font-semibold rounded-xl hover:bg-rose-700 shadow-xl shadow-rose-100 transition-all">
                             <Navigation size={18} /> Clock Out (Selesai)
                          </button>
                       </div>
@@ -587,7 +587,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
              {/* Action Bar */}
              <div className="flex justify-between items-center px-1">
                 <h3 className="text-xl font-bold text-slate-900 tracking-tight">Katalog Armada</h3>
-                <button onClick={() => setShowAssetModal(true)} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-100">
+                <button type="button" onClick={() => setShowAssetModal(true)} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-100">
                    <Plus size={18} /> Tambah Unit
                 </button>
              </div>
@@ -627,11 +627,11 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                          </div>
 
                          <div className="mt-8 pt-8 border-t border-slate-50 flex items-center justify-between">
-                            <button className="text-[11px] font-semibold text-slate-400 hover:text-blue-600 transition-all uppercase tracking-wide flex items-center gap-2">
+                            <button type="button" className="text-[11px] font-semibold text-slate-400 hover:text-blue-600 transition-all uppercase tracking-wide flex items-center gap-2">
                                Lihat Detail <ChevronRight size={14} />
                             </button>
                             {asset.status === 'AVAILABLE' && (
-                              <button onClick={() => setShowBookingModal(true)} className="px-4 py-2 bg-slate-900 text-white text-[10px] font-semibold rounded-xl hover:bg-blue-600 transition-all uppercase tracking-tighter shadow-lg shadow-blue-50 opacity-0 group-hover:opacity-100">
+                              <button type="button" onClick={() => setShowBookingModal(true)} className="px-4 py-2 bg-slate-900 text-white text-[10px] font-semibold rounded-xl hover:bg-blue-600 transition-all uppercase tracking-tighter shadow-lg shadow-blue-50 opacity-0 group-hover:opacity-100">
                                 Sewakan
                               </button>
                             )}
@@ -702,7 +702,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                 </span>
                              </td>
                              <td className="px-8 py-6 text-right">
-                                <button className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition opacity-0 group-hover:opacity-100">
+                                <button type="button" className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition opacity-0 group-hover:opacity-100">
                                    <MoreVertical size={16} />
                                 </button>
                              </td>
@@ -724,7 +724,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                     </h3>
                     <p className="text-xs text-slate-400 font-medium tracking-tight uppercase font-semibold">Kardeks Kendaraan (Vehicle Medical History)</p>
                  </div>
-                 <button onClick={() => setShowMedicalModal(true)} className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white text-sm font-bold rounded-xl hover:bg-amber-600 shadow-xl shadow-amber-100 transition-all">
+                 <button type="button" onClick={() => setShowMedicalModal(true)} className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white text-sm font-bold rounded-xl hover:bg-amber-600 shadow-xl shadow-amber-100 transition-all">
                     <Plus size={18} /> Catat Servis Baru
                  </button>
               </div>
@@ -804,7 +804,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                    <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
                       <Car size={20} className="text-blue-600" /> Tambah Armada Baru
                    </h3>
-                   <button onClick={() => setShowAssetModal(false)} className="text-slate-400"><X size={20} /></button>
+                   <button type="button" onClick={() => setShowAssetModal(false)} className="text-slate-400"><X size={20} /></button>
                 </div>
                 <form onSubmit={handleAddAsset} className="space-y-6">
                    <div className="grid grid-cols-2 gap-4">
@@ -858,7 +858,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                    <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
                       <Calendar size={20} className="text-emerald-500" /> Buat Pesanan Baru
                    </h3>
-                   <button onClick={() => setShowBookingModal(false)} className="text-slate-400"><X size={20} /></button>
+                   <button type="button" onClick={() => setShowBookingModal(false)} className="text-slate-400"><X size={20} /></button>
                 </div>
                 <form onSubmit={handleAddBooking} className="space-y-6">
                    <div className="space-y-1.5">
@@ -904,7 +904,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                    <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
                       <MapPin size={20} className="text-blue-600" /> Tambah Rute Baru
                    </h3>
-                   <button onClick={() => setShowRouteModal(false)} className="text-slate-400"><X size={20} /></button>
+                   <button type="button" onClick={() => setShowRouteModal(false)} className="text-slate-400"><X size={20} /></button>
                 </div>
                 <form onSubmit={handleCreateRoute} className="space-y-5">
                    <div className="space-y-1.5">
@@ -947,7 +947,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                    <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
                       <Clock size={20} className="text-indigo-600" /> Buka Lini Jadwal Baru
                    </h3>
-                   <button onClick={() => setShowScheduleModal(false)} className="text-slate-400"><X size={20} /></button>
+                   <button type="button" onClick={() => setShowScheduleModal(false)} className="text-slate-400"><X size={20} /></button>
                 </div>
                 <form onSubmit={handleCreateSchedule} className="space-y-5">
                     <div className="space-y-1.5">
@@ -1006,7 +1006,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                    <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
                       <CircleDollarSign size={20} className="text-emerald-500" /> Penjualan Tiket
                    </h3>
-                   <button onClick={() => setShowTicketModal(false)} className="text-slate-400"><X size={20} /></button>
+                   <button type="button" onClick={() => setShowTicketModal(false)} className="text-slate-400"><X size={20} /></button>
                 </div>
                 <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Info Perjalanan</p>
@@ -1047,7 +1047,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                    <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
                       <Wrench size={20} className="text-amber-500" /> Catat Rekam Medis (Servis)
                    </h3>
-                   <button onClick={() => setShowMedicalModal(false)} className="text-slate-400"><X size={20} /></button>
+                   <button type="button" onClick={() => setShowMedicalModal(false)} className="text-slate-400"><X size={20} /></button>
                 </div>
                 <form onSubmit={handleAddMedical} className="space-y-5 overflow-y-auto pr-2 custom-scrollbar">
                    <div className="space-y-1.5">
@@ -1127,7 +1127,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                    <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
                       <UserCheck size={20} className="text-blue-600" /> Pendaftaran Kru Baru
                    </h3>
-                   <button onClick={() => setShowCrewModal(false)} className="text-slate-400"><X size={20} /></button>
+                   <button type="button" onClick={() => setShowCrewModal(false)} className="text-slate-400"><X size={20} /></button>
                 </div>
                 <form onSubmit={handleAddCrew} className="space-y-5">
                    <div className="grid grid-cols-2 gap-4">
@@ -1199,7 +1199,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                       </h3>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Metode: {scanType === 'IN' ? 'Check-In' : 'Check-Out'} • QR + GPS</p>
                    </div>
-                   <button onClick={() => setShowScanModal(false)} className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-colors"><X size={20} /></button>
+                   <button type="button" onClick={() => setShowScanModal(false)} className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-colors"><X size={20} /></button>
                 </div>
 
                 <div className="space-y-6">
@@ -1236,7 +1236,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                            <Navigation className="text-emerald-600" size={18} />
                            <p className="text-[10px] text-emerald-700 font-bold uppercase leading-tight">Pastikan Anda berada di area Terminal/Pool agar GPS tervalidasi.</p>
                         </div>
-                        <button onClick={() => setSelectedCrewForAttendance('')} className="w-full py-4 text-slate-400 font-bold text-xs hover:text-slate-600 uppercase tracking-wide">
+                        <button type="button" onClick={() => setSelectedCrewForAttendance('')} className="w-full py-4 text-slate-400 font-bold text-xs hover:text-slate-600 uppercase tracking-wide">
                            Ganti Identitas
                         </button>
                      </div>

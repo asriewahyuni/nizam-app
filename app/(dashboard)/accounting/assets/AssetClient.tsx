@@ -402,7 +402,7 @@ export function AssetClient({
         </div>
         
         <div className="flex items-center gap-3">
-          <button
+          <button type="button"
             disabled={assets.length === 0}
             onClick={handleExportXLSX}
             className="flex cursor-pointer items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -411,7 +411,7 @@ export function AssetClient({
             Export XLSX
           </button>
 
-          <button 
+          <button type="button" 
             disabled={!activeBranchId || depProcessing}
             onClick={handlePreview}
             className="flex cursor-pointer items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 hover:border-blue-200 hover:bg-blue-50 text-blue-600 font-semibold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -420,7 +420,7 @@ export function AssetClient({
             Preview Jurnal
           </button>
 
-          <button 
+          <button type="button" 
             disabled={!activeBranchId || depProcessing}
             onClick={async () => {
               if (!await confirm("Jalankan Posting Jurnal Penyusutan Otomatis sekarang?")) return
@@ -440,7 +440,7 @@ export function AssetClient({
             {depProcessing ? 'Sedang Memproses...' : 'Jalankan Penyusutan'}
           </button>
 
-          <button 
+          <button type="button" 
             disabled={!activeBranchId}
             onClick={() => { setEditingAssetId(null); setShowModal(true); }}
             className="flex cursor-pointer items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-all shadow-xl shadow-blue-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -600,12 +600,12 @@ export function AssetClient({
                           </td>
                            <td className="px-8 py-6 text-center">
                               <div className="flex items-center justify-center gap-2">
-                                 <button onClick={() => { setSelectedAsset(asset); setShowLabelModal(true); }} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm" title="Label Aset"> <QrCode size={18} /> </button>
+                                 <button type="button" onClick={() => { setSelectedAsset(asset); setShowLabelModal(true); }} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm" title="Label Aset"> <QrCode size={18} /> </button>
                                  {asset.status === 'ACTIVE' ? (
                                    <>
-                                     <button disabled={!activeBranchId} onClick={() => handleEdit(asset)} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Edit Aset"> <Pencil size={18} /> </button>
-                                     <button disabled={!activeBranchId} onClick={() => handleOpenDisposal(asset)} className="p-3 bg-white border border-emerald-200 text-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Jual / Lepas Aset"> <DollarSign size={18} /> </button>
-                                     <button disabled={!activeBranchId} onClick={() => handleDelete(asset)} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Hapus Aset"> <Trash2 size={18} /> </button>
+                                     <button type="button" disabled={!activeBranchId} onClick={() => handleEdit(asset)} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Edit Aset"> <Pencil size={18} /> </button>
+                                     <button type="button" disabled={!activeBranchId} onClick={() => handleOpenDisposal(asset)} className="p-3 bg-white border border-emerald-200 text-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Jual / Lepas Aset"> <DollarSign size={18} /> </button>
+                                     <button type="button" disabled={!activeBranchId} onClick={() => handleDelete(asset)} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Hapus Aset"> <Trash2 size={18} /> </button>
                                    </>
                                  ) : (
                                    <span className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-400 rounded-full">SOLD</span>
@@ -629,7 +629,7 @@ export function AssetClient({
                   {editingAssetId ? <Pencil size={28} className="text-amber-500" /> : <Landmark size={28} className="text-blue-600" />}
                   {editingAssetId ? 'Perbarui Data Aset' : 'Kapitalisasi Aset Tetap Baru'}
                </h2>
-               <button onClick={() => { setShowModal(false); setEditingAssetId(null); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-900 transition-all shadow-sm"> <X size={20} /> </button>
+               <button type="button" onClick={() => { setShowModal(false); setEditingAssetId(null); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-900 transition-all shadow-sm"> <X size={20} /> </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto max-h-[80vh] custom-scrollbar">
@@ -801,7 +801,7 @@ export function AssetClient({
            <div className="bg-white rounded-xl shadow-md w-full max-w-sm overflow-hidden p-8 space-y-8 animate-in zoom-in-95">
               <div className="flex items-center justify-between">
                  <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2"> <Printer className="text-blue-600" /> Label Aset </h2>
-                 <button onClick={() => setShowLabelModal(false)} className="text-slate-400 hover:text-slate-900"> <X size={24} /> </button>
+                 <button type="button" onClick={() => setShowLabelModal(false)} className="text-slate-400 hover:text-slate-900"> <X size={24} /> </button>
               </div>
               <div id="printable-label" className="bg-white border-2 border-slate-100 p-6 rounded-xl flex flex-col items-center gap-4 text-center">
                  <h4 className="text-sm font-semibold text-slate-900 truncate w-full">{selectedAsset.name}</h4>
@@ -812,8 +812,8 @@ export function AssetClient({
                  <p className="text-[10px] font-mono font-bold text-blue-600">{selectedAsset.code}</p>
               </div>
               <div className="flex gap-4">
-                 <button onClick={() => setShowLabelModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 font-semibold rounded-xl" > Tutup </button>
-                 <button onClick={() => window.print()} className="flex-1 py-4 bg-blue-600 text-white font-semibold rounded-xl shadow-xl flex items-center justify-center gap-2" > <Printer size={18} /> Cetak </button>
+                 <button type="button" onClick={() => setShowLabelModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 font-semibold rounded-xl" > Tutup </button>
+                 <button type="button" onClick={() => window.print()} className="flex-1 py-4 bg-blue-600 text-white font-semibold rounded-xl shadow-xl flex items-center justify-center gap-2" > <Printer size={18} /> Cetak </button>
               </div>
            </div>
            <style jsx global>{`
@@ -835,7 +835,7 @@ export function AssetClient({
                     <History size={24} className="text-blue-600" />
                     Preview Jurnal Penyusutan Otomatis
                  </h2>
-                 <button onClick={() => setShowPreview(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-900 transition-all shadow-sm"> <X size={20} /> </button>
+                 <button type="button" onClick={() => setShowPreview(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-900 transition-all shadow-sm"> <X size={20} /> </button>
               </div>
 
               <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
@@ -862,8 +862,8 @@ export function AssetClient({
               </div>
 
               <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4">
-                 <button onClick={() => setShowPreview(false)} className="flex-1 py-4 bg-white border-2 border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-all"> Tutup </button>
-                 <button 
+                 <button type="button" onClick={() => setShowPreview(false)} className="flex-1 py-4 bg-white border-2 border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-all"> Tutup </button>
+                 <button type="button" 
                    onClick={async () => {
                       if (!await confirm("Konfirmasi posting jurnal di atas?")) return
                       setShowPreview(false)
@@ -899,7 +899,7 @@ export function AssetClient({
                    </h2>
                    <p className="text-[11px] font-bold text-slate-500 mt-1">{selectedAssetForDisposal.name} ({selectedAssetForDisposal.code})</p>
                  </div>
-                 <button onClick={() => setShowDisposeModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-900 transition-all shadow-sm"><X size={20} /></button>
+                 <button type="button" onClick={() => setShowDisposeModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-900 transition-all shadow-sm"><X size={20} /></button>
               </div>
 
               {!disposeResult ? (
@@ -985,8 +985,8 @@ export function AssetClient({
                   </div>
 
                   <div className="flex gap-4">
-                    <button onClick={() => setShowDisposeModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 font-semibold rounded-xl hover:bg-slate-200 transition-all">Batal</button>
-                    <button
+                    <button type="button" onClick={() => setShowDisposeModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 font-semibold rounded-xl hover:bg-slate-200 transition-all">Batal</button>
+                    <button type="button"
                       onClick={handleDispose}
                       disabled={disposeLoading}
                       className="flex-[2] py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-xl shadow-emerald-200 transition-all active:scale-95 disabled:opacity-50"
@@ -1018,7 +1018,7 @@ export function AssetClient({
                       <p className={`text-sm font-semibold ${disposeResult.gainLoss >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCurrency(Math.abs(disposeResult.gainLoss))}</p>
                     </div>
                   </div>
-                  <button onClick={() => setShowDisposeModal(false)} className="w-full py-4 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-700 transition-all">
+                  <button type="button" onClick={() => setShowDisposeModal(false)} className="w-full py-4 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-700 transition-all">
                     Tutup
                   </button>
                 </div>

@@ -207,11 +207,11 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
             <input type="number" value={silverPrice} onChange={(e) => setSilverPrice(parseInt(e.target.value))}
               className="w-28 bg-slate-50 border border-slate-200 rounded-xl p-2 font-semibold text-xs text-slate-600 outline-none focus:ring-2 ring-slate-200 transition-all" />
           </div>
-          <button onClick={applyPrices} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-semibold hover:bg-slate-800 transition-all shadow-lg active:scale-95">
+          <button type="button" onClick={applyPrices} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-semibold hover:bg-slate-800 transition-all shadow-lg active:scale-95">
             PREVIEW
           </button>
           
-          <button onClick={handleAutoPrice} disabled={loading} className="bg-amber-100 text-amber-700 font-semibold px-4 py-2.5 rounded-xl text-[10px] hover:bg-amber-200 transition-all flex items-center justify-center gap-2 border border-amber-300 disabled:opacity-50">
+          <button type="button" onClick={handleAutoPrice} disabled={loading} className="bg-amber-100 text-amber-700 font-semibold px-4 py-2.5 rounded-xl text-[10px] hover:bg-amber-200 transition-all flex items-center justify-center gap-2 border border-amber-300 disabled:opacity-50">
             <Globe size={14} /> AUTO GLOBAL RATE
           </button>
         </div>
@@ -224,7 +224,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
             className={`p-4 rounded-xl text-sm font-bold flex items-center gap-3 ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
             {msg.type === 'ok' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
             {msg.text}
-            <button onClick={() => setMsg(null)} className="ml-auto opacity-50 hover:opacity-100"><XCircle size={16}/></button>
+            <button type="button" onClick={() => setMsg(null)} className="ml-auto opacity-50 hover:opacity-100"><XCircle size={16}/></button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -270,13 +270,13 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
 
         <div className="flex gap-3">
           {summary.haulStatus === 'ACTIVE' && (
-            <button onClick={handleCheckHaul} disabled={loading}
+            <button type="button" onClick={handleCheckHaul} disabled={loading}
               className="flex items-center gap-2 px-4 py-2 text-[10px] font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
               <RefreshCw size={12}/> CEK STATUS HAUL
             </button>
           )}
           {(summary.haulStatus === 'NO_HAUL' || summary.haulStatus === 'BATAL') && summary.isZakatObligated && (
-            <button onClick={handleStartHaul} disabled={loading}
+            <button type="button" onClick={handleStartHaul} disabled={loading}
               className="flex items-center gap-2 px-4 py-2 text-[10px] font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all">
               <Play size={12}/> MULAI HAUL BARU
             </button>
@@ -317,7 +317,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                 )}
                 
                 {summary.haulStatus === 'COMPLETED' && (
-                  <button onClick={() => setShowPayDialog(true)} className="bg-emerald-500 hover:bg-emerald-400 text-white px-5 py-2 rounded-full text-[10px] font-semibold shadow-xl shadow-emerald-500/20 flex items-center gap-2 transition-all active:scale-95">
+                  <button type="button" onClick={() => setShowPayDialog(true)} className="bg-emerald-500 hover:bg-emerald-400 text-white px-5 py-2 rounded-full text-[10px] font-semibold shadow-xl shadow-emerald-500/20 flex items-center gap-2 transition-all active:scale-95">
                     <Wallet size={12}/> BAYAR ZAKAT (TUNAIKAN)
                   </button>
                 )}
@@ -335,14 +335,14 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                 <motion.div key="pay-form" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 text-white shadow-inner">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-sm uppercase tracking-wide flex items-center gap-2"><Wallet size={16}/> Bayar Zakat</h3>
-                    <button onClick={() => setShowPayDialog(false)} className="text-white/50 hover:text-white"><XCircle size={16}/></button>
+                    <button type="button" onClick={() => setShowPayDialog(false)} className="text-white/50 hover:text-white"><XCircle size={16}/></button>
                   </div>
                   
                   <div className="space-y-3 mb-4">
                     <label className="text-[10px] font-semibold text-white/70 uppercase tracking-wide">Sumber Dana (Kas & Bank)</label>
                     <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                       {summary.zakatAssets.filter((a: any) => a.type === 'CASH').map((acc: any) => (
-                        <button key={acc.id || acc.code} onClick={() => setSelectedBank(acc.id)} 
+                        <button type="button" key={acc.id || acc.code} onClick={() => setSelectedBank(acc.id)} 
                           className={`text-left p-3 rounded-xl border-2 transition-all flex justify-between items-center ${selectedBank === acc.id ? 'border-white bg-white/20' : 'border-white/10 bg-white/5 hover:border-white/20'}`}>
                           <div>
                             <p className="text-xs font-semibold">{acc.name}</p>
@@ -353,7 +353,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                       ))}
                     </div>
                   </div>
-                  <button onClick={handlePayZakat} disabled={paying || !selectedBank}
+                  <button type="button" onClick={handlePayZakat} disabled={paying || !selectedBank}
                     className="w-full py-3 bg-white text-amber-700 hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-xs font-semibold shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
                     {paying ? <RotateCcw size={16} className="animate-spin" /> : <ShieldCheck size={16} />} 
                     KONFIRMASI BAYAR & JURNAL

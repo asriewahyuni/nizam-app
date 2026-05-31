@@ -48,21 +48,21 @@ export function ConfirmDeleteModal({
               <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
                 <AlertTriangle className="h-6 w-6 text-red-500" />
               </div>
-              <button onClick={onClose} disabled={isPending} className="p-1 hover:bg-slate-100 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} disabled={isPending} className="p-1 hover:bg-slate-100 rounded-xl transition-colors">
                 <X className="h-5 w-5 text-slate-400" />
               </button>
             </div>
             <h3 className="mt-4 text-lg font-semibold text-slate-900 tracking-tight">{title}</h3>
             <p className="mt-2 text-sm text-slate-500 leading-relaxed">{message}</p>
             <div className="mt-6 flex gap-3">
-              <button
+              <button type="button"
                 onClick={onClose}
                 disabled={isPending}
                 className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-50"
               >
                 Batal
               </button>
-              <button
+              <button type="button"
                 onClick={onConfirm}
                 disabled={isPending}
                 className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-all disabled:opacity-50 inline-flex items-center justify-center gap-2"

@@ -103,7 +103,7 @@ export function EditProgramModal({ open, onClose, course }: Props) {
                   <p className="text-xs text-slate-500">{course.title.slice(0, 40)}</p>
                 </div>
               </div>
-              <button onClick={onClose} disabled={isPending} className="p-1.5 hover:bg-slate-100 rounded-xl transition-colors">
+              <button type="button" onClick={onClose} disabled={isPending} className="p-1.5 hover:bg-slate-100 rounded-xl transition-colors">
                 <X className="h-5 w-5 text-slate-400" />
               </button>
             </div>
@@ -189,14 +189,14 @@ export function EditProgramModal({ open, onClose, course }: Props) {
 
                 {/* Actions */}
                 <div className="mt-6 flex gap-3">
-                  <button
+                  <button type="button"
                     onClick={onClose}
                     disabled={isPending}
                     className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-50"
                   >
                     Batal
                   </button>
-                  <button
+                  <button type="button"
                     onClick={handleSubmit}
                     disabled={isPending}
                     className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-all disabled:opacity-50 inline-flex items-center justify-center gap-2 shadow-lg shadow-blue-200"

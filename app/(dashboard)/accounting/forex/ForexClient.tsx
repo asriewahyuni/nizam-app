@@ -164,7 +164,7 @@ export function ForexClient({ orgId, history }: { orgId: string; history: ForexR
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
+                        <button type="button"
                           onClick={() => handleDelete(item.id)}
                           disabled={deleting === item.id}
                           className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"

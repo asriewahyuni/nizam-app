@@ -84,7 +84,7 @@ export function SubmitTicketForm({ org }: { org: OrgInfo }) {
               Kami akan menghubungi kamu melalui {email ? `email (${email})` : ''}{email && phone ? ' atau ' : ''}{phone ? `WA/telepon (${phone})` : ''} setelah ada update.
             </p>
           )}
-          <button
+          <button type="button"
             onClick={() => {
               setSubmitted(null)
               setName(''); setEmail(''); setPhone(''); setSubject(''); setDescription('')

@@ -2563,7 +2563,7 @@ export function ApiSettingsClient({
         ].map(tab => {
           const Icon = tab.icon
           return (
-            <button
+            <button type="button"
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-semibold uppercase tracking-wide transition-all ${
@@ -2588,7 +2588,7 @@ export function ApiSettingsClient({
           {isAdmin && (
             <div className="flex justify-between items-center">
               <p className="text-sm text-slate-500 font-medium">{apiKeys.length} API key terdaftar</p>
-              <button
+              <button type="button"
                 onClick={() => setShowGenModal(true)}
                 className="flex items-center gap-2 px-5 py-3 bg-violet-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 active:scale-95"
               >
@@ -2662,7 +2662,7 @@ export function ApiSettingsClient({
                 </div>
                 {isAdmin && (
                   <div className="flex items-center gap-2 shrink-0">
-                    <button
+                    <button type="button"
                       onClick={() => handleOpenEditKey(key)}
                       disabled={loading}
                       className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-[10px] font-semibold uppercase tracking-wide hover:bg-slate-200 transition-all disabled:opacity-50"
@@ -2670,7 +2670,7 @@ export function ApiSettingsClient({
                       <Pencil size={13} /> Edit
                     </button>
                     {key.is_active && (
-                      <button
+                      <button type="button"
                         onClick={() => handleRevoke(key.id, key.name)}
                         disabled={loading}
                         className="flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-[10px] font-semibold uppercase tracking-wide hover:bg-red-100 transition-all disabled:opacity-50"
@@ -3053,7 +3053,7 @@ export function ApiSettingsClient({
           </div>
 
           <div className="flex justify-end pt-4 border-t border-slate-100">
-            <button
+            <button type="button"
               onClick={handleSaveConfig}
               disabled={loading}
               className="flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 active:scale-95"
@@ -3217,7 +3217,7 @@ export function ApiSettingsClient({
           </div>
 
           <div className="flex justify-end pt-4 border-t border-slate-100">
-            <button
+            <button type="button"
               onClick={handleSaveConfig}
               disabled={loading}
               className="flex items-center gap-2 px-8 py-4 bg-rose-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 disabled:opacity-50 active:scale-95"
@@ -3532,7 +3532,7 @@ if (signature !== expected) {
             </div>
 
             <div className="flex justify-end pt-4 border-t border-slate-100">
-              <button
+              <button type="button"
                 onClick={handleSaveConfig}
                 disabled={loading}
                 className="flex items-center gap-2 px-8 py-4 bg-violet-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
@@ -3686,7 +3686,7 @@ if (signature !== expected) {
                     </p>
                   </div>
                   {!generatedKey && (
-                    <button onClick={() => setShowGenModal(false)} className="p-2 rounded-xl bg-slate-100 text-slate-400 hover:bg-slate-200 transition-all">
+                    <button type="button" onClick={() => setShowGenModal(false)} className="p-2 rounded-xl bg-slate-100 text-slate-400 hover:bg-slate-200 transition-all">
                       <X size={16} />
                     </button>
                   )}
@@ -3702,7 +3702,7 @@ if (signature !== expected) {
                           <p className="text-[10px] font-semibold uppercase tracking-wide">Plaintext Key</p>
                         </div>
                         <code className="text-emerald-400 text-xs md:text-sm font-mono break-all leading-relaxed">{generatedKey}</code>
-                        <button
+                        <button type="button"
                           onClick={() => handleCopyKey(generatedKey)}
                           className="absolute top-4 right-4 p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all"
                         >
@@ -3737,7 +3737,7 @@ if (signature !== expected) {
                         ))}
                       </div>
 
-                      <button
+                      <button type="button"
                         onClick={() => { setGeneratedKey(null); setShowGenModal(false) }}
                         className="w-full py-4 bg-slate-900 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-black transition-all"
                       >
@@ -3868,13 +3868,13 @@ if (signature !== expected) {
                       </div>
 
                       <div className="flex flex-col sm:flex-row gap-3">
-                        <button
+                        <button type="button"
                           onClick={() => setShowGenModal(false)}
                           className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-slate-200 transition-all"
                         >
                           Batal
                         </button>
-                        <button
+                        <button type="button"
                           onClick={handleGenerate}
                           disabled={loading || !genName.trim() || genScopes.length === 0}
                           className="flex-1 py-4 bg-violet-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
@@ -4000,7 +4000,7 @@ if (signature !== expected) {
                       Perbarui scope, rate limit, expiry, cabang, dan whitelist IP tanpa revoke key.
                     </p>
                   </div>
-                  <button onClick={() => setShowEditModal(false)} className="p-2 rounded-xl bg-slate-100 text-slate-400 hover:bg-slate-200 transition-all">
+                  <button type="button" onClick={() => setShowEditModal(false)} className="p-2 rounded-xl bg-slate-100 text-slate-400 hover:bg-slate-200 transition-all">
                     <X size={16} />
                   </button>
                 </div>
@@ -4094,13 +4094,13 @@ if (signature !== expected) {
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3">
-                    <button
+                    <button type="button"
                       onClick={() => setShowEditModal(false)}
                       className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-slate-200 transition-all"
                     >
                       Batal
                     </button>
-                    <button
+                    <button type="button"
                       onClick={handleUpdateKey}
                       disabled={loading || !editName.trim() || editScopes.length === 0}
                       className="flex-1 py-4 bg-violet-600 text-white rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"

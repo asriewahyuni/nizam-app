@@ -210,7 +210,7 @@ export default function RatioClient({ initialData }: Props) {
         {categories.map((cat) => {
           const Icon = cat.icon
           return (
-            <button
+            <button type="button"
               key={cat.key}
               onClick={() => setActiveCategory(cat.key)}
               className={`flex items-center gap-3 px-5 py-3 rounded-xl font-semibold text-sm transition-all whitespace-nowrap ${

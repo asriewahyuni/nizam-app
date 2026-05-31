@@ -70,7 +70,7 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
 
         <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
           {['ALL', 'CREATE', 'UPDATE', 'DELETE', 'VOID'].map((type) => (
-            <button
+            <button type="button"
               key={type}
               onClick={() => setFilterType(type)}
               className={cn(
@@ -141,7 +141,7 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
                     <Clock size={12} className="text-slate-300" />
                     ID: {log.record_id?.slice(0, 8) || 'N/A'}...
                   </div>
-                  <button className="flex items-center gap-1 text-blue-600 font-bold hover:underline ml-auto">
+                  <button type="button" className="flex items-center gap-1 text-blue-600 font-bold hover:underline ml-auto">
                     Detil Data <ExternalLink size={12} />
                   </button>
                 </div>

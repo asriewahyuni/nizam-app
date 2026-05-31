@@ -122,21 +122,21 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
              />
            </div>
 
-           <button 
+           <button type="button" 
              onClick={() => alert("Segera Hadir: Sinkronisasi e-Billing & Modul Bank untuk pembuatan Jurnal Pembayaran Pajak otomatis.")}
              className="flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all text-sm"
            >
              <Wallet size={16} /> Bayar Pajak
            </button>
            
-           <button 
+           <button type="button" 
              onClick={() => alert("Segera Hadir: Ekspor CSV/PDF Laporan SPT Masa format baku DJP Online.")}
              className="flex items-center gap-2 px-5 py-3 bg-white text-slate-700 font-bold border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-sm"
            >
              <Download size={16} /> Download SPT
            </button>
 
-           <button onClick={() => window.print()} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-emerald-600 rounded-xl shadow-sm transition-all hidden md:flex items-center justify-center">
+           <button type="button" onClick={() => window.print()} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-emerald-600 rounded-xl shadow-sm transition-all hidden md:flex items-center justify-center">
              <Printer size={18} />
            </button>
         </div>
@@ -263,13 +263,13 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
          <div className="lg:col-span-2 space-y-8">
             {/* Tab Selector */}
             <div className="flex bg-slate-100 p-1.5 rounded-xl w-fit">
-               <button 
+               <button type="button" 
                  onClick={() => setActiveTab('VAT')}
                  className={`px-8 py-3 rounded-xl text-xs font-semibold transition-all ${activeTab === 'VAT' ? 'bg-white text-emerald-600 shadow-xl shadow-emerald-200/50' : 'text-slate-400 hover:text-slate-600'}`}
                >
                  MANAJEMEN PPN
                </button>
-               <button 
+               <button type="button" 
                  onClick={() => setActiveTab('PPH')}
                  className={`px-8 py-3 rounded-xl text-xs font-semibold transition-all ${activeTab === 'PPH' ? 'bg-white text-blue-600 shadow-xl shadow-blue-200/50' : 'text-slate-400 hover:text-slate-600'}`}
                >
@@ -292,7 +292,7 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
                            Rincian Transaksi PPN 
                            <span className="px-3 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold text-slate-400">Real-time Data</span>
                         </h4>
-                        <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-semibold shadow-lg shadow-emerald-200">
+                        <button type="button" className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-semibold shadow-lg shadow-emerald-200">
                            <FileText size={14} /> EXPORT CSV
                         </button>
                      </div>

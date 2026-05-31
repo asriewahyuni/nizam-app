@@ -811,19 +811,19 @@ export default function HrisClient({
             <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner overflow-x-auto scrollbar-hide max-w-[90vw] md:max-w-none">
               {['EMPLOYEES', 'POSITIONS', 'ACTIVATION'].includes(activeTab) && (
                 <>
-                  <button
+                  <button type="button"
                     onClick={() => setActiveTab('POSITIONS')}
                     className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 ${activeTab === 'POSITIONS' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     Positions & Roles
                   </button>
-                  <button
+                  <button type="button"
                     onClick={() => setActiveTab('EMPLOYEES')}
                     className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 ${activeTab === 'EMPLOYEES' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     Employees
                   </button>
-                  <button
+                  <button type="button"
                      onClick={() => setActiveTab('ACTIVATION')}
                      className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 ${activeTab === 'ACTIVATION' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
                   >
@@ -832,17 +832,17 @@ export default function HrisClient({
                 </>
               )}
               {activeTab === 'ATTENDANCE' && (
-                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                <button type="button" className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
                   Mesin Absensi Terpusat
                 </button>
               )}
               {activeTab === 'PAYROLL' && (
-                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                <button type="button" className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
                   Master Komponen Gaji
                 </button>
               )}
               {activeTab === 'RUNS' && (
-                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                <button type="button" className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-semibold uppercase tracking-wide transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
                   Siklus Penggajian
                 </button>
               )}
@@ -969,7 +969,7 @@ export default function HrisClient({
                   </div>
                   <div className="flex gap-1.5 flex-wrap">
                     {([['ALL','Semua'],['FULL_TIME','Full Time'],['CONTRACT','Kontrak'],['PROBATION','Probation'],['INTERN','Magang'],['RESIGNED','Resign'],['TERMINATED','Terminated']] as const).map(([val,label]) => (
-                      <button key={val} onClick={() => setFilterStatusEmp(val)}
+                      <button type="button" key={val} onClick={() => setFilterStatusEmp(val)}
                         className={`px-3 py-1.5 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatusEmp === val ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
                         {label}
                         {val !== 'ALL' && <span className="ml-1 opacity-70">({employees.filter((e:any)=>e.employment_status===val).length})</span>}
@@ -1025,13 +1025,13 @@ export default function HrisClient({
                             </div>
                           </div>
                         <div className="flex flex-col gap-2 items-end">
-                          <button
+                          <button type="button"
                             onClick={(e: any) => { e.stopPropagation(); handleOpenEdit(emp); }}
                             className="p-3 bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition shadow-sm border border-slate-100"
                           >
                             <Edit2 size={16} />
                           </button>
-                          <button
+                          <button type="button"
                             onClick={(e: any) => { e.stopPropagation(); handleOpenTransfer(emp); }}
                             disabled={transferTargets.length === 0}
                             className="p-3 bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition shadow-sm border border-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1039,7 +1039,7 @@ export default function HrisClient({
                           >
                             <ArrowRightLeft size={16} />
                           </button>
-                          <button
+                          <button type="button"
                             onClick={(e: any) => { e.stopPropagation(); handleResignEmployee(emp); }}
                             disabled={String(emp.employment_status || '').toUpperCase() === 'RESIGNED'}
                             className="p-3 bg-white text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition shadow-sm border border-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1051,7 +1051,7 @@ export default function HrisClient({
                           >
                             <AlertCircle size={16} />
                           </button>
-                          <button
+                          <button type="button"
                             onClick={(e: any) => { e.stopPropagation(); handleDeleteEmployee(emp); }}
                             className="p-3 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition shadow-sm border border-slate-100"
                             title="Hapus karyawan"
@@ -1060,7 +1060,7 @@ export default function HrisClient({
                           </button>
                           
                           {emp.reset_requested && (
-                            <button
+                            <button type="button"
                               onClick={(e: any) => { e.stopPropagation(); handleResetPassword(emp); }}
                               disabled={resettingId === emp.id}
                               className="p-3 bg-rose-500 text-white hover:bg-rose-600 rounded-xl transition shadow-lg shadow-rose-200 animate-bounce"
@@ -1175,8 +1175,8 @@ export default function HrisClient({
                           </div>
                           {!role.is_system && (
                             <div className="flex gap-2">
-                              <button onClick={() => { setEditingPosition(role); setIsPositionModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-600 bg-white rounded-xl shadow-sm"><Edit2 size={14}/></button>
-                              <button onClick={() => handleDeletePosition(role.id, role.is_system)} className="p-2 text-slate-300 hover:text-rose-500 bg-white rounded-xl shadow-sm"><Trash2 size={14}/></button>
+                              <button type="button" onClick={() => { setEditingPosition(role); setIsPositionModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-600 bg-white rounded-xl shadow-sm"><Edit2 size={14}/></button>
+                              <button type="button" onClick={() => handleDeletePosition(role.id, role.is_system)} className="p-2 text-slate-300 hover:text-rose-500 bg-white rounded-xl shadow-sm"><Trash2 size={14}/></button>
                             </div>
                           )}
                           {role.is_system && <StatusBadge label="SYSTEM PROTECTED" variant="warning" />}
@@ -1472,7 +1472,7 @@ export default function HrisClient({
                                   {comp.is_taxable && <StatusBadge label="TAXABLE" variant="warning" />}
                                 </div>
                               </div>
-                              <button onClick={() => handleDeletePayrollComponent(comp.id)} className="p-3 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                              <button type="button" onClick={() => handleDeletePayrollComponent(comp.id)} className="p-3 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
                                 <Trash2 size={16} />
                               </button>
                             </div>
@@ -1586,7 +1586,7 @@ export default function HrisClient({
                         </td>
                         <td className="px-8 py-6">
                           <div className="flex items-center justify-end gap-2">
-                            <button
+                            <button type="button"
                               onClick={async () => {
                                 const res = await getPayrollRunDetails(orgId, run.id)
                                 setViewingRun(run)
@@ -1606,12 +1606,12 @@ export default function HrisClient({
                                 >
                                   DISBURSE
                                 </SafeButton>
-                                <button onClick={() => handleDeleteRun(run.id, false)} className="p-2 text-slate-200 hover:text-rose-500 transition-colors">
+                                <button type="button" onClick={() => handleDeleteRun(run.id, false)} className="p-2 text-slate-200 hover:text-rose-500 transition-colors">
                                   <Trash2 size={16} />
                                 </button>
                               </>
                             ) : (
-                              <button onClick={() => handleDeleteRun(run.id, true)} className="p-2 text-slate-200 hover:text-rose-500 transition-colors" title="Void Payroll">
+                              <button type="button" onClick={() => handleDeleteRun(run.id, true)} className="p-2 text-slate-200 hover:text-rose-500 transition-colors" title="Void Payroll">
                                 <AlertCircle size={16} />
                               </button>
                             )}
@@ -2248,7 +2248,7 @@ export default function HrisClient({
                     <p className="text-[10px] font-semibold opacity-70 uppercase tracking-wide mt-0.5">Bulk salary calculation</p>
                   </div>
                 </div>
-                <button onClick={() => setIsRunModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-all">
+                <button type="button" onClick={() => setIsRunModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-all">
                   <X size={18} />
                 </button>
               </div>
@@ -2405,7 +2405,7 @@ export default function HrisClient({
                   >
                     CONFIRM & DISBURSE
                   </SafeButton>
-                  <button onClick={() => { setIsPayModalOpen(null); setPayAccountId('') }} className="text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:text-slate-500 transition-all">ABORT OPERATION</button>
+                  <button type="button" onClick={() => { setIsPayModalOpen(null); setPayAccountId('') }} className="text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:text-slate-500 transition-all">ABORT OPERATION</button>
                 </div>
               </div>
             </motion.div>
@@ -2431,7 +2431,7 @@ export default function HrisClient({
                     <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">{editingEmp ? 'Update personnel records' : 'Fill legal master data'}</p>
                   </div>
                 </div>
-                <button onClick={() => setIsAddModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
+                <button type="button" onClick={() => setIsAddModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
                   <X size={18} />
                 </button>
               </div>
@@ -2689,7 +2689,7 @@ export default function HrisClient({
                     <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">{transferingEmp.first_name} {transferingEmp.last_name || ''}</p>
                   </div>
                 </div>
-                <button onClick={() => setIsTransferModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all border border-slate-100">
+                <button type="button" onClick={() => setIsTransferModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all border border-slate-100">
                   <X size={18} />
                 </button>
               </div>
@@ -2808,7 +2808,7 @@ export default function HrisClient({
                     )}
                   </div>
                 </div>
-                <button onClick={() => setViewingRun(null)} className="p-2 bg-white text-slate-400 rounded-xl hover:text-slate-600 border border-slate-100 shadow-sm transition">
+                <button type="button" onClick={() => setViewingRun(null)} className="p-2 bg-white text-slate-400 rounded-xl hover:text-slate-600 border border-slate-100 shadow-sm transition">
                   <X size={20} />
                 </button>
               </div>
@@ -2844,7 +2844,7 @@ export default function HrisClient({
                           </div>
                           <div className="text-right flex flex-col items-end gap-2">
                             <div className="flex items-center gap-2">
-                              <button
+                              <button type="button"
                                 onClick={() => {
                                   const printWindow = window.open('', '_blank');
                                   if (!printWindow) return;
@@ -2951,7 +2951,7 @@ export default function HrisClient({
               </div>
 
               <div className="p-8 border-t border-slate-100 bg-slate-50 flex justify-end">
-                <button onClick={() => setViewingRun(null)} className="px-10 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition shadow-sm">Tutup</button>
+                <button type="button" onClick={() => setViewingRun(null)} className="px-10 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition shadow-sm">Tutup</button>
               </div>
             </motion.div>
           </div>
@@ -2974,7 +2974,7 @@ export default function HrisClient({
             {toast.type === 'error' && <AlertCircle size={24} className="text-rose-500 shrink-0" />}
             {toast.type === 'info' && <AlertCircle size={24} className="text-blue-500 shrink-0" />}
             <p className="text-sm font-bold tracking-tight leading-tight max-w-sm">{toast.message}</p>
-            <button onClick={() => setToast(null)} className="ml-2 pl-4 border-l border-current opacity-60 hover:opacity-100 transition-opacity">
+            <button type="button" onClick={() => setToast(null)} className="ml-2 pl-4 border-l border-current opacity-60 hover:opacity-100 transition-opacity">
               <X size={16} />
             </button>
           </motion.div>

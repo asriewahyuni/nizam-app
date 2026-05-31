@@ -85,7 +85,7 @@ export default function ForecastClient({ forecast, orgId, activeBranchName = nul
 
         <div className="flex bg-slate-100 p-1.5 rounded-xl w-fit">
             {[30, 60, 90].map((d) => (
-                <button 
+                <button type="button" 
                   key={d}
                   onClick={() => changeDays(d)}
                   className={`px-6 py-3 rounded-xl text-[10px] font-semibold transition-all ${days === d ? 'bg-white text-indigo-600 shadow-xl shadow-indigo-200/50' : 'text-slate-400 hover:text-slate-600'}`}

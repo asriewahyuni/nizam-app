@@ -322,7 +322,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
             </div>
           </div>
 
-          <button
+          <button type="button"
             onClick={handleSaveProfile}
             disabled={saving}
             className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-200 active:scale-[0.98]"
@@ -375,7 +375,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button
+            <button type="button"
               onClick={() => handleClockAttendance('IN')}
               disabled={attendanceSaving || Boolean(todayAttendance)}
               className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-200 active:scale-[0.98]"
@@ -383,7 +383,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
               {attendanceSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle size={16} />}
               CLOCK IN
             </button>
-            <button
+            <button type="button"
               onClick={() => handleClockAttendance('OUT')}
               disabled={attendanceSaving || !todayAttendance || Boolean(todayAttendance?.check_out)}
               className="w-full py-4 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-sky-200 active:scale-[0.98]"
@@ -513,7 +513,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
             />
           </div>
 
-          <button
+          <button type="button"
             onClick={handleSubmitExpenseClaim}
             disabled={expenseSaving || receiptUploading || !employee}
             className="w-full py-4 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-200 active:scale-[0.98]"
@@ -552,7 +552,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                       {claim.status}
                     </span>
                     {['PENDING', 'REJECTED'].includes(claim.status) && (
-                      <button
+                      <button type="button"
                         onClick={() => handleDeleteExpenseClaim(claim.id)}
                         disabled={expenseSaving}
                         className="text-[10px] font-semibold uppercase tracking-wide text-rose-500 hover:text-rose-600 disabled:opacity-40 flex items-center gap-1"
@@ -632,7 +632,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
             />
           </div>
 
-          <button
+          <button type="button"
             onClick={handleSubmitLeave}
             disabled={leaveSaving || !employee}
             className="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-200 active:scale-[0.98]"
@@ -668,7 +668,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                       {request.status}
                     </span>
                     {request.status === 'PENDING' && (
-                      <button
+                      <button type="button"
                         onClick={() => handleCancelLeave(request.id)}
                         disabled={leaveSaving}
                         className="text-[10px] font-semibold uppercase tracking-wide text-rose-500 hover:text-rose-600 disabled:opacity-40"
@@ -730,7 +730,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
             )}
           </div>
 
-          <button
+          <button type="button"
             onClick={handleChangePassword}
             disabled={pwdSaving || !newPwd || !confirmPwd}
             className="w-full py-4 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-semibold uppercase tracking-wide text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-200 active:scale-[0.98]"
@@ -761,7 +761,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
             : <AlertCircle size={22} className="text-rose-500 shrink-0" />
           }
           <p className="text-sm font-bold">{toast.message}</p>
-          <button onClick={() => setToast(null)} className="ml-2 pl-4 border-l border-current opacity-60 hover:opacity-100 transition-opacity">
+          <button type="button" onClick={() => setToast(null)} className="ml-2 pl-4 border-l border-current opacity-60 hover:opacity-100 transition-opacity">
             <X size={15} />
           </button>
         </div>

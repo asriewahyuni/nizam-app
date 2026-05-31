@@ -1115,7 +1115,7 @@ export default function SalesClient({
         />
         <div className="px-8 pb-3 flex gap-1.5 flex-wrap">
           {([['ALL','Semua'],['DRAFT','Draft'],['ORDERED','Proses'],['FINISHED','Selesai'],['VOIDED','Void']] as const).map(([val, label]) => (
-            <button key={val} onClick={() => setFilterStatus(val)}
+            <button type="button" key={val} onClick={() => setFilterStatus(val)}
               className={`px-3 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatus === val ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
               {label}
               {val !== 'ALL' && <span className="ml-1 opacity-70">({(sales||[]).filter((s:any)=>s.status===val).length})</span>}
@@ -1151,7 +1151,7 @@ export default function SalesClient({
                 sortedSales.map((s: any) => (
                   <tr key={s.id} className="group hover:bg-slate-50 transition-colors">
                     <td className="px-8 py-6">
-                       <button onClick={() => setViewSale(s)} className="text-xs font-semibold text-blue-600 tracking-tighter hover:underline">
+                       <button type="button" onClick={() => setViewSale(s)} className="text-xs font-semibold text-blue-600 tracking-tighter hover:underline">
                          {s.sale_number}
                        </button>
                        <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(s.sale_date, 'short')}</div>
@@ -1214,36 +1214,36 @@ export default function SalesClient({
                     <td className="px-8 py-6">
                        <div className="flex flex-wrap items-center justify-end gap-2">
                          {s.status === 'DRAFT' && (
-                           <button onClick={() => openDraftSaleEditor(s)} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-500 hover:text-white transition-all border border-indigo-100" title="Edit Draft SO">
+                           <button type="button" onClick={() => openDraftSaleEditor(s)} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-500 hover:text-white transition-all border border-indigo-100" title="Edit Draft SO">
                              <Pencil size={16}/>
                            </button>
                          )}
 
                          {s.status === 'ORDERED' && (
-                           <button onClick={() => handleDeliverPO(s)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm border border-emerald-100 group/btn" title="Kirim Barang">
+                           <button type="button" onClick={() => handleDeliverPO(s)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm border border-emerald-100 group/btn" title="Kirim Barang">
                              <CheckSquare size={16}/>
                            </button>
                          )}
                          
                          {(s.status === 'DRAFT' || s.status === 'ORDERED' || (s.status === 'FINISHED' && s.payment_status === 'UNPAID')) && (
-                           <button onClick={() => handleVoidPO(s.id)} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-slate-100" title="Batalkan Transaksi">
+                           <button type="button" onClick={() => handleVoidPO(s.id)} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-slate-100" title="Batalkan Transaksi">
                              <XCircle size={16}/>
                            </button>
                          )}
 
                          {s.status !== 'VOIDED' && (
                             <>
-                              <button onClick={() => { setViewSale(s); setPrintMode('DELIVERY_ORDER'); }} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Preview & Cetak Surat Jalan">
+                              <button type="button" onClick={() => { setViewSale(s); setPrintMode('DELIVERY_ORDER'); }} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Preview & Cetak Surat Jalan">
                                 <Printer size={16}/>
                               </button>
-                              <button onClick={() => { setViewSale(s); setPrintMode('INVOICE'); }} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Preview & Cetak Invoice">
+                              <button type="button" onClick={() => { setViewSale(s); setPrintMode('INVOICE'); }} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Preview & Cetak Invoice">
                                 <FileText size={16}/>
                               </button>
                             </>
                          )}
 
                          {String(s?.shariah_mode || '').trim().toUpperCase() === 'ISTISHNA' && s.status === 'ORDERED' && (
-                           <button 
+                           <button type="button" 
                              onClick={async () => {
                                const proceed = await confirm('Sistem akan otomatis membuat BoM baru dan mem-publish SPK (Work Order) untuk pesanan ini dengan tenggat waktu mengikuti Jatuh Tempo pengiriman. Lanjutkan?');
                                if (!proceed) return;
@@ -1264,13 +1264,13 @@ export default function SalesClient({
                          )}
 
                          {s.payment_status !== 'PAID' && (s.status === 'FINISHED' || ((isSaleSalam(s) || String(s?.shariah_mode || '').trim().toUpperCase() === 'ISTISHNA') && s.status === 'ORDERED')) && (
-                           <button onClick={() => handleOpenPayment(s)} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-[10px] font-semibold uppercase tracking-wide rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
+                           <button type="button" onClick={() => handleOpenPayment(s)} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-[10px] font-semibold uppercase tracking-wide rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
                              <DollarSign size={14}/> Terima Bayar
                            </button>
                          )}
 
                          {s.status === 'FINISHED' && (
-                           <button onClick={() => handleOpenReturn(s)} className="p-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all border border-amber-100" title="Proses Retur">
+                           <button type="button" onClick={() => handleOpenReturn(s)} className="p-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all border border-amber-100" title="Proses Retur">
                              <RotateCcw size={16}/>
                            </button>
                          )}
@@ -1872,7 +1872,7 @@ export default function SalesClient({
                      </h2>
                      <p className="text-xs text-slate-500 font-medium">Pengembalian barang dan pemotongan piutang otomatis.</p>
                    </div>
-                   <button onClick={() => setShowReturnModal(false)} className="p-2 hover:bg-white rounded-xl transition-colors"><XCircle className="text-slate-400" size={24} /></button>
+                   <button type="button" onClick={() => setShowReturnModal(false)} className="p-2 hover:bg-white rounded-xl transition-colors"><XCircle className="text-slate-400" size={24} /></button>
                 </div>
                 <div className="p-6 overflow-y-auto space-y-6">
                    <div className="grid grid-cols-2 gap-4">
@@ -1920,13 +1920,13 @@ export default function SalesClient({
                       ) : (
                         <>
                           <div className="flex gap-2">
-                            <button 
+                            <button type="button" 
                               onClick={() => setRefundMode('AR')}
                               className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold border transition-all ${refundMode === 'AR' ? 'bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-100' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
                             >
                               Deposit / Potong Piutang (AR)
                             </button>
-                            <button 
+                            <button type="button" 
                               onClick={() => setRefundMode('CASH')}
                               className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold border transition-all ${refundMode === 'CASH' ? 'bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-100' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
                             >
@@ -1970,8 +1970,8 @@ export default function SalesClient({
                 <div className="p-6 bg-slate-50 flex items-center justify-between">
                    <div className="text-[10px] text-slate-400 font-bold max-w-[200px]">💡 Sistem akan otomatis membalik jurnal Pendapatan, Pajak, dan HPP sesuai proporsi unit.</div>
                    <div className="flex gap-3">
-                      <button onClick={() => setShowReturnModal(false)} className="px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">Batal</button>
-                      <button 
+                      <button type="button" onClick={() => setShowReturnModal(false)} className="px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">Batal</button>
+                      <button type="button" 
                         onClick={handleProcessReturn}
                         disabled={loading}
                         className="px-8 py-3 bg-amber-600 text-white text-sm font-bold rounded-xl hover:bg-amber-700 shadow-xl shadow-amber-100 disabled:opacity-50 transition-all flex items-center gap-2"
@@ -2032,7 +2032,7 @@ export default function SalesClient({
                       <h3 className="text-xl font-bold text-slate-900 print:text-2xl print:tracking-wide">{printMode === 'DELIVERY_ORDER' ? 'SURAT JALAN / MANIFEST PENGIRIMAN' : 'SALES ORDER / INVOICE'}</h3>
                       <p className="text-sm font-semibold text-blue-600 print:text-slate-900 print:mt-1">{viewSale.sale_number}</p>
                    </div>
-                   <button onClick={() => setViewSale(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-full hover:bg-slate-200 transition-colors print:hidden so-no-print">
+                   <button type="button" onClick={() => setViewSale(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-full hover:bg-slate-200 transition-colors print:hidden so-no-print">
                      <XCircle size={24}/>
                    </button>
                 </div>
@@ -2184,13 +2184,13 @@ export default function SalesClient({
                 </div>
                 
                 <div className="p-4 border-t border-slate-100 bg-white flex justify-end gap-2 print:hidden so-no-print">
-                   <button onClick={() => { setPrintMode('INVOICE'); setTimeout(() => window.print(), 100); }} className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200">
+                   <button type="button" onClick={() => { setPrintMode('INVOICE'); setTimeout(() => window.print(), 100); }} className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200">
                       Cetak SO / Invoice
                    </button>
-                   <button onClick={() => { setPrintMode('DELIVERY_ORDER'); setTimeout(() => window.print(), 100); }} className="px-4 py-2 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all border border-blue-200">
+                   <button type="button" onClick={() => { setPrintMode('DELIVERY_ORDER'); setTimeout(() => window.print(), 100); }} className="px-4 py-2 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all border border-blue-200">
                       Cetak Surat Jalan
                    </button>
-                   <button onClick={() => setViewSale(null)} className="px-6 py-2.5 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-xl shadow-md transition-all border border-slate-700 ml-2">
+                   <button type="button" onClick={() => setViewSale(null)} className="px-6 py-2.5 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-xl shadow-md transition-all border border-slate-700 ml-2">
                       Tutup
                    </button>
                 </div>
@@ -2209,7 +2209,7 @@ export default function SalesClient({
                        <h3 className="text-xl font-semibold text-slate-900">Terima Pembayaran</h3>
                        <p className="text-xs text-slate-400 font-bold mt-1 uppercase">Faktur: {selectedSaleForPayment.sale_number}</p>
                     </div>
-                    <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-white rounded-full transition-colors text-slate-400 hover:text-rose-500">
+                    <button type="button" onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-white rounded-full transition-colors text-slate-400 hover:text-rose-500">
                       <XCircle size={24}/>
                     </button>
                 </div>
@@ -2308,8 +2308,8 @@ export default function SalesClient({
                        <span className="text-sm font-semibold text-slate-700">{formatCurrency(paymentAmount + discountAmount)}</span>
                     </div>
                     <div className="flex items-center justify-end gap-3">
-                       <button onClick={() => setShowPaymentModal(false)} className="px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">Batal</button>
-                       <button 
+                       <button type="button" onClick={() => setShowPaymentModal(false)} className="px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">Batal</button>
+                       <button type="button" 
                          onClick={handleProcessPayment}
                          disabled={loading || !collectionAccountId || (paymentAmount + discountAmount) <= 0}
                          className="px-8 py-3 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 shadow-xl shadow-emerald-100 disabled:opacity-50 transition-all flex items-center gap-2"

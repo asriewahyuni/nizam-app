@@ -55,14 +55,14 @@ export function ProgramListClient({ courses }: { courses: Course[] }) {
               </div>
             </div>
             <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              <button
+              <button type="button"
                 onClick={() => setEditingCourse(c)}
                 title="Edit program"
                 className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-blue-300 hover:bg-blue-500/30 hover:text-white transition-all"
               >
                 <Pencil size={14} />
               </button>
-              <button
+              <button type="button"
                 onClick={() => setDeletingCourseId(c.id)}
                 title="Hapus program"
                 className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-all"

@@ -495,7 +495,7 @@ export default function QuotationClient({
                         <StatusBadge label="Pending Quotation" variant="warning" />
                       </td>
                       <td className="px-8 py-6 text-right space-x-2">
-                        <button
+                        <button type="button"
                           onClick={() => handleConvert(quotation.id)}
                           className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-semibold uppercase tracking-wide hover:bg-emerald-600 hover:text-white transition-all"
                         >
@@ -882,7 +882,7 @@ export default function QuotationClient({
                         </h3>
                         <p className="text-sm font-semibold text-blue-600 print:text-slate-900 print:mt-1">{quotationNumber}</p>
                       </div>
-                      <button
+                      <button type="button"
                         onClick={() => setViewQuotation(null)}
                         className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-full hover:bg-slate-200 transition-colors print:hidden quotation-no-print"
                       >
@@ -1023,13 +1023,13 @@ export default function QuotationClient({
                     </div>
 
                     <div className="p-4 border-t border-slate-100 bg-white flex justify-end gap-2 print:hidden quotation-no-print">
-                      <button
+                      <button type="button"
                         onClick={() => setTimeout(() => window.print(), 100)}
                         className="px-4 py-2 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all border border-blue-200"
                       >
                         Cetak Quotation
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setViewQuotation(null)}
                         className="px-6 py-2.5 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-xl shadow-md transition-all border border-slate-700 ml-2"
                       >

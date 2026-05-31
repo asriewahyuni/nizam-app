@@ -407,7 +407,7 @@ export function QuickStartClient({ data }: { data: QuickStartData }) {
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">Referensi cepat semua fitur Nizam ERP</p>
           </div>
-          <button
+          <button type="button"
             onClick={() => setDismissed(false)}
             className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
           >
@@ -425,7 +425,7 @@ export function QuickStartClient({ data }: { data: QuickStartData }) {
 
       {/* ── Zona 1: Sapaan Dinamis ────────────────────────────────────────── */}
       <div className="relative rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
-        <button
+        <button type="button"
           onClick={handleDismiss}
           className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
           title="Tutup panduan (bisa dibuka lagi dari sidebar)"
@@ -595,7 +595,7 @@ function EncyclopediaSection({
           {MODULES.map(m => {
             const MIcon = m.icon
             return (
-              <button
+              <button type="button"
                 key={m.id}
                 onClick={() => setActiveModule(m.id)}
                 className={cn(

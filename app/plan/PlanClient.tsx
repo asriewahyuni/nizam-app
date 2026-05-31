@@ -148,7 +148,7 @@ export default function PlanClient({ packages }: { packages: Package[] }) {
               if (!meta) return null
               const isActive = activePlan === n
               return (
-                <button
+                <button type="button"
                   key={pkg.id}
                   onClick={() => setActivePlan(n)}
                   className={cn(

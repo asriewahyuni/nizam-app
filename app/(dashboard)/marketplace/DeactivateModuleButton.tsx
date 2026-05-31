@@ -25,7 +25,7 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
 
   return (
     <>
-      <button
+      <button type="button"
         onClick={() => setShowConfirm(true)}
         className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors py-1"
         title="Nonaktifkan modul"
@@ -42,7 +42,7 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
               <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
                 <AlertTriangle className="h-5 w-5 text-red-500" />
               </div>
-              <button
+              <button type="button"
                 onClick={() => setShowConfirm(false)}
                 className="text-slate-400 hover:text-slate-600 transition-colors"
               >
@@ -59,14 +59,14 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
             </p>
 
             <div className="mt-6 flex gap-3">
-              <button
+              <button type="button"
                 onClick={() => setShowConfirm(false)}
                 disabled={isPending}
                 className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
               >
                 Batal
               </button>
-              <button
+              <button type="button"
                 onClick={handleConfirm}
                 disabled={isPending}
                 className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"

@@ -112,7 +112,7 @@ export function TicketListClient({ tickets, orgId, orgSlug, orgName }: Props) {
               <ExternalLink size={12} className="shrink-0 text-slate-400" />
               <span className="truncate">/submit/{orgSlug}</span>
             </div>
-            <button
+            <button type="button"
               onClick={copyLink}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#003366] hover:bg-[#002a55] text-white text-xs font-semibold transition-colors cursor-pointer"
             >

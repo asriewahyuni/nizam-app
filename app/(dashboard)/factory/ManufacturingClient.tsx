@@ -364,13 +364,13 @@ export function ManufacturingClient({
         </div>
 
         <div className="flex bg-slate-100/50 p-1 rounded-xl border border-slate-100">
-           <button
+           <button type="button"
               onClick={() => setActiveTab('SPK')}
               className={`px-6 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'SPK' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
            >
               Work Order (SPK)
            </button>
-           <button
+           <button type="button"
               onClick={() => setActiveTab('BOM')}
               className={`px-6 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'BOM' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
            >
@@ -380,7 +380,7 @@ export function ManufacturingClient({
 
         <div className="flex items-center gap-3">
           {activeTab === 'BOM' ? (
-            <button
+            <button type="button"
               onClick={() => setShowBomModal(true)}
               disabled={!activeBranchId}
               className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -389,7 +389,7 @@ export function ManufacturingClient({
               Setup BoM Baru
             </button>
           ) : (
-            <button
+            <button type="button"
               onClick={() => {
                 setDraftSpkNumber(createSpkDraftNumber())
                 setShowSpkModal(true)
@@ -440,7 +440,7 @@ export function ManufacturingClient({
                 <div className="px-8 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
                   <div className="flex gap-1.5 flex-wrap">
                     {([['ALL','Semua'],['DRAFT','Draft'],['RELEASED','Aktif'],['COMPLETED','Selesai'],['CANCELLED','Batal']] as const).map(([val, label]) => (
-                      <button key={val} onClick={() => setFilterStatusF(val)}
+                      <button type="button" key={val} onClick={() => setFilterStatusF(val)}
                         className={`px-3 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatusF === val ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
                         {label}
                         {val !== 'ALL' && <span className="ml-1 opacity-70">({workOrders.filter(w=>w.status===val).length})</span>}
@@ -512,7 +512,7 @@ export function ManufacturingClient({
                              </td>
                              <td className="px-8 py-5">
                                  <div className="flex justify-end gap-2">
-                                 <button
+                                 <button type="button"
                                    onClick={() => handleOpenPrintPreview(wo)}
                                    className="px-4 py-2 bg-white text-slate-700 text-[10px] font-semibold uppercase rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
                                  >
@@ -520,7 +520,7 @@ export function ManufacturingClient({
                                    Cetak SPK
                                  </button>
                                  {wo.status === 'DRAFT' && (
-                                   <button 
+                                   <button type="button" 
                                      disabled={!activeBranchId || loading}
                                      onClick={() => handleRelease(wo)} 
                                      className="px-4 py-2 bg-blue-600 text-white text-[10px] font-semibold uppercase rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -530,7 +530,7 @@ export function ManufacturingClient({
                                  )}
                                 {wo.status === 'RELEASED' && (
                                   <>
-                                    <button 
+                                    <button type="button" 
                                       disabled={!activeBranchId}
                                       onClick={() => {
                                         setSelectedWo(wo)
@@ -542,7 +542,7 @@ export function ManufacturingClient({
                                     </button>
                                   </>
                                 )}
-                                <button
+                                <button type="button"
                                   disabled={!activeBranchId}
                                   onClick={async () => {
                                     if (confirm('Yakin ingin menghapus SPK ini?')) {
@@ -626,7 +626,7 @@ export function ManufacturingClient({
                      </div>
 
                      <div className="pt-4 flex items-center justify-between">
-                        <button 
+                        <button type="button" 
                           disabled={!activeBranchId}
                           onClick={() => {
                             setEditingBom(bom)
@@ -642,7 +642,7 @@ export function ManufacturingClient({
                            Edit Resep <ChevronRight size={14} />
                         </button>
 
-                        <button 
+                        <button type="button" 
                           disabled={!activeBranchId}
                           onClick={async () => {
                             if (confirm('Yakin ingin menghapus resep (BoM) ini?')) {
@@ -729,14 +729,14 @@ export function ManufacturingClient({
                   <p className="text-xs text-slate-500 font-medium">Cetak satu dokumen untuk satu SPK.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button
+                  <button type="button"
                     onClick={handlePrintCurrentWo}
                     className="px-5 py-2.5 bg-white text-slate-700 font-bold text-sm border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
                   >
                     <Printer size={16} />
                     Cetak SPK
                   </button>
-                  <button
+                  <button type="button"
                     onClick={() => setSelectedPrintWo(null)}
                     className="w-10 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all flex items-center justify-center shadow-sm"
                   >
@@ -881,7 +881,7 @@ export function ManufacturingClient({
                   <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
                      <Zap size={20} className="text-emerald-500" /> Terbitkan SPK Baru
                   </h3>
-                  <button onClick={() => setShowSpkModal(false)} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
+                  <button type="button" onClick={() => setShowSpkModal(false)} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
                </div>
                <form onSubmit={handleCreateSpk} className="space-y-6">
                   <div className="space-y-2 text-left">
@@ -923,7 +923,7 @@ export function ManufacturingClient({
                   <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
                      <Settings size={20} className="text-blue-500" /> {editingBom ? 'Edit Bill of Materials' : 'Setup Bill of Materials'}
                   </h3>
-                  <button onClick={() => { setShowBomModal(false); setEditingBom(null); setBomItems([]); }} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
+                  <button type="button" onClick={() => { setShowBomModal(false); setEditingBom(null); setBomItems([]); }} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
                </div>
                <form onSubmit={handleCreateBom} className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
                   <div className="grid grid-cols-2 gap-4">
@@ -1019,7 +1019,7 @@ export function ManufacturingClient({
                   </h3>
                   <p className="text-xs text-slate-400 font-medium">{selectedWo.wo_number} - {selectedWo.bom?.product?.name}</p>
                 </div>
-                <button onClick={() => setShowFinishModal(false)} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
+                <button type="button" onClick={() => setShowFinishModal(false)} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
               </div>
 
               <form onSubmit={handleFinishSpk} className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar text-left">
@@ -1238,7 +1238,7 @@ export function ManufacturingClient({
                 </div>
 
                 <div className="flex flex-col gap-3">
-                  <button
+                  <button type="button"
                     onClick={() => {
                       setShowStockWarningModal(false)
                       if (pendingWo) {
@@ -1250,7 +1250,7 @@ export function ManufacturingClient({
                     Bypass & Lanjut Produksi
                   </button>
                   
-                  <button
+                  <button type="button"
                     disabled={loading}
                     onClick={handleRequestToPurchasing}
                     className="w-full py-5 bg-blue-600 text-white font-semibold rounded-[24px] shadow-xl hover:bg-blue-700 transition-all transform hover:-translate-y-1 active:scale-95 text-xs tracking-wide uppercase flex items-center justify-center gap-2"
@@ -1258,7 +1258,7 @@ export function ManufacturingClient({
                     <Truck size={14} /> {loading ? 'Mengirim...' : 'Kirim Rikues ke Purchasing'}
                   </button>
 
-                  <button
+                  <button type="button"
                     onClick={() => {
                       setShowStockWarningModal(false)
                       setShowQuotationPrompt(true)
@@ -1293,13 +1293,13 @@ export function ManufacturingClient({
                 </p>
               </div>
               <div className="flex gap-4">
-                <button
+                <button type="button"
                   onClick={() => setShowQuotationPrompt(false)}
                   className="flex-1 py-5 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition text-[11px] uppercase tracking-wide"
                 >
                   Nanti Saja
                 </button>
-                <button
+                <button type="button"
                   onClick={() => router.push('/sales/quotations')}
                   className="flex-1 py-5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-500 shadow-xl shadow-blue-100 transition text-[11px] uppercase tracking-wide"
                 >

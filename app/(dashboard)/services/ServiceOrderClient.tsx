@@ -63,7 +63,7 @@ export function ServiceOrderClient({ orgId, orders, contacts }: ServiceOrderClie
           <p className="text-sm text-slate-500 font-medium">Pengelolaan Perintah Kerja untuk Industri Layanan & Jasa.</p>
         </div>
 
-        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-6 py-3 bg-[#003366] text-white text-sm font-bold rounded-xl hover:bg-[#002d5a] shadow-xl shadow-[#003366]/10 transition-all">
+        <button type="button" onClick={() => setShowModal(true)} className="flex items-center gap-2 px-6 py-3 bg-[#003366] text-white text-sm font-bold rounded-xl hover:bg-[#002d5a] shadow-xl shadow-[#003366]/10 transition-all">
            <Plus size={18} /> Terbitkan Job Order
         </button>
       </div>
@@ -108,12 +108,12 @@ export function ServiceOrderClient({ orgId, orders, contacts }: ServiceOrderClie
                    </div>
                    <div className="flex items-center gap-2">
                       {order.status === 'PENDING' && (
-                        <button onClick={() => updateServiceStatus(orgId, order.id, 'IN_PROGRESS')} className="px-4 py-2 bg-[#003366] text-white text-[10px] font-semibold uppercase rounded-lg">Mulai</button>
+                        <button type="button" onClick={() => updateServiceStatus(orgId, order.id, 'IN_PROGRESS')} className="px-4 py-2 bg-[#003366] text-white text-[10px] font-semibold uppercase rounded-lg">Mulai</button>
                       )}
                       {order.status === 'IN_PROGRESS' && (
-                        <button onClick={() => updateServiceStatus(orgId, order.id, 'COMPLETED')} className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-semibold uppercase rounded-lg">Selesai</button>
+                        <button type="button" onClick={() => updateServiceStatus(orgId, order.id, 'COMPLETED')} className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-semibold uppercase rounded-lg">Selesai</button>
                       )}
-                      <button className="p-2 bg-slate-50 text-slate-300 hover:text-slate-600 rounded-lg transition"><MoreVertical size={16} /></button>
+                      <button type="button" className="p-2 bg-slate-50 text-slate-300 hover:text-slate-600 rounded-lg transition"><MoreVertical size={16} /></button>
                    </div>
                 </div>
              </motion.div>
@@ -131,7 +131,7 @@ export function ServiceOrderClient({ orgId, orders, contacts }: ServiceOrderClie
                    <h3 className="text-xl font-semibold text-slate-900 flex items-center gap-3">
                       <Plus size={20} className="text-[#003366]" /> Terbitkan SPK Jasa
                    </h3>
-                   <button onClick={() => setShowModal(false)} className="text-slate-400"><X size={20} /></button>
+                   <button type="button" onClick={() => setShowModal(false)} className="text-slate-400"><X size={20} /></button>
                 </div>
                 <form onSubmit={handleCreateOrder} className="space-y-6">
                    <div className="space-y-1.5 text-left">

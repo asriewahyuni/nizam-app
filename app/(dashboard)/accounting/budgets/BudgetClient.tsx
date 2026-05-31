@@ -246,13 +246,13 @@ export function BudgetClient({
 
         <div className="flex items-center gap-3">
           <div className="flex bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm print:hidden">
-            <button 
+            <button type="button" 
               onClick={() => setActiveTab('ANALYSIS')}
               className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'ANALYSIS' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-500 hover:text-slate-800'}`}
             >
               Realisasi Anggaran
             </button>
-            <button 
+            <button type="button" 
               onClick={() => setActiveTab('EDIT')}
               className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${
                 activeTab === 'EDIT'

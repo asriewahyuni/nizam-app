@@ -261,7 +261,7 @@ export default function RolesManagementPage() {
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[100] bg-rose-500 text-white px-8 py-4 rounded-xl shadow-md flex items-center gap-3 animate-bounce">
           <AlertCircle size={20} />
           <p className="text-sm font-semibold uppercase tracking-wide">{errorMsg}</p>
-          <button onClick={() => setErrorMsg(null)} className="ml-4 opacity-50 hover:opacity-100"><X size={16} /></button>
+          <button type="button" onClick={() => setErrorMsg(null)} className="ml-4 opacity-50 hover:opacity-100"><X size={16} /></button>
         </div>
       )}
 
@@ -294,7 +294,7 @@ export default function RolesManagementPage() {
               <Reorder.Item key={role.id} value={role} className="relative group touch-none">
                 <div className="flex items-center" style={{ paddingLeft: `${role.depth * 20}px` }}>
                   {role.depth > 0 && <CornerDownRight size={14} className="text-slate-200 mr-2 shrink-0" />}
-                  <button onClick={() => setActiveRoleId(role.id)} className={`flex-1 text-left p-4 rounded-xl transition-all border flex items-center gap-3 ${activeRoleId === role.id ? 'bg-slate-900 text-white border-slate-900 shadow-xl shadow-slate-200' : 'bg-white border-transparent hover:border-slate-200 text-slate-600 shadow-sm'}`}>
+                  <button type="button" onClick={() => setActiveRoleId(role.id)} className={`flex-1 text-left p-4 rounded-xl transition-all border flex items-center gap-3 ${activeRoleId === role.id ? 'bg-slate-900 text-white border-slate-900 shadow-xl shadow-slate-200' : 'bg-white border-transparent hover:border-slate-200 text-slate-600 shadow-sm'}`}>
                     <GripVertical size={14} className={`${activeRoleId === role.id ? 'text-slate-600' : 'text-slate-300'} opacity-40 group-hover:opacity-100 transition-opacity`} />
                     <div className="flex-1 overflow-hidden">
                       <h3 className="font-semibold text-[11px] uppercase tracking-wider truncate">{role.name}</h3>
@@ -327,9 +327,9 @@ export default function RolesManagementPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => handleOpenEdit(activeRole)} className="p-3 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><Edit2 size={18} /></button>
+                  <button type="button" onClick={() => handleOpenEdit(activeRole)} className="p-3 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><Edit2 size={18} /></button>
                   {!activeRole.is_system && (
-                    <button onClick={() => setConfirmDelete({ open: true, id: activeRole.id, name: activeRole.name })} className="p-3 bg-red-50 text-red-400 hover:text-white hover:bg-red-500 rounded-xl transition-all"><Trash2 size={18} /></button>
+                    <button type="button" onClick={() => setConfirmDelete({ open: true, id: activeRole.id, name: activeRole.name })} className="p-3 bg-red-50 text-red-400 hover:text-white hover:bg-red-500 rounded-xl transition-all"><Trash2 size={18} /></button>
                   )}
                 </div>
               </header>
@@ -366,11 +366,11 @@ export default function RolesManagementPage() {
                                       <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wide">{mod.id}</p>
                                     </div>
                                     <div className="flex gap-2">
-                                      <button onClick={() => togglePermission(mod.perms[0])} className={`px-5 py-2.5 rounded-xl text-[9px] font-semibold uppercase tracking-wide transition-all border ${hasRead ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-100' : 'bg-white text-slate-300 border-slate-100 hover:text-slate-600 hover:border-slate-300'}`}>
+                                      <button type="button" onClick={() => togglePermission(mod.perms[0])} className={`px-5 py-2.5 rounded-xl text-[9px] font-semibold uppercase tracking-wide transition-all border ${hasRead ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg shadow-emerald-100' : 'bg-white text-slate-300 border-slate-100 hover:text-slate-600 hover:border-slate-300'}`}>
                                         {hasRead && <Check size={10} className="inline mr-1" />} Lihat
                                       </button>
                                       {mod.perms.length > 1 && (
-                                        <button onClick={() => togglePermission(mod.perms[1])} className={`px-5 py-2.5 rounded-xl text-[9px] font-semibold uppercase tracking-wide transition-all border ${hasWrite ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-200' : 'bg-white text-slate-300 border-slate-100 hover:text-slate-600 hover:border-slate-300'}`}>
+                                        <button type="button" onClick={() => togglePermission(mod.perms[1])} className={`px-5 py-2.5 rounded-xl text-[9px] font-semibold uppercase tracking-wide transition-all border ${hasWrite ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-200' : 'bg-white text-slate-300 border-slate-100 hover:text-slate-600 hover:border-slate-300'}`}>
                                           {hasWrite && <Check size={10} className="inline mr-1" />} Ubah
                                         </button>
                                       )}

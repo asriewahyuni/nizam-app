@@ -49,7 +49,7 @@ export default function AccountingError({
             </pre>
           </details>
         )}
-        <button
+        <button type="button"
           onClick={reset}
           className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-all cursor-pointer"
         >

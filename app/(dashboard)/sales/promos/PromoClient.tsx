@@ -192,14 +192,14 @@ export default function PromoClient({ orgId, initialPromos }: PromoClientProps) 
                   </div>
 
                   <div className="relative z-10 flex items-center gap-2">
-                    <button
+                    <button type="button"
                       onClick={() => handleCopy(promo.code)}
                       className="bg-slate-50 p-3 rounded-xl text-slate-400 hover:bg-blue-600 hover:text-white transition-all shadow-sm group-hover:-translate-y-1"
                       title="Salin kode promo"
                     >
                       {copiedCode === promo.code ? <CheckCircle2 size={18} className="text-emerald-400" /> : <Copy size={18} />}
                     </button>
-                    <button
+                    <button type="button"
                       onClick={() => handleDeletePromo(promo)}
                       disabled={isSaving}
                       className="bg-slate-50 p-3 rounded-xl text-slate-400 hover:bg-rose-600 hover:text-white transition-all shadow-sm group-hover:-translate-y-1 disabled:opacity-50"
@@ -226,7 +226,7 @@ export default function PromoClient({ orgId, initialPromos }: PromoClientProps) 
             <p className="text-sm font-semibold text-white/80 mb-8 relative z-10 leading-relaxed">
               Persiapkan program poin loyalitas untuk menjaga pelanggan setia Anda tidak kabur ke kompetitor.
             </p>
-            <button className="relative z-10 w-full bg-white text-blue-600 font-semibold tracking-wide uppercase text-[10px] py-4 rounded-xl hover:bg-blue-50 transition-colors shadow-lg shadow-black/10">
+            <button type="button" className="relative z-10 w-full bg-white text-blue-600 font-semibold tracking-wide uppercase text-[10px] py-4 rounded-xl hover:bg-blue-50 transition-colors shadow-lg shadow-black/10">
               Aktifkan Modul Loyalty
             </button>
           </div>

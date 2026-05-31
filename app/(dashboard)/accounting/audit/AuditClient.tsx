@@ -73,7 +73,7 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
           <p className="text-sm text-slate-500 font-medium">Mendeteksi anomali jurnal, selisih stok, dan kelalaian depresiasi aset.</p>
         </div>
         
-        <button 
+        <button type="button" 
           onClick={handleRefresh}
           disabled={loading}
           className="flex items-center gap-3 px-8 py-5 bg-white border-2 border-slate-100 hover:border-indigo-200 hover:bg-slate-50 text-slate-900 font-semibold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50"
@@ -149,7 +149,7 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
                   {stats.overdueAssetCount}
                </span>
                {stats.overdueAssetCount > 0 && (
-                  <button 
+                  <button type="button" 
                     onClick={() => runReconcile('ASSETS')}
                     disabled={reconciling === 'ASSETS'}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-[10px] font-semibold uppercase rounded-xl hover:bg-indigo-700 transition-all active:scale-95"
@@ -270,7 +270,7 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
                Analisis Selisih Inventaris vs Buku Besar
                <span className="text-xs font-bold text-slate-400 italic font-mono">(Accounts 1301-1399 vs Physical On-Hand)</span>
             </h3>
-            <button
+            <button type="button"
               onClick={() => runReconcile('INVENTORY')}
               disabled={reconciling === 'INVENTORY'}
               className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-amber-100 text-amber-600 text-[10px] font-semibold uppercase rounded-xl hover:bg-amber-50 transition-all active:scale-95 disabled:opacity-50"

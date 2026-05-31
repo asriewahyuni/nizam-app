@@ -1635,15 +1635,15 @@ export default function SaaSAdminPage() {
             <p className="text-slate-400 font-bold text-sm tracking-wide mt-1 uppercase">NIZAM SaaS Platform Administration</p>
          </div>
 	         <div className="flex flex-wrap gap-3">
-	            <button onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Tenants</button>
-	            <button onClick={() => setActiveTab('module_management')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'module_management' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Manajemen Modul</button>
-	            <button onClick={() => setActiveTab('addon_management')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'addon_management' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Manajemen Add-on</button>
-	            <button onClick={() => setActiveTab('activity')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'activity' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Activity</button>
-	            <button onClick={() => setActiveTab('assessors')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'assessors' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Assessors</button>
-	            <button onClick={() => setActiveTab('packages')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'packages' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>SaaS Plans</button>
-	            <button onClick={() => setActiveTab('ai_tokens')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'ai_tokens' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>AI Tokens</button>
-	            <button onClick={() => setActiveTab('invoices')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'invoices' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Billing</button>
-	            <button onClick={() => setActiveTab('settings')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Settings</button>
+	            <button type="button" onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Tenants</button>
+	            <button type="button" onClick={() => setActiveTab('module_management')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'module_management' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Manajemen Modul</button>
+	            <button type="button" onClick={() => setActiveTab('addon_management')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'addon_management' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Manajemen Add-on</button>
+	            <button type="button" onClick={() => setActiveTab('activity')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'activity' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Activity</button>
+	            <button type="button" onClick={() => setActiveTab('assessors')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'assessors' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Assessors</button>
+	            <button type="button" onClick={() => setActiveTab('packages')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'packages' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>SaaS Plans</button>
+	            <button type="button" onClick={() => setActiveTab('ai_tokens')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'ai_tokens' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>AI Tokens</button>
+	            <button type="button" onClick={() => setActiveTab('invoices')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'invoices' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Billing</button>
+	            <button type="button" onClick={() => setActiveTab('settings')} className={`px-6 py-3 rounded-xl text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Settings</button>
 	         </div>
       </div>
 
@@ -1691,7 +1691,7 @@ export default function SaaSAdminPage() {
 	                    <h3 className="text-xl font-semibold tracking-tight text-slate-900">Assessor SaaS</h3>
 	                    <p className="mt-1 text-xs font-bold text-slate-400">Akses panel assessor di tenant hanya membaca daftar ini.</p>
 	                  </div>
-	                  <button onClick={fetchAssessors} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
+	                  <button type="button" onClick={fetchAssessors} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
 	                    <RefreshCw size={18} className={loadingAssessors ? 'animate-spin' : ''} />
 	                  </button>
 	                </div>
@@ -1732,7 +1732,7 @@ export default function SaaSAdminPage() {
 	                          </td>
 	                          <td className="py-4 px-6 text-right">
 	                            <div className="flex justify-end gap-2">
-	                              <button
+	                              <button type="button"
 	                                onClick={() => toggleAssessorStatus(assessor.id, assessor.isActive)}
 	                                disabled={assessorPending}
 	                                title={assessor.isActive ? 'Nonaktifkan assessor' : 'Aktifkan assessor'}
@@ -1740,7 +1740,7 @@ export default function SaaSAdminPage() {
 	                              >
 	                                {assessor.isActive ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
 	                              </button>
-	                              <button
+	                              <button type="button"
 	                                onClick={() => handleDeleteAssessor(assessor.id, assessor.email)}
 	                                disabled={assessorPending}
 	                                title="Hapus assessor"
@@ -1914,7 +1914,7 @@ export default function SaaSAdminPage() {
 	                      <div key={pkg.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
 	                        <div className="flex items-center justify-between gap-3">
 	                          <div className="text-sm font-semibold text-slate-900">{pkg.name}</div>
-	                          <button
+	                          <button type="button"
 	                            onClick={() => toggleAiTopupStatus(pkg.id, Boolean(pkg.is_active))}
 	                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${pkg.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`}
 	                          >
@@ -1930,10 +1930,10 @@ export default function SaaSAdminPage() {
 	                            <div className="text-sm font-semibold text-slate-900">Rp {Number(pkg.price_idr || 0).toLocaleString('id-ID')}</div>
 	                          </div>
 	                          <div className="flex gap-2">
-	                            <button onClick={() => setAiTopupModal({ open: true, editData: pkg })} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
+	                            <button type="button" onClick={() => setAiTopupModal({ open: true, editData: pkg })} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
 	                              <Edit3 size={16} />
 	                            </button>
-	                            <button onClick={() => handleDeleteAiTopupPackage(pkg.id, pkg.name)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
+	                            <button type="button" onClick={() => handleDeleteAiTopupPackage(pkg.id, pkg.name)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
 	                              <Trash2 size={16} />
 	                            </button>
 	                          </div>
@@ -2025,7 +2025,7 @@ export default function SaaSAdminPage() {
                       >
                         {tenantDeleteMode ? 'Keluar Mode Hapus' : 'Mode Hapus Tenant Nonaktif'}
                       </SafeButton>
-                      <button
+                      <button type="button"
                         onClick={fetchOrganizations}
                         className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white/90 text-slate-500 shadow-sm transition-all hover:bg-white hover:text-slate-800"
                         title="Refresh data tenant"
@@ -2255,7 +2255,7 @@ export default function SaaSAdminPage() {
                           </td>
                           <td className="px-6 py-5 text-right">
                             <div className="flex justify-end gap-2">
-                              <button
+                              <button type="button"
                                 onClick={() => openEntitlementModal(org, 'modules')}
                                 title="Kelola paket dan entitlement tenant"
                                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50"
@@ -2263,7 +2263,7 @@ export default function SaaSAdminPage() {
                                 <Package size={14} />
                                 <span>Kelola</span>
                               </button>
-                              <button
+                              <button type="button"
                                 onClick={() => handleLoginAsTenant(org)}
                                 disabled={loginAsPending}
                                 title="Login sebagai owner tenant ini"
@@ -2276,11 +2276,11 @@ export default function SaaSAdminPage() {
                                 )}
                                 <span>Masuk</span>
                               </button>
-                              <button onClick={() => openOrgModal(org)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:text-slate-700">
+                              <button type="button" onClick={() => openOrgModal(org)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:text-slate-700">
                                  <Edit3 size={16} />
                               </button>
                               {tenantDeleteMode && (
-                                <button
+                                <button type="button"
                                   onClick={() => handleDeleteOrg(org)}
                                   disabled={org.is_active || deletingOrgId === org.id}
                                   title={org.is_active ? 'Hanya tenant Suspended yang bisa dihapus.' : 'Hapus tenant nonaktif'}
@@ -2345,7 +2345,7 @@ export default function SaaSAdminPage() {
                     Kelola bundle plan dan module aktif tenant dari tab khusus ini.
                   </p>
                 </div>
-                <button onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
+                <button type="button" onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
                   <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                 </button>
               </div>
@@ -2462,7 +2462,7 @@ export default function SaaSAdminPage() {
                     Kelola entitlement add-on manual tenant tanpa mencampurinya dengan module bawaan plan.
                   </p>
                 </div>
-                <button onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
+                <button type="button" onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
                   <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                 </button>
               </div>
@@ -2513,7 +2513,7 @@ export default function SaaSAdminPage() {
                             </td>
                             <td className="py-4 px-6 text-right">
                               <div className="flex justify-end gap-2">
-                                <button
+                                <button type="button"
                                   onClick={() => openEntitlementModal(org, 'all')}
                                   className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 transition-all hover:bg-slate-50"
                                 >
@@ -2557,10 +2557,10 @@ export default function SaaSAdminPage() {
                             {pkg.name}
                           </div>
                           <div className="flex gap-1">
-                             <button onClick={() => setPkgModal({ open: true, editData: pkg })} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                             <button type="button" onClick={() => setPkgModal({ open: true, editData: pkg })} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                                 <Edit3 size={16} />
                              </button>
-                             <button onClick={() => handleDeletePackage(pkg.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                             <button type="button" onClick={() => handleDeletePackage(pkg.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
                                 <Trash2 size={16} />
                              </button>
                           </div>
@@ -2602,7 +2602,7 @@ export default function SaaSAdminPage() {
                       </div>
                       <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                          <span className="text-xs font-bold text-slate-600">Status</span>
-                         <button
+                         <button type="button"
                             onClick={() => togglePackageStatus(pkg.id, pkg.active)}
                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${pkg.active ? 'bg-emerald-500' : 'bg-slate-300'}`}
                          >
@@ -2660,7 +2660,7 @@ export default function SaaSAdminPage() {
                            <td className="px-8 py-5 text-right">
                               <div className="flex items-center justify-end gap-2">
                                  {inv.status !== 'PAID' && inv.status !== 'CANCELLED' && (
-                                    <button 
+                                    <button type="button" 
                                        onClick={() => approveInvoice(inv)} 
                                        className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-semibold uppercase rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95"
                                     >
@@ -2669,7 +2669,7 @@ export default function SaaSAdminPage() {
                                  )}
                                  
                                  {inv.status !== 'PAID' && inv.status !== 'CANCELLED' && (
-                                    <button 
+                                    <button type="button" 
                                        onClick={() => cancelInvoice(inv.id)} 
                                        title="Batalkan Invoice"
                                        className="p-2 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all"
@@ -2678,7 +2678,7 @@ export default function SaaSAdminPage() {
                                     </button>
                                  )}
 
-                                 <button 
+                                 <button type="button" 
                                     onClick={() => deleteInvoice(inv.id)} 
                                     title="Hapus Permanen"
                                     className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
@@ -2726,7 +2726,7 @@ export default function SaaSAdminPage() {
                     {entitlementModalSubtitle}
                   </p>
                 </div>
-                <button
+                <button type="button"
                   onClick={resetEntitlementModal}
                   className="rounded-xl border border-slate-200 p-3 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
                 >

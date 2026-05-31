@@ -153,7 +153,7 @@ export function TicketDetailClient({ ticket: initialTicket, notes: initialNotes,
               const isActive = ticket.status === s
               const isDone = STATUS_FLOW.indexOf(ticket.status) > i
               return (
-                <button
+                <button type="button"
                   key={s}
                   onClick={() => handleStatusChange(s)}
                   disabled={isPending}
@@ -193,7 +193,7 @@ export function TicketDetailClient({ ticket: initialTicket, notes: initialNotes,
             <div className="bg-white rounded-xl border border-slate-200 p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Resolusi / Tindakan</p>
-                <button
+                <button type="button"
                   onClick={() => setShowResolutionForm(!showResolutionForm)}
                   className="text-xs text-[#003366] hover:underline cursor-pointer"
                 >
@@ -210,7 +210,7 @@ export function TicketDetailClient({ ticket: initialTicket, notes: initialNotes,
                     placeholder="Tuliskan tindakan yang sudah diambil untuk menyelesaikan tiket ini..."
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#003366]/20 focus:border-[#003366] resize-none"
                   />
-                  <button
+                  <button type="button"
                     onClick={handleSaveResolution}
                     disabled={isPending}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors disabled:opacity-60"

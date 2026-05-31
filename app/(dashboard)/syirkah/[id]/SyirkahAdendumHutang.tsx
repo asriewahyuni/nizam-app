@@ -85,7 +85,7 @@ export function SyirkahAdendumHutang({
         </div>
 
         {!isDraft && !isEditing && (
-          <button
+          <button type="button"
             onClick={() => setIsEditing(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all"
           >
@@ -170,14 +170,14 @@ export function SyirkahAdendumHutang({
             )}
 
             <div className="flex gap-3 pt-1">
-              <button
+              <button type="button"
                 onClick={handleCancel}
                 disabled={isPending}
                 className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-50"
               >
                 <X size={14} /> Batal
               </button>
-              <button
+              <button type="button"
                 onClick={handleSave}
                 disabled={isPending}
                 className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-700 transition-all disabled:opacity-50 shadow-lg shadow-amber-100"

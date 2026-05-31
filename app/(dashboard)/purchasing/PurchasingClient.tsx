@@ -810,13 +810,13 @@ export default function PurchasingClient({
       <BulkImportSection orgId={orgId} type="purchase" onSuccess={() => router.refresh()} />
 
       <div className="flex bg-slate-100/50 p-1.5 rounded-xl w-fit border border-slate-100">
-         <button
+         <button type="button"
             onClick={() => setActiveTab('PURCHASES')}
             className={`px-8 py-2.5 text-xs font-semibold rounded-xl transition-all uppercase tracking-wide ${activeTab === 'PURCHASES' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
          >
             Purchase Orders
          </button>
-         <button
+         <button type="button"
             onClick={() => setActiveTab('REQUESTS')}
             className={`px-8 py-2.5 text-xs font-semibold rounded-xl transition-all uppercase tracking-wide flex items-center gap-2 ${activeTab === 'REQUESTS' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
          >
@@ -848,7 +848,7 @@ export default function PurchasingClient({
         />
         <div className="px-8 pb-3 flex gap-1.5 flex-wrap">
           {([['ALL','Semua'],['DRAFT','Draft'],['ORDERED','Dipesan'],['RECEIVED','Diterima'],['VOIDED','Void']] as const).map(([val, label]) => (
-            <button key={val} onClick={() => setFilterStatus(val)}
+            <button type="button" key={val} onClick={() => setFilterStatus(val)}
               className={`px-3 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatus === val ? 'bg-rose-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
               {label}
               {val !== 'ALL' && <span className="ml-1 opacity-70">({purchaseRows.filter((p:any)=>p.status===val).length})</span>}
@@ -935,19 +935,19 @@ export default function PurchasingClient({
                       </td>
                        <td className="px-8 py-6">
                        <div className="flex flex-wrap items-center justify-end gap-2">
-                         <button onClick={() => handleOpenDetail(p)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Detail Dokumen PO">
+                         <button type="button" onClick={() => handleOpenDetail(p)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Detail Dokumen PO">
                            <FileText size={16}/>
                          </button>
 
                          {p.status === 'DRAFT' && (
-                           <button onClick={() => openDraftPurchaseEditor(p)} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-500 hover:text-white transition-all border border-indigo-100" title="Edit Draft PO">
+                           <button type="button" onClick={() => openDraftPurchaseEditor(p)} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-500 hover:text-white transition-all border border-indigo-100" title="Edit Draft PO">
                              <Pencil size={16}/>
                            </button>
                          )}
                          
                          {p.status === 'ORDERED' && (
                            <span className="inline-flex" title={receiveButtonTitle}>
-                             <button
+                             <button type="button"
                                onClick={() => handleReceivePO(p)}
                                disabled={receiveBlockedByPayment}
                                aria-disabled={receiveBlockedByPayment}
@@ -963,19 +963,19 @@ export default function PurchasingClient({
                          )}
                          
                          {(p.status === 'DRAFT' || p.status === 'ORDERED' || (p.status === 'RECEIVED' && p.payment_status === 'UNPAID')) && (
-                           <button onClick={() => handleVoidPO(p.id)} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-slate-100" title="Batalkan PO">
+                           <button type="button" onClick={() => handleVoidPO(p.id)} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-slate-100" title="Batalkan PO">
                              <XCircle size={16}/>
                            </button>
                          )}
 
                          {(p.status === 'RECEIVED' || (isPurchaseSalam(p) && p.status === 'ORDERED')) && p.payment_status !== 'PAID' && (
-                           <button onClick={() => handleOpenPayment(p)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[10px] font-semibold uppercase tracking-wide rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                           <button type="button" onClick={() => handleOpenPayment(p)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[10px] font-semibold uppercase tracking-wide rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
                              <CreditCard size={14}/> Bayar
                            </button>
                          )}
 
                          {p.status === 'RECEIVED' && (
-                           <button onClick={() => handleOpenReturn(p)} className="p-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all border border-amber-100" title="Retur Barang">
+                           <button type="button" onClick={() => handleOpenReturn(p)} className="p-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all border border-amber-100" title="Retur Barang">
                              <RotateCcw size={16}/>
                            </button>
                          )}
@@ -1034,7 +1034,7 @@ export default function PurchasingClient({
                         <div className="flex justify-end gap-2">
                           {r.status === 'PENDING' && (
                             <>
-                              <button 
+                              <button type="button" 
                                 onClick={() => {
                                   resetPurchaseForm()
                                   setLines([{
@@ -1057,7 +1057,7 @@ export default function PurchasingClient({
                               >
                                 Proses ke PO
                               </button>
-                              <button 
+                              <button type="button" 
                                 onClick={async () => {
                                   if (confirm('Tolak permintaan ini?')) {
                                     await updatePurchaseRequestStatus(orgId, r.id, 'REJECTED', activeBranchId || undefined)
@@ -1741,10 +1741,10 @@ export default function PurchasingClient({
                      <p className="text-xs text-slate-500 font-medium">Preview & Cetak Dokumen PO Resmi</p>
                    </div>
                    <div className="flex gap-3">
-                      <button onClick={handlePrintDetail} className="px-5 py-2.5 bg-white text-slate-600 font-bold text-sm border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm">
+                      <button type="button" onClick={handlePrintDetail} className="px-5 py-2.5 bg-white text-slate-600 font-bold text-sm border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm">
                         <Printer size={16}/> Cetak PDF
                       </button>
-                      <button onClick={() => setShowDetailModal(false)} className="w-10 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all flex items-center justify-center shadow-sm">
+                      <button type="button" onClick={() => setShowDetailModal(false)} className="w-10 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all flex items-center justify-center shadow-sm">
                         <X size={18}/>
                       </button>
                    </div>
@@ -1962,7 +1962,7 @@ export default function PurchasingClient({
                     <p className="text-amber-100 text-xs font-medium">Sinkronisasi ulang PO RECEIVED yang stoknya belum masuk</p>
                   </div>
                 </div>
-                <button
+                <button type="button"
                   onClick={() => setShowRepairModal(false)}
                   className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center text-white transition-all"
                 >
@@ -1982,7 +1982,7 @@ export default function PurchasingClient({
                         <li>Proses bisa memakan beberapa detik tergantung jumlah PO</li>
                       </ul>
                     </div>
-                    <button
+                    <button type="button"
                       onClick={handleRepairStock}
                       className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg shadow-amber-100 flex items-center justify-center gap-2"
                     >
@@ -2050,13 +2050,13 @@ export default function PurchasingClient({
                     )}
 
                     <div className="flex gap-3">
-                      <button
+                      <button type="button"
                         onClick={() => setRepairResult(null)}
                         className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all text-sm"
                       >
                         Jalankan Ulang
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setShowRepairModal(false)}
                         className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-700 transition-all text-sm"
                       >

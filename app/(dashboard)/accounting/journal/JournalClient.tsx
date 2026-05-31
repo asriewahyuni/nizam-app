@@ -454,7 +454,7 @@ export default function JournalClient({
           <>
             <div className="flex bg-slate-100/60 p-1 rounded-xl border border-slate-100 mr-2 shadow-inner">
               {(['POSTED', 'VOIDED', 'DRAFT'] as const).map((s) => (
-                <button
+                <button type="button"
                   key={s}
                   onClick={() => setStatusFilter(s)}
                   className={`cursor-pointer px-4 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${filterStatus === s ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
@@ -872,7 +872,7 @@ export default function JournalClient({
 	                              >
 	                                POSTING
 	                              </SafeButton>
-	                              <button 
+	                              <button type="button" 
 	                                onClick={async () => {
 	                                  if (!await confirm("Hapus draft jurnal ini secara permanen?")) return
 	                                  const res = await hardDeleteDraftJournal(entry.id, orgId)
@@ -942,7 +942,7 @@ export default function JournalClient({
                       </h3>
                       <p className="text-xs text-blue-100 mt-1 font-medium italic">Manually create a draft journal entry into the ledger.</p>
                     </div>
-                    <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition">
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition">
                       <X size={20} />
                     </button>
                 </div>

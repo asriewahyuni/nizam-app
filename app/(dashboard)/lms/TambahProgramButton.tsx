@@ -12,7 +12,7 @@ export function TambahProgramButton() {
 
   return (
     <>
-      <button
+      <button type="button"
         onClick={() => setOpen(true)}
         id="btn-tambah-program"
         className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 active:scale-95 transition-all shadow-xl shadow-blue-200"

@@ -133,9 +133,9 @@ function EditBatchModal({
           </div>
           {error && <p className="text-xs font-semibold text-rose-500 bg-rose-50 rounded-xl px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-2">
-            <button onClick={onClose} disabled={isPending}
+            <button type="button" onClick={onClose} disabled={isPending}
               className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Batal</button>
-            <button onClick={handleSave} disabled={isPending}
+            <button type="button" onClick={handleSave} disabled={isPending}
               className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 inline-flex items-center justify-center gap-2">
               {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Simpan
@@ -228,9 +228,9 @@ function EditSessionModal({
           </div>
           {error && <p className="text-xs font-semibold text-rose-500 bg-rose-50 rounded-xl px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-2">
-            <button onClick={onClose} disabled={isPending}
+            <button type="button" onClick={onClose} disabled={isPending}
               className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Batal</button>
-            <button onClick={handleSave} disabled={isPending}
+            <button type="button" onClick={handleSave} disabled={isPending}
               className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 inline-flex items-center justify-center gap-2">
               {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Simpan
@@ -279,7 +279,7 @@ function ModalWrapper({
                 </div>
                 <h2 className="text-lg font-semibold text-slate-900 tracking-tight">{title}</h2>
               </div>
-              <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-xl">
+              <button type="button" onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-xl">
                 <X className="h-5 w-5 text-slate-400" />
               </button>
             </div>
@@ -312,11 +312,11 @@ export function BatchActions({ batch }: { batch: any }) {
   return (
     <>
       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-50 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => setEditOpen(true)}
+        <button type="button" onClick={() => setEditOpen(true)}
           className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-colors">
           <Edit3 className="h-3 w-3" /> Edit
         </button>
-        <button onClick={() => setDeleteOpen(true)}
+        <button type="button" onClick={() => setDeleteOpen(true)}
           className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-colors">
           <Trash2 className="h-3 w-3" /> Hapus
         </button>
@@ -356,11 +356,11 @@ export function SessionActions({ session }: { session: any }) {
   return (
     <>
       <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => setEditOpen(true)}
+        <button type="button" onClick={() => setEditOpen(true)}
           className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-colors">
           <Edit3 className="h-3 w-3" /> Edit
         </button>
-        <button onClick={() => setDeleteOpen(true)}
+        <button type="button" onClick={() => setDeleteOpen(true)}
           className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-colors">
           <Trash2 className="h-3 w-3" /> Hapus
         </button>
@@ -404,11 +404,11 @@ export function CourseActions({
   return (
     <>
       <div className="flex items-center gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => setEditOpen(true)}
+        <button type="button" onClick={() => setEditOpen(true)}
           className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-colors">
           <Edit3 className="h-3 w-3" /> Edit
         </button>
-        <button onClick={() => setDeleteOpen(true)}
+        <button type="button" onClick={() => setDeleteOpen(true)}
           className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-colors">
           <Trash2 className="h-3 w-3" /> Hapus
         </button>
@@ -501,9 +501,9 @@ function EditProgramInlineModal({
           </div>
           {error && <p className="text-xs font-semibold text-rose-500 bg-rose-50 rounded-xl px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-2">
-            <button onClick={onClose} disabled={isPending}
+            <button type="button" onClick={onClose} disabled={isPending}
               className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Batal</button>
-            <button onClick={handleSave} disabled={isPending}
+            <button type="button" onClick={handleSave} disabled={isPending}
               className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 inline-flex items-center justify-center gap-2">
               {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Simpan

@@ -73,7 +73,7 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
                 dan mencegah adanya perubahan yang tidak diinginkan.
             </p>
         </div>
-        <button 
+        <button type="button" 
             onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-xl font-semibold shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-[0.98]"
         >
@@ -138,7 +138,7 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
                                 {pe.is_closed ? 'Status: TERKUNCI' : 'Status: DIBUKA'}
                             </span>
                             
-                            <button 
+                            <button type="button" 
                                 onClick={() => handleToggleClose(pe)}
                                 className={`px-6 py-3 rounded-xl text-[10px] font-semibold tracking-wide transition-all ${pe.is_closed ? 'bg-white border border-slate-200 text-slate-900 hover:bg-slate-900 hover:text-white' : 'bg-slate-900 text-white shadow-lg shadow-slate-200 hover:shadow-xl'}`}
                             >
@@ -217,14 +217,14 @@ export default function ClosingClient({ periods, orgId }: ClosingClientProps) {
                         </div>
 
                         <div className="flex flex-col gap-3 pt-4">
-                            <button 
+                            <button type="button" 
                                 disabled={isSubmitting}
                                 onClick={handleCreate}
                                 className="w-full py-5 bg-slate-900 disabled:bg-slate-300 text-white rounded-xl font-semibold shadow-xl shadow-slate-200 hover:scale-[1.02] active:scale-[0.98] transition-all"
                             >
                                 {isSubmitting ? 'MEMPROSES...' : 'AKTIFKAN PERIODE'}
                             </button>
-                            <button onClick={() => setIsModalOpen(false)} className="w-full py-5 bg-white border border-slate-200 text-slate-400 rounded-xl font-semibold text-xs hover:text-slate-600 transition-all">
+                            <button type="button" onClick={() => setIsModalOpen(false)} className="w-full py-5 bg-white border border-slate-200 text-slate-400 rounded-xl font-semibold text-xs hover:text-slate-600 transition-all">
                                 BATALKAN
                             </button>
                         </div>
