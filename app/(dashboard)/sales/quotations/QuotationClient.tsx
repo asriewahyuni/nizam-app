@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, FileText, Send, AlertCircle, Trash2, Printer, ArrowRight, XCircle } from 'lucide-react'
+import { Plus, FileText, Send, AlertCircle, Trash2, Printer, ArrowRight, XCircle, Search, ArrowUp, ArrowDown } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createQuotation, convertQuotationToOrder } from '@/modules/sales/actions/sales.actions'
 import { createContact } from '@/modules/contacts/actions/contact.actions'
@@ -179,6 +179,21 @@ export default function QuotationClient({
   const [customerError, setCustomerError] = useState<string | null>(null)
   const [viewQuotation, setViewQuotation] = useState<QuotationRecord | null>(null)
   const [customerOptions, setCustomerOptions] = useState<ContactOption[]>(() => sortContactOptions(customers))
+  const [sortOrderQ, setSortOrderQ] = useState<'desc' | 'asc'>('desc')
+  const [searchQ, setSearchQ] = useState('')
+  const sortedQuotations = [...quotations]
+    .filter(q => {
+      if (!searchQ.trim()) return true
+      const query = searchQ.toLowerCase()
+      const num = (q.sale_number || '').toLowerCase()
+      const cust = (pickRelation(q.contacts) as any)?.name?.toLowerCase() || ''
+      return num.includes(query) || cust.includes(query)
+    })
+    .sort((a, b) => {
+      const da = String((a as any).sale_date || (a as any).created_at || '')
+      const db = String((b as any).sale_date || (b as any).created_at || '')
+      return sortOrderQ === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+    })
   const [customerForm, setCustomerForm] = useState<CustomerFormState>(() => createEmptyCustomerForm())
 
   const [customerId, setCustomerId] = useState('')
@@ -432,12 +447,27 @@ export default function QuotationClient({
         </div>
 
         <SectionCard>
-          <SectionHeader title="Daftar Quotation" subtitle="Semua dokumen penawaran yang pernah dikirimkan." />
+          <SectionHeader title="Daftar Quotation" subtitle="Semua dokumen penawaran yang pernah dikirimkan."
+            actions={
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input value={searchQ} onChange={e => setSearchQ(e.target.value)}
+                  placeholder="Cari no. ref atau customer..."
+                  className="pl-9 pr-4 py-2 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-100 transition-all outline-none w-56" />
+              </div>
+            }
+          />
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">No. Ref</th>
+                  <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                    <button type="button" onClick={() => setSortOrderQ(o => o === 'desc' ? 'asc' : 'desc')}
+                      className="inline-flex items-center gap-1.5 hover:text-slate-700 transition-colors cursor-pointer">
+                      No. Ref & Tanggal
+                      {sortOrderQ === 'desc' ? <ArrowDown size={12} className="text-blue-500" /> : <ArrowUp size={12} className="text-blue-500" />}
+                    </button>
+                  </th>
                   <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Customer</th>
                   <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Total Penawaran</th>
                   <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-center">Status</th>
@@ -445,14 +475,18 @@ export default function QuotationClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {quotations.map((quotation) => {
+                {sortedQuotations.length === 0 ? (
+                  <tr><td colSpan={5} className="py-16 text-center text-slate-400 font-bold text-xs uppercase italic">Tidak ada quotation yang cocok.</td></tr>
+                ) : null}
+                {sortedQuotations.map((quotation) => {
                   const customer = pickRelation(quotation.contacts)
                   const totals = getQuotationTotals(quotation)
 
                   return (
                     <tr key={quotation.id} className="hover:bg-slate-50">
-                      <td className="px-8 py-6 text-xs font-semibold text-blue-600">
-                        {quotation.sale_number || `SQ-${quotation.id.slice(0, 8)}`}
+                      <td className="px-8 py-6">
+                        <div className="text-xs font-semibold text-blue-600">{quotation.sale_number || `SQ-${quotation.id.slice(0, 8)}`}</div>
+                        {(quotation as any).sale_date && <div className="text-[10px] text-slate-400 mt-0.5">{new Date((quotation as any).sale_date).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})}</div>}
                       </td>
                       <td className="px-8 py-6 font-bold">{customer?.name || '-'}</td>
                       <td className="px-8 py-6 text-right font-semibold">{formatRupiah(totals.grandTotal)}</td>

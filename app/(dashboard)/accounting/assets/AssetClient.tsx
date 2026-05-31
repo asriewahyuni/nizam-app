@@ -2,7 +2,7 @@
 
 import React, { startTransition, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Landmark, Building2, CarFront, Monitor, Plus, Calculator, History, Trash2, Calendar, FileText, X, Printer, QrCode, Pencil, DollarSign, AlertTriangle, Download } from 'lucide-react'
+import { Landmark, Building2, CarFront, Monitor, Plus, Calculator, History, Trash2, Calendar, FileText, X, Printer, QrCode, Pencil, DollarSign, AlertTriangle, Download, ArrowUp, ArrowDown, Search as SearchIcon } from 'lucide-react'
 import Barcode from 'react-barcode'
 import { QRCodeCanvas } from 'qrcode.react'
 import { createFixedAsset, runOrganizationDepreciation, updateFixedAsset, deleteFixedAsset, previewOrganizationDepreciation, disposeFixedAsset } from '@/modules/accounting/actions/assets.actions'
@@ -84,6 +84,19 @@ export function AssetClient({
   const router = useRouter()
   // Defensive: pastikan initialAssets selalu array meski server return null/undefined
   const [assets, setAssets] = useState<any[]>(Array.isArray(initialAssets) ? initialAssets : [])
+  const [sortOrderA, setSortOrderA] = useState<'desc' | 'asc'>('desc')
+  const [searchAsset, setSearchAsset] = useState('')
+  const displayedAssets = [...assets]
+    .filter(a => {
+      if (!searchAsset.trim()) return true
+      const q = searchAsset.toLowerCase()
+      return (a.name||'').toLowerCase().includes(q) || (a.code||'').toLowerCase().includes(q) || (a.category||'').toLowerCase().includes(q)
+    })
+    .sort((a, b) => {
+      const da = String(a.purchase_date || a.created_at || '')
+      const db = String(b.purchase_date || b.created_at || '')
+      return sortOrderA === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+    })
   const [showModal, setShowModal] = useState(false)
   const [showLabelModal, setShowLabelModal] = useState(false)
   const [selectedAsset, setSelectedAsset] = useState<any>(null)
@@ -496,11 +509,17 @@ export function AssetClient({
 
       {/* Asset Table */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-         <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
+         <div className="p-8 border-b border-slate-50 flex flex-wrap items-center justify-between gap-3 bg-slate-50/30">
             <h3 className="font-semibold text-slate-900 text-xl flex items-center gap-3">
                Daftar Inventaris Aset Tetap
                <span className="px-3 py-1 bg-white border border-slate-200 text-slate-400 rounded-full text-xs font-bold">{assets.length} Aset</span>
             </h3>
+            <div className="relative">
+              <SearchIcon size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={searchAsset} onChange={e => setSearchAsset(e.target.value)}
+                placeholder="Cari nama atau kode aset..."
+                className="pl-9 pr-4 py-2 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-100 outline-none w-52" />
+            </div>
          </div>
 
          <div className="overflow-x-auto">
@@ -508,7 +527,13 @@ export function AssetClient({
                <thead className="bg-slate-50/50 text-[10px] uppercase font-semibold tracking-[0.1em] text-slate-400 border-b border-slate-100">
                   <tr>
                     <th className="px-8 py-5">Identitas Aset</th>
-                    <th className="px-6 py-5">Informasi Pembelian</th>
+                    <th className="px-6 py-5">
+                      <button type="button" onClick={() => setSortOrderA(o => o === 'desc' ? 'asc' : 'desc')}
+                        className="inline-flex items-center gap-1.5 hover:text-slate-700 transition-colors cursor-pointer">
+                        Tgl Pembelian
+                        {sortOrderA === 'desc' ? <ArrowDown size={12} className="text-blue-500" /> : <ArrowUp size={12} className="text-blue-500" />}
+                      </button>
+                    </th>
                     <th className="px-6 py-5">Sumber Dana</th>
                     <th className="px-6 py-5">Umur Ekonomis</th>
                     <th className="px-6 py-5 text-right">Harga Perolehan</th>
@@ -517,15 +542,15 @@ export function AssetClient({
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-50">
-                 {assets.length === 0 ? (
+                 {displayedAssets.length === 0 ? (
                     <tr>
                        <td colSpan={6} className="px-8 py-20 text-center opacity-40">
                           <Landmark size={64} className="mx-auto mb-4 text-slate-300" />
-                          <p className="font-bold text-slate-600">Belum ada aset tetap yang terdaftar.</p>
+                          <p className="font-bold text-slate-600">{searchAsset ? 'Tidak ada aset yang cocok.' : 'Belum ada aset tetap yang terdaftar.'}</p>
                        </td>
                     </tr>
                  ) : (
-                    assets.map(asset => (
+                    displayedAssets.map(asset => (
                        <tr key={asset.id} className="hover:bg-blue-50/20 transition-all group">
                           <td className="px-8 py-6">
                              <div className="flex items-center gap-4">

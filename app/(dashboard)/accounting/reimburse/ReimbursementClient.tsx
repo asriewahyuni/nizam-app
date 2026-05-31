@@ -19,7 +19,10 @@ import {
   Building2,
   DollarSign,
   AlertCircle,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ArrowUp,
+  ArrowDown,
+  Search
 } from 'lucide-react'
 import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
@@ -48,6 +51,25 @@ const SIMPLE_CATEGORIES = [
 
 export default function ReimbursementClient({ reimbursements, bankAccounts, expenseAccounts, orgId, currentUserId }: ReimbursementClientProps) {
   const router = useRouter()
+  const [sortOrderR, setSortOrderR] = useState<'desc' | 'asc'>('desc')
+  const [filterStatusR, setFilterStatusR] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAID'>('ALL')
+  const [searchR, setSearchR] = useState('')
+  const sortedReimbursements = [...reimbursements]
+    .filter(re => {
+      if (filterStatusR !== 'ALL' && re.status !== filterStatusR) return false
+      if (searchR.trim()) {
+        const q = searchR.toLowerCase()
+        const desc = (re.description || '').toLowerCase()
+        const num = (re.claim_number || '').toLowerCase()
+        if (!desc.includes(q) && !num.includes(q)) return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      const da = String(a.transaction_date || a.created_at || '')
+      const db = String(b.transaction_date || b.created_at || '')
+      return sortOrderR === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+    })
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false)
   const [selectedReimbursement, setSelectedReimbursement] = useState<any>(null)
   const [isPayModalOpen, setIsPayModalOpen] = useState(false)
@@ -266,18 +288,45 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
 
       {/* Main Table */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        {/* Filter & Search bar */}
+        <div className="px-8 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
+          <div className="flex gap-1.5 flex-wrap">
+            {([['ALL','Semua'],['PENDING','Menunggu'],['APPROVED','Disetujui'],['REJECTED','Ditolak'],['PAID','Dibayar']] as const).map(([val, label]) => (
+              <button key={val} onClick={() => setFilterStatusR(val)}
+                className={`px-3 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatusR === val ? 'bg-[#003366] text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                {label}
+                {val !== 'ALL' && <span className="ml-1 opacity-70">({reimbursements.filter(r=>r.status===val).length})</span>}
+              </button>
+            ))}
+          </div>
+          <div className="relative ml-auto">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={searchR} onChange={e => setSearchR(e.target.value)}
+              placeholder="Cari deskripsi atau no. klaim..."
+              className="pl-9 pr-4 py-1.5 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-100 transition-all outline-none w-56" />
+          </div>
+        </div>
         <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50/50 border-b border-slate-50">
                         <th className="px-8 py-6 text-[10px] font-semibold uppercase text-slate-400 tracking-wide">Karyawan & Status</th>
-                        <th className="px-6 py-6 text-[10px] font-semibold uppercase text-slate-400 tracking-wide">Klaim # & Deskripsi</th>
+                        <th className="px-6 py-6 text-[10px] font-semibold uppercase text-slate-400 tracking-wide">
+                          <button type="button" onClick={() => setSortOrderR(o => o === 'desc' ? 'asc' : 'desc')}
+                            className="inline-flex items-center gap-1.5 hover:text-slate-700 transition-colors cursor-pointer">
+                            Klaim # & Tanggal
+                            {sortOrderR === 'desc' ? <ArrowDown size={12} className="text-blue-500" /> : <ArrowUp size={12} className="text-blue-500" />}
+                          </button>
+                        </th>
                         <th className="px-6 py-6 text-[10px] font-semibold uppercase text-slate-400 tracking-wide text-right">Total Biaya</th>
                         <th className="px-8 py-6 text-center text-[10px] font-semibold uppercase text-slate-400 tracking-wide">Aksi</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                    {reimbursements.map((re) => (
+                    {sortedReimbursements.length === 0 && (
+                      <tr><td colSpan={4} className="py-16 text-center text-slate-400 font-bold text-xs uppercase italic">Tidak ada data yang cocok.</td></tr>
+                    )}
+                    {sortedReimbursements.map((re) => (
                         <tr key={re.id} className="hover:bg-slate-50/50 transition-colors group">
                              <td className="px-8 py-6">
                                  <div className="space-y-2 text-xs">
@@ -354,7 +403,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
                             </td>
                         </tr>
                     ))}
-                    {reimbursements.length === 0 && (
+                    {reimbursements.length === 0 && sortedReimbursements.length === 0 && (
                         <tr>
                             <td colSpan={4} className="py-24 text-center">
                                 <div className="space-y-4 opacity-30">

@@ -21,7 +21,9 @@ import {
   Play,
   Printer,
   AlertTriangle,
-  Truck
+  Truck,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { createBom, updateBom, deleteBom, createWorkOrder, updateWorkOrderStatus, deleteWorkOrder, addWorkOrderCost, getFGBins, createPurchaseRequests } from '@/modules/factory/actions/factory.actions'
@@ -110,6 +112,15 @@ export function ManufacturingClient({
 }: ManufacturingClientProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'BOM' | 'SPK'>('SPK')
+  const [sortOrderF, setSortOrderF] = useState<'desc' | 'asc'>('desc')
+  const [filterStatusF, setFilterStatusF] = useState<'ALL' | 'DRAFT' | 'RELEASED' | 'COMPLETED' | 'CANCELLED'>('ALL')
+  const sortedWorkOrders = [...workOrders]
+    .filter(wo => filterStatusF === 'ALL' || wo.status === filterStatusF)
+    .sort((a, b) => {
+      const da = String(a.created_at || a.issue_date || '')
+      const db = String(b.created_at || b.issue_date || '')
+      return sortOrderF === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+    })
   const [showBomModal, setShowBomModal] = useState(false)
   const [showSpkModal, setShowSpkModal] = useState(false)
   const [showFinishModal, setShowFinishModal] = useState(false)
@@ -425,6 +436,22 @@ export function ManufacturingClient({
              </div>
 
              <div className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+                {/* Filter bar */}
+                <div className="px-8 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
+                  <div className="flex gap-1.5 flex-wrap">
+                    {([['ALL','Semua'],['DRAFT','Draft'],['RELEASED','Aktif'],['COMPLETED','Selesai'],['CANCELLED','Batal']] as const).map(([val, label]) => (
+                      <button key={val} onClick={() => setFilterStatusF(val)}
+                        className={`px-3 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatusF === val ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                        {label}
+                        {val !== 'ALL' && <span className="ml-1 opacity-70">({workOrders.filter(w=>w.status===val).length})</span>}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" onClick={() => setSortOrderF(o => o === 'desc' ? 'asc' : 'desc')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all uppercase tracking-wide ml-auto">
+                    Tanggal {sortOrderF === 'desc' ? <ArrowDown size={12} className="text-blue-500" /> : <ArrowUp size={12} className="text-blue-500" />}
+                  </button>
+                </div>
                 <div className="overflow-x-auto">
                 <table className="w-full text-left">
                    <thead className="bg-slate-50 border-b border-slate-100">
@@ -437,12 +464,12 @@ export function ManufacturingClient({
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-50">
-                      {workOrders.length === 0 ? (
+                      {sortedWorkOrders.length === 0 ? (
                         <tr>
-                           <td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-bold italic">Belum ada perintah kerja yang aktif.</td>
+                           <td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-bold italic">{filterStatusF !== 'ALL' ? 'Tidak ada SPK dengan status ini.' : 'Belum ada perintah kerja yang aktif.'}</td>
                         </tr>
                       ) : (
-                        workOrders.map((wo) => {
+                        sortedWorkOrders.map((wo) => {
                           const isUrgent = wo.status !== 'COMPLETED' && wo.deadline_date && new Date(wo.deadline_date) <= new Date(new Date().getTime() + 3 * 24 * 60 * 60 * 1000);
                           const isOverdue = wo.status !== 'COMPLETED' && wo.deadline_date && new Date(wo.deadline_date) < new Date();
                           return (

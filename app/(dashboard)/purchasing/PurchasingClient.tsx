@@ -75,11 +75,24 @@ export default function PurchasingClient({
    })
    const [purchaseRows, setPurchaseRows] = useState<any[]>(() => purchases || [])
    const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
-   const sortedPurchaseRows = [...purchaseRows].sort((a, b) => {
-     const da = String(a.purchase_date || a.created_at || '')
-     const db = String(b.purchase_date || b.created_at || '')
-     return sortOrder === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
-   })
+   const [filterStatus, setFilterStatus] = useState<'ALL' | 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'VOIDED'>('ALL')
+   const [searchPO, setSearchPO] = useState('')
+   const sortedPurchaseRows = [...purchaseRows]
+     .filter((p: any) => {
+       if (filterStatus !== 'ALL' && p.status !== filterStatus) return false
+       if (searchPO.trim()) {
+         const q = searchPO.toLowerCase()
+         const num = (p.purchase_number || '').toLowerCase()
+         const vendor = (p.contacts?.name || '').toLowerCase()
+         if (!num.includes(q) && !vendor.includes(q)) return false
+       }
+       return true
+     })
+     .sort((a, b) => {
+       const da = String(a.purchase_date || a.created_at || '')
+       const db = String(b.purchase_date || b.created_at || '')
+       return sortOrder === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+     })
    const orgSettings = org?.settings || {}
    const companyProfile = {
      name: orgSettings.brand_name || orgName || 'Perusahaan',
@@ -823,10 +836,24 @@ export default function PurchasingClient({
           actions={
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input placeholder="Cari nomor PO atau vendor..." className="pl-9 pr-4 py-2 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-100 transition-all outline-none w-64" />
+              <input
+                value={searchPO}
+                onChange={e => setSearchPO(e.target.value)}
+                placeholder="Cari nomor PO atau vendor..."
+                className="pl-9 pr-4 py-2 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-100 transition-all outline-none w-64"
+              />
             </div>
           }
         />
+        <div className="px-8 pb-3 flex gap-1.5 flex-wrap">
+          {([['ALL','Semua'],['DRAFT','Draft'],['ORDERED','Dipesan'],['RECEIVED','Diterima'],['VOIDED','Void']] as const).map(([val, label]) => (
+            <button key={val} onClick={() => setFilterStatus(val)}
+              className={`px-3 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatus === val ? 'bg-rose-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+              {label}
+              {val !== 'ALL' && <span className="ml-1 opacity-70">({purchaseRows.filter((p:any)=>p.status===val).length})</span>}
+            </button>
+          ))}
+        </div>
         
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -850,8 +877,8 @@ export default function PurchasingClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {purchaseRows.length === 0 ? (
-                <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Belum ada data pembelian.</td></tr>
+              {sortedPurchaseRows.length === 0 ? (
+                <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">{searchPO || filterStatus !== 'ALL' ? 'Tidak ada data yang cocok.' : 'Belum ada data pembelian.'}</td></tr>
               ) : (
                 sortedPurchaseRows.map((p: any) => {
                   const receiveBlockedByPayment = p.status === 'ORDERED' && isReceiveBlockedByPayment(p)

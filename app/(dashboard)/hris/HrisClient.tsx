@@ -37,7 +37,9 @@ import {
   AlertCircle,
   Key,
   FileText,
-  MessageCircle
+  MessageCircle,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
@@ -132,6 +134,26 @@ export default function HrisClient({
 }) {
   const router = useRouter()
   const [employees, setEmployees] = useState(initialEmployees)
+  const [searchEmp, setSearchEmp] = useState('')
+  const [filterStatusEmp, setFilterStatusEmp] = useState<'ALL' | 'FULL_TIME' | 'CONTRACT' | 'PROBATION' | 'INTERN' | 'RESIGNED' | 'TERMINATED'>('ALL')
+  const [sortOrderEmp, setSortOrderEmp] = useState<'asc' | 'desc'>('asc')
+  const displayedEmployees = [...employees]
+    .filter(emp => {
+      if (filterStatusEmp !== 'ALL' && emp.employment_status !== filterStatusEmp) return false
+      if (searchEmp.trim()) {
+        const q = searchEmp.toLowerCase()
+        const name = `${emp.first_name||''} ${emp.last_name||''}`.toLowerCase()
+        const nik = (emp.nik||'').toLowerCase()
+        const dept = (emp.department_name||emp.department||'').toLowerCase()
+        if (!name.includes(q) && !nik.includes(q) && !dept.includes(q)) return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      const na = `${a.first_name||''} ${a.last_name||''}`.toLowerCase()
+      const nb = `${b.first_name||''} ${b.last_name||''}`.toLowerCase()
+      return sortOrderEmp === 'asc' ? na.localeCompare(nb) : nb.localeCompare(na)
+    })
   const [payrollComponents, setPayrollComponents] = useState(initialPayrollComponents)
   const [payrollRuns, setPayrollRuns] = useState(initialPayrollRuns || [])
   const [attendanceRecords, setAttendanceRecords] = useState(initialAttendanceRecords || [])
@@ -937,8 +959,33 @@ export default function HrisClient({
                   )}
                 </div>
 
+                {/* Search + Filter bar */}
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <div className="relative">
+                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input value={searchEmp} onChange={e => setSearchEmp(e.target.value)}
+                      placeholder="Cari nama, NIK, atau dept..."
+                      className="pl-9 pr-4 py-2 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-100 outline-none w-52" />
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {([['ALL','Semua'],['FULL_TIME','Full Time'],['CONTRACT','Kontrak'],['PROBATION','Probation'],['INTERN','Magang'],['RESIGNED','Resign'],['TERMINATED','Terminated']] as const).map(([val,label]) => (
+                      <button key={val} onClick={() => setFilterStatusEmp(val)}
+                        className={`px-3 py-1.5 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatusEmp === val ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                        {label}
+                        {val !== 'ALL' && <span className="ml-1 opacity-70">({employees.filter((e:any)=>e.employment_status===val).length})</span>}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" onClick={() => setSortOrderEmp(o => o === 'asc' ? 'desc' : 'asc')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all uppercase tracking-wide ml-auto">
+                    A-Z {sortOrderEmp === 'asc' ? <ArrowUp size={12} className="text-blue-500" /> : <ArrowDown size={12} className="text-blue-500" />}
+                  </button>
+                </div>
+                {displayedEmployees.length === 0 && (
+                  <div className="py-16 text-center text-slate-400 font-bold text-sm italic">Tidak ada karyawan yang cocok dengan filter.</div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {employees.map((emp: any) => (
+                  {displayedEmployees.map((emp: any) => (
                     <motion.div
                       whileHover={{ y: -5 }}
                       key={emp.id}

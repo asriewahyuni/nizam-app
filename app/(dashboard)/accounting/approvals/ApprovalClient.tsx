@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useState } from 'react'
-import { Check, X, Bell, FileText, View, QrCode, ShieldCheck, AlertTriangle, Clock, Shield } from 'lucide-react'
+import { Check, X, Bell, FileText, View, QrCode, ShieldCheck, AlertTriangle, Clock, Shield, ArrowUp, ArrowDown, Search } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { decideApproval, getApprovalDetail, getApprovalHistory, getPendingApprovals } from '@/modules/organization/actions/approval.actions'
 import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
@@ -96,6 +96,19 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
   const [approvals, setApprovals] = useState(initialApprovals)
   const [history, setHistory] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'PENDING' | 'HISTORY'>('PENDING')
+  const [sortOrderAp, setSortOrderAp] = useState<'desc' | 'asc'>('desc')
+  const [searchAp, setSearchAp] = useState('')
+  const sortedApprovals = [...approvals]
+    .filter(req => {
+      if (!searchAp.trim()) return true
+      const q = searchAp.toLowerCase()
+      return (req.requester_name||'').toLowerCase().includes(q) || (req.scope_type||'').toLowerCase().includes(q) || (req.id||'').toLowerCase().includes(q)
+    })
+    .sort((a, b) => {
+      const da = String(a.requested_at || a.created_at || '')
+      const db = String(b.requested_at || b.created_at || '')
+      return sortOrderAp === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+    })
   const [submitting, setSubmitting] = useState<string | null>(null)
 
   // Detail Modal State
@@ -230,6 +243,19 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
 
         {activeTab === 'PENDING' ? (
           <div className="grid grid-cols-1 gap-6">
+          {/* Sort & Search bar */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={searchAp} onChange={e => setSearchAp(e.target.value)}
+                placeholder="Cari pemohon atau tipe..."
+                className="pl-9 pr-4 py-2 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-100 outline-none w-52" />
+            </div>
+            <button type="button" onClick={() => setSortOrderAp(o => o === 'desc' ? 'asc' : 'desc')}
+              className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-semibold rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all uppercase tracking-wide ml-auto">
+              Tanggal {sortOrderAp === 'desc' ? <ArrowDown size={12} className="text-blue-500" /> : <ArrowUp size={12} className="text-blue-500" />}
+            </button>
+          </div>
         {approvals.length === 0 ? (
           <div className="py-20 bg-white rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
             <div className="w-16 h-16 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500">
@@ -241,7 +267,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
             </div>
           </div>
         ) : (
-          approvals.map((req) => {
+          sortedApprovals.map((req) => {
             const sourceTone = getSourceTypeTone(req.source_type)
             return (
             <div key={req.id} className="bg-white rounded-xl p-8 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-6 overflow-hidden relative group">

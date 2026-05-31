@@ -19,6 +19,8 @@ import {
   X,
   User,
   Gauge,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import {
@@ -90,6 +92,8 @@ const STATUS_TRANSITIONS: Record<WorkshopStatus, WorkshopStatus[]> = {
 export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices, serviceRates, partProducts }: Props) {
   const [tab, setTab] = useState<Tab>('spk')
   const [search, setSearch] = useState('')
+  const [sortOrderW, setSortOrderW] = useState<'desc' | 'asc'>('desc')
+  const [filterStatusW, setFilterStatusW] = useState<'ALL' | 'ANTRI' | 'DIKERJAKAN' | 'SELESAI' | 'DISERAHKAN'>('ALL')
   const [showSpkModal, setShowSpkModal] = useState(false)
   const [showVehicleModal, setShowVehicleModal] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<WorkshopWorkOrder | null>(null)
@@ -106,14 +110,23 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
   // Filter berdasarkan pencarian
   const filteredOrders = useMemo(() => {
     const q = search.toLowerCase()
-    if (!q) return workOrders
-    return workOrders.filter(o =>
-      o.spkNumber.toLowerCase().includes(q) ||
-      o.contactName.toLowerCase().includes(q) ||
-      o.vehicle?.plateNumber.toLowerCase().includes(q) ||
-      o.mechanicName?.toLowerCase().includes(q)
-    )
-  }, [workOrders, search])
+    return [...workOrders]
+      .filter(o => {
+        if (filterStatusW !== 'ALL' && o.status !== filterStatusW) return false
+        if (!q) return true
+        return (
+          o.spkNumber.toLowerCase().includes(q) ||
+          o.contactName.toLowerCase().includes(q) ||
+          o.vehicle?.plateNumber.toLowerCase().includes(q) ||
+          o.mechanicName?.toLowerCase().includes(q)
+        )
+      })
+      .sort((a, b) => {
+        const da = String(a.createdAt || '')
+        const db = String(b.createdAt || '')
+        return sortOrderW === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+      })
+  }, [workOrders, search, filterStatusW, sortOrderW])
 
   const filteredVehicles = useMemo(() => {
     const q = search.toLowerCase()
@@ -250,7 +263,24 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#003366]/20"
           />
         </div>
+        {tab === 'spk' && (
+          <button type="button" onClick={() => setSortOrderW(o => o === 'desc' ? 'asc' : 'desc')}
+            className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-semibold rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all uppercase tracking-wide">
+            Tanggal {sortOrderW === 'desc' ? <ArrowDown size={12} className="text-blue-500" /> : <ArrowUp size={12} className="text-blue-500" />}
+          </button>
+        )}
       </div>
+      {tab === 'spk' && (
+        <div className="flex gap-1.5 flex-wrap px-1">
+          {([['ALL','Semua'],['ANTRI','Antri'],['DIKERJAKAN','Dikerjakan'],['SELESAI','Selesai'],['DISERAHKAN','Diserahkan']] as const).map(([val, label]) => (
+            <button key={val} onClick={() => setFilterStatusW(val)}
+              className={`px-3 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatusW === val ? 'bg-[#003366] text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+              {label}
+              {val !== 'ALL' && <span className="ml-1 opacity-70">({workOrders.filter(o=>o.status===val).length})</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Content */}
       {tab === 'spk' ? (

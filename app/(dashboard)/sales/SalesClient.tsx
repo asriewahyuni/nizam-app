@@ -320,11 +320,24 @@ export default function SalesClient({
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
-  const sortedSales = [...(sales || [])].sort((a, b) => {
-    const da = String(a.sale_date || a.created_at || '')
-    const db = String(b.sale_date || b.created_at || '')
-    return sortOrder === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
-  })
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'DRAFT' | 'ORDERED' | 'FINISHED' | 'VOIDED'>('ALL')
+  const [searchSales, setSearchSales] = useState('')
+  const sortedSales = [...(sales || [])]
+    .filter((s: any) => {
+      if (filterStatus !== 'ALL' && s.status !== filterStatus) return false
+      if (searchSales.trim()) {
+        const q = searchSales.toLowerCase()
+        const num = (s.sale_number || '').toLowerCase()
+        const cust = (s.contacts?.name || '').toLowerCase()
+        if (!num.includes(q) && !cust.includes(q)) return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      const da = String(a.sale_date || a.created_at || '')
+      const db = String(b.sale_date || b.created_at || '')
+      return sortOrder === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+    })
    const [loading, setLoading] = useState(false)
    const searchParams = useSearchParams()
    const router = useRouter()
@@ -1090,10 +1103,24 @@ export default function SalesClient({
           actions={
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input placeholder="Cari nomor invoice atau customer..." className="pl-9 pr-4 py-2 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-100 transition-all outline-none w-64" />
+              <input
+                value={searchSales}
+                onChange={e => setSearchSales(e.target.value)}
+                placeholder="Cari nomor invoice atau customer..."
+                className="pl-9 pr-4 py-2 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-100 transition-all outline-none w-64"
+              />
             </div>
           }
         />
+        <div className="px-8 pb-3 flex gap-1.5 flex-wrap">
+          {([['ALL','Semua'],['DRAFT','Draft'],['ORDERED','Proses'],['FINISHED','Selesai'],['VOIDED','Void']] as const).map(([val, label]) => (
+            <button key={val} onClick={() => setFilterStatus(val)}
+              className={`px-3 py-1 text-[10px] font-semibold rounded-lg uppercase tracking-wide transition-all ${filterStatus === val ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+              {label}
+              {val !== 'ALL' && <span className="ml-1 opacity-70">({(sales||[]).filter((s:any)=>s.status===val).length})</span>}
+            </button>
+          ))}
+        </div>
         
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -1117,8 +1144,8 @@ export default function SalesClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {sales.length === 0 ? (
-                <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Belum ada data penjualan.</td></tr>
+              {sortedSales.length === 0 ? (
+                <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">{searchSales || filterStatus !== 'ALL' ? 'Tidak ada data yang cocok.' : 'Belum ada data penjualan.'}</td></tr>
               ) : (
                 sortedSales.map((s: any) => (
                   <tr key={s.id} className="group hover:bg-slate-50 transition-colors">
