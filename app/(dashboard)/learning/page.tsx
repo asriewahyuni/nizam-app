@@ -27,11 +27,11 @@ import {
   updateCompetencyTrainingStatus,
 } from '@/modules/hris/actions/competency-training.actions'
 import {
-import { StatCard } from '@/components/ui/NizamUI'
   listCompetencyTrainings,
   summarizeCompetencyTrainings,
   type CompetencyTrainingRecord,
 } from '@/modules/hris/lib/competency-training.server'
+import { StatCard } from '@/components/ui/NizamUI'
 
 function formatOrgKindLabel(kind: 'PARENT' | 'CHILD' | 'STANDALONE') {
   if (kind === 'PARENT') return 'Parent / Holding'

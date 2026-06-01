@@ -34,7 +34,6 @@ import {
   type BSCOperationalMetricKey,
 } from '@/modules/accounting/lib/bsc-kpi-mapping'
 import {
-import { useConfirm } from '@/components/ui/NizamUI'
   saveBSCPerspectiveWeights,
   upsertBSCKPI,
   archiveBSCKPI,
@@ -50,6 +49,7 @@ import { useConfirm } from '@/components/ui/NizamUI'
   type BSCSetupPayload,
   type BSCKPIItem
 } from '@/modules/accounting/actions/bsc.actions'
+import { useConfirm } from '@/components/ui/NizamUI'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

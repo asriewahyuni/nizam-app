@@ -3,11 +3,11 @@
 import { useState, useTransition } from 'react'
 import { CheckCircle2, XCircle, Loader2, CreditCard, X } from 'lucide-react'
 import {
-import { useConfirm } from '@/components/ui/NizamUI'
   confirmLmsRegistration,
   cancelLmsRegistration,
   updateRegistrationPayment,
 } from '@/modules/edu/actions/lms-registration.actions'
+import { useConfirm } from '@/components/ui/NizamUI'
 
 type Reg = {
   id: string

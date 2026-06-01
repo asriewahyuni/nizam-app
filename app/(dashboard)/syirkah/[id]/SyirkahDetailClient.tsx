@@ -9,13 +9,13 @@ import { formatDate, formatRupiah } from '@/lib/utils'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { SYIRKAH_PROFIT_SHARING_EQUITY_CODE } from '@/modules/accounting/lib/shariah-coa'
 import {
-import { useConfirm } from '@/components/ui/NizamUI'
   upsertSyirkahContract,
   upsertSyirkahMember,
   deleteSyirkahMember,
   syncSyirkahCapitalToCore,
   syncSyirkahProfitSharingToCore,
 } from '@/modules/syirkah/actions/syirkah.actions'
+import { useConfirm } from '@/components/ui/NizamUI'
 
 const SYIRKAH_DEFAULT_CASH_CODES = ['1103', '1101', '1102', '1105']
 

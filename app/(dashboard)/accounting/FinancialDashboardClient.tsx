@@ -10,7 +10,6 @@ import { DollarSign, TrendingUp, TrendingDown, Wallet, PieChart as PieChartIcon,
 import type { DashboardFinancialData, MonthlySnapshot, ExpenseCategory } from '@/modules/accounting/actions/financial-dashboard.actions'
 import { formatRupiah } from '@/lib/utils'
 import Link from 'next/link'
-import { StatCard } from '@/components/ui/NizamUI'
 
 interface Props {
   data: DashboardFinancialData

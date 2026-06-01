@@ -28,7 +28,6 @@ import CreateBatchForm from './CreateBatchForm'
 import CreateCourseForm from './CreateCourseForm'
 import CreateSessionForm from './CreateSessionForm'
 import { formatRupiah } from '@/lib/utils'
-import { SectionHeader } from '@/components/ui/NizamUI'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -27,7 +27,6 @@ import {
   type StorefrontPublicPayload,
 } from '@/modules/ecommerce/lib/ecommerce'
 import { formatRupiah } from '@/lib/utils'
-import { SectionHeader } from '@/components/ui/NizamUI'
 
 type StorefrontClientProps = {
   payload: StorefrontPublicPayload

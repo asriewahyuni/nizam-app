@@ -5,7 +5,6 @@ import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bug, Camera, ChevronDown, ChevronUp, CircleAlert, Clock3, LifeBuoy, Send } from 'lucide-react'
 import { createSupportTicket, type SupportTicketRecord } from '@/modules/saas/actions/ticketing.actions'
-import { formatDateTime } from '@/lib/utils'
 
 type TicketingClientProps = {
   tickets: SupportTicketRecord[]

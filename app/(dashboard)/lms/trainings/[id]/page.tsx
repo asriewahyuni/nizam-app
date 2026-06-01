@@ -21,7 +21,6 @@ import {
   updateCompetencyTrainingSessionStatus,
 } from '@/modules/hris/actions/competency-training.actions'
 import { getCompetencyTrainingDetail } from '@/modules/hris/lib/competency-training.server'
-import { StatCard } from '@/components/ui/NizamUI'
 
 function buildLearningRedirect(params: Record<string, string>, hash = 'daftar-pelatihan') {
   const search = new URLSearchParams(params)
