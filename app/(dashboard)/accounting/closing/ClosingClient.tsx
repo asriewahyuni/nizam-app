@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { createFiscalPeriod, closeFiscalPeriod, openFiscalPeriod } from '@/modules/accounting/actions/closing.actions'
+import { useConfirm } from '@/components/ui/NizamUI'
 
 interface ClosingClientProps {
   periods: any[]

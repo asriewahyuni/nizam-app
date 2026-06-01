@@ -7,6 +7,7 @@ import Barcode from 'react-barcode'
 import { QRCodeCanvas } from 'qrcode.react'
 import { createFixedAsset, runOrganizationDepreciation, updateFixedAsset, deleteFixedAsset, previewOrganizationDepreciation, disposeFixedAsset } from '@/modules/accounting/actions/assets.actions'
 import { formatDate } from '@/lib/utils'
+import { useConfirm } from '@/components/ui/NizamUI'
 
 interface AssetClientProps {
   orgId: string

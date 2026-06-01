@@ -6,6 +6,7 @@ import { formatRupiah } from '@/lib/utils'
 import Link from 'next/link'
 import { deleteSyirkahContract, upsertSyirkahContract } from '@/modules/syirkah/actions/syirkah.actions'
 import { useRouter } from 'next/navigation'
+import { useConfirm } from '@/components/ui/NizamUI'
 
 export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: string; initialData: any }) {
   const { netProfit, totalDebtAllocation, totalCurrentDebt, contracts, allMembers, distributionContext } = initialData

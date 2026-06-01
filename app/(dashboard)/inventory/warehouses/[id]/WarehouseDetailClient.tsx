@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatDate, formatRupiah } from '@/lib/utils'
 import { createWarehouseBin, deleteWarehouseBin } from '@/modules/inventory/actions/warehouse.actions'
+import { useConfirm } from '@/components/ui/NizamUI'
 
 type WarehouseBinStockItem = {
   product_id: string

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signSyirkahMember } from '@/modules/syirkah/actions/syirkah.actions'
 import { CheckCircle, Loader2, PenLine } from 'lucide-react'
+import { useConfirm } from '@/components/ui/NizamUI'
 
 export default function SignConfirmButton({ memberToken, memberName }: {
   memberToken: string

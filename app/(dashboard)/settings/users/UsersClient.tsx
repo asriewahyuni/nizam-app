@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { Plus, Shield, Trash2, Edit2, ShieldAlert, Link as LinkIcon, Copy, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useConfirm } from '@/components/ui/NizamUI'
 
 type UsersClientProps = {
   orgId: string

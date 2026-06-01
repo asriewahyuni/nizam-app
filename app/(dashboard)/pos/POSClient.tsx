@@ -11,6 +11,7 @@ import { closePosShift, getPosShiftHistory, openPosShift, settlePosShift, type P
 import { buildPosWhatsappReceiptMessage, normalizeWhatsappPhone } from '@/modules/sales/lib/pos-whatsapp'
 import { resolveDefaultPosAccountId, type PosShiftConfig, type PosShiftMethod } from '@/modules/sales/lib/pos-shift'
 import type { SalesPromoRecord } from '@/modules/sales/lib/sales-promos'
+import { useConfirm } from '@/components/ui/NizamUI'
 
 type PosSuccessData = {
    total: number

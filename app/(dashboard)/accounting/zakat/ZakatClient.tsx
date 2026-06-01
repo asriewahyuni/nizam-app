@@ -29,6 +29,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis, AreaChart, A
 import { getLivePreciousMetalsPrices } from '@/modules/accounting/actions/price.actions'
 import { startZakatHaul, checkAndCancelHaul, payZakat, syncActiveHaulPrices } from '@/modules/accounting/actions/zakat.actions'
 import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
+import { useConfirm } from '@/components/ui/NizamUI'
 
 interface ZakatClientProps {
   summary: any
