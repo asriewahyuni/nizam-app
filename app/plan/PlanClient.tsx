@@ -8,7 +8,7 @@ import {
   Users, Network, GitBranch, Star,
 } from 'lucide-react'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
+import { cn, formatRupiah } from '@/lib/utils'
 import {
   OPERATOR_GROWTH_ADDON_OPTIONS,
   OPERATOR_MODULE_OPTIONS,
