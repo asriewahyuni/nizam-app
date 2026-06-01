@@ -18,6 +18,7 @@ import {
 } from '@/lib/saas/module-catalog'
 import type { OperatorDocumentSnapshot } from '@/modules/saas/actions/operator-sales.actions'
 import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'
+import { formatDate } from '@/lib/utils'
 
 function formatIdr(value: number) {
   return new Intl.NumberFormat('id-ID', {

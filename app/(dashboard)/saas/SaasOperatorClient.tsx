@@ -28,6 +28,7 @@ import {
 } from '@/lib/saas/module-catalog'
 import { CORE_MODULES, MINIMUM_CORE_MODULES, OPERATIONAL_MODULES } from '@/modules/marketplace/lib/module-registry'
 import { OPERATOR_GROWTH_ADDON_OPTIONS } from '@/lib/saas/operator-pricing'
+import { formatDate } from '@/lib/utils'
 
 type ResellerOption = {
   id: string

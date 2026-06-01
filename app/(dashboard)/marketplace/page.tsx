@@ -14,6 +14,7 @@ import { CheckCircle2, Lock, ArrowRight, Sparkles, ShieldCheck, Zap, Circle } fr
 import { DeactivateModuleButton } from './DeactivateModuleButton'
 import { ActivateModuleButton } from './ActivateModuleButton'
 import { ActivateCoreModuleButton } from './ActivateCoreModuleButton'
+import { formatRupiah } from '@/lib/utils'
 
 function moduleNameMatches(enabled: string, key: string): boolean {
   const n = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]/g, '')

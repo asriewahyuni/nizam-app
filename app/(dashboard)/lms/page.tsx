@@ -19,6 +19,7 @@ import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.serv
 import { formatRupiah } from '@/lib/utils'
 import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
 import { TambahProgramButton } from './TambahProgramButton'
+import { StatCard } from '@/components/ui/NizamUI'
 
 function StatCard({
   label,

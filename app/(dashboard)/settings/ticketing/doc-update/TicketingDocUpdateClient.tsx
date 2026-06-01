@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ArrowLeft, Bug, Clock3, FileStack, ShieldCheck } from 'lucide-react'
 import type { SupportTicketDocUpdateRecord } from '@/modules/saas/actions/ticketing.actions'
+import { formatDateTime } from '@/lib/utils'
 
 type TicketingDocUpdateClientProps = {
   updates: SupportTicketDocUpdateRecord[]

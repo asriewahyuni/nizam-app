@@ -3,6 +3,7 @@ import { unstable_noStore as noStore } from 'next/cache'
 import { CalendarDays, Users, Banknote, BookOpen, Clock } from 'lucide-react'
 import { getPublicBatchInfo, getBatchRegisteredCount } from '@/modules/edu/actions/lms-registration.actions'
 import RegistrationForm from './RegistrationForm'
+import { formatRupiah } from '@/lib/utils'
 
 export async function generateMetadata({ params }: { params: Promise<{ batchId: string }> }) {
   const { batchId } = await params

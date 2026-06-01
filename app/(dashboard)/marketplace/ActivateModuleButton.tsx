@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Loader2, X, CreditCard, Tag, CheckCircle2, Sparkles, Shield } from 'lucide-react'
 import { activateModule } from '@/modules/marketplace/actions/marketplace.actions'
 import { motion, AnimatePresence } from 'framer-motion'
+import { formatRupiah } from '@/lib/utils'
 
 type Props = {
   moduleKey: string

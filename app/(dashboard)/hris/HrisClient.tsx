@@ -54,6 +54,7 @@ import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import {
+import { EmptyState, PageHeader, SafeButton, SectionCard, SectionHeader, StatCard, StatusBadge, useConfirm } from '@/components/ui/NizamUI'
   PageHeader,
   StatCard,
   SectionCard,

@@ -7,6 +7,7 @@ import { createLmsBatch, createLmsSession } from '@/modules/edu/actions/lms-comm
 import { CourseActions, BatchActions, SessionActions } from './AdminCRUDActions'
 import SessionQRClient from './SessionQRClient'
 import CreateCourseForm from './CreateCourseForm'
+import { formatRupiah } from '@/lib/utils'
 
 type Course = {
   id: string

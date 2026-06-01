@@ -4,6 +4,7 @@ import { Users, CheckCircle2, Clock, XCircle, Link2 } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getAllLmsRegistrations } from '@/modules/edu/actions/lms-registration.actions'
 import { RegistrasiActions } from './RegistrasiActions'
+import { formatRupiah } from '@/lib/utils'
 
 const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
   PENDING_PAYMENT: { label: 'Menunggu Bayar', class: 'bg-amber-50 text-amber-700 border-amber-100' },

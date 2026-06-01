@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from 'react'
 import { createLmsRegistration } from '@/modules/edu/actions/lms-registration.actions'
 import { CheckCircle2, Loader2 } from 'lucide-react'
+import { formatRupiah } from '@/lib/utils'
 
 type Props = {
   batchId: string

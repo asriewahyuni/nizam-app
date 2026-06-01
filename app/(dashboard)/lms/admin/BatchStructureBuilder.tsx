@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { PlusCircle, Trash2, ArrowDownCircle } from 'lucide-react'
+import { formatRupiah } from '@/lib/utils'
 
 type CostItem = {
   name: string

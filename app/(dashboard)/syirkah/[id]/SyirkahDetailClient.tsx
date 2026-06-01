@@ -5,7 +5,7 @@ import { ArrowLeft, Save, Plus, QrCode, Trash2, Edit2, Handshake, RefreshCw } fr
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
-import { formatRupiah } from '@/lib/utils'
+import { formatDate, formatRupiah } from '@/lib/utils'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { SYIRKAH_PROFIT_SHARING_EQUITY_CODE } from '@/modules/accounting/lib/shariah-coa'
 import {

@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowUpRight, CheckCircle2, ChevronDown, ChevronUp, Clock3, Eye, EyeOff, LifeBuoy, Send } from 'lucide-react'
 import {
+import { formatDateTime } from '@/lib/utils'
   postSupportTicketProgress,
   type OperatorSupportTicketRecord,
   type OperatorSupportTicketUpdateRecord,

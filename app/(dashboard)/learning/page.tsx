@@ -27,6 +27,7 @@ import {
   updateCompetencyTrainingStatus,
 } from '@/modules/hris/actions/competency-training.actions'
 import {
+import { StatCard } from '@/components/ui/NizamUI'
   listCompetencyTrainings,
   summarizeCompetencyTrainings,
   type CompetencyTrainingRecord,
