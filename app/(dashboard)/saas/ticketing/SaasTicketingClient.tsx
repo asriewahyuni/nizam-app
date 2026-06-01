@@ -10,8 +10,6 @@ import {
   type OperatorSupportTicketUpdateRecord,
   type OperatorTicketingSnapshot,
 } from '@/modules/saas/actions/ticketing.actions'
-import { formatDateTime } from '@/lib/utils'
-
 function formatDateTime(value: string) {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return '-'
