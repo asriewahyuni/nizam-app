@@ -101,6 +101,29 @@ export default function PlanClient({ packages }: { packages: Package[] }) {
   const activePkg = packages.find(p => normalize(p.name) === activePlan)
   const activeMeta = activePkg ? PLAN_META[normalize(activePkg.name)] : null
 
+  if (packages.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
+        <div className="text-center space-y-4 max-w-sm">
+          <Link href="/">
+            <span className="text-[#003366] font-black text-2xl tracking-tight">Nizam <span className="font-light">MiniERP</span></span>
+          </Link>
+          <p className="text-slate-500 text-sm font-medium">
+            Informasi paket sedang tidak tersedia. Hubungi kami untuk konsultasi.
+          </p>
+          <a
+            href="https://wa.me/6281227145000?text=Halo%2C%20saya%20ingin%20konsultasi%20mengenai%20paket%20Nizam%20MiniERP.%20Bisa%20dibantu%3F"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center px-6 py-3 bg-[#003366] text-white text-xs font-black uppercase tracking-[0.18em] rounded-2xl hover:bg-[#00264d] transition-colors cursor-pointer"
+          >
+            Konsultasi via WhatsApp →
+          </a>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       <div className="max-w-4xl mx-auto px-4 py-12 space-y-10">
