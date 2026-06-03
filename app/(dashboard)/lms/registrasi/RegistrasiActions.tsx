@@ -105,6 +105,7 @@ export function RegistrasiActions({ reg }: { reg: Reg }) {
           onClose={() => setShowPaymentModal(false)}
         />
       )}
+      {ConfirmUI}
     </div>
   )
 }
@@ -199,7 +200,6 @@ function PaymentModal({ reg, onClose }: { reg: Reg; onClose: () => void }) {
           </div>
         )}
       </div>
-      {ConfirmUI}
     </div>
   )
 }

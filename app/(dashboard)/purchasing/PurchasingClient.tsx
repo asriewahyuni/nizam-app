@@ -64,10 +64,10 @@ export default function PurchasingClient({
 }: any) {
    const router = useRouter()
    const searchParams = useSearchParams()
+   const { confirm, ConfirmUI } = useConfirm()
    const payId = searchParams.get('pay')
    const requestedTab = String(searchParams.get('tab') || '').trim().toUpperCase()
    const [activeTab, setActiveTab] = useState<PurchasingTab>(() => {
-  const { confirm, ConfirmUI } = useConfirm()
      if (requestedTab === 'REQUESTS') return 'REQUESTS'
      if (requestedTab === 'PURCHASES' || payId) return 'PURCHASES'
      return purchaseRequests.some((request: { status?: unknown }) => request?.status === 'PENDING') ? 'REQUESTS' : 'PURCHASES'
