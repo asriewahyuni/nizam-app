@@ -44,7 +44,7 @@ function normalizePermissionList(permissions?: string[] | null) {
 }
 
 function isPosPermission(permission: string) {
-  return /^pos($|[:._-])/.test(permission)
+  return /^pos($|[:._-])/.test(permission) || /^canvassing($|[:._-])/.test(permission)
 }
 
 function normalizeEnabledModuleList(enabledModules?: string[] | null) {
@@ -119,8 +119,13 @@ export function resolveDefaultAuthorizedRoute(input: NavigationAccessInput) {
     return '/dashboard'
   }
 
-  if (hasPosOnlyAccess(input.userRole, input.permissions) && hasEnabledModuleAccess(input.enabledModules, 'POS')) {
-    return '/pos'
+  if (hasPosOnlyAccess(input.userRole, input.permissions)) {
+    if (hasRolePermission(input.userRole, input.permissions, 'canvassing') && hasEnabledModuleAccess(input.enabledModules, 'Mobile Canvassing')) {
+      return '/pos-mobile'
+    }
+    if (hasEnabledModuleAccess(input.enabledModules, 'POS')) {
+      return '/pos'
+    }
   }
 
   for (const candidate of DEFAULT_LANDING_CANDIDATES) {

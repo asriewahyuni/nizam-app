@@ -81,6 +81,7 @@ const MODULE_CATEGORIES = [
       { id: 'pos', name: 'POS (Kasir)', perms: ['pos:read', 'pos:write'] },
       { id: 'quotation', name: 'Penawaran Harga', perms: ['quotation:read', 'quotation:write'] },
       { id: 'sales', name: 'Penjualan', perms: ['sales:read', 'sales:write'] },
+      { id: 'canvassing', name: 'Canvassing & Mobile POS', perms: ['canvassing:read', 'canvassing:write'] },
     ]
   },
   {

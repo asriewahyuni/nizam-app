@@ -37,7 +37,7 @@ function moduleNameMatches(enabledModuleRaw: string, candidateRaw: string) {
 }
 
 function isPosCashierRoute(pathname: string) {
-  return pathname === '/pos' || pathname.startsWith('/pos/')
+  return pathname === '/pos' || pathname.startsWith('/pos/') || pathname === '/sales/co-sales' || pathname.startsWith('/sales/co-sales/')
 }
 
 export default async function DashboardLayout({
@@ -142,10 +142,9 @@ export default async function DashboardLayout({
 
   if (
     isPosOnlyUser &&
-    hasEnabledModuleAccess(orgData.enabledModules, 'POS') &&
     !isPosCashierRoute(requestPathname)
   ) {
-    return redirect('/pos')
+    return redirect('/')
   }
 
   // Map paths to their required module names (matching saas_packages.modules)
@@ -175,6 +174,7 @@ export default async function DashboardLayout({
     { path: '/inventory', requiredModule: 'Inventory', aliases: ['Inventory', 'Inventori'], permissionKeys: ['inventory', 'warehouse'] },
     { path: '/factory', requiredModule: 'Manufacturing', aliases: ['Manufacturing', 'Factory'], permissionKeys: ['factory', 'manufacturing'] },
     { path: '/purchasing', requiredModule: 'Purchasing', aliases: ['Purchasing', 'Pembelian'], permissionKeys: ['purchasing', 'purchase'] },
+    { path: '/sales/co-sales', requiredModule: 'Mobile Canvassing', aliases: ['Canvassing', 'Mobile Stock', 'Mobile POS'], permissionKeys: ['sales', 'canvassing'] },
     { path: '/sales', requiredModule: 'Sales', aliases: ['Sales', 'Penjualan'], permissionKeys: ['sales', 'quotation'] },
     { path: '/pos', requiredModule: 'POS', aliases: ['POS', 'POS (Kasir)'], permissionKeys: ['pos'] },
     { path: '/fleet', requiredModule: 'Fleet & Rental', aliases: ['Fleet & Rental', 'Fleet Management', 'Smart Fleet Management'], permissionKeys: ['fleet'] },
@@ -201,7 +201,7 @@ export default async function DashboardLayout({
 
     if (!isModulePaid && !isSaasAssessorRouteAccess) {
       console.warn(`[ACL] Redirecting - Module not paid: ${requiredModule} (checked aliases: ${allNames.join(', ')}) for path: ${requestPathname}`)
-      return redirect('/dashboard')
+      return redirect('/')
     }
 
     // 2. RBAC PERMISSION GUARD (Only check if NOT owner/admin)
@@ -216,7 +216,7 @@ export default async function DashboardLayout({
       )
       if (!hasPermission) {
         console.warn(`[ACL] Redirecting - No permission for: ${requiredModule} for path: ${requestPathname}`)
-        return redirect('/dashboard')
+        return redirect('/')
       }
     }
   }

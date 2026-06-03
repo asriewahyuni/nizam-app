@@ -98,7 +98,8 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
   const readClient = (isInternalAuthProvider() ? admin : supabase) as any
   const { data: roles } = await readClient.from('roles').select('*').eq('org_id', orgData.org.id).order('name')
   const { data: branches } = await readClient.from('branches').select('id, name, code, pic_employee_id').eq('org_id', orgData.org.id).eq('is_active', true).order('name')
-  const hrisImpersonationTargetsResult = adminImpersonation
+  const canImpersonate = orgData.role === 'owner' || orgData.role === 'admin' || Boolean(adminImpersonation)
+  const hrisImpersonationTargetsResult = canImpersonate
     ? await getTenantHrisImpersonationCandidates(orgData.org.id)
     : { data: [] as unknown[] }
 
@@ -287,8 +288,8 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
     transferDisabledReason={transferDisabledReason}
     initialTransferHistory={clientSafeTransferHistory}
     initialInvitations={clientSafeInvitations}
-    adminImpersonation={serializeHrisClientValue(adminImpersonation)}
-    hrisImpersonationTargets={serializeHrisClientValue(hrisImpersonationTargetsResult.data || [])}
+    adminImpersonation={serializeHrisClientValue(adminImpersonation) as any}
+    hrisImpersonationTargets={serializeHrisClientValue(hrisImpersonationTargetsResult.data || []) as any}
     defaultTab={defaultTab}
   />
 }

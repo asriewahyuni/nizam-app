@@ -140,8 +140,8 @@ export function SetupClient({
         await completeModuleOnboarding(mod.key)
         setStepStatuses((prev) => { const n = [...prev] as StepStatus[]; n[steps.length - 1] = 'done'; return n })
         setTimeout(() => {
+          router.refresh()
           router.push(mod.href)
-          // Tidak perlu router.refresh() — router.push sudah full load halaman baru
         }, 600)
       } catch (err: any) {
         setToast({ message: err.message || 'Gagal menyelesaikan setup', type: 'error' })

@@ -340,6 +340,22 @@ export const ADDON_MODULES: ModuleDefinition[] = [
     ],
     requires: ['Sales'],
   },
+  {
+    key: 'Mobile Canvassing',
+    name: 'Canvassing & Mobile POS',
+    tagline: 'Aplikasi kasir mobile untuk sales lapangan',
+    description: 'Manajemen sales lapangan, gudang kendaraan berjalan, dan Mobile POS dengan dukungan retur/tukar tambah.',
+    icon: '🚚',
+    color: 'bg-blue-600',
+    href: '/sales/co-sales',
+    isCore: false,
+    isAddon: true,
+    category: 'addon',
+    onboardingSteps: [
+      { id: 'roles', title: 'Atur Peran Sales', description: 'Berikan hak akses POS pada akun sales lapangan Anda.' },
+    ],
+    requires: ['Sales', 'Inventory'],
+  },
 ]
 
 // ── PILLAR MODULES (selalu aktif) ──────────────────────────────────────────

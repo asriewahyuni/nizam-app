@@ -586,7 +586,7 @@ export function saasModuleMatches(enabledModuleRaw: string, candidateRaw: string
   const candidate = normalizeSaasEntitlementName(candidateRaw)
 
   if (!enabled || !candidate) return false
-  return enabled === candidate
+  return enabled.toLowerCase() === candidate.toLowerCase()
 }
 
 export function saasModuleCoversCapability(enabledModuleRaw: string, candidateRaw: string) {

@@ -391,7 +391,7 @@ export default function HrisClient({
         // Alert non-intrusif memberitahu berhasil
         showToast('Data Karyawan berhasil disimpan!', 'success')
       }
-      if (res.warning) showToast(res.warning, 'info')
+      if ((res as any).warning) showToast((res as any).warning, 'info')
     }
     setLoading(false)
   }
@@ -784,7 +784,7 @@ export default function HrisClient({
   const defaultDateTimeInput = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
   const selectedTransferOrg = transferTargets.find((org: any) => org.orgId === transferTargetOrgId)
   const selectedTransferBranches = selectedTransferOrg?.branches || []
-  const showHrisImpersonationTools = Boolean(adminImpersonation)
+  const showHrisImpersonationTools = Boolean(adminImpersonation) || (hrisImpersonationTargets && hrisImpersonationTargets.length > 0)
 
   return (
     <div className="space-y-10 pb-20">
@@ -1743,7 +1743,7 @@ export default function HrisClient({
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900 tracking-tight uppercase italic">HRIS Impersonation</h3>
                     <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">
-                      Aktif karena admin platform sedang impersonate tenant {adminImpersonation?.email ? `• ${adminImpersonation.email}` : ''}
+                      {adminImpersonation?.email ? `Aktif karena admin platform sedang impersonate tenant • ${adminImpersonation.email}` : 'Fitur aktif untuk Admin/Owner Organisasi'}
                     </p>
                   </div>
                 </div>
@@ -1760,7 +1760,7 @@ export default function HrisClient({
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-6 py-5">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Kapan panel ini muncul?</div>
                   <p className="text-sm font-bold text-slate-700 leading-relaxed">
-                    Panel ini hanya tampil saat platform admin sedang berada dalam mode impersonation tenant. Dari sini Anda bisa turun ke akun yang punya akses HR/HRIS untuk cek scope menu, branch, dan batas akses aslinya.
+                    Panel ini memungkinkan Admin untuk "Login As" akun karyawan yang memiliki akses HR/HRIS, guna mengecek batas akses, scope menu, dan visibilitas data sesuai peran mereka.
                   </p>
                 </div>
 

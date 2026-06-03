@@ -123,6 +123,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'POS (Kasir)', href: '/pos', icon: Store, permission_key: 'pos', module_key: 'POS' },
       { label: 'Penawaran (Quotation)', href: '/sales/quotations', icon: FileText, permission_key: 'quotation', module_key: 'Sales' },
       { label: 'Penjualan', href: '/sales', icon: TrendingUp, permission_key: 'sales', module_key: 'Sales' },
+      { label: 'Canvassing (Co-Sales)', href: '/sales/co-sales', icon: Truck, permission_key: 'canvassing', module_key: 'Mobile Canvassing' },
       { label: 'Sales Pipeline', href: '/sales/pipeline', icon: Activity, permission_key: 'sales', module_key: 'Sales' },
       { label: 'Target & Komisi', href: '/sales/commission', icon: Target, permission_key: 'sales', module_key: 'Sales' },
       { label: 'Promo & Reward', href: '/sales/promos', icon: Zap, permission_key: 'sales', module_key: 'Sales' },
@@ -483,35 +484,28 @@ export function AppSidebar({
     // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
     if (isDemo) return true
 
-    // 0b. PILLAR BYPASS: Modul pillar (Finance, Marketing, HRIS) selalu muncul di sidebar
-    //     Sidebar items yang punya module_key milik pillar modules auto-visible.
-    if (item.module_key && PILLAR_MODULES.some(p => p.key.toLowerCase() === item.module_key!.toLowerCase())) {
-      return true
-    }
-
     // 1. SaaS Module Check
+    let passesSaaSCheck = true
     if (item.module_key && enabledModules.length > 0) {
-      const matches = enabledModules.some((moduleName) => {
-        const enabledLower = moduleName.trim().toLowerCase()
-
-        // a. Exact label match — granular per-menu control
-        //    e.g. enabledModules has 'Akun (CoA)' → only shows 'Akun (CoA)', not 'Buku Besar'
-        if (enabledLower === item.label.trim().toLowerCase()) return true
-
-        // b. Canonical module match — backward compat with packages storing canonical names
-        //    e.g. enabledModules has 'Job Order' → normalizes to 'Job Order (Jasa)'
-        //        matches item.module_key 'Job Order (Jasa)' via coverage check.
-        const normalizedEnabled = normalizeSaasEntitlementName(moduleName)
-        if (normalizedEnabled.trim()) {
-          // Check both: (1) normalized canonical matches module_key, (2) original input matches module_key
-          if (saasModuleCoversCapability(normalizedEnabled, item.module_key!) ||
-              saasModuleCoversCapability(moduleName, item.module_key!)) return true
-        }
-
-        return false
-      })
-      if (!matches) return false
+      // 0b. PILLAR BYPASS: Modul pillar (Finance, Marketing, HRIS) selalu aktif secara SaaS
+      const isPillar = PILLAR_MODULES.some(p => p.key.toLowerCase() === item.module_key!.toLowerCase())
+      
+      if (!isPillar) {
+        const matches = enabledModules.some((moduleName) => {
+          const enabledLower = moduleName.trim().toLowerCase()
+          if (enabledLower === item.label.trim().toLowerCase()) return true
+          const normalizedEnabled = normalizeSaasEntitlementName(moduleName)
+          if (normalizedEnabled.trim()) {
+            if (saasModuleCoversCapability(normalizedEnabled, item.module_key!) ||
+                saasModuleCoversCapability(moduleName, item.module_key!)) return true
+          }
+          return false
+        })
+        if (!matches) passesSaaSCheck = false
+      }
     }
+
+    if (!passesSaaSCheck) return false
 
     // 2. RBAC Permission Check
     return hasRolePermission(userRole, permissions, item.permission_key)

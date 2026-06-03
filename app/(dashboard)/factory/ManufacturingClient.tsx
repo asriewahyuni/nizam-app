@@ -145,6 +145,7 @@ export function ManufacturingClient({
   const [showQuotationPrompt, setShowQuotationPrompt] = useState(false)
   const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk memakai modul manufaktur.'
   const spkStats = [
+    { label: 'Kapasitas Air', value: '15.000 L', icon: Zap, color: 'text-[#2563EB] bg-blue-50' },
     { label: 'SPK Aktif', value: workOrders.filter(w => w.status === 'RELEASED').length, icon: Play, color: 'text-blue-600 bg-blue-50' },
     { label: 'Draft', value: workOrders.filter(w => w.status === 'DRAFT').length, icon: FileText, color: 'text-slate-600 bg-slate-50' },
     { label: 'Selesai (Bulan ini)', value: workOrders.filter(w => w.status === 'COMPLETED').length, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
@@ -421,7 +422,7 @@ export function ManufacturingClient({
       <AnimatePresence initial={false} mode="wait">
         {activeTab === 'SPK' ? (
           <div key="spk" className="space-y-6">
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                 {spkStats.map((stat, i) => (
                   <div key={i} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4">
                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.color}`}>

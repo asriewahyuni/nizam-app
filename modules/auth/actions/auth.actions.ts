@@ -1324,14 +1324,17 @@ export async function getTenantHrisImpersonationCandidates(orgId: string) {
     return { error: 'Organisasi tidak valid.', data: [] as HrisImpersonationCandidate[] }
   }
 
-  const impersonationState = await requirePlatformAdminImpersonation()
-  if ('error' in impersonationState) {
-    return { error: impersonationState.error, data: [] as HrisImpersonationCandidate[] }
-  }
-
   const activeOrg = await getActiveOrg()
   if (!activeOrg || String(activeOrg.org?.id || '').trim() !== trimmedOrgId) {
     return { error: 'Konteks tenant aktif tidak sesuai.', data: [] as HrisImpersonationCandidate[] }
+  }
+
+  const impersonationState = await requirePlatformAdminImpersonation()
+  const isPlatformAdmin = !('error' in impersonationState)
+  const isOrgAdmin = activeOrg.role === 'owner' || activeOrg.role === 'admin'
+
+  if (!isPlatformAdmin && !isOrgAdmin) {
+    return { error: 'Akses ditolak. Fitur ini hanya untuk Admin.', data: [] as HrisImpersonationCandidate[] }
   }
 
   const adminClient = await createAdminClient()
@@ -1389,8 +1392,8 @@ export async function getTenantHrisImpersonationCandidates(orgId: string) {
     if (!rawUserId || seenUserIds.has(rawUserId)) return false
     seenUserIds.add(rawUserId)
 
-    const customRole = rolesById.get(String(member?.role_id || '').trim())
-    return hasHrisImpersonationAccess(member?.role, customRole?.permissions)
+    // Tampilkan semua karyawan/member agar admin bisa melihat portal ESS mereka
+    return true
   })
 
   const candidates = await Promise.all(
@@ -1494,9 +1497,13 @@ export async function signInAsTenantHrisUser(orgId: string, targetUserId: string
     return { error: 'Target impersonation HRIS tidak valid.' }
   }
 
+  const activeOrg = await getActiveOrg()
   const impersonationState = await requirePlatformAdminImpersonation()
-  if ('error' in impersonationState) {
-    return { error: impersonationState.error }
+  const isPlatformAdmin = !('error' in impersonationState)
+  const isOrgAdmin = activeOrg?.role === 'owner' || activeOrg?.role === 'admin'
+
+  if (!isPlatformAdmin && !isOrgAdmin) {
+    return { error: 'Akses ditolak. Fitur ini hanya untuk Admin.' }
   }
 
   const candidateResult = await getTenantHrisImpersonationCandidates(trimmedOrgId)
@@ -1513,7 +1520,7 @@ export async function signInAsTenantHrisUser(orgId: string, targetUserId: string
     return { success: true as const }
   }
 
-  const cookieStore = impersonationState.cookieStore
+  const cookieStore = await cookies()
 
   if (isInternalAuthProvider()) {
     const switched = await createInternalAuthSessionByUserId(targetCandidate.targetUserId)
@@ -1532,7 +1539,7 @@ export async function signInAsTenantHrisUser(orgId: string, targetUserId: string
     cookieStore.delete(ACTIVE_BRANCH_COOKIE)
 
     revalidatePath('/', 'layout')
-    redirect('/hris')
+    redirect('/')
   }
 
   const adminClient = await createAdminClient()
