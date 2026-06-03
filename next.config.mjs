@@ -20,7 +20,7 @@ export default withSentryConfig(nextConfig, {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
-  org: "nizam-29",
+  org: "nizam-bz",
 
   project: "javascript-nextjs",
 
@@ -51,10 +51,5 @@ export default withSentryConfig(nextConfig, {
       // Automatically tree-shake Sentry logger statements to reduce bundle size
       removeDebugLogging: true,
     },
-  },
-
-  sourcemaps: {
-    disable: !canUploadSourceMaps,
-    deleteSourcemapsAfterUpload: true,
   },
 });
