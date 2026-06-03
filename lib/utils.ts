@@ -168,3 +168,13 @@ export function getInitials(name: string): string {
 export function toFixed2(n: number): number {
   return Math.round(n * 100) / 100
 }
+
+/**
+ * Convert a JavaScript array of strings to a PostgreSQL array literal.
+ * Used to bypass JSON serialization for TEXT[] columns.
+ * Usage: toPgArray(['FINANCE', 'IT']) → '{"FINANCE","IT"}'
+ */
+export function toPgArray(arr: string[] | null | undefined): string {
+  if (!arr || !Array.isArray(arr) || arr.length === 0) return '{}'
+  return '{' + arr.map(s => `"${String(s).replace(/"/g, '\\"')}"`).join(',') + '}'
+}

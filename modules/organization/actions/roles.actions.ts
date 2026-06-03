@@ -9,6 +9,7 @@ import {
   normalizePermissions,
   normalizeRoleRecord,
 } from '@/modules/organization/lib/role-normalization'
+import { toPgArray } from '@/lib/utils'
 
 type RoleMutationInput = {
   id?: string | null
@@ -104,7 +105,7 @@ export async function saveOrganizationRole(orgId: string, input: RoleMutationInp
   const payload = {
     org_id: context.orgId,
     name,
-    department_ids: normalizeDepartmentIds(input.departmentIds),
+    department_ids: toPgArray(normalizeDepartmentIds(input.departmentIds)),
     parent_id: String(input.parentId || '').trim() || null,
   }
 
@@ -132,7 +133,7 @@ export async function saveOrganizationRole(orgId: string, input: RoleMutationInp
     .from('roles')
     .insert({
       ...payload,
-      permissions: [],
+      permissions: toPgArray([]),
       is_system: false,
       priority: Number(count || 0),
     })
@@ -155,7 +156,7 @@ export async function updateOrganizationRolePermissions(orgId: string, roleId: s
   const { error } = await context.db
     .from('roles')
     .update({
-      permissions: normalizePermissions(permissions),
+      permissions: toPgArray(normalizePermissions(permissions)),
     })
     .eq('id', trimmedRoleId)
     .eq('org_id', context.orgId)
