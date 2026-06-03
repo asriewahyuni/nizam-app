@@ -7,15 +7,17 @@ import { activateModule } from '@/modules/marketplace/actions/marketplace.action
 
 type Props = {
   moduleKey: string
+  disabled?: boolean
 }
 
-export function ActivateCoreModuleButton({ moduleKey }: Props) {
+export function ActivateCoreModuleButton({ moduleKey, disabled = false }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
 
   function handleClick() {
+    if (disabled) return
     setError(null)
     startTransition(async () => {
       try {
@@ -23,6 +25,7 @@ export function ActivateCoreModuleButton({ moduleKey }: Props) {
         setDone(true)
         router.refresh()
       } catch (err: any) {
+        if (err?.digest?.startsWith('NEXT_REDIRECT')) return
         setError(err.message || 'Gagal mengaktifkan modul inti')
       }
     })
@@ -40,8 +43,8 @@ export function ActivateCoreModuleButton({ moduleKey }: Props) {
     <div className="flex flex-col items-end gap-1">
       <button type="button"
         onClick={handleClick}
-        disabled={isPending}
-        className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap disabled:opacity-50"
+        disabled={isPending || disabled}
+        className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isPending ? (
           <><Loader2 className="h-3 w-3 animate-spin" /> Mengaktifkan...</>

@@ -107,7 +107,10 @@ export default async function MarketplacePage() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {CORE_MODULES.map(mod => {
             const isEnabled = enabledModules.some(m => moduleNameMatches(m, mod.key))
-            return <CoreModuleCard key={mod.key} mod={mod} enabled={isEnabled} />
+            const unmetRequirements = (mod.requires || []).filter(
+              req => !enabledModules.some(m => moduleNameMatches(m, req))
+            )
+            return <CoreModuleCard key={mod.key} mod={mod} enabled={isEnabled} unmetRequirements={unmetRequirements} />
           })}
         </div>
       </section>
@@ -217,29 +220,44 @@ export default async function MarketplacePage() {
 }
 
 // ── Core Module Card ─────────────────────────────────────────────────────────
-function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: boolean }) {
+function CoreModuleCard({ mod, enabled, unmetRequirements = [] }: {
+  mod: ModuleDefinition
+  enabled: boolean
+  unmetRequirements?: string[]
+}) {
+  const hasUnmet = unmetRequirements.length > 0
   return (
-    <div className={`flex items-center gap-4 rounded-xl border px-5 py-4 transition-all ${
+    <div className={`flex flex-col gap-3 rounded-xl border px-5 py-4 transition-all ${
       enabled
         ? 'border-emerald-100 bg-emerald-50/40'
-        : 'border-slate-200 bg-white hover:shadow-md hover:border-blue-200'
+        : hasUnmet
+          ? 'border-slate-200 bg-slate-50/60'
+          : 'border-slate-200 bg-white hover:shadow-md hover:border-blue-200'
     }`}>
-      <div className={`w-10 h-10 rounded-xl ${mod.color} flex items-center justify-center text-lg flex-shrink-0 shadow-sm ${
-        enabled ? '' : 'opacity-50 grayscale'
-      }`}>
-        {mod.icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-bold text-slate-900 truncate">{mod.name}</div>
-        <div className="text-xs text-slate-500 truncate">{mod.tagline}</div>
+      <div className="flex items-center gap-4">
+        <div className={`w-10 h-10 rounded-xl ${mod.color} flex items-center justify-center text-lg flex-shrink-0 shadow-sm ${
+          (enabled || !hasUnmet) ? '' : 'opacity-40 grayscale'
+        }`}>
+          {mod.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold text-slate-900 truncate">{mod.name}</div>
+          <div className="text-xs text-slate-500 truncate">{mod.tagline}</div>
+        </div>
+
+        {enabled ? (
+          <span className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
+            <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
+          </span>
+        ) : (
+          <ActivateCoreModuleButton moduleKey={mod.key} disabled={hasUnmet} />
+        )}
       </div>
 
-      {enabled ? (
-        <span className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
-          <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
-        </span>
-      ) : (
-        <ActivateCoreModuleButton moduleKey={mod.key} />
+      {!enabled && hasUnmet && (
+        <div className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-100 rounded-lg px-3 py-1.5">
+          Aktifkan terlebih dahulu: {unmetRequirements.join(', ')}
+        </div>
       )}
     </div>
   )

@@ -8,31 +8,28 @@ import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
 
 /**
  * Dapatkan semua instance modul untuk org aktif.
+ * Menggunakan queryPostgres langsung untuk bypass RLS (tabel pakai RLS berbasis auth.uid()).
  */
 export async function getOrgModuleInstances(orgId: string) {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('org_module_instances')
-    .select('*')
-    .eq('org_id', orgId)
-
-  if (error) return []
-  return data
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const result = await queryPostgres(
+    `SELECT * FROM org_module_instances WHERE org_id = $1`,
+    [orgId]
+  )
+  return result.rows ?? []
 }
 
 /**
  * Dapatkan status satu modul spesifik.
+ * Menggunakan queryPostgres langsung untuk bypass RLS (tabel pakai RLS berbasis auth.uid()).
  */
 export async function getModuleInstanceStatus(orgId: string, moduleKey: string) {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from('org_module_instances')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('module_key', moduleKey)
-    .single()
-
-  return data ?? null
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const result = await queryPostgres(
+    `SELECT * FROM org_module_instances WHERE org_id = $1 AND module_key = $2 LIMIT 1`,
+    [orgId, moduleKey]
+  )
+  return result.rows?.[0] ?? null
 }
 
 /**
@@ -108,47 +105,58 @@ export async function activateModule(moduleKey: string) {
     }
   }
 
-  // Cek apakah sebelumnya DISABLED
-  const { data: existing } = await supabase
-    .from('org_module_instances')
-    .select('id, status')
-    .eq('org_id', orgData.org.id)
-    .eq('module_key', moduleKey)
-    .single()
+  // Gunakan queryPostgres langsung untuk bypass RLS (org_module_instances punya RLS berbasis auth.uid())
+  const { queryPostgres } = await import('@/lib/db/postgres')
 
-  if (existing) {
-    // Re-aktifkan: kembali ke PENDING
-    await supabase
-      .from('org_module_instances')
-      .update({ status: 'PENDING' })
-      .eq('id', existing.id)
-  } else {
-    // Insert baru
-    const { error } = await supabase
-      .from('org_module_instances')
-      .insert({ org_id: orgData.org.id, module_key: moduleKey, status: 'PENDING' })
-    if (error) throw new Error(error.message)
+  // Upsert org_module_instances — jika sudah ada update ke PENDING, jika belum insert baru
+  await queryPostgres(
+    `INSERT INTO org_module_instances (org_id, module_key, status, settings)
+     VALUES ($1, $2, 'PENDING', '{}'::jsonb)
+     ON CONFLICT (org_id, module_key)
+     DO UPDATE SET status = CASE WHEN org_module_instances.status = 'DISABLED' THEN 'PENDING' ELSE org_module_instances.status END`,
+    [orgData.org.id, moduleKey]
+  )
+
+  // ── Pastikan use_custom_modules = true dan seed enabled_modules ────────────
+  // getActiveOrg() hanya membaca org.enabled_modules ketika use_custom_modules = true.
+  // Jika belum aktif, seed enabled_modules dengan semua modul plan saat ini terlebih dahulu
+  // agar modul dari saas_packages tidak hilang saat kita beralih ke custom modules.
+  const orgSettings = (orgData.org.settings && typeof orgData.org.settings === 'object')
+    ? orgData.org.settings as Record<string, any>
+    : {}
+
+  if (!orgSettings.use_custom_modules) {
+    const currentModules = orgData.enabledModules ?? []
+    await queryPostgres(
+      `UPDATE organizations
+       SET enabled_modules = $1::text[],
+           settings = settings || '{"use_custom_modules": true}'::jsonb
+       WHERE id = $2`,
+      [currentModules, orgData.org.id]
+    )
   }
 
-  // Tambahkan ke enabled_modules (idempotent via RPC)
-  await supabase.rpc('append_enabled_module', {
-    p_org_id: orgData.org.id,
-    p_module_key: moduleKey,
-  })
+  // Tambahkan modul baru ke enabled_modules (idempotent, langsung via queryPostgres)
+  await queryPostgres(
+    `UPDATE organizations
+     SET enabled_modules = array_append(COALESCE(enabled_modules, '{}'), $1::text)
+     WHERE id = $2
+       AND NOT ($1::text = ANY(COALESCE(enabled_modules, '{}')))`,
+    [moduleKey, orgData.org.id]
+  )
 
-  // ── Khusus child org: pastikan use_custom_modules = true ──────────────────
-  // Child org mewarisi plan dari parent, tapi enabled_modules-nya berbeda.
-  // use_custom_modules harus true agar kolom enabled_modules di org dibaca
-  // oleh getActiveOrg(), bukan diambil dari saas_packages plan.
-  const isChildOrg = Boolean(orgData.org.parent_org_id)
-  if (isChildOrg && !orgData.org.settings?.use_custom_modules) {
-    const currentSettings = (orgData.org.settings && typeof orgData.org.settings === 'object')
-      ? orgData.org.settings
-      : {}
-    await supabase
-      .from('organizations')
-      .update({ settings: { ...currentSettings, use_custom_modules: true } })
-      .eq('id', orgData.org.id)
+  // Core/pillar module langsung READY — tidak perlu onboarding manual
+  if (modDef?.isCore) {
+    await queryPostgres(
+      `INSERT INTO org_module_instances (org_id, module_key, status, ready_at, settings)
+       VALUES ($1, $2, 'READY', NOW(), '{}'::jsonb)
+       ON CONFLICT (org_id, module_key)
+       DO UPDATE SET status = 'READY', ready_at = NOW()`,
+      [orgData.org.id, moduleKey]
+    )
+    revalidatePath('/marketplace')
+    revalidatePath('/dashboard')
+    redirect('/marketplace')
   }
 
   revalidatePath('/marketplace')
@@ -212,21 +220,17 @@ export async function completeModuleOnboarding(moduleKey: string) {
   const orgData = await getActiveOrg()
   if (!orgData) throw new Error('Not authenticated')
 
-  const supabase = await createClient()
-  const { error } = await supabase
-    .from('org_module_instances')
-    .update({
-      status: 'READY',
-      ready_at: new Date().toISOString(),
-    })
-    .eq('org_id', orgData.org.id)
-    .eq('module_key', moduleKey)
-
-  if (error) throw new Error(error.message)
+  // Gunakan queryPostgres langsung untuk bypass RLS (org_module_instances punya RLS berbasis auth.uid())
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  await queryPostgres(
+    `INSERT INTO org_module_instances (org_id, module_key, status, ready_at, settings)
+     VALUES ($1, $2, 'READY', NOW(), '{}'::jsonb)
+     ON CONFLICT (org_id, module_key)
+     DO UPDATE SET status = 'READY', ready_at = NOW()`,
+    [orgData.org.id, moduleKey]
+  )
 
   // Hanya invalidate marketplace agar modul tampil sebagai READY.
-  // Dashboard layout TIDAK perlu di-revalidate karena sidebar membaca
-  // enabledModules yang sudah ada — router.push dari client sudah cukup.
   revalidatePath('/marketplace')
   return { success: true }
 }
