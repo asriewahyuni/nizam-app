@@ -22,9 +22,19 @@ const MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations')
 // ─── Load .env.local jika variabel belum ada di environment ──────────────────
 
 function loadEnvLocal() {
-  const envFile = path.join(ROOT, '.env.local')
-  if (!fs.existsSync(envFile)) return
-  const lines = fs.readFileSync(envFile, 'utf8').split('\n')
+  const envLocalFile = path.join(ROOT, '.env.local')
+  const envFile = path.join(ROOT, '.env')
+  
+  let targetFile = ''
+  if (fs.existsSync(envLocalFile)) {
+    targetFile = envLocalFile
+  } else if (fs.existsSync(envFile)) {
+    targetFile = envFile
+  } else {
+    return
+  }
+  
+  const lines = fs.readFileSync(targetFile, 'utf8').split('\n')
   for (const line of lines) {
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith('#')) continue
