@@ -5,6 +5,7 @@
 
 import { queryPostgres } from '@/lib/db/postgres'
 import { sendWeeklySystemUsageReport } from '@/lib/activity/weekly-usage-report.server'
+import { runDatabaseBackup } from '@/lib/backup/backup-db.server'
 
 type SchedulerRunOptions = {
   dryRun?: boolean
@@ -206,9 +207,78 @@ function getWeeklyUsageReportTask(): SchedulerTaskDefinition {
   }
 }
 
+function buildNextDailyRunLabel(now: Date, timeZone: string, hour: number, minute: number) {
+  const nowParts = getZonedDateParts(now, timeZone)
+  const passedToday = nowParts.hour > hour || (nowParts.hour === hour && nowParts.minute >= minute)
+  const offsetDays = passedToday ? 1 : 0
+  const nextDate = new Date(now.getTime() + offsetDays * 24 * 60 * 60 * 1000)
+  const nextParts = getZonedDateParts(nextDate, timeZone)
+  return `${pad(hour)}:${pad(minute)} ${timeZone} (${formatZonedDateKey(nextParts)})`
+}
+
+function buildCurrentDailyWindow(now: Date, timeZone: string, hour: number, minute: number) {
+  const nowParts = getZonedDateParts(now, timeZone)
+  const beforeTodayWindow = nowParts.hour < hour || (nowParts.hour === hour && nowParts.minute < minute)
+  const windowDate = beforeTodayWindow
+    ? new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    : now
+  const windowParts = getZonedDateParts(windowDate, timeZone)
+  return {
+    scheduleKey: `${formatZonedDateKey(windowParts)}-${pad(hour)}${pad(minute)}`,
+    currentWindowLabel: `${pad(hour)}:${pad(minute)} ${timeZone} (${formatZonedDateKey(windowParts)})`,
+  }
+}
+
+function createDailyTaskDecision(now: Date, options: { timeZone: string; hour: number; minute: number }): SchedulerTaskDecision {
+  const parts = getZonedDateParts(now, options.timeZone)
+  const due = parts.hour === options.hour && parts.minute === options.minute
+  const currentWindow = buildCurrentDailyWindow(now, options.timeZone, options.hour, options.minute)
+  return {
+    due,
+    scheduleKey: currentWindow.scheduleKey,
+    currentWindowLabel: currentWindow.currentWindowLabel,
+    nextRunLabel: buildNextDailyRunLabel(now, options.timeZone, options.hour, options.minute),
+  }
+}
+
+function getDailyDbBackupTask(): SchedulerTaskDefinition {
+  const timeZone = normalizeText(process.env.BACKUP_SCHEDULER_TIMEZONE) || 'Asia/Jakarta'
+  // BACKUP_SCHEDULER_CRON format: "0 3 * * *" → ambil hour & minute saja
+  const cronValue = normalizeText(process.env.BACKUP_SCHEDULER_CRON) || '0 3 * * *'
+  const cronParts = cronValue.split(' ')
+  const minute = Math.min(59, Math.max(0, normalizeInteger(cronParts[0], 0)))
+  const hour = Math.min(23, Math.max(0, normalizeInteger(cronParts[1], 3)))
+
+  return {
+    name: 'daily-db-backup',
+    description: 'Backup database PostgreSQL harian dan kirim ke Telegram admin',
+    timezone: timeZone,
+    decision: (now) => createDailyTaskDecision(now, { timeZone, hour, minute }),
+    run: async ({ dryRun }) => {
+      const result = await runDatabaseBackup(dryRun)
+      if (!result.ok) {
+        throw new Error(result.error || 'Backup gagal tanpa pesan error.')
+      }
+      return {
+        summary: dryRun
+          ? `DRY RUN — file: ${result.filename}`
+          : `Sukses — ${result.filename} (${result.sizeMB} MB) → Telegram msg #${result.telegramMessageId}`,
+        meta: {
+          dryRun,
+          filename: result.filename,
+          sizeBytes: result.sizeBytes,
+          sizeMB: result.sizeMB,
+          telegramMessageId: result.telegramMessageId,
+        },
+      }
+    },
+  }
+}
+
 export function getScheduledTasks(): SchedulerTaskDefinition[] {
   return [
     getWeeklyUsageReportTask(),
+    getDailyDbBackupTask(),
   ]
 }
 
