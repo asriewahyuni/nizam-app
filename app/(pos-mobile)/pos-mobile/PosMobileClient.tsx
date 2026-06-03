@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Plus, Minus, Search, Package, MapPin, Truck, ChevronLeft, CheckCircle2, User, CreditCard, X, Receipt } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getContacts } from '@/modules/contacts/actions/contact.actions';
-import { getCustomerOutstandingAR, processArCollection } from '@/modules/sales/actions/pos-mobile-ar.actions';
+import { createContact } from '@/modules/contacts/actions/contact.actions';
+import { getCustomerOutstandingAR, processArCollection, getCanvasserContacts } from '@/modules/sales/actions/pos-mobile-ar.actions';
 import { useRouter } from 'next/navigation';
 
 type Product = {
@@ -29,6 +29,9 @@ export function PosMobileClient({ orgId, branchId, userEmail, userName }: any) {
   const [customers, setCustomers] = useState<any[]>([]);
   const [searchCustomer, setSearchCustomer] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({ name: '', address: '', phone_wa: '' });
+  const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
   
   // Phase 2: Modes
   const [activeTab, setActiveTab] = useState<'SALES' | 'AR'>('SALES');
@@ -49,7 +52,7 @@ export function PosMobileClient({ orgId, branchId, userEmail, userName }: any) {
   useEffect(() => {
     async function loadCustomers() {
       try {
-        const data = await getContacts(orgId, 'CUSTOMER');
+        const data = await getCanvasserContacts(orgId);
         setCustomers(data || []);
       } catch (err) {
         console.error('Failed to load customers', err);
@@ -57,6 +60,31 @@ export function PosMobileClient({ orgId, branchId, userEmail, userName }: any) {
     }
     loadCustomers();
   }, [orgId]);
+
+  const handleCreateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustomerForm.name.trim()) return;
+    setIsSubmittingCustomer(true);
+
+    const fd = new FormData();
+    fd.append('name', newCustomerForm.name);
+    fd.append('type', 'CUSTOMER');
+    fd.append('address', newCustomerForm.address);
+    fd.append('phone_wa', newCustomerForm.phone_wa);
+
+    const res = await createContact(orgId, fd);
+    setIsSubmittingCustomer(false);
+
+    if (res.success && res.data) {
+      setCustomers(prev => [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name)));
+      setIsCreatingCustomer(false);
+      setNewCustomerForm({ name: '', address: '', phone_wa: '' });
+      // Optionally auto-select the new customer
+      // setSelectedCustomer(res.data);
+    } else {
+      alert(res.error || 'Gagal membuat pelanggan baru');
+    }
+  };
 
   useEffect(() => {
     if (selectedCustomer && activeTab === 'AR') {
@@ -132,15 +160,15 @@ export function PosMobileClient({ orgId, branchId, userEmail, userName }: any) {
   // ---- RENDER: SUCCESS SCREEN (SALES) ----
   if (salesSuccess) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-white h-[100dvh]">
+      <div className="flex flex-col items-center justify-center p-6 text-center bg-white h-full w-full">
         <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
           <CheckCircle2 className="w-24 h-24 text-green-500 mx-auto mb-4" />
         </motion.div>
-        <h2 className="text-2xl font-bold text-[#1E293B] mb-2">Transaksi Berhasil!</h2>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Transaksi Berhasil!</h2>
         <p className="text-slate-500 mb-8">Penjualan tercatat untuk {selectedCustomer?.name}</p>
         <button 
           onClick={() => setSalesSuccess(false)}
-          className="w-full max-w-xs bg-[#2563EB] text-white py-4 rounded-xl font-semibold text-lg active:scale-95 transition-transform"
+          className="w-full max-w-xs bg-slate-900 text-white py-4 rounded-xl font-semibold text-lg active:scale-95 transition-transform shadow-md"
         >
           Selesai
         </button>
@@ -151,15 +179,15 @@ export function PosMobileClient({ orgId, branchId, userEmail, userName }: any) {
   // ---- RENDER: SUCCESS SCREEN (AR) ----
   if (arSuccess) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-white h-[100dvh]">
+      <div className="flex flex-col items-center justify-center p-6 text-center bg-white h-full w-full">
         <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
           <CheckCircle2 className="w-24 h-24 text-green-500 mx-auto mb-4" />
         </motion.div>
-        <h2 className="text-2xl font-bold text-[#1E293B] mb-2">Pembayaran Diterima!</h2>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Pembayaran Diterima!</h2>
         <p className="text-slate-500 mb-8">Penerimaan tagihan berhasil masuk ke setoran sementara.</p>
         <button 
           onClick={() => setArSuccess(false)}
-          className="w-full max-w-xs bg-[#2563EB] text-white py-4 rounded-xl font-semibold text-lg active:scale-95 transition-transform"
+          className="w-full max-w-xs bg-slate-900 text-white py-4 rounded-xl font-semibold text-lg active:scale-95 transition-transform shadow-md"
         >
           Kembali
         </button>
@@ -171,28 +199,34 @@ export function PosMobileClient({ orgId, branchId, userEmail, userName }: any) {
   if (!selectedCustomer) {
     const filteredCustomers = customers.filter(c => c.name?.toLowerCase().includes(searchCustomer.toLowerCase()));
     return (
-      <div className="flex flex-col h-[100dvh] bg-[#F8FAFC]">
-        <header className="bg-[#2563EB] text-white shadow-sm px-4 py-5 flex items-center justify-between shrink-0">
+      <div className="flex flex-col h-full w-full bg-[#F8FAFC]">
+        <header className="bg-slate-900 text-white shadow-md px-5 pt-10 pb-6 flex items-center justify-between shrink-0">
           <div>
-            <h1 className="font-bold text-lg leading-tight">Mulai Kunjungan</h1>
-            <p className="text-sm opacity-80">Pilih toko/pelanggan</p>
+            <h1 className="font-bold text-2xl leading-tight">Mulai Kunjungan</h1>
+            <p className="text-slate-300 mt-1 text-sm">Pilih toko atau pelanggan</p>
           </div>
-          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-            <Truck className="w-5 h-5 text-white" />
+          <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm">
+            <MapPin className="w-6 h-6 text-white" />
           </div>
         </header>
 
-        <div className="p-4 border-b border-slate-200 bg-white">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+        <div className="p-4 bg-white shadow-sm z-10 border-b border-slate-100 flex gap-2">
+          <div className="relative group flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-slate-900 transition-colors" />
             <input 
               type="text" 
               placeholder="Cari nama toko..." 
               value={searchCustomer}
               onChange={e => setSearchCustomer(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#2563EB] focus:border-transparent outline-none transition-all"
+              className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition-all shadow-inner"
             />
           </div>
+          <button 
+            onClick={() => setIsCreatingCustomer(true)}
+            className="w-14 shrink-0 bg-slate-900 text-white rounded-2xl flex items-center justify-center active:scale-95 transition-transform"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -217,38 +251,105 @@ export function PosMobileClient({ orgId, branchId, userEmail, userName }: any) {
             ))
           )}
         </div>
+
+        {/* Modal Create Customer */}
+        <AnimatePresence>
+          {isCreatingCustomer && (
+            <div className="absolute inset-0 z-50 flex items-end justify-center bg-slate-900/60 backdrop-blur-sm">
+              <motion.div 
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="bg-white w-full rounded-t-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+              >
+                <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                  <h3 className="font-bold text-xl text-slate-900">Pelanggan Baru</h3>
+                  <button onClick={() => setIsCreatingCustomer(false)} className="p-2.5 bg-slate-100 hover:bg-slate-200 transition-colors rounded-full text-slate-500">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-6 overflow-y-auto pb-safe">
+                  <form onSubmit={handleCreateCustomer} className="flex flex-col gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Nama Toko/Pelanggan <span className="text-red-500">*</span></label>
+                      <input 
+                        type="text" 
+                        required
+                        value={newCustomerForm.name}
+                        onChange={e => setNewCustomerForm(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 outline-none"
+                        placeholder="Contoh: Toko Maju Jaya"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Nomor WhatsApp</label>
+                      <input 
+                        type="text" 
+                        value={newCustomerForm.phone_wa}
+                        onChange={e => setNewCustomerForm(prev => ({ ...prev, phone_wa: e.target.value }))}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 outline-none"
+                        placeholder="Contoh: 08123456789"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Alamat Lengkap</label>
+                      <textarea 
+                        rows={3}
+                        value={newCustomerForm.address}
+                        onChange={e => setNewCustomerForm(prev => ({ ...prev, address: e.target.value }))}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900 outline-none resize-none"
+                        placeholder="Alamat toko..."
+                      />
+                    </div>
+                    <button 
+                      type="submit"
+                      disabled={isSubmittingCustomer || !newCustomerForm.name.trim()}
+                      className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-slate-900/20 active:scale-[0.98] transition-all disabled:opacity-50 mt-4"
+                    >
+                      {isSubmittingCustomer ? 'Menyimpan...' : 'Simpan Pelanggan'}
+                    </button>
+                  </form>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
 
   // ---- RENDER: MAIN DASHBOARD ----
   return (
-    <div className="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-[#F8FAFC]">
+    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-[#F8FAFC] relative">
       {/* Header */}
-      <header className="bg-white shadow-sm px-4 py-3 flex flex-col gap-3 z-10 shrink-0 border-b border-slate-200">
+      <header className="bg-white shadow-sm px-4 md:pt-10 pt-5 pb-3 flex flex-col gap-4 z-10 shrink-0 border-b border-slate-200">
         <div className="flex items-center gap-3">
-          <button onClick={() => { setSelectedCustomer(null); setCart([]); }} className="p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-full">
+          <button onClick={() => { setSelectedCustomer(null); setCart([]); }} className="p-2 -ml-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 rounded-full transition-colors">
             <ChevronLeft className="w-6 h-6" />
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-[#1E293B] text-lg leading-tight truncate">{selectedCustomer.name}</h1>
-            <p className="text-xs text-slate-500 truncate">{selectedCustomer.address || 'Toko'}</p>
+            <h1 className="font-bold text-slate-900 text-xl leading-tight truncate">{selectedCustomer.name}</h1>
+            <p className="text-sm text-slate-500 truncate flex items-center gap-1 mt-0.5">
+              <MapPin className="w-3 h-3" />
+              {selectedCustomer.address || 'Alamat Toko'}
+            </p>
           </div>
         </div>
         
         {/* Tabs */}
-        <div className="flex bg-slate-100 p-1 rounded-lg">
+        <div className="flex bg-slate-100 p-1 rounded-xl">
           <button 
             onClick={() => setActiveTab('SALES')}
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'SALES' ? 'bg-white text-[#2563EB] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab === 'SALES' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             Jual Barang
           </button>
           <button 
             onClick={() => setActiveTab('AR')}
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'AR' ? 'bg-white text-[#2563EB] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab === 'AR' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            Tagih Piutang (AR)
+            Tagih Piutang
           </button>
         </div>
       </header>
@@ -338,19 +439,19 @@ export function PosMobileClient({ orgId, branchId, userEmail, userName }: any) {
       <AnimatePresence>
         {activeTab === 'SALES' && cart.length > 0 && (
           <motion.div 
-            initial={{ y: 100 }}
+            initial={{ y: 150 }}
             animate={{ y: 0 }}
-            exit={{ y: 100 }}
-            className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 pb-safe z-20 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.1)]"
+            exit={{ y: 150 }}
+            className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-5 pb-safe z-20 shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.15)] rounded-t-3xl"
           >
             <div className="flex items-center justify-between mb-4">
               <span className="text-slate-500 font-medium">Total ({totalItems} item)</span>
-              <span className="text-2xl font-bold text-[#1E293B]">{formatRupiah(total)}</span>
+              <span className="text-2xl font-black text-slate-900">{formatRupiah(total)}</span>
             </div>
             <button 
               onClick={handleCheckout}
               disabled={isCheckingOut || total < 0}
-              className="w-full bg-[#F97316] text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-[#F97316]/30 active:scale-95 transition-all flex items-center justify-center disabled:opacity-50"
+              className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-slate-900/20 active:scale-[0.98] transition-all flex items-center justify-center disabled:opacity-50"
             >
               {isCheckingOut ? (
                 <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
@@ -367,24 +468,25 @@ export function PosMobileClient({ orgId, branchId, userEmail, userName }: any) {
       {/* Modal Payment (AR) */}
       <AnimatePresence>
         {selectedInvoice && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-slate-900/40 backdrop-blur-sm p-4 pb-0">
+          <div className="absolute inset-0 z-50 flex items-end justify-center bg-slate-900/60 backdrop-blur-sm">
             <motion.div 
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white w-full rounded-t-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] mb-0"
             >
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-bold text-lg text-slate-900">Terima Pembayaran</h3>
-                <button onClick={() => setSelectedInvoice(null)} className="p-2 bg-slate-100 rounded-full text-slate-500">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                <h3 className="font-bold text-xl text-slate-900">Setoran Tunai</h3>
+                <button onClick={() => setSelectedInvoice(null)} className="p-2.5 bg-slate-100 hover:bg-slate-200 transition-colors rounded-full text-slate-500">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6 overflow-y-auto">
-                <div className="bg-slate-50 p-4 rounded-xl mb-6">
-                  <p className="text-sm text-slate-500 mb-1">Faktur: {selectedInvoice.sale_number}</p>
-                  <p className="text-xs text-slate-500 mb-2">Sisa Tagihan:</p>
-                  <p className="text-2xl font-bold text-slate-900">{formatRupiah(selectedInvoice.outstanding_amount)}</p>
+              <div className="p-6 overflow-y-auto pb-safe">
+                <div className="bg-slate-50 p-5 rounded-2xl mb-6 border border-slate-100">
+                  <p className="text-sm font-medium text-slate-500 mb-1">Faktur: {selectedInvoice.sale_number}</p>
+                  <p className="text-xs font-medium text-slate-500 mb-2 mt-4">Total Tunggakan:</p>
+                  <p className="text-3xl font-black text-rose-600">{formatRupiah(selectedInvoice.outstanding_amount)}</p>
                 </div>
 
                 <div className="mb-6">

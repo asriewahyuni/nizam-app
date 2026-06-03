@@ -23,8 +23,8 @@ CREATE TABLE IF NOT EXISTS training_assessment_templates (
 
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
-  updated_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_by  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  updated_by  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
 
   UNIQUE (org_id, course_slug)
 );
@@ -57,8 +57,8 @@ DECLARE
 BEGIN
   -- pick the first org that has the LMS module activated
   SELECT mi.org_id INTO seed_org_id
-  FROM module_instances mi
-  WHERE mi.module_id = 'LMS' AND mi.status = 'READY'
+  FROM org_module_instances mi
+  WHERE mi.module_key = 'LMS' AND mi.status = 'READY'
   LIMIT 1;
 
   IF seed_org_id IS NULL THEN

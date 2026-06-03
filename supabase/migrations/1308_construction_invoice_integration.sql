@@ -8,7 +8,7 @@
 -- 1. Add invoice tracking columns ke construction_billing_terms (if not exists)
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE public.construction_billing_terms
-  ADD COLUMN IF NOT EXISTS invoice_id UUID REFERENCES public.invoices(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS invoice_id UUID REFERENCES public.sales(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS invoice_date DATE,
   ADD COLUMN IF NOT EXISTS invoice_number TEXT UNIQUE;
 
@@ -65,20 +65,21 @@ BEGIN
   END IF;
 
   -- Generate invoice number
-  SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number, '^[0-9]+') AS INTEGER)), 0) + 1
+  SELECT COALESCE(MAX(CAST(SUBSTRING(sale_number, '^[0-9]+') AS INTEGER)), 0) + 1
   INTO v_next_seq
-  FROM public.invoices
-  WHERE org_id = p_org_id AND EXTRACT(YEAR FROM invoice_date) = EXTRACT(YEAR FROM p_invoice_date);
+  FROM public.sales
+  WHERE org_id = p_org_id AND EXTRACT(YEAR FROM sale_date) = EXTRACT(YEAR FROM p_invoice_date);
 
   v_invoice_number := 'INV-' || TO_CHAR(p_invoice_date, 'YYYY') || '-' ||
                       LPAD(v_next_seq::TEXT, 6, '0') || '-CONSTR';
 
   -- Create invoice
-  INSERT INTO public.invoices (
-    org_id, invoice_number, invoice_date, due_date,
-    customer_id, customer_name, customer_email,
-    bill_to_name, bill_to_email,
-    status, currency, notes
+  INSERT INTO public.sales (
+    org_id, sale_number, sale_date, due_date,
+    customer_id,
+    status, notes,
+    total_amount, grand_total,
+    payment_status
   )
   VALUES (
     p_org_id,
@@ -86,13 +87,11 @@ BEGIN
     p_invoice_date,
     COALESCE(v_billing_term.due_date, p_invoice_date + INTERVAL '30 days'),
     COALESCE(v_client.id, NULL::UUID),
-    COALESCE(v_client.name, 'Client ' || v_billing_term.project_code),
-    COALESCE(v_client.email, NULL),
-    COALESCE(v_client.name, 'Client ' || v_billing_term.project_code),
-    COALESCE(v_client.email, NULL),
-    'DRAFT',
-    'IDR',
-    'Termin ' || v_billing_term.term_label || ' - ' || v_billing_term.project_code
+    'OPEN',
+    'Termin ' || v_billing_term.term_label || ' - ' || v_billing_term.project_code,
+    v_billing_term.billing_amount,
+    v_billing_term.billing_amount,
+    'UNPAID'
   )
   RETURNING id INTO v_invoice_id;
 
@@ -101,20 +100,16 @@ BEGIN
                         ROUND(v_billing_term.billing_percent, 1) || '% dari nilai kontrak)';
 
   -- Add invoice line item
-  INSERT INTO public.invoice_items (
-    invoice_id, item_number, description,
-    quantity, unit_price, line_total,
-    account_id, tax_treatment
+  INSERT INTO public.sales_items (
+    org_id, sale_id, description,
+    quantity, unit_price
   )
   VALUES (
+    p_org_id,
     v_invoice_id,
-    1,
     v_item_description,
     1,
-    v_billing_term.billing_amount,
-    v_billing_term.billing_amount,
-    NULL::UUID,
-    'NON_TAXABLE'
+    v_billing_term.billing_amount
   );
 
   -- Update billing term dengan invoice reference

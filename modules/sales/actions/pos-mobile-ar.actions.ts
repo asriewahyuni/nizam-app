@@ -6,9 +6,39 @@ import { revalidatePath } from 'next/cache';
 import { queryPostgres } from '@/lib/db/postgres';
 
 /**
+ * Mendapatkan daftar pelanggan yang murni dibuat oleh/ditugaskan ke Canvaser ini.
+ */
+export async function getCanvasserContacts(orgId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  try {
+    const result = await queryPostgres<any>(`
+      SELECT id, name, type, address, phone, phone_wa 
+      FROM contacts 
+      WHERE org_id = $1 
+        AND created_by = $2 
+        AND is_active = true 
+      ORDER BY name ASC
+    `, [orgId, user.id]);
+    
+    return result.rows;
+  } catch (error) {
+    console.error('[getCanvasserContacts] Error:', error);
+    return [];
+  }
+}
+
+/**
  * Mendapatkan daftar tagihan Piutang (AR) pelanggan yang belum lunas.
+ * Hanya menampilkan tagihan yang dibuat oleh Canvaser ini.
  */
 export async function getCustomerOutstandingAR(orgId: string, customerId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
   try {
     const result = await queryPostgres<any>(`
       SELECT 

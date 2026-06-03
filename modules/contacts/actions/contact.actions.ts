@@ -5,6 +5,23 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 
+export async function getOrgSalesAssignees(orgId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const result = await queryPostgres<any>(`
+    SELECT m.user_id, u.email as user_email
+    FROM org_members m
+    JOIN users u ON u.id = m.user_id
+    WHERE m.org_id = $1 AND m.is_active = true
+    ORDER BY u.email ASC
+  `, [orgId])
+  
+  return result.rows
+}
+
 type ContactType = 'CUSTOMER' | 'SUPPLIER'
 type ContactMutationPayload = {
   name: string
@@ -116,7 +133,8 @@ export async function createContact(orgId: string, formData: FormData): Promise<
   const { data, error } = await context.db.from('contacts').insert({
     org_id: orgId,
     ...payload,
-    is_active: true
+    is_active: true,
+    created_by: context.user.id
   }).select().single()
 
   if (error) return { error: 'Gagal membuat kontak: ' + error.message }
@@ -133,12 +151,19 @@ export async function updateContact(orgId: string, contactId: string, formData: 
   const payload = parseContactFormData(formData)
   if ('error' in payload) return payload
 
+  const updatePayload: any = {
+    ...payload,
+    updated_at: new Date().toISOString(),
+  }
+
+  const newCreatedBy = formData.get('created_by')
+  if (typeof newCreatedBy === 'string' && newCreatedBy.trim() !== '') {
+    updatePayload.created_by = newCreatedBy.trim()
+  }
+
   const { data, error } = await context.db
     .from('contacts')
-    .update({
-      ...payload,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', contactId)
     .eq('org_id', orgId)
     .eq('is_active', true)

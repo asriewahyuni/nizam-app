@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getContacts } from '@/modules/contacts/actions/contact.actions'
+import { getContacts, getOrgSalesAssignees } from '@/modules/contacts/actions/contact.actions'
 import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.actions'
 import ContactClient from './ContactClient'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
@@ -22,9 +22,10 @@ export default async function ContactsPage({
   const rawType = Array.isArray(resolvedSearchParams.type) ? resolvedSearchParams.type[0] : resolvedSearchParams.type
   const initialTypeFilter = rawType === 'CUSTOMER' || rawType === 'SUPPLIER' ? rawType : 'ALL'
 
-  const [contacts, analytics] = await Promise.all([
+  const [contacts, analytics, assignees] = await Promise.all([
     getContacts(orgId),
-    getDashboardAnalytics(orgId, activeBranch?.id)
+    getDashboardAnalytics(orgId, activeBranch?.id),
+    getOrgSalesAssignees(orgId)
   ])
   
   return (
@@ -33,6 +34,7 @@ export default async function ContactsPage({
       contacts={contacts} 
       customerPareto={analytics.customerPareto} 
       initialTypeFilter={initialTypeFilter}
+      assignees={assignees}
     />
   )
 }

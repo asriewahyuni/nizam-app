@@ -36,6 +36,7 @@ type ContactRecord = {
   address: string | null
   phone_wa?: string | null
   instagram?: string | null
+  created_by?: string | null
 }
 
 type ContactFormState = {
@@ -46,6 +47,7 @@ type ContactFormState = {
   address: string
   phone_wa: string
   instagram: string
+  created_by: string
 }
 
 interface ContactClientProps {
@@ -53,6 +55,7 @@ interface ContactClientProps {
   contacts: any[]
   customerPareto: any
   initialTypeFilter?: ContactFilter
+  assignees?: { user_id: string; user_email: string }[]
 }
 
 function normalizeContact(contact: any): ContactRecord {
@@ -65,6 +68,7 @@ function normalizeContact(contact: any): ContactRecord {
     address: contact.address || null,
     phone_wa: contact.phone_wa || null,
     instagram: contact.instagram || null,
+    created_by: contact.created_by || null,
   }
 }
 
@@ -85,6 +89,7 @@ function createEmptyForm(type: ContactType): ContactFormState {
     address: '',
     phone_wa: '',
     instagram: '',
+    created_by: '',
   }
 }
 
@@ -97,6 +102,7 @@ function toFormState(contact: ContactRecord): ContactFormState {
     address: contact.address || '',
     phone_wa: contact.phone_wa || '',
     instagram: contact.instagram || '',
+    created_by: contact.created_by || '',
   }
 }
 
@@ -109,6 +115,7 @@ function buildFormData(formState: ContactFormState, forcedType?: ContactType) {
   formData.set('address', formState.address)
   formData.set('phone_wa', formState.phone_wa)
   formData.set('instagram', formState.instagram)
+  formData.set('created_by', formState.created_by)
   return formData
 }
 
@@ -117,6 +124,7 @@ export default function ContactClient({
   contacts,
   customerPareto,
   initialTypeFilter = 'ALL',
+  assignees = []
 }: ContactClientProps) {
   const router = useRouter()
   const [contactItems, setContactItems] = useState<ContactRecord[]>(() => sortContacts((contacts || []).map(normalizeContact)))
@@ -572,6 +580,22 @@ export default function ContactClient({
                   placeholder="Alamat kantor, toko, atau gudang"
                 />
               </div>
+
+              {formType === 'CUSTOMER' && assignees.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Sales Assignee (Penanggung Jawab)</label>
+                  <select
+                    value={formState.created_by}
+                    onChange={(event) => setFormState((current) => ({ ...current, created_by: event.target.value }))}
+                    className="w-full h-12 px-4 border rounded-xl bg-slate-50 text-sm font-bold focus:border-blue-500 outline-none"
+                  >
+                    <option value="">-- Tidak Ada / Default --</option>
+                    {assignees.map(u => (
+                      <option key={u.user_id} value={u.user_id}>{u.user_email}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex justify-end gap-3 pt-4 border-t mt-6">
                 <button type="button" onClick={closeFormModal} className="px-6 py-3 font-bold text-slate-400">
