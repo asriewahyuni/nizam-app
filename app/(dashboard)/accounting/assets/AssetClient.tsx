@@ -84,6 +84,7 @@ export function AssetClient({
   coa,
 }: AssetClientProps) {
   const router = useRouter()
+  const { confirm, ConfirmUI } = useConfirm()
   // Defensive: pastikan initialAssets selalu array meski server return null/undefined
   const [assets, setAssets] = useState<any[]>(Array.isArray(initialAssets) ? initialAssets : [])
   const [sortOrderA, setSortOrderA] = useState<'desc' | 'asc'>('desc')

@@ -178,6 +178,7 @@ export default async function DashboardLayout({
     { path: '/sales', requiredModule: 'Sales', aliases: ['Sales', 'Penjualan'], permissionKeys: ['sales', 'quotation'] },
     { path: '/pos', requiredModule: 'POS', aliases: ['POS', 'POS (Kasir)'], permissionKeys: ['pos'] },
     { path: '/fleet', requiredModule: 'Fleet & Rental', aliases: ['Fleet & Rental', 'Fleet Management', 'Smart Fleet Management'], permissionKeys: ['fleet'] },
+    { path: '/po-bus', requiredModule: 'PO Bus', aliases: ['PO Bus', 'Perusahaan Otobus', 'Bus Operator'], permissionKeys: ['po_bus'] },
     { path: '/hris', requiredModule: 'HRIS', aliases: ['HRIS', 'Karyawan (HRIS)', 'Attendance', 'Payroll'], permissionKeys: ['hris', 'employee', 'employees', 'attendance', 'payroll'] },
     { path: '/learning', requiredModule: 'HRIS', aliases: ['HRIS', 'Learning', 'Peningkatan Kompetensi'], permissionKeys: ['learning', 'hris', 'employee', 'employees'] },
     { path: '/lms', requiredModule: 'LMS', aliases: ['LMS', 'LMS (E-Learning)', 'Training Center'], permissionKeys: ['learning'] },

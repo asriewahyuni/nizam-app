@@ -64,6 +64,7 @@ export const SAAS_FULL_CORE_EXTENSION_ITEMS = [
 ] as const
 
 export const SAAS_VERTICAL_MODULE_ITEMS = [
+  { label: 'PO Bus', value: 'PO Bus' },
   { label: 'Fleet & Rental', value: 'Fleet & Rental' },
   { label: 'Job Order (Jasa)', value: 'Job Order (Jasa)' },
   { label: 'Project & Construction', value: 'Project & Construction' },
@@ -463,6 +464,10 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
   {
     canonical: 'Fleet & Rental',
     aliases: ['fleet & rental', 'fleet', 'fleet management', 'smart fleet management'],
+  },
+  {
+    canonical: 'PO Bus',
+    aliases: ['po bus', 'perusahaan otobus', 'bus operator', 'po bis', 'manajemen bus'],
   },
   {
     canonical: 'Job Order (Jasa)',

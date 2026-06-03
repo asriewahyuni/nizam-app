@@ -187,6 +187,22 @@ export const HRIS_MODULES: ModuleDefinition[] = [
 // ── BUSINESS TYPE (swapable, isi Operasional) ──────────────────────────────
 export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
   {
+    key: 'PO Bus',
+    name: 'PO Bus',
+    tagline: 'Manajemen Perusahaan Otobus',
+    description: 'Untuk Perusahaan Otobus: armada bus, kru (driver, kernet, kondektur), mekanik, rekam servis & ban, emergency call, ticketing penumpang, manajemen agen, dan checkpoint GPS.',
+    icon: '🚌',
+    color: 'bg-blue-600',
+    href: '/po-bus',
+    isCore: false,
+    category: 'business_type',
+    onboardingSteps: [
+      { id: 'settings', title: 'Pengaturan Armada', description: 'Daftarkan unit bus, rute trayek, dan agen tiket.' },
+    ],
+    tags: ['transportasi', 'bus', 'tiket', 'armada', 'PO Bus'],
+    requires: [],
+  },
+  {
     key: 'Fleet & Rental',
     name: 'Fleet & Rental',
     tagline: 'Bisnis armada kendaraan dan sewa aset',
