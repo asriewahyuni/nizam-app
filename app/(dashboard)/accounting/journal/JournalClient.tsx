@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2, Calculator, ArrowRightLeft, ArrowUp, ArrowDown } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton, useConfirm} from '@/components/ui/NizamUI'
-import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries, getAccountLedger } from '@/modules/accounting/actions/journal.actions'
+import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries, getAccountLedger, bulkPostJournalEntries, getAllMatchingJournalEntryIds } from '@/modules/accounting/actions/journal.actions'
 import type { AccountLedgerResult } from '@/modules/accounting/actions/journal.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
@@ -89,6 +89,7 @@ export default function JournalClient({
   const { confirm, ConfirmUI } = useConfirm()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([])
   const [filterStatus, setFilterStatus] = useState<JournalStatusFilter>(initialFilterStatus)
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [searchText, setSearchText] = useState('')
@@ -170,6 +171,7 @@ export default function JournalClient({
     setSearchResults(null)
     setSearchHasMore(false)
     resetAccountLedger()
+    setSelectedEntryIds([])
   }
 
   function resetAccountLedger() {
@@ -411,6 +413,18 @@ export default function JournalClient({
     const res = await postJournalEntry(id, orgId)
     if (res.error) alert(res.error)
     else window.location.reload()
+  }
+
+  const handleBulkPost = async () => {
+    if (selectedEntryIds.length === 0) return alert('Pilih minimal satu draft jurnal untuk di-posting.')
+    if (!await confirm(`Posting ${selectedEntryIds.length} jurnal yang dipilih? Jurnal tidak bisa diubah setelah di-posting.`)) return
+    
+    setIsSubmitting(true)
+    const res = await bulkPostJournalEntries(selectedEntryIds, orgId)
+    setIsSubmitting(false)
+    
+    if (res.error) alert(res.error)
+    window.location.reload()
   }
 
   const handleVoid = async (id: string) => {
@@ -727,10 +741,68 @@ export default function JournalClient({
           </>
         ) : (
           <>
+        {selectedEntryIds.length > 0 && filterStatus === 'DRAFT' && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-6 py-4 mb-4 flex flex-col sm:flex-row sm:items-center justify-between shadow-sm mx-6 mt-6 gap-4">
+            <div className="text-sm font-semibold text-emerald-800 flex items-center flex-wrap gap-2">
+              <CheckCircle2 size={18} />
+              <span>{selectedEntryIds.length} draft jurnal dipilih.</span>
+              
+              {canLoadMoreEntries && selectedEntryIds.length === visibleEntries.filter((e:any) => !getClosedPeriodForDate(e.entry_date)).length && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsLoadingEntries(true)
+                    try {
+                      const allIds = await getAllMatchingJournalEntryIds(orgId, {
+                        status: 'DRAFT',
+                        branch_id: activeBranchId || undefined,
+                        search: activeSearch || undefined
+                      })
+                      if (allIds.length > 0) {
+                        setSelectedEntryIds(allIds)
+                      }
+                    } catch (err) {
+                      alert('Gagal mengambil seluruh data.')
+                    } finally {
+                      setIsLoadingEntries(false)
+                    }
+                  }}
+                  className="ml-2 font-medium underline decoration-emerald-300 underline-offset-4 text-emerald-700 hover:text-emerald-900 cursor-pointer"
+                >
+                  Pilih semua yang cocok
+                </button>
+              )}
+            </div>
+            <SafeButton 
+              variant="primary" 
+              size="sm" 
+              isLoading={isSubmitting}
+              onClick={handleBulkPost}
+            >
+              POSTING SEKALIGUS
+            </SafeButton>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
+                {filterStatus === 'DRAFT' && (
+                  <th className="px-6 py-5 w-10">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      checked={visibleEntries.length > 0 && selectedEntryIds.length === visibleEntries.filter((e:any) => !getClosedPeriodForDate(e.entry_date)).length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedEntryIds(visibleEntries.filter((entry: any) => !getClosedPeriodForDate(entry.entry_date)).map((entry: any) => entry.id))
+                        } else {
+                          setSelectedEntryIds([])
+                        }
+                      }}
+                    />
+                  </th>
+                )}
                 <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
                   <button
                     type="button"
@@ -753,7 +825,7 @@ export default function JournalClient({
             </thead>
             <tbody className="divide-y divide-slate-50">
               {visibleEntries.length === 0 ? (
-                <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Tidak ada data jurnal {filterStatus.toLowerCase()}.</td></tr>
+                <tr><td colSpan={filterStatus === 'DRAFT' ? 6 : 5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Tidak ada data jurnal {filterStatus.toLowerCase()}.</td></tr>
               ) : (
 	                visibleEntries.map((entry: any) => {
                       const lockedPeriod = getClosedPeriodForDate(entry.entry_date)
@@ -765,6 +837,23 @@ export default function JournalClient({
 
                       return (
 	                  <tr key={entry.id} className="group hover:bg-slate-50 transition-colors">
+                      {filterStatus === 'DRAFT' && (
+                        <td className="px-6 py-6 align-top">
+                          <input 
+                            type="checkbox" 
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            disabled={Boolean(lockedPeriod)}
+                            checked={selectedEntryIds.includes(entry.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedEntryIds([...selectedEntryIds, entry.id])
+                              } else {
+                                setSelectedEntryIds(selectedEntryIds.filter(id => id !== entry.id))
+                              }
+                            }}
+                          />
+                        </td>
+                      )}
 	                    <td className="px-8 py-6 align-top">
 	                       <div className="text-sm font-semibold text-slate-900 tracking-tight">{entry.entry_date ? format(new Date(entry.entry_date), 'yyyy-MM-dd') : ''}</div>
 	                       <div className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase tracking-tighter">{entry.entry_number}</div>

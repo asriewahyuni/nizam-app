@@ -48,17 +48,22 @@ export default async function JournalPage({
     ? resolvedSearchParams.entry[0]
     : resolvedSearchParams.entry
 
-  // Parallel data fetching for performance
-  const [postedEntries, voidedEntries, draftEntries, targetedEntries, accounts, fiscalPeriods] = await Promise.all([
-    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'POSTED', limit: JOURNAL_INITIAL_PAGE_SIZE }),
-    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'VOIDED', limit: JOURNAL_INITIAL_PAGE_SIZE }),
-    getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'DRAFT', limit: JOURNAL_INITIAL_PAGE_SIZE }),
-    requestedEntry
-      ? getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, entry: requestedEntry, limit: 1 })
-      : Promise.resolve([]),
+  // Fetch master data first (lightweight)
+  const [accounts, fiscalPeriods] = await Promise.all([
     getChartOfAccounts(orgData.org.id),
     getFiscalPeriods(orgData.org.id),
   ])
+
+  // Fetch journal entries sequentially to avoid PostgreSQL connection pool exhaustion (max 10 by default)
+  // especially when Next.js prefetching triggers multiple page loads concurrently.
+  const targetedEntries = requestedEntry
+    ? await getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, entry: requestedEntry, limit: 1 })
+    : []
+  
+  const draftEntries = await getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'DRAFT', limit: JOURNAL_INITIAL_PAGE_SIZE })
+  const postedEntries = await getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'POSTED', limit: JOURNAL_INITIAL_PAGE_SIZE })
+  const voidedEntries = await getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id, status: 'VOIDED', limit: JOURNAL_INITIAL_PAGE_SIZE })
+
   const entries = mergeJournalEntries([targetedEntries, postedEntries, voidedEntries, draftEntries])
   const targetedStatus = normalizeStatusFilter(String(targetedEntries[0]?.status || ''))
   const initialFilterStatus = requestedStatus || targetedStatus || (draftEntries.length > 0 ? 'DRAFT' : 'POSTED')

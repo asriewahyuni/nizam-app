@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { hydratePurchaseTransparencyForEntries } from '@/modules/accounting/lib/purchase-ledger-transparency'
+import { createAuditLog } from '@/modules/settings/actions/audit.actions'
 import type { JournalReferenceType } from '@/types/database.types'
 
 export interface JournalLineInput {
@@ -1303,6 +1304,62 @@ export async function postJournalEntry(
 }
 
 // ─────────────────────────────────────────────────────────────
+// bulkPostJournalEntries — Bulk post multiple DRAFT entries
+// ─────────────────────────────────────────────────────────────
+export async function bulkPostJournalEntries(
+  entryIds: string[],
+  orgId: string
+) {
+  let successCount = 0
+  let failedCount = 0
+  let lastError = ''
+
+  for (const entryId of entryIds) {
+    const res = await postJournalEntry(entryId, orgId, { skipRevalidate: true })
+    if (res.error) {
+      failedCount++
+      lastError = res.error
+    } else {
+      successCount++
+    }
+  }
+
+  if (successCount > 0) {
+    try {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        await createAuditLog(
+          orgId,
+          user.id,
+          'POST',
+          'journal_entries',
+          'BULK_POST',
+          null,
+          {
+            successCount,
+            failedCount,
+            entryIds,
+            message: `Berhasil bulk posting ${successCount} jurnal.`
+          }
+        )
+      }
+    } catch (err) {
+      console.error('Failed to write bulk post audit log', err)
+    }
+  }
+
+  revalidatePath('/accounting/journal')
+
+  if (failedCount > 0) {
+    return { error: `Berhasil memposting ${successCount} jurnal, gagal ${failedCount} jurnal. Error terakhir: ${lastError}` }
+  }
+
+  return { success: true }
+}
+
+// ─────────────────────────────────────────────────────────────
 // voidJournalEntry — Void a POSTED entry (with reason)
 // ─────────────────────────────────────────────────────────────
 export async function voidJournalEntry(
@@ -1603,6 +1660,124 @@ export async function getJournalEntries(
   } catch (err) {
     ;(console as any).error('[getJournalEntries] purchase transparency hydrate error:', err)
     return entries.map((entry) => ({ ...entry, purchase_transparency: null }))
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// getJournalEntriesCount — Get total count of journal entries
+// ─────────────────────────────────────────────────────────────
+export async function getJournalEntriesCount(
+  orgId: string,
+  filters?: {
+    status?: string | null
+    startDate?: string | null
+    endDate?: string | null
+    branch_id?: string | null
+    search?: string | null
+  }
+): Promise<number> {
+  const whereClauses: string[] = []
+  const params: unknown[] = []
+
+  params.push(orgId)
+  whereClauses.push(`org_id = $1`)
+
+  if (filters?.status) {
+    params.push(filters.status)
+    whereClauses.push(`status = $${params.length}`)
+  }
+
+  if (filters?.branch_id) {
+    params.push(filters.branch_id)
+    whereClauses.push(`branch_id = $${params.length}`)
+  }
+
+  if (filters?.startDate) {
+    params.push(filters.startDate)
+    whereClauses.push(`entry_date >= $${params.length}`)
+  }
+
+  if (filters?.endDate) {
+    params.push(filters.endDate)
+    whereClauses.push(`entry_date <= $${params.length}`)
+  }
+
+  if (filters?.search) {
+    params.push(`%${filters.search}%`)
+    const p = `$${params.length}`
+    whereClauses.push(`(entry_number ILIKE ${p} OR description ILIKE ${p})`)
+  }
+
+  try {
+    const { queryPostgres } = await import('@/lib/db/postgres')
+    const result = await queryPostgres<{ total: string }>(`
+      SELECT COUNT(*) as total
+      FROM   public.journal_entries
+      WHERE  ${whereClauses.join(' AND ')}
+    `, params)
+    return parseInt(result.rows[0]?.total || '0', 10)
+  } catch (err) {
+    console.error('[getJournalEntriesCount] SQL error:', err)
+    return 0
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// getAllMatchingJournalEntryIds — Get all matching IDs for bulk select
+// ─────────────────────────────────────────────────────────────
+export async function getAllMatchingJournalEntryIds(
+  orgId: string,
+  filters?: {
+    status?: string | null
+    startDate?: string | null
+    endDate?: string | null
+    branch_id?: string | null
+    search?: string | null
+  }
+): Promise<string[]> {
+  const whereClauses: string[] = []
+  const params: unknown[] = []
+
+  params.push(orgId)
+  whereClauses.push(`org_id = $1`)
+
+  if (filters?.status) {
+    params.push(filters.status)
+    whereClauses.push(`status = $${params.length}`)
+  }
+
+  if (filters?.branch_id) {
+    params.push(filters.branch_id)
+    whereClauses.push(`branch_id = $${params.length}`)
+  }
+
+  if (filters?.startDate) {
+    params.push(filters.startDate)
+    whereClauses.push(`entry_date >= $${params.length}`)
+  }
+
+  if (filters?.endDate) {
+    params.push(filters.endDate)
+    whereClauses.push(`entry_date <= $${params.length}`)
+  }
+
+  if (filters?.search) {
+    params.push(`%${filters.search}%`)
+    const p = `$${params.length}`
+    whereClauses.push(`(entry_number ILIKE ${p} OR description ILIKE ${p})`)
+  }
+
+  try {
+    const { queryPostgres } = await import('@/lib/db/postgres')
+    const result = await queryPostgres<{ id: string }>(`
+      SELECT id
+      FROM   public.journal_entries
+      WHERE  ${whereClauses.join(' AND ')}
+    `, params)
+    return result.rows.map((r: any) => String(r.id))
+  } catch (err) {
+    console.error('[getAllMatchingJournalEntryIds] SQL error:', err)
+    return []
   }
 }
 
