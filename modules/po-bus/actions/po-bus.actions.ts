@@ -394,18 +394,19 @@ export async function deleteBusMechanic(orgId: string, mechanicId: string) {
 }
 
 // ─── SERVICE RECORDS ──────────────────────────────────────────────────────────
-// Tetap pakai fleet_maintenance_labs karena ini modul servis generic
+// Menggunakan bus_service_records (standalone, FK → bus_units)
+// karena sejak migration 1320 bus_units tidak bergantung pada fleet_assets.
 
 export async function getBusServiceRecords(orgId: string, busId?: string | null) {
   const supabase = await createClient()
 
   let query = (supabase as any)
-    .from('fleet_maintenance_labs')
-    .select('*, asset:fleet_assets(id, plate_number, model)')
+    .from('bus_service_records')
+    .select('*, bus:bus_units(id, plate_number, model)')
     .eq('org_id', orgId)
     .order('service_date', { ascending: false })
 
-  if (busId) query = query.eq('asset_id', busId)
+  if (busId) query = query.eq('bus_id', busId)
 
   const { data, error } = await query
   if (error) return []
@@ -433,11 +434,11 @@ export async function createBusServiceRecord(orgId: string, payload: {
   if (!bus) return { error: 'Unit bus tidak ditemukan.' }
 
   const { data, error } = await (supabase as any)
-    .from('fleet_maintenance_labs')
+    .from('bus_service_records')
     .insert([{
       org_id: orgId,
       branch_id: bus.branch_id,
-      asset_id: payload.bus_id,
+      bus_id: payload.bus_id,
       service_date: payload.service_date,
       description: payload.description.trim(),
       maintenance_type: payload.maintenance_type || 'ROUTINE',
