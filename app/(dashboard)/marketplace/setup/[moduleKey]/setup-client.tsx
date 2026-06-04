@@ -140,8 +140,7 @@ export function SetupClient({
         await completeModuleOnboarding(mod.key)
         setStepStatuses((prev) => { const n = [...prev] as StepStatus[]; n[steps.length - 1] = 'done'; return n })
         setTimeout(() => {
-          router.refresh()
-          router.push(mod.href)
+          router.push('/marketplace')
         }, 600)
       } catch (err: any) {
         setToast({ message: err.message || 'Gagal menyelesaikan setup', type: 'error' })
@@ -407,10 +406,10 @@ export function SetupClient({
 
                 <div className="flex gap-3 pt-2">
                   <a
-                    href="/marketplace"
+                    href={mod.href}
                     className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
                   >
-                    Kembali ke Marketplace
+                    <ArrowRight className="w-4 h-4" /> Buka Modul
                   </a>
                   <button type="button"
                     onClick={handleComplete}
@@ -418,9 +417,9 @@ export function SetupClient({
                     className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shadow-emerald-600/25"
                   >
                     {isPending ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Membuka...</>
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</>
                     ) : (
-                      <><ArrowRight className="w-4 h-4" /> Buka Modul {mod.name}</>
+                      <><CheckCircle2 className="w-4 h-4" /> Selesai &amp; Aktifkan Lagi</>
                     )}
                   </button>
                 </div>
