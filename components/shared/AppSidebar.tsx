@@ -332,6 +332,22 @@ export function AppSidebar({
   const isLockedByAttendance = (href: string) =>
     requiresAttendanceGate && !hasClockedInToday && !isAttendanceFree(href)
 
+  // Gate check: pillar module yang belum diaktifasi dari Marketplace
+  const isLockedByActivation = (item: NavGroup['items'][number]) => {
+    if (!item.module_key || isDemo || enabledModules.length === 0) return false
+    const isPillar = PILLAR_MODULES.some(p => p.key.toLowerCase() === item.module_key!.toLowerCase())
+    if (!isPillar) return false
+    return !enabledModules.some((moduleName) => {
+      const lower = moduleName.trim().toLowerCase()
+      if (lower === item.module_key!.toLowerCase()) return true
+      if (lower === item.label.trim().toLowerCase()) return true
+      const normalized = normalizeSaasEntitlementName(moduleName)
+      return normalized.trim()
+        ? saasModuleCoversCapability(normalized, item.module_key!) || saasModuleCoversCapability(moduleName, item.module_key!)
+        : false
+    })
+  }
+
   // Handler klik saat gate aktif
   const handleLockedClick = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -706,25 +722,29 @@ export function AppSidebar({
                       if (item.href === '/crm/tickets') badgeCount = badgeMetrics.newCrmTickets
 
                       const locked = isLockedByAttendance(item.href)
+                      const lockedByActivation = !locked && isLockedByActivation(item)
+                      const anyLocked = locked || lockedByActivation
                       return (
                         <li key={`${group.group}:${item.label}:${item.href}`}>
                           <Link
-                            href={locked ? '/karyawan' : (item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href)}
-                            onMouseEnter={() => !locked && prefetchRoute(item.href)}
-                            onFocus={() => !locked && prefetchRoute(item.href)}
-                            onTouchStart={() => !locked && prefetchRoute(item.href)}
-                            onPointerDown={() => !locked && prefetchRoute(item.href)}
+                            href={locked ? '/karyawan' : lockedByActivation ? '/marketplace' : (item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href)}
+                            onMouseEnter={() => !anyLocked && prefetchRoute(item.href)}
+                            onFocus={() => !anyLocked && prefetchRoute(item.href)}
+                            onTouchStart={() => !anyLocked && prefetchRoute(item.href)}
+                            onPointerDown={() => !anyLocked && prefetchRoute(item.href)}
                             onClick={(e) => {
                               if (locked) { handleLockedClick(e); return }
-                              prefetchRoute(item.href)
-                              notifyRouteLoadingStart()
+                              if (!lockedByActivation) {
+                                prefetchRoute(item.href)
+                                notifyRouteLoadingStart()
+                              }
                               setIsMobileOpen(false)
                             }}
-                            title={effectiveIsCollapsed ? item.label : (locked ? 'Clock-in dulu untuk akses menu ini' : '')}
+                            title={effectiveIsCollapsed ? item.label : (locked ? 'Clock-in dulu untuk akses menu ini' : lockedByActivation ? 'Aktifkan modul ini di Marketplace' : '')}
                             className={`flex items-center rounded-md text-sm font-medium transition-colors duration-150 group/item relative
                               ${effectiveIsCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2'}
-                              ${locked
-                                ? 'opacity-40 cursor-not-allowed'
+                              ${anyLocked
+                                ? 'opacity-50 cursor-not-allowed'
                                 : isActive
                                   ? 'bg-[#003366] text-white'
                                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -737,12 +757,12 @@ export function AppSidebar({
                                   strokeWidth={isActive ? 2 : 1.75}
                                   className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover/item:text-slate-700'}`}
                                 />
-                                {locked && (
-                                  <div className="absolute -top-1 -right-1.5 w-3 h-3 rounded-full bg-amber-400 border border-white flex items-center justify-center">
+                                {anyLocked && (
+                                  <div className={`absolute -top-1 -right-1.5 w-3 h-3 rounded-full border border-white flex items-center justify-center ${lockedByActivation ? 'bg-blue-500' : 'bg-amber-400'}`}>
                                     <Lock size={6} className="text-white" />
                                   </div>
                                 )}
-                                {!locked && effectiveIsCollapsed && badgeCount > 0 && (
+                                {!anyLocked && effectiveIsCollapsed && badgeCount > 0 && (
                                   <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#003366] border border-white flex items-center justify-center text-[7px] font-semibold text-white shrink-0">
                                     {badgeCount > 9 ? '9+' : badgeCount}
                                   </div>
@@ -756,17 +776,22 @@ export function AppSidebar({
 
                             {!effectiveIsCollapsed && (
                               <div className="flex items-center gap-2">
-                                {!locked && badgeCount > 0 && (
+                                {!anyLocked && badgeCount > 0 && (
                                   <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-semibold tracking-wide leading-none flex items-center justify-center animate-in fade-in zoom-in ${isActive ? 'bg-white text-[#003366] shadow-sm' : 'bg-[#003366] text-white shadow-sm shadow-[#003366]/10'}`}>
                                     {badgeCount}
                                   </div>
                                 )}
-                                {!locked && item.module_key && pendingModules.includes(item.module_key) && badgeCount === 0 && (
+                                {lockedByActivation && (
+                                  <div className="px-1.5 py-0.5 rounded-md text-[8px] font-semibold tracking-wide leading-none bg-blue-50 text-blue-600 border border-blue-200/80 opacity-0 group-hover/item:opacity-100 transition-opacity duration-150">
+                                    AKTIFKAN
+                                  </div>
+                                )}
+                                {!anyLocked && item.module_key && pendingModules.includes(item.module_key) && badgeCount === 0 && (
                                   <div className="px-1.5 py-0.5 rounded-md text-[9px] font-semibold tracking-wide leading-none bg-amber-400 text-white animate-in fade-in zoom-in">
                                     SETUP
                                   </div>
                                 )}
-                                {!locked && isCore && !isActive && badgeCount === 0 && !(item.module_key && pendingModules.includes(item.module_key)) && (
+                                {!anyLocked && isCore && !isActive && badgeCount === 0 && !(item.module_key && pendingModules.includes(item.module_key)) && (
                                   <div className="px-1.5 py-0.5 rounded-md text-[8px] font-semibold tracking-wide leading-none bg-teal-50 text-teal-600 border border-teal-200/80 opacity-0 group-hover/item:opacity-100 transition-opacity duration-150">
                                     CORE
                                   </div>
@@ -799,24 +824,28 @@ export function AppSidebar({
                     if (item.href === '/crm/tickets') badgeCount = badgeMetrics.newCrmTickets
 
                     const locked = isLockedByAttendance(item.href)
+                    const lockedByActivation = !locked && isLockedByActivation(item)
+                    const anyLocked = locked || lockedByActivation
                     return (
                       <li key={`${group.group}:${item.label}:${item.href}`}>
                         <Link
-                          href={locked ? '/karyawan' : (item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href)}
-                          onMouseEnter={() => !locked && prefetchRoute(item.href)}
-                          onFocus={() => !locked && prefetchRoute(item.href)}
-                          onTouchStart={() => !locked && prefetchRoute(item.href)}
-                          onPointerDown={() => !locked && prefetchRoute(item.href)}
+                          href={locked ? '/karyawan' : lockedByActivation ? '/marketplace' : (item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href)}
+                          onMouseEnter={() => !anyLocked && prefetchRoute(item.href)}
+                          onFocus={() => !anyLocked && prefetchRoute(item.href)}
+                          onTouchStart={() => !anyLocked && prefetchRoute(item.href)}
+                          onPointerDown={() => !anyLocked && prefetchRoute(item.href)}
                           onClick={(e) => {
                             if (locked) { handleLockedClick(e); return }
-                            prefetchRoute(item.href)
-                            notifyRouteLoadingStart()
+                            if (!lockedByActivation) {
+                              prefetchRoute(item.href)
+                              notifyRouteLoadingStart()
+                            }
                             setIsMobileOpen(false)
                           }}
-                          title={locked ? 'Clock-in dulu' : item.label}
+                          title={locked ? 'Clock-in dulu' : lockedByActivation ? `Aktifkan ${item.label} di Marketplace` : item.label}
                           className={`flex items-center justify-center rounded-md p-2.5 text-sm font-medium transition-colors duration-150 group/item relative
-                            ${locked
-                              ? 'opacity-40 cursor-not-allowed'
+                            ${anyLocked
+                              ? 'opacity-50 cursor-not-allowed'
                               : isActive
                                 ? 'bg-[#003366] text-white'
                                 : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
@@ -828,12 +857,12 @@ export function AppSidebar({
                               strokeWidth={isActive ? 2 : 1.75}
                               className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover/item:text-slate-700'}`}
                             />
-                            {locked && (
-                              <div className="absolute -top-1 -right-1.5 w-3 h-3 rounded-full bg-amber-400 border border-white flex items-center justify-center">
+                            {anyLocked && (
+                              <div className={`absolute -top-1 -right-1.5 w-3 h-3 rounded-full border border-white flex items-center justify-center ${lockedByActivation ? 'bg-blue-500' : 'bg-amber-400'}`}>
                                 <Lock size={6} className="text-white" />
                               </div>
                             )}
-                            {!locked && badgeCount > 0 && (
+                            {!anyLocked && badgeCount > 0 && (
                               <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#003366] border border-white flex items-center justify-center text-[7px] font-semibold text-white shrink-0">
                                 {badgeCount > 9 ? '9+' : badgeCount}
                               </div>
