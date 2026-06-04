@@ -18,7 +18,7 @@ const DEMO_PASSWORD = 'demo-nizam-2026!'
 const DEMO_ACCOUNT_WAIT_RETRIES = 5
 const DEMO_ACCOUNT_WAIT_MS = 1000
 const DEMO_SESSION_MAX_AGE = 60 * 60 * 12
-const DEMO_BUSINESS_TYPES: DemoBusinessType[] = ['COMPUTER', 'CATERING', 'RESTAURANT', 'SUPPLIER_MBG', 'BLANK']
+const DEMO_BUSINESS_TYPES: DemoBusinessType[] = ['COMPUTER', 'CATERING', 'RESTAURANT', 'SUPPLIER_MBG', 'BUS_OPERATOR', 'BLANK']
 const BLANK_DEMO_BUDGET_TEMPLATES = [
   { code: '4001', budgetAmount: 250000000 },
   { code: '5001', budgetAmount: 95000000 },
@@ -46,7 +46,7 @@ type DemoSessionUser = {
  * 3. Create fresh org with seed data
  * 4. Redirect to dashboard
  */
-export type DemoBusinessType = 'COMPUTER' | 'CATERING' | 'RESTAURANT' | 'SUPPLIER_MBG' | 'BLANK'
+export type DemoBusinessType = 'COMPUTER' | 'CATERING' | 'RESTAURANT' | 'SUPPLIER_MBG' | 'BUS_OPERATOR' | 'BLANK'
 
 function normalizeDemoBusinessType(value: unknown): DemoBusinessType {
   const normalized = String(value || '').trim().toUpperCase()
@@ -159,11 +159,12 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
 
   // 3. Create fresh demo organization
   const orgId = crypto.randomUUID()
-  const defaultNames = {
+  const defaultNames: Record<DemoBusinessType, string> = {
     'COMPUTER': 'NIZAM Computer Assembly',
     'CATERING': 'NIZAM Catering Sehat',
     'RESTAURANT': 'NIZAM Rumah Makan Mantap',
     'SUPPLIER_MBG': 'NIZAM MBG Supplier Hub',
+    'BUS_OPERATOR': 'PO Bintang Marwah',
     'BLANK': 'NIZAM Baru (Kosongan)'
   }
   const orgName = businessName || defaultNames[demoType]
@@ -470,6 +471,12 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
     return branchId
   }
 
+  // PO Bus: seed armada, crew, rute, pool, tiket, dan integrasi aset tetap.
+  if (demoType === 'BUS_OPERATOR') {
+    await seedDemoBusData(supabase, orgId, branchId)
+    return branchId
+  }
+
   // --- WAREHOUSES & CONTACTS & PRODUCTS BY TYPE ---
   let warehousesData: any[] = []
   let contactsData: any[] = []
@@ -655,4 +662,268 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
   }
 
   return branchId
+}
+
+// ─── SEED DATA: PO BUS OPERATOR ───────────────────────────────────────────────
+
+export async function seedDemoBusData(supabase: any, orgId: string, branchId: string) {
+  const today = new Date().toISOString().split('T')[0]
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+
+  // ── 1. Bus Units ──────────────────────────────────────────────────────────
+  const busIds = { b1: crypto.randomUUID(), b2: crypto.randomUUID(), b3: crypto.randomUUID() }
+  const busUnits = [
+    {
+      id: busIds.b1, org_id: orgId, branch_id: branchId,
+      plate_number: 'B 7821 KAA', brand: 'Hino', model: 'RG 100', year: 2022,
+      capacity: 50, body_type: 'Patas', color: 'Biru Putih',
+      engine_number: 'J08E-TM123456', chassis_number: 'MJEPK8JK5NFF00001',
+      status: 'TERSEDIA', odometer: 42500,
+      purchase_price: 650000000, purchase_date: '2022-03-15',
+      notes: 'Armada unggulan trayek Jakarta–Bandung',
+    },
+    {
+      id: busIds.b2, org_id: orgId, branch_id: branchId,
+      plate_number: 'B 9143 KAB', brand: 'Mercedes-Benz', model: 'OH 1626', year: 2021,
+      capacity: 44, body_type: 'Executive', color: 'Putih Merah',
+      engine_number: 'OM926LA-987654', chassis_number: 'WDB9341761L654321',
+      status: 'BEROPERASI', odometer: 78200,
+      purchase_price: 850000000, purchase_date: '2021-07-20',
+      notes: 'Armada kelas eksekutif trayek Jakarta–Surabaya',
+    },
+    {
+      id: busIds.b3, org_id: orgId, branch_id: branchId,
+      plate_number: 'Z 1567 KAC', brand: 'Hino', model: 'RN 285', year: 2020,
+      capacity: 48, body_type: 'Patas AC', color: 'Merah Putih',
+      engine_number: 'E13C-VK000111', chassis_number: 'MJEPK8JK4LFF09999',
+      status: 'SERVIS', odometer: 113000,
+      purchase_price: 580000000, purchase_date: '2020-01-10',
+      notes: 'Sedang perawatan rutin — ganti oli mesin',
+    },
+  ]
+  await supabase.from('bus_units').insert(busUnits)
+
+  // ── 2. Auto-register Fixed Assets (integrasi Accounting) ─────────────────
+  const fixedAssetIds: Record<string, string> = {}
+  const fixedAssetsData = busUnits.map(b => ({
+    id: crypto.randomUUID(),
+    org_id: orgId, branch_id: branchId,
+    code: `BUS-${b.plate_number.replace(/\s+/g, '').toUpperCase()}`,
+    name: `Bus ${b.brand} ${b.model} — ${b.plate_number.toUpperCase()}`,
+    category: 'Kendaraan',
+    purchase_date: b.purchase_date,
+    purchase_price: b.purchase_price,
+    salvage_value: Math.round(b.purchase_price * 0.1),
+    useful_life_months: 120, // 10 tahun
+    depreciation_method: 'STRAIGHT_LINE',
+    accumulated_depreciation: 0,
+    current_book_value: b.purchase_price,
+    status: b.status === 'TIDAK_AKTIF' ? 'DISPOSED' : 'ACTIVE',
+  }))
+
+  const { data: insertedAssets } = await supabase
+    .from('fixed_assets').insert(fixedAssetsData).select('id, code')
+
+  if (insertedAssets) {
+    for (let i = 0; i < busUnits.length; i++) {
+      fixedAssetIds[busUnits[i].id] = fixedAssetsData[i].id
+      await supabase.from('bus_units')
+        .update({ fixed_asset_id: fixedAssetsData[i].id })
+        .eq('id', busUnits[i].id)
+    }
+  }
+
+  // ── 3. Bus Crew ───────────────────────────────────────────────────────────
+  const crewIds = {
+    d1: crypto.randomUUID(), d2: crypto.randomUUID(), cd1: crypto.randomUUID(),
+    k1: crypto.randomUUID(), k2: crypto.randomUUID(),
+  }
+  await supabase.from('bus_crew').insert([
+    { id: crewIds.d1, org_id: orgId, branch_id: branchId, name: 'Agus Salim', role: 'DRIVER', phone: '08123-4567-890', nik: '3201010101800001', license_number: 'SIM-B2-AGS-2020', license_expiry: '2026-12-31', blood_type: 'O', join_date: '2018-04-01', is_active: true },
+    { id: crewIds.d2, org_id: orgId, branch_id: branchId, name: 'Dedi Mulyadi', role: 'DRIVER', phone: '08212-3456-789', nik: '3201010202750002', license_number: 'SIM-B2-DDM-2021', license_expiry: '2027-06-30', blood_type: 'A', join_date: '2020-01-15', is_active: true },
+    { id: crewIds.cd1, org_id: orgId, branch_id: branchId, name: 'Rian Pratama', role: 'CO_DRIVER', phone: '08567-8901-234', nik: '3201010303850003', join_date: '2021-09-01', is_active: true },
+    { id: crewIds.k1, org_id: orgId, branch_id: branchId, name: 'Slamet Riyadi', role: 'KERNET', phone: '08345-6789-012', nik: '3201010404900004', join_date: '2022-02-01', is_active: true },
+    { id: crewIds.k2, org_id: orgId, branch_id: branchId, name: 'Wahyu Nugroho', role: 'KERNET', phone: '08456-7890-123', nik: '3201010505950005', join_date: '2023-06-01', is_active: true },
+  ])
+
+  // ── 4. Mechanics ──────────────────────────────────────────────────────────
+  const mechId = crypto.randomUUID()
+  await supabase.from('bus_mechanics').insert([
+    { id: mechId, org_id: orgId, branch_id: branchId, name: 'Bambang Supriadi', phone: '08111-2233-445', specialization: 'Mesin Diesel & Transmisi', is_active: true },
+    { org_id: orgId, branch_id: branchId, name: 'Cv. Karya Teknik Motor (Mitra)', phone: '0251-889900', specialization: 'Elektrikal & AC', is_active: true },
+  ])
+
+  // ── 5. Routes ─────────────────────────────────────────────────────────────
+  const routeIds = { r1: crypto.randomUUID(), r2: crypto.randomUUID(), r3: crypto.randomUUID() }
+  await supabase.from('bus_routes').insert([
+    { id: routeIds.r1, org_id: orgId, branch_id: branchId, name: 'Jakarta — Bandung', origin: 'Jakarta (Kampung Rambutan)', destination: 'Bandung (Leuwipanjang)', distance_km: 148, duration_hours: 3, base_price: 125000, is_active: true },
+    { id: routeIds.r2, org_id: orgId, branch_id: branchId, name: 'Jakarta — Surabaya', origin: 'Jakarta (Pulogadung)', destination: 'Surabaya (Bungurasih)', distance_km: 724, duration_hours: 12, base_price: 350000, is_active: true },
+    { id: routeIds.r3, org_id: orgId, branch_id: branchId, name: 'Bandung — Yogyakarta', origin: 'Bandung (Leuwipanjang)', destination: 'Yogyakarta (Giwangan)', distance_km: 440, duration_hours: 9, base_price: 250000, is_active: true },
+  ])
+
+  // ── 6. Pools ──────────────────────────────────────────────────────────────
+  const poolIds = { p1: crypto.randomUUID(), p2: crypto.randomUUID() }
+  await supabase.from('bus_pools').insert([
+    {
+      id: poolIds.p1, org_id: orgId, branch_id: branchId,
+      code: 'BM-JKT-01', name: 'Pool Utama Jakarta', pool_type: 'POOL_UTAMA',
+      owner_name: 'PT Bintang Marwah Transport', pic_name: 'Hendra Kusuma',
+      phone: '021-8765432', whatsapp: '08119876543', email: 'pool.jakarta@bintangmarwah.id',
+      address: 'Jl. Raya Bogor KM 22, Ciracas', city: 'Jakarta Timur', province: 'DKI Jakarta',
+      commission_pct: 0, deposit_balance: 0, credit_limit: 0,
+      bank_name: 'Bank Mandiri', bank_account: '123-456-7890', bank_account_name: 'PT Bintang Marwah Transport',
+      is_active: true,
+    },
+    {
+      id: poolIds.p2, org_id: orgId, branch_id: branchId,
+      code: 'BM-BDG-01', name: 'Agen Resmi Bandung Jaya', pool_type: 'AGEN_RESMI',
+      owner_name: 'Sunardi', pic_name: 'Lina Kartika',
+      phone: '022-4512345', whatsapp: '08561234567', email: 'bandungjaya.tiket@gmail.com',
+      address: 'Jl. Sudirman No. 88, Pasir Kaliki', city: 'Bandung', province: 'Jawa Barat',
+      commission_pct: 5, deposit_balance: 15000000, credit_limit: 5000000,
+      bank_name: 'BCA', bank_account: '456-7890-123', bank_account_name: 'Sunardi',
+      is_active: true,
+    },
+  ])
+
+  // Seed pool top-up untuk Bandung Jaya
+  await supabase.from('bus_pool_top_ups').insert([
+    { org_id: orgId, pool_id: poolIds.p2, amount: 15000000, payment_method: 'TRANSFER', reference_no: 'TRF-2024-0601', notes: 'Deposit awal kerjasama' },
+  ])
+
+  // ── 7. Agents ─────────────────────────────────────────────────────────────
+  const agentIds = { a1: crypto.randomUUID(), a2: crypto.randomUUID() }
+  await supabase.from('bus_agents').insert([
+    { id: agentIds.a1, org_id: orgId, branch_id: branchId, pool_id: poolIds.p2, name: 'Toko Tiket Maju Jaya', phone: '022-7654321', email: 'majujaya.tiket@gmail.com', city: 'Bandung', commission_pct: 3, is_active: true },
+    { id: agentIds.a2, org_id: orgId, branch_id: branchId, pool_id: null, name: 'CV Tiket Online Nusantara', phone: '08777-1234-567', email: 'tiket@nusantara.id', city: 'Jakarta', commission_pct: 4, is_active: true },
+  ])
+
+  // ── 8. Checkpoints ────────────────────────────────────────────────────────
+  await supabase.from('bus_checkpoints').insert([
+    { org_id: orgId, branch_id: branchId, name: 'Terminal Kampung Rambutan', location_name: 'Jl. TB Simatupang, Jakarta Timur', gps_coords: '-6.3270,106.8836', is_active: true },
+    { org_id: orgId, branch_id: branchId, name: 'Rest Area KM 57 Cipularang', location_name: 'Tol Cipularang KM 57', gps_coords: '-6.7502,107.3619', is_active: true },
+    { org_id: orgId, branch_id: branchId, name: 'Terminal Leuwipanjang', location_name: 'Jl. Leuwipanjang, Bandung', gps_coords: '-6.9669,107.5897', is_active: true },
+    { org_id: orgId, branch_id: branchId, name: 'Terminal Tirtonadi Solo', location_name: 'Jl. Ahmad Yani No. 262, Surakarta', gps_coords: '-7.5559,110.8243', is_active: true },
+  ])
+
+  // ── 9. Schedules ──────────────────────────────────────────────────────────
+  const schedIds = { s1: crypto.randomUUID(), s2: crypto.randomUUID(), s3: crypto.randomUUID() }
+  const dep1 = new Date(today + 'T08:00:00').toISOString()
+  const dep2 = new Date(today + 'T20:00:00').toISOString()
+  const dep3 = new Date(nextWeek + 'T07:00:00').toISOString()
+  await supabase.from('bus_schedules').insert([
+    { id: schedIds.s1, org_id: orgId, branch_id: branchId, route_id: routeIds.r1, bus_id: busIds.b1, driver_id: crewIds.d1, helper_id: crewIds.k1, departure_time: dep1, arrival_time: new Date(new Date(dep1).getTime() + 3 * 3600000).toISOString(), status: 'TERJADWAL', notes: 'Pemberangkatan pagi reguler' },
+    { id: schedIds.s2, org_id: orgId, branch_id: branchId, route_id: routeIds.r2, bus_id: busIds.b2, driver_id: crewIds.d2, helper_id: crewIds.k2, departure_time: dep2, arrival_time: new Date(new Date(dep2).getTime() + 12 * 3600000).toISOString(), status: 'BERANGKAT', notes: 'Bus sudah berangkat pukul 20.00' },
+    { id: schedIds.s3, org_id: orgId, branch_id: branchId, route_id: routeIds.r1, bus_id: busIds.b1, driver_id: crewIds.d1, helper_id: crewIds.k1, departure_time: dep3, arrival_time: new Date(new Date(dep3).getTime() + 3 * 3600000).toISOString(), status: 'TERJADWAL' },
+  ])
+
+  // ── 10. Tickets ───────────────────────────────────────────────────────────
+  const passengerNames = ['Budi Santoso', 'Dewi Rahayu', 'Eko Prasetyo', 'Fitria Wulandari', 'Guntur Setiawan', 'Hana Pertiwi', 'Irfan Maulana', 'Joko Widodo']
+  const ticketData = passengerNames.slice(0, 5).map((name, i) => ({
+    org_id: orgId, branch_id: branchId,
+    schedule_id: schedIds.s1,
+    agent_id: i < 2 ? agentIds.a1 : i < 4 ? agentIds.a2 : null,
+    pool_id: i < 2 ? poolIds.p2 : null,
+    passenger_name: name,
+    passenger_phone: `0812-${String(i + 1).padStart(4, '0')}-${String(i * 1234).padStart(4, '0')}`,
+    seat_number: String(i + 1),
+    price: 125000,
+    status: i < 3 ? 'DIBAYAR' : 'DIPESAN',
+  }))
+  // Tiket untuk jadwal yang sudah berangkat
+  const ticketData2 = passengerNames.slice(0, 6).map((name, i) => ({
+    org_id: orgId, branch_id: branchId,
+    schedule_id: schedIds.s2,
+    agent_id: i % 2 === 0 ? agentIds.a2 : null,
+    pool_id: null,
+    passenger_name: name,
+    passenger_phone: `0813-${String(i + 10).padStart(4, '0')}-0000`,
+    seat_number: String(i + 1),
+    price: 350000,
+    status: 'DIGUNAKAN',
+  }))
+  await supabase.from('bus_tickets').insert([...ticketData, ...ticketData2])
+
+  // ── 11. Service Records ───────────────────────────────────────────────────
+  await supabase.from('bus_service_records').insert([
+    { org_id: orgId, branch_id: branchId, bus_id: busIds.b3, service_date: yesterday, description: 'Ganti oli mesin 10W-40, filter oli, filter udara', maintenance_type: 'ROUTINE', cost: 1250000, odometer_at: 113000, technician_name: 'Bambang Supriadi', next_service_km: 123000, next_service_date: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0] },
+    { org_id: orgId, branch_id: branchId, bus_id: busIds.b1, service_date: new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0], description: 'Pemeriksaan rem depan & belakang, kalibrasi', maintenance_type: 'PREVENTIVE', cost: 850000, odometer_at: 41200, technician_name: 'Bambang Supriadi', next_service_km: 52000 },
+  ])
+
+  // ── 12. Tire Records ──────────────────────────────────────────────────────
+  await supabase.from('bus_tire_records').insert([
+    { org_id: orgId, branch_id: branchId, bus_id: busIds.b1, position: 'FL', brand: 'Bridgestone', size: '295/80R22.5', installed_at: '2024-01-15', odometer_at: 35000, mileage_limit_km: 80000 },
+    { org_id: orgId, branch_id: branchId, bus_id: busIds.b1, position: 'FR', brand: 'Bridgestone', size: '295/80R22.5', installed_at: '2024-01-15', odometer_at: 35000, mileage_limit_km: 80000 },
+    { org_id: orgId, branch_id: branchId, bus_id: busIds.b2, position: 'FL', brand: 'Michelin', size: '295/80R22.5', installed_at: '2023-08-10', odometer_at: 61000, mileage_limit_km: 90000 },
+  ])
+
+  // ── 13. Emergency Call (satu log aktif) ───────────────────────────────────
+  await supabase.from('bus_emergency_calls').insert([
+    { org_id: orgId, branch_id: branchId, bus_id: busIds.b3, reporter_name: 'Slamet Riyadi (Kernet)', call_time: new Date(Date.now() - 3 * 3600000).toISOString(), location_description: 'Tol Cipularang KM 67+200 arah Bandung', location_gps: '-6.8201,107.4102', issue_type: 'MOGOK', description: 'Mesin overheat, tidak bisa dihidupkan kembali. Membutuhkan derek.', assigned_mechanic_id: mechId, status: 'DALAM_PROSES' },
+  ])
+
+  // ── 14. Pool Settlement (1 settlement terbayar) ───────────────────────────
+  await supabase.from('bus_pool_settlements').insert([
+    { org_id: orgId, pool_id: poolIds.p2, period_start: new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0], period_end: yesterday, total_tickets: 18, total_revenue: 2250000, commission_pct: 5, commission_amount: 112500, payment_method: 'TRANSFER', reference_no: 'SET-2024-0531', status: 'DIBAYAR', paid_at: yesterday + 'T09:30:00+07:00', notes: 'Settlement komisi Mei 2024' },
+  ])
+
+  // ── 15. Accounting Integration: Journal Entry untuk Investasi Armada ──────
+  const accounts = await waitForDemoAccounts(supabase, orgId)
+  if (accounts && accounts.length > 0) {
+    const capitalAccId = accounts?.find((a: any) => a.code === '3001')?.id
+    const cashAccId = accounts?.find((a: any) => a.code === '1101')?.id
+    const bankAccId = accounts?.find((a: any) => a.code === '1201')?.id
+    // Cari akun Aset Tetap (kode 1601 atau 1501 tergantung COA seed)
+    const fixedAssetAccId = accounts?.find((a: any) =>
+      ['1601', '1501', '1600', '1500', '1701'].includes(a.code)
+    )?.id
+
+    // Modal operasional awal (kas + bank)
+    if (cashAccId && bankAccId && capitalAccId) {
+      const cashInject = 300000000   // 300jt kas operasional
+      const bankInject = 2500000000  // 2.5M bank (modal armada)
+
+      const { data: cashEntry } = await supabase.from('journal_entries').insert({
+        org_id: orgId, branch_id: branchId,
+        entry_date: today,
+        description: 'Setoran Modal Awal Usaha — PO Bintang Marwah',
+        status: 'DRAFT', is_auto: true,
+      }).select().single()
+
+      if (cashEntry) {
+        await supabase.from('journal_lines').insert([
+          { entry_id: cashEntry.id, account_id: cashAccId, debit: cashInject, credit: 0, memo: 'Kas Operasional Awal' },
+          { entry_id: cashEntry.id, account_id: bankAccId, debit: bankInject, credit: 0, memo: 'Rekening Giro — Modal Armada' },
+          { entry_id: cashEntry.id, account_id: capitalAccId, debit: 0, credit: cashInject + bankInject, memo: 'Modal Disetor Pemilik' },
+        ])
+        await supabase.from('journal_entries').update({ status: 'POSTED' }).eq('id', cashEntry.id)
+      }
+    }
+
+    // Journal entry untuk perolehan aset tetap (armada bus)
+    if (fixedAssetAccId && capitalAccId) {
+      const totalFleetValue = busUnits.reduce((s, b) => s + b.purchase_price, 0)
+
+      const { data: assetEntry } = await supabase.from('journal_entries').insert({
+        org_id: orgId, branch_id: branchId,
+        entry_date: today,
+        description: 'Perolehan Armada Bus — Aset Tetap Kendaraan',
+        status: 'DRAFT', is_auto: true,
+      }).select().single()
+
+      if (assetEntry) {
+        const assetLines = busUnits.map(b => ({
+          entry_id: assetEntry.id, account_id: fixedAssetAccId,
+          debit: b.purchase_price, credit: 0,
+          memo: `${b.brand} ${b.model} — ${b.plate_number}`,
+        }))
+        await supabase.from('journal_lines').insert([
+          ...assetLines,
+          { entry_id: assetEntry.id, account_id: capitalAccId, debit: 0, credit: totalFleetValue, memo: 'Modal Disetor — Armada Kendaraan' },
+        ])
+        await supabase.from('journal_entries').update({ status: 'POSTED' }).eq('id', assetEntry.id)
+      }
+    }
+  }
 }

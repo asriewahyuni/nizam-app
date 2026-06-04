@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useFormStatus } from 'react-dom'
-import { Play, Sparkles, Building2, ArrowRight, Zap, Shield, BarChart3, Package, Factory, Users, Utensils, Store, Truck, Laptop, type LucideIcon } from 'lucide-react'
+import { Play, Sparkles, Building2, ArrowRight, Zap, Shield, BarChart3, Package, Factory, Users, Utensils, Store, Truck, Laptop, Bus, type LucideIcon } from 'lucide-react'
 import { startDemoSessionFromForm, type DemoBusinessType } from '@/modules/demo/actions/demo.actions'
 import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'
 
@@ -22,12 +22,19 @@ const BUSINESS_TYPES: { id: DemoBusinessType; label: string; icon: LucideIcon; d
     description: 'Ideal untuk resto/warung dengan stok harian dan penjualan porsian.',
     color: 'from-emerald-500 to-teal-600'
   },
-  { 
-    id: 'SUPPLIER_MBG', 
-    label: 'Supplier MBG', 
-    icon: Truck, 
+  {
+    id: 'SUPPLIER_MBG',
+    label: 'Supplier MBG',
+    icon: Truck,
     description: 'Khusus program Makan Bergizi Gratis: Logistik, Susu, dan Paket Sekolah.',
     color: 'from-blue-500 to-indigo-600'
+  },
+  {
+    id: 'BUS_OPERATOR',
+    label: 'Perusahaan Otobus',
+    icon: Bus,
+    description: 'Manajemen armada bus, crew, rute, pool agen, tiket, dan integrasi aset tetap.',
+    color: 'from-violet-500 to-purple-700'
   },
   { 
     id: 'COMPUTER', 
