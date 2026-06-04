@@ -72,7 +72,7 @@ const getFleetIcon = (type: string) => {
 export function FleetClient({ orgId, assets, bookings, routes, schedules, medicalRecords, crew, terminals, attendanceToday, contacts }: FleetClientProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'UNITS' | 'BOOKINGS' | 'PO_BUS' | 'LABS'>('PO_BUS')
-  const [poSubTab, setPoSubTab] = useState<'ROUTES' | 'SCHEDULES' | 'TICKETING' | 'CREW' | 'ATTENDANCE'>('SCHEDULES')
+  const [poSubTab, setPoSubTab] = useState<'ROUTES' | 'SCHEDULES' | 'TICKETING' | 'CREW' | 'ATTENDANCE' | 'TERMINALS'>('SCHEDULES')
   const [showAssetModal, setShowAssetModal] = useState(false)
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [showRouteModal, setShowRouteModal] = useState(false)
@@ -80,6 +80,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [showMedicalModal, setShowMedicalModal] = useState(false)
   const [showCrewModal, setShowCrewModal] = useState(false)
+  const [showTerminalModal, setShowTerminalModal] = useState(false)
   const [showScanModal, setShowScanModal] = useState(false)
   const [scanType, setScanType] = useState<'IN' | 'OUT'>('IN')
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null)
@@ -258,6 +259,19 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
     setLoading(false)
   }
 
+  const handleAddTerminal = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    const { createTerminal } = await import('@/modules/fleet/actions/fleet.actions')
+    const res = await createTerminal(orgId, new FormData(e.currentTarget))
+    if (res.error) alert(res.error)
+    else {
+      setShowTerminalModal(false)
+      refreshFleetPage()
+    }
+    setLoading(false)
+  }
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="max-w-7xl mx-auto space-y-10">
       
@@ -308,7 +322,8 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
              <div className="flex items-center gap-4 border-b border-slate-100 mb-6 pb-1">
                 {[
                   { id: 'SCHEDULES', label: 'Jadwal', icon: Clock },
-                  { id: 'ROUTES', label: 'Rute', icon: MapPin },
+                  { id: 'ROUTES', label: 'Rute', icon: MapIcon },
+                  { id: 'TERMINALS', label: 'Terminal', icon: MapPin },
                   { id: 'TICKETING', label: 'Tiketing', icon: CircleDollarSign },
                   { id: 'CREW', label: 'Daftar Kru', icon: UserCheck },
                   { id: 'ATTENDANCE', label: 'Presensi', icon: Scan },
@@ -411,6 +426,45 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                    </div>
                 </div>
              )}
+
+             {poSubTab === 'TERMINALS' && (
+                 <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                       <h3 className="text-xl font-semibold text-slate-900">Manajemen Terminal</h3>
+                       <button type="button" onClick={() => setShowTerminalModal(true)} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-100">
+                          <Plus size={18} /> Tambah Terminal
+                       </button>
+                    </div>
+
+                    <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden">
+                       <table className="w-full text-left">
+                          <thead className="bg-slate-50 border-b border-slate-100">
+                             <tr>
+                                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Nama Terminal</th>
+                                <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Lokasi / Kota</th>
+                                <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">Aksi</th>
+                             </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                             {terminals.length === 0 ? (
+                               <tr><td colSpan={3} className="py-16 text-center text-slate-400 font-bold italic">Belum ada terminal terdaftar.</td></tr>
+                             ) : (
+                               terminals.map(t => (
+                                 <tr key={t.id}>
+                                    <td className="px-8 py-5 font-semibold text-slate-900 text-sm flex items-center gap-2">
+                                       <MapPin size={16} className="text-slate-400" />
+                                       {t.name}
+                                    </td>
+                                    <td className="px-6 py-5 text-xs text-slate-500 font-bold uppercase">{t.location_name}</td>
+                                    <td className="px-8 py-5 text-right"><button type="button" className="text-blue-600 font-bold text-xs">Edit</button></td>
+                                 </tr>
+                               ))
+                             )}
+                          </tbody>
+                       </table>
+                    </div>
+                 </div>
+              )}
 
              {poSubTab === 'TICKETING' && (
                 <div className="space-y-6">
@@ -575,6 +629,35 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
              )}
           </motion.div>
         )}
+
+      {/* TERMINAL MODAL */}
+      {showTerminalModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-[32px] w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="flex justify-between items-center p-6 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900">Tambah Terminal Baru</h3>
+              <button type="button" onClick={() => setShowTerminalModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+            </div>
+            <form onSubmit={handleAddTerminal} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Nama Terminal</label>
+                <input required name="name" placeholder="Misal: Terminal Lebak Bulus" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-sm focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Lokasi / Kota</label>
+                <input required name="location_name" placeholder="Misal: Jakarta Selatan" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-sm focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowTerminalModal(false)} className="px-6 py-3 font-semibold text-slate-500 hover:bg-slate-100 rounded-xl transition-all">Batal</button>
+                <button type="submit" disabled={loading} className="px-6 py-3 font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-100 transition-all disabled:opacity-50">
+                  {loading ? 'Menyimpan...' : 'Simpan Terminal'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
         {activeTab === 'UNITS' && (
           <motion.div key="units" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">

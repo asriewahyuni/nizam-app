@@ -2095,6 +2095,7 @@ export default function SaaSAdminPage() {
                   <div className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
+                      suppressHydrationWarning
                       value={searchTxt}
                       onChange={(e) => setSearchTxt(e.target.value)}
                       placeholder="Cari tenant atau email pemilik..."
@@ -2300,6 +2301,7 @@ export default function SaaSAdminPage() {
                 <div className="lg:col-span-2 relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input
+                    suppressHydrationWarning
                     value={searchTxt}
                     onChange={(e) => setSearchTxt(e.target.value)}
                     placeholder="Cari tenant untuk manajemen modul..."

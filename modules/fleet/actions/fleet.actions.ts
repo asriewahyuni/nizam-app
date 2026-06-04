@@ -931,6 +931,29 @@ export async function getTerminals(orgId: string, branchId?: string | null) {
   return data
 }
 
+export async function createTerminal(orgId: string, formData: FormData) {
+  const supabase = await createFleetDb()
+  const activeBranch = await requireFleetCreateBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menambahkan terminal.'
+  )
+  if ('error' in activeBranch) return { error: activeBranch.error }
+
+  const payload = {
+    org_id: orgId,
+    branch_id: activeBranch.branchId,
+    name: formData.get('name') as string,
+    location_name: formData.get('location_name') as string
+  }
+
+  const { error } = await supabase.from('fleet_terminals').insert(payload)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/fleet')
+  return { success: true }
+}
+
 export async function getFleetAttendanceToday(orgId: string, branchId?: string | null) {
   const supabase = await createFleetDb()
   const branchSelection = await resolveFleetBranchSelection(orgId, branchId)
