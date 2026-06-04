@@ -23,8 +23,8 @@ CREATE TABLE IF NOT EXISTS training_assessment_templates (
 
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  created_by  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  updated_by  UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_by  UUID REFERENCES internal_auth_users(id) ON DELETE SET NULL,
+  updated_by  UUID REFERENCES internal_auth_users(id) ON DELETE SET NULL,
 
   UNIQUE (org_id, course_slug)
 );
