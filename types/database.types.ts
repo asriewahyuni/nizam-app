@@ -190,6 +190,35 @@ export type FleetTerminal = {
   radius_meters: number | null; qr_code_token: string | null
   created_at: string
 }
+
+export type CargoStatus = 'DRAFT' | 'MANIFESTED' | 'IN_TRANSIT' | 'ARRIVED' | 'DELIVERED' | 'CANCELLED'
+export type CargoPaymentStatus = 'UNPAID' | 'PAID'
+
+export type FleetCargoShipment = {
+  id: string
+  org_id: string
+  branch_id?: string | null
+  tracking_number: string
+  sender_name: string
+  sender_phone: string
+  receiver_name: string
+  receiver_phone: string
+  origin_terminal_id: string
+  destination_terminal_id: string
+  item_description?: string | null
+  weight_kg: number
+  volume_m3: number
+  shipping_cost: number
+  handling_fee: number
+  grand_total: number
+  payment_status: CargoPaymentStatus
+  payment_method?: string | null
+  schedule_id?: string | null
+  status: CargoStatus
+  created_at: string
+  updated_at: string
+}
+
 export type FixedAsset = {
   id: string; org_id: string; branch_id: string; code: string
   name: string; description: string | null; category: string | null
