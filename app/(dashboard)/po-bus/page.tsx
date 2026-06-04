@@ -6,6 +6,7 @@ import {
   getBusEmergencyCalls, getBusAgents,
   getBusRoutes, getBusSchedules, getBusTickets, getBusCheckpoints,
   getFixedAssetsForBus,
+  getBusPools, getBusPoolTopUps, getBusPoolSettlements,
 } from '@/modules/po-bus/actions/po-bus.actions'
 import { POBusClient } from './POBusClient'
 
@@ -20,6 +21,7 @@ export default async function POBusPage() {
   const [
     units, crew, mechanics, serviceRecords, tireRecords,
     emergencyCalls, agents, routes, schedules, tickets, checkpoints, fixedAssets,
+    pools, poolTopUps, poolSettlements,
   ] = await Promise.all([
     getBusUnits(orgId),
     getBusCrew(orgId),
@@ -33,6 +35,9 @@ export default async function POBusPage() {
     getBusTickets(orgId),
     getBusCheckpoints(orgId),
     getFixedAssetsForBus(orgId),
+    getBusPools(orgId),
+    getBusPoolTopUps(orgId),
+    getBusPoolSettlements(orgId),
   ])
 
   return (
@@ -51,6 +56,9 @@ export default async function POBusPage() {
         tickets={tickets}
         checkpoints={checkpoints}
         fixedAssets={fixedAssets}
+        pools={pools}
+        poolTopUps={poolTopUps}
+        poolSettlements={poolSettlements}
       />
     </div>
   )

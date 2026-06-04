@@ -118,6 +118,7 @@ export type BusAgent = {
   id: string
   org_id: string
   branch_id: string | null
+  pool_id: string | null
   name: string
   phone: string | null
   email: string | null
@@ -128,6 +129,7 @@ export type BusAgent = {
   notes: string | null
   created_at: string
   updated_at: string
+  pool?: Pick<BusPool, 'id' | 'code' | 'name'> | null
 }
 
 export type BusRoute = {
@@ -174,6 +176,7 @@ export type BusTicket = {
   branch_id: string | null
   schedule_id: string
   agent_id: string | null
+  pool_id: string | null
   passenger_name: string
   passenger_phone: string | null
   seat_number: string
@@ -183,6 +186,7 @@ export type BusTicket = {
   created_at: string
   schedule?: Pick<BusSchedule, 'id' | 'departure_time' | 'route'> | null
   agent?: Pick<BusAgent, 'id' | 'name'> | null
+  pool?: Pick<BusPool, 'id' | 'code' | 'name'> | null
 }
 
 export type BusCheckpoint = {
@@ -194,4 +198,72 @@ export type BusCheckpoint = {
   gps_coords: string | null
   is_active: boolean
   created_at: string
+}
+
+// ─── POOL / AGEN ──────────────────────────────────────────────────────────────
+
+export type BusPoolType = 'POOL_UTAMA' | 'AGEN_RESMI' | 'SUB_AGEN'
+export type BusPoolSettlementStatus = 'PENDING' | 'DIBAYAR'
+
+export type BusPool = {
+  id: string
+  org_id: string
+  branch_id: string | null
+  code: string
+  name: string
+  pool_type: BusPoolType
+  owner_name: string | null
+  pic_name: string | null
+  phone: string | null
+  whatsapp: string | null
+  email: string | null
+  address: string | null
+  city: string | null
+  province: string | null
+  gps_coords: string | null
+  commission_pct: number
+  deposit_balance: number
+  credit_limit: number
+  bank_name: string | null
+  bank_account: string | null
+  bank_account_name: string | null
+  is_active: boolean
+  notes: string | null
+  created_at: string
+  updated_at: string
+  // computed joins (optional)
+  agent_count?: number
+  ticket_count?: number
+}
+
+export type BusPoolTopUp = {
+  id: string
+  org_id: string
+  pool_id: string
+  amount: number
+  payment_method: string
+  reference_no: string | null
+  notes: string | null
+  recorded_by: string | null
+  created_at: string
+  pool?: Pick<BusPool, 'id' | 'code' | 'name'> | null
+}
+
+export type BusPoolSettlement = {
+  id: string
+  org_id: string
+  pool_id: string
+  period_start: string
+  period_end: string
+  total_tickets: number
+  total_revenue: number
+  commission_pct: number
+  commission_amount: number
+  payment_method: string | null
+  reference_no: string | null
+  status: BusPoolSettlementStatus
+  notes: string | null
+  paid_at: string | null
+  created_at: string
+  pool?: Pick<BusPool, 'id' | 'code' | 'name'> | null
 }

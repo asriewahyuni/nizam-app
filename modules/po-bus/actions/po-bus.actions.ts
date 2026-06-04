@@ -9,7 +9,8 @@ import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/bra
 import { revalidatePath } from 'next/cache'
 import type {
   BusAgent, BusCheckpoint, BusCrew, BusEmergencyCall,
-  BusMechanic, BusRoute, BusSchedule, BusTicket,
+  BusMechanic, BusPool, BusPoolSettlement, BusPoolTopUp,
+  BusRoute, BusSchedule, BusTicket,
   BusTireRecord, BusUnit, BusUnitStatus, EmergencyCallStatus,
   FixedAssetSummary,
 } from '../lib/po-bus-types'
@@ -603,7 +604,7 @@ export async function getBusAgents(orgId: string, branchId?: string | null): Pro
 
 export async function createBusAgent(orgId: string, payload: {
   name: string; phone?: string; email?: string; address?: string
-  city?: string; commission_pct?: number; notes?: string
+  city?: string; commission_pct?: number; notes?: string; pool_id?: string
 }) {
   const supabase = await createClient()
   const resolvedBranchId = await resolveBranchId(orgId)
@@ -621,6 +622,7 @@ export async function createBusAgent(orgId: string, payload: {
       city: payload.city?.trim() || null,
       commission_pct: payload.commission_pct || 0,
       notes: payload.notes?.trim() || null,
+      pool_id: payload.pool_id || null,
       is_active: true,
     }])
     .select().single()
@@ -632,7 +634,7 @@ export async function createBusAgent(orgId: string, payload: {
 
 export async function updateBusAgent(orgId: string, agentId: string, payload: Partial<{
   name: string; phone: string; email: string; address: string
-  city: string; commission_pct: number; notes: string; is_active: boolean
+  city: string; commission_pct: number; notes: string; is_active: boolean; pool_id: string
 }>) {
   const supabase = await createClient()
   const { error } = await (supabase as any)
@@ -861,6 +863,226 @@ export async function createBusCheckpoint(orgId: string, payload: {
       gps_coords: payload.gps_coordinates || null,
       is_active: true,
     }])
+    .select().single()
+
+  if (error) return { error: (error as DbError).message }
+  revalidatePath('/po-bus')
+  return { data }
+}
+
+// ─── POOLS ────────────────────────────────────────────────────────────────────
+
+export async function getBusPools(orgId: string, branchId?: string | null): Promise<BusPool[]> {
+  const supabase = await createClient()
+  const resolvedBranchId = await resolveBranchId(orgId, branchId)
+
+  let query = (supabase as any)
+    .from('bus_pools')
+    .select('*')
+    .eq('org_id', orgId)
+    .order('name', { ascending: true })
+
+  if (resolvedBranchId) query = query.eq('branch_id', resolvedBranchId)
+
+  const { data, error } = await query
+  if (error) return []
+  return (data || []) as BusPool[]
+}
+
+export async function createBusPool(orgId: string, payload: {
+  code: string; name: string; pool_type?: string
+  owner_name?: string; pic_name?: string; phone?: string; whatsapp?: string; email?: string
+  address?: string; city?: string; province?: string
+  commission_pct?: number; credit_limit?: number
+  bank_name?: string; bank_account?: string; bank_account_name?: string
+  notes?: string
+}) {
+  const supabase = await createClient()
+  const resolvedBranchId = await resolveBranchId(orgId)
+
+  if (!payload.code?.trim()) return { error: 'Kode pool wajib diisi.' }
+  if (!payload.name?.trim()) return { error: 'Nama pool wajib diisi.' }
+
+  const { data, error } = await (supabase as any)
+    .from('bus_pools')
+    .insert([{
+      org_id: orgId, branch_id: resolvedBranchId,
+      code: payload.code.trim().toUpperCase(),
+      name: payload.name.trim(),
+      pool_type: payload.pool_type || 'AGEN_RESMI',
+      owner_name: payload.owner_name?.trim() || null,
+      pic_name: payload.pic_name?.trim() || null,
+      phone: payload.phone?.trim() || null,
+      whatsapp: payload.whatsapp?.trim() || null,
+      email: payload.email?.trim() || null,
+      address: payload.address?.trim() || null,
+      city: payload.city?.trim() || null,
+      province: payload.province?.trim() || null,
+      commission_pct: payload.commission_pct ?? 0,
+      deposit_balance: 0,
+      credit_limit: payload.credit_limit ?? 0,
+      bank_name: payload.bank_name?.trim() || null,
+      bank_account: payload.bank_account?.trim() || null,
+      bank_account_name: payload.bank_account_name?.trim() || null,
+      is_active: true,
+      notes: payload.notes?.trim() || null,
+    }])
+    .select().single()
+
+  if (error) return { error: (error as DbError).message }
+  revalidatePath('/po-bus')
+  return { data }
+}
+
+export async function updateBusPool(orgId: string, poolId: string, payload: Partial<{
+  code: string; name: string; pool_type: string
+  owner_name: string; pic_name: string; phone: string; whatsapp: string; email: string
+  address: string; city: string; province: string
+  commission_pct: number; credit_limit: number
+  bank_name: string; bank_account: string; bank_account_name: string
+  is_active: boolean; notes: string
+}>) {
+  const supabase = await createClient()
+
+  const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+  const strFields = ['name','owner_name','pic_name','phone','whatsapp','email','address','city','province','bank_name','bank_account','bank_account_name','notes']
+  for (const f of strFields) {
+    if (f in payload) updates[f] = (payload as any)[f]?.trim() || null
+  }
+  if ('code' in payload && payload.code) updates.code = payload.code.trim().toUpperCase()
+  if ('pool_type' in payload) updates.pool_type = payload.pool_type
+  if ('commission_pct' in payload) updates.commission_pct = payload.commission_pct
+  if ('credit_limit' in payload) updates.credit_limit = payload.credit_limit
+  if ('is_active' in payload) updates.is_active = payload.is_active
+
+  const { data, error } = await (supabase as any)
+    .from('bus_pools')
+    .update(updates)
+    .eq('org_id', orgId)
+    .eq('id', poolId)
+    .select().single()
+
+  if (error) return { error: (error as DbError).message }
+  revalidatePath('/po-bus')
+  return { data }
+}
+
+export async function deleteBusPool(orgId: string, poolId: string) {
+  const supabase = await createClient()
+  const { error } = await (supabase as any)
+    .from('bus_pools')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('org_id', orgId).eq('id', poolId)
+
+  if (error) return { error: (error as DbError).message }
+  revalidatePath('/po-bus')
+  return { success: true }
+}
+
+// ─── POOL TOP-UPS ─────────────────────────────────────────────────────────────
+
+export async function getBusPoolTopUps(orgId: string, poolId?: string | null): Promise<BusPoolTopUp[]> {
+  const supabase = await createClient()
+
+  let query = (supabase as any)
+    .from('bus_pool_top_ups')
+    .select('*, pool:bus_pools(id, code, name)')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  if (poolId) query = query.eq('pool_id', poolId)
+
+  const { data, error } = await query
+  if (error) return []
+  return (data || []) as unknown as BusPoolTopUp[]
+}
+
+export async function createBusPoolTopUp(orgId: string, payload: {
+  pool_id: string; amount: number; payment_method?: string; reference_no?: string; notes?: string
+}) {
+  if (!payload.pool_id) return { error: 'Pool wajib dipilih.' }
+  if (!payload.amount || payload.amount <= 0) return { error: 'Jumlah top-up harus lebih dari 0.' }
+
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  const insertResult = await queryPostgres(
+    `INSERT INTO bus_pool_top_ups (org_id, pool_id, amount, payment_method, reference_no, notes)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [orgId, payload.pool_id, payload.amount,
+     payload.payment_method || 'TRANSFER',
+     payload.reference_no?.trim() || null,
+     payload.notes?.trim() || null]
+  )
+  if (insertResult.error) return { error: (insertResult.error as any).message }
+
+  await queryPostgres(
+    `UPDATE bus_pools SET deposit_balance = deposit_balance + $1, updated_at = NOW()
+     WHERE id = $2 AND org_id = $3`,
+    [payload.amount, payload.pool_id, orgId]
+  )
+
+  revalidatePath('/po-bus')
+  return { data: insertResult.data?.[0] }
+}
+
+// ─── POOL SETTLEMENTS ─────────────────────────────────────────────────────────
+
+export async function getBusPoolSettlements(orgId: string, poolId?: string | null): Promise<BusPoolSettlement[]> {
+  const supabase = await createClient()
+
+  let query = (supabase as any)
+    .from('bus_pool_settlements')
+    .select('*, pool:bus_pools(id, code, name)')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (poolId) query = query.eq('pool_id', poolId)
+
+  const { data, error } = await query
+  if (error) return []
+  return (data || []) as unknown as BusPoolSettlement[]
+}
+
+export async function createBusPoolSettlement(orgId: string, payload: {
+  pool_id: string; period_start: string; period_end: string
+  total_tickets: number; total_revenue: number; commission_pct: number
+  payment_method?: string; reference_no?: string; notes?: string
+}) {
+  if (!payload.pool_id) return { error: 'Pool wajib dipilih.' }
+  if (!payload.period_start || !payload.period_end) return { error: 'Periode wajib diisi.' }
+
+  const supabase = await createClient()
+  const commissionAmount = Math.round(payload.total_revenue * (payload.commission_pct / 100) * 100) / 100
+
+  const { data, error } = await (supabase as any)
+    .from('bus_pool_settlements')
+    .insert([{
+      org_id: orgId, pool_id: payload.pool_id,
+      period_start: payload.period_start, period_end: payload.period_end,
+      total_tickets: payload.total_tickets || 0,
+      total_revenue: payload.total_revenue || 0,
+      commission_pct: payload.commission_pct || 0,
+      commission_amount: commissionAmount,
+      payment_method: payload.payment_method || 'TRANSFER',
+      reference_no: payload.reference_no?.trim() || null,
+      status: 'PENDING', notes: payload.notes?.trim() || null,
+    }])
+    .select().single()
+
+  if (error) return { error: (error as DbError).message }
+  revalidatePath('/po-bus')
+  return { data }
+}
+
+export async function markSettlementPaid(orgId: string, settlementId: string, referenceNo?: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await (supabase as any)
+    .from('bus_pool_settlements')
+    .update({ status: 'DIBAYAR', paid_at: new Date().toISOString(), reference_no: referenceNo?.trim() || null })
+    .eq('org_id', orgId).eq('id', settlementId)
     .select().single()
 
   if (error) return { error: (error as DbError).message }

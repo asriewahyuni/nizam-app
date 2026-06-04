@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react'
 import {
   Bus, Users, Wrench, AlertTriangle, MapPin, Ticket, Building2,
   Navigation, Plus, Phone, Mail, Edit2, CheckCircle2, Clock,
-  XCircle, TruckIcon, Settings, ChevronRight, Flame
+  XCircle, TruckIcon, Settings, ChevronRight, Flame,
+  Banknote, Wallet, Store, ArrowUpCircle, Receipt, BadgeCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -20,14 +21,17 @@ import {
   createBusAgent, updateBusAgent, deleteBusAgent,
   createBusRoute, createBusSchedule, updateBusScheduleStatus,
   createBusTicket, createBusCheckpoint,
+  createBusPool, updateBusPool, deleteBusPool,
+  createBusPoolTopUp, createBusPoolSettlement, markSettlementPaid,
 } from '@/modules/po-bus/actions/po-bus.actions'
 import type {
   BusUnit, BusCrew, BusMechanic, BusTireRecord,
   BusEmergencyCall, BusAgent, BusRoute, BusSchedule, BusTicket, BusCheckpoint,
+  BusPool, BusPoolTopUp, BusPoolSettlement,
   FixedAssetSummary,
 } from '@/modules/po-bus/lib/po-bus-types'
 
-type Tab = 'ARMADA' | 'CREW' | 'MEKANIK' | 'PERAWATAN' | 'EMERGENCY' | 'OPERASIONAL' | 'CHECKPOINT'
+type Tab = 'ARMADA' | 'CREW' | 'MEKANIK' | 'PERAWATAN' | 'EMERGENCY' | 'OPERASIONAL' | 'CHECKPOINT' | 'POOL'
 type PerawatanTab = 'SERVIS' | 'BAN'
 type OperasionalTab = 'RUTE' | 'JADWAL' | 'TIKET' | 'AGEN'
 
@@ -47,6 +51,9 @@ interface POBusClientProps {
   tickets: BusTicket[]
   checkpoints: BusCheckpoint[]
   fixedAssets: FixedAssetSummary[]
+  pools: BusPool[]
+  poolTopUps: BusPoolTopUp[]
+  poolSettlements: BusPoolSettlement[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -127,6 +134,7 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
 export function POBusClient({
   orgId, units, crew, mechanics, serviceRecords, tireRecords,
   emergencyCalls, agents, routes, schedules, tickets, checkpoints, fixedAssets,
+  pools, poolTopUps, poolSettlements,
 }: POBusClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>('ARMADA')
   const [perawatanTab, setPerawatanTab] = useState<PerawatanTab>('SERVIS')
@@ -146,6 +154,17 @@ export function POBusClient({
   const [localSchedules, setLocalSchedules] = useState(schedules)
   const [localTickets, setLocalTickets] = useState(tickets)
   const [localCheckpoints, setLocalCheckpoints] = useState(checkpoints)
+  const [localPools, setLocalPools] = useState(pools)
+  const [localTopUps, setLocalTopUps] = useState(poolTopUps)
+  const [localSettlements, setLocalSettlements] = useState(poolSettlements)
+
+  const [selectedPool, setSelectedPool] = useState<BusPool | null>(null)
+  const [editingPool, setEditingPool] = useState<BusPool | null>(null)
+  const [showPoolModal, setShowPoolModal] = useState(false)
+  const [showTopUpModal, setShowTopUpModal] = useState(false)
+  const [showSettlementModal, setShowSettlementModal] = useState(false)
+  const [topUpTargetPool, setTopUpTargetPool] = useState<BusPool | null>(null)
+  const [settlementTargetPool, setSettlementTargetPool] = useState<BusPool | null>(null)
 
   const [selectedFixedAsset, setSelectedFixedAsset] = useState<FixedAssetSummary | null>(null)
   const [editingUnit, setEditingUnit] = useState<BusUnit | null>(null)
@@ -167,6 +186,112 @@ export function POBusClient({
 
   function showError(msg: string) { setError(msg); setTimeout(() => setError(null), 4000) }
 
+  // ─── Pool handlers ──────────────────────────────────────────────────────────
+
+  async function handleSavePool(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    const payload = {
+      code: fd.get('code') as string,
+      name: fd.get('name') as string,
+      pool_type: fd.get('pool_type') as string,
+      owner_name: fd.get('owner_name') as string,
+      pic_name: fd.get('pic_name') as string,
+      phone: fd.get('phone') as string,
+      whatsapp: fd.get('whatsapp') as string,
+      email: fd.get('email') as string,
+      address: fd.get('address') as string,
+      city: fd.get('city') as string,
+      province: fd.get('province') as string,
+      commission_pct: Number(fd.get('commission_pct')) || 0,
+      credit_limit: Number(fd.get('credit_limit')) || 0,
+      bank_name: fd.get('bank_name') as string,
+      bank_account: fd.get('bank_account') as string,
+      bank_account_name: fd.get('bank_account_name') as string,
+      notes: fd.get('notes') as string,
+    }
+    startTransition(async () => {
+      let res: any
+      if (editingPool) {
+        res = await updateBusPool(orgId, editingPool.id, payload)
+        if (!res.error) setLocalPools(prev => prev.map(p => p.id === editingPool.id ? { ...p, ...res.data } : p))
+      } else {
+        res = await createBusPool(orgId, payload)
+        if (!res.error && res.data) setLocalPools(prev => [res.data, ...prev])
+      }
+      if (res.error) { showError(res.error); return }
+      setShowPoolModal(false); setEditingPool(null)
+    })
+  }
+
+  async function handleDeletePool(pool: BusPool) {
+    const ok = await confirm(`Nonaktifkan pool "${pool.name}"?`, 'Pool akan dinonaktifkan. Data tiket dan top-up tetap tersimpan.')
+    if (!ok) return
+    startTransition(async () => {
+      const res = await deleteBusPool(orgId, pool.id)
+      if (res.error) { showError(res.error); return }
+      setLocalPools(prev => prev.filter(p => p.id !== pool.id))
+      if (selectedPool?.id === pool.id) setSelectedPool(null)
+    })
+  }
+
+  async function handleTopUp(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!topUpTargetPool) return
+    const fd = new FormData(e.currentTarget)
+    const payload = {
+      pool_id: topUpTargetPool.id,
+      amount: Number(fd.get('amount')),
+      payment_method: fd.get('payment_method') as string,
+      reference_no: fd.get('reference_no') as string,
+      notes: fd.get('notes') as string,
+    }
+    startTransition(async () => {
+      const res = await createBusPoolTopUp(orgId, payload)
+      if (res.error) { showError(res.error); return }
+      if (res.data) setLocalTopUps(prev => [res.data as BusPoolTopUp, ...prev])
+      setLocalPools(prev => prev.map(p => p.id === topUpTargetPool.id
+        ? { ...p, deposit_balance: p.deposit_balance + payload.amount }
+        : p))
+      if (selectedPool?.id === topUpTargetPool.id)
+        setSelectedPool(prev => prev ? { ...prev, deposit_balance: prev.deposit_balance + payload.amount } : prev)
+      setShowTopUpModal(false); setTopUpTargetPool(null)
+    })
+  }
+
+  async function handleSettlement(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!settlementTargetPool) return
+    const fd = new FormData(e.currentTarget)
+    const payload = {
+      pool_id: settlementTargetPool.id,
+      period_start: fd.get('period_start') as string,
+      period_end: fd.get('period_end') as string,
+      total_tickets: Number(fd.get('total_tickets')) || 0,
+      total_revenue: Number(fd.get('total_revenue')) || 0,
+      commission_pct: settlementTargetPool.commission_pct,
+      payment_method: fd.get('payment_method') as string,
+      reference_no: fd.get('reference_no') as string,
+      notes: fd.get('notes') as string,
+    }
+    startTransition(async () => {
+      const res = await createBusPoolSettlement(orgId, payload)
+      if (res.error) { showError(res.error); return }
+      if (res.data) setLocalSettlements(prev => [res.data as BusPoolSettlement, ...prev])
+      setShowSettlementModal(false); setSettlementTargetPool(null)
+    })
+  }
+
+  async function handleMarkPaid(settlement: BusPoolSettlement) {
+    const ok = await confirm(`Tandai settlement ini sebagai DIBAYAR?`, `Komisi ${formatRupiah(settlement.commission_amount)} akan ditandai sudah dibayarkan.`)
+    if (!ok) return
+    startTransition(async () => {
+      const res = await markSettlementPaid(orgId, settlement.id)
+      if (res.error) { showError(res.error); return }
+      setLocalSettlements(prev => prev.map(s => s.id === settlement.id ? { ...s, status: 'DIBAYAR', paid_at: new Date().toISOString() } : s))
+    })
+  }
+
   const openEmergencies = localEmergencyCalls.filter(e => e.status !== 'SELESAI').length
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -177,6 +302,7 @@ export function POBusClient({
     { id: 'EMERGENCY', label: 'Emergency', icon: <Flame className="w-4 h-4" /> },
     { id: 'OPERASIONAL', label: 'Operasional', icon: <TruckIcon className="w-4 h-4" /> },
     { id: 'CHECKPOINT', label: 'Checkpoint', icon: <Navigation className="w-4 h-4" /> },
+    { id: 'POOL', label: 'Pool / Agen', icon: <Store className="w-4 h-4" /> },
   ]
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -336,7 +462,7 @@ export function POBusClient({
   async function handleSaveAgent(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
-    const payload = { name: fd.get('name') as string, phone: fd.get('phone') as string, email: fd.get('email') as string, address: fd.get('address') as string, city: fd.get('city') as string, commission_pct: Number(fd.get('commission_pct')) || 0, notes: fd.get('notes') as string }
+    const payload = { name: fd.get('name') as string, phone: fd.get('phone') as string, email: fd.get('email') as string, address: fd.get('address') as string, city: fd.get('city') as string, commission_pct: Number(fd.get('commission_pct')) || 0, notes: fd.get('notes') as string, pool_id: (fd.get('pool_id') as string) || undefined }
     if (editingAgent) {
       const r = await updateBusAgent(orgId, editingAgent.id, payload)
       if (r.error) { showError(r.error); return }
@@ -790,6 +916,266 @@ export function POBusClient({
         </SectionCard>
       )}
 
+      {/* POOL */}
+      {activeTab === 'POOL' && (() => {
+        const POOL_TYPE_LABELS: Record<string, string> = { POOL_UTAMA: 'Pool Utama', AGEN_RESMI: 'Agen Resmi', SUB_AGEN: 'Sub-Agen' }
+        const POOL_TYPE_COLORS: Record<string, string> = {
+          POOL_UTAMA: 'bg-blue-50 text-blue-700 border border-blue-200',
+          AGEN_RESMI: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+          SUB_AGEN: 'bg-slate-100 text-slate-600 border border-slate-200',
+        }
+        const activePools = localPools.filter(p => p.is_active)
+        const totalBalance = activePools.reduce((s, p) => s + p.deposit_balance, 0)
+        const pendingSettlements = localSettlements.filter(s => s.status === 'PENDING')
+        const pendingCommission = pendingSettlements.reduce((s, s2) => s + s2.commission_amount, 0)
+
+        return !selectedPool ? (
+          <div className="space-y-6">
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard label="Total Pool Aktif" value={activePools.length} icon={Store} color="blue" />
+              <StatCard label="Total Saldo Deposit" value={formatRupiah(totalBalance)} icon={Wallet} color="green" />
+              <StatCard label="Komisi Tertunggak" value={formatRupiah(pendingCommission)} icon={Banknote} color="amber" />
+              <StatCard label="Settlement Pending" value={pendingSettlements.length} icon={Receipt} color="red" />
+            </div>
+
+            <SectionCard>
+              <SectionHeader
+                title="Daftar Pool / Agen"
+                subtitle="Manajemen kantor agen dan titik penjualan tiket terafiliasi"
+                icon={Store}
+                actions={<SafeButton onClick={() => { setEditingPool(null); setShowPoolModal(true) }} icon={<Plus className="w-4 h-4" />} size="sm">Registrasi Pool</SafeButton>}
+              />
+              {localPools.length === 0
+                ? <EmptyState icon={Store} title="Belum ada pool terdaftar" description="Daftarkan pool atau kantor agen penjualan tiket." action={<SafeButton onClick={() => { setEditingPool(null); setShowPoolModal(true) }} icon={<Plus className="w-4 h-4" />}>Registrasi Pool</SafeButton>} />
+                : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
+                    {localPools.map(pool => {
+                      const poolAgents = localAgents.filter(a => a.pool_id === pool.id && a.is_active)
+                      const poolTickets = localTickets.filter(t => t.pool_id === pool.id)
+                      return (
+                        <div key={pool.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group" onClick={() => setSelectedPool(pool)}>
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="p-2 bg-blue-50 rounded-lg shrink-0"><Store className="w-4 h-4 text-blue-600" /></div>
+                              <div>
+                                <p className="font-semibold text-slate-800 text-sm leading-tight">{pool.name}</p>
+                                <p className="text-[11px] text-slate-400 font-mono">{pool.code}</p>
+                              </div>
+                            </div>
+                            <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', POOL_TYPE_COLORS[pool.pool_type] || POOL_TYPE_COLORS.AGEN_RESMI)}>
+                              {POOL_TYPE_LABELS[pool.pool_type] || pool.pool_type}
+                            </span>
+                          </div>
+
+                          {pool.city && <p className="text-xs text-slate-500 mb-3 flex items-center gap-1"><MapPin className="w-3 h-3" />{pool.city}{pool.province ? `, ${pool.province}` : ''}</p>}
+
+                          <div className="grid grid-cols-3 gap-2 text-center mb-3">
+                            <div className="bg-slate-50 rounded-lg p-2">
+                              <p className="text-[10px] text-slate-400 font-medium">Komisi</p>
+                              <p className="font-bold text-slate-700 text-sm">{pool.commission_pct}%</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-2">
+                              <p className="text-[10px] text-slate-400 font-medium">Agen</p>
+                              <p className="font-bold text-slate-700 text-sm">{poolAgents.length}</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-2">
+                              <p className="text-[10px] text-slate-400 font-medium">Tiket</p>
+                              <p className="font-bold text-slate-700 text-sm">{poolTickets.length}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <div>
+                              <p className="text-[10px] text-slate-400">Saldo Deposit</p>
+                              <p className={cn('text-sm font-bold', pool.deposit_balance > 0 ? 'text-emerald-600' : 'text-slate-500')}>{formatRupiah(pool.deposit_balance)}</p>
+                            </div>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                              <button className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
+                                onClick={() => { setTopUpTargetPool(pool); setShowTopUpModal(true) }} title="Top-up saldo">
+                                <ArrowUpCircle className="w-4 h-4" />
+                              </button>
+                              <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                                onClick={() => { setEditingPool(pool); setShowPoolModal(true) }}>
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                onClick={() => handleDeletePool(pool)}>
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+            </SectionCard>
+
+            {/* Settlement Pending */}
+            {pendingSettlements.length > 0 && (
+              <SectionCard>
+                <SectionHeader title="Settlement Komisi Tertunggak" subtitle="Komisi yang belum dibayarkan ke pool" icon={Receipt} />
+                <div className="mt-4 space-y-2">
+                  {pendingSettlements.map(s => (
+                    <div key={s.id} className="flex items-center justify-between p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                      <div>
+                        <p className="font-semibold text-slate-800 text-sm">{s.pool?.name || s.pool_id}</p>
+                        <p className="text-xs text-slate-500">{formatDate(s.period_start)} – {formatDate(s.period_end)} · {s.total_tickets} tiket</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="text-xs text-slate-400">Komisi {s.commission_pct}%</p>
+                          <p className="font-bold text-amber-700">{formatRupiah(s.commission_amount)}</p>
+                        </div>
+                        <SafeButton size="sm" onClick={() => handleMarkPaid(s)} icon={<BadgeCheck className="w-3.5 h-3.5" />}>Bayar</SafeButton>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+          </div>
+        ) : (
+          /* ── Pool Detail View ── */
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSelectedPool(null)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer transition-colors"><ChevronRight className="w-4 h-4 rotate-180" /></button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold text-slate-800">{selectedPool.name}</h2>
+                  <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full',
+                    selectedPool.pool_type === 'POOL_UTAMA' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                    selectedPool.pool_type === 'AGEN_RESMI' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                    'bg-slate-100 text-slate-600 border border-slate-200'
+                  )}>{POOL_TYPE_LABELS[selectedPool.pool_type] || selectedPool.pool_type}</span>
+                </div>
+                <p className="text-xs text-slate-400 font-mono">{selectedPool.code}{selectedPool.city ? ` · ${selectedPool.city}` : ''}</p>
+              </div>
+              <div className="ml-auto flex gap-2">
+                <SafeButton size="sm" variant="secondary" onClick={() => { setTopUpTargetPool(selectedPool); setShowTopUpModal(true) }} icon={<ArrowUpCircle className="w-3.5 h-3.5" />}>Top-up</SafeButton>
+                <SafeButton size="sm" variant="secondary" onClick={() => { setSettlementTargetPool(selectedPool); setShowSettlementModal(true) }} icon={<Receipt className="w-3.5 h-3.5" />}>Settlement</SafeButton>
+                <SafeButton size="sm" onClick={() => { setEditingPool(selectedPool); setShowPoolModal(true) }} icon={<Edit2 className="w-3.5 h-3.5" />}>Edit</SafeButton>
+              </div>
+            </div>
+
+            {/* Info cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <p className="text-xs text-slate-400 mb-1">Saldo Deposit</p>
+                <p className={cn('text-xl font-bold', selectedPool.deposit_balance > 0 ? 'text-emerald-600' : 'text-slate-500')}>{formatRupiah(selectedPool.deposit_balance)}</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <p className="text-xs text-slate-400 mb-1">Komisi</p>
+                <p className="text-xl font-bold text-slate-700">{selectedPool.commission_pct}%</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <p className="text-xs text-slate-400 mb-1">Tiket Terjual</p>
+                <p className="text-xl font-bold text-slate-700">{localTickets.filter(t => t.pool_id === selectedPool.id).length}</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <p className="text-xs text-slate-400 mb-1">Agen Aktif</p>
+                <p className="text-xl font-bold text-slate-700">{localAgents.filter(a => a.pool_id === selectedPool.id && a.is_active).length}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Info Pool */}
+              <SectionCard>
+                <h3 className="font-semibold text-slate-800 mb-3">Informasi Pool</h3>
+                <div className="space-y-2 text-sm">
+                  {selectedPool.owner_name && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">Pemilik</span><span className="text-slate-700">{selectedPool.owner_name}</span></div>}
+                  {selectedPool.pic_name && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">PIC</span><span className="text-slate-700">{selectedPool.pic_name}</span></div>}
+                  {selectedPool.phone && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">Telepon</span><span className="text-slate-700">{selectedPool.phone}</span></div>}
+                  {selectedPool.whatsapp && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">WhatsApp</span><span className="text-slate-700">{selectedPool.whatsapp}</span></div>}
+                  {selectedPool.email && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">Email</span><span className="text-slate-700">{selectedPool.email}</span></div>}
+                  {selectedPool.address && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">Alamat</span><span className="text-slate-700">{selectedPool.address}</span></div>}
+                  {selectedPool.bank_name && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <p className="text-xs font-semibold text-slate-500 mb-2">Rekening Bank</p>
+                      <p className="text-slate-700">{selectedPool.bank_name} — {selectedPool.bank_account}</p>
+                      {selectedPool.bank_account_name && <p className="text-slate-500 text-xs">{selectedPool.bank_account_name}</p>}
+                    </div>
+                  )}
+                </div>
+              </SectionCard>
+
+              {/* Top-up history */}
+              <SectionCard>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-slate-800">Riwayat Top-up Saldo</h3>
+                  <SafeButton size="sm" variant="secondary" onClick={() => { setTopUpTargetPool(selectedPool); setShowTopUpModal(true) }} icon={<Plus className="w-3.5 h-3.5" />}>Top-up</SafeButton>
+                </div>
+                {localTopUps.filter(t => t.pool_id === selectedPool.id).length === 0
+                  ? <p className="text-sm text-slate-400 text-center py-4">Belum ada top-up</p>
+                  : <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {localTopUps.filter(t => t.pool_id === selectedPool.id).map(tu => (
+                      <div key={tu.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+                        <div>
+                          <p className="text-xs font-semibold text-emerald-600">+{formatRupiah(tu.amount)}</p>
+                          <p className="text-[11px] text-slate-400">{tu.payment_method} · {formatDate(tu.created_at)}</p>
+                          {tu.reference_no && <p className="text-[11px] text-slate-400 font-mono">{tu.reference_no}</p>}
+                        </div>
+                        {tu.notes && <p className="text-[11px] text-slate-400 max-w-[120px] truncate">{tu.notes}</p>}
+                      </div>
+                    ))}
+                  </div>}
+              </SectionCard>
+            </div>
+
+            {/* Agen di pool ini */}
+            <SectionCard>
+              <h3 className="font-semibold text-slate-800 mb-3">Agen dalam Pool Ini</h3>
+              {localAgents.filter(a => a.pool_id === selectedPool.id).length === 0
+                ? <p className="text-sm text-slate-400 text-center py-4">Belum ada agen yang ditetapkan ke pool ini. Assign agen dari tab Operasional → Agen.</p>
+                : <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {localAgents.filter(a => a.pool_id === selectedPool.id).map(ag => (
+                    <div key={ag.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                        <span className="text-blue-700 font-semibold text-xs">{ag.name.slice(0,2).toUpperCase()}</span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-800 text-sm">{ag.name}</p>
+                        <p className="text-xs text-slate-400">{ag.phone || ag.city || 'Tanpa kota'} · Komisi {ag.commission_pct}%</p>
+                      </div>
+                      {!ag.is_active && <span className="ml-auto text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Non-aktif</span>}
+                    </div>
+                  ))}
+                </div>}
+            </SectionCard>
+
+            {/* Settlement history */}
+            <SectionCard>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-slate-800">Riwayat Settlement Komisi</h3>
+                <SafeButton size="sm" variant="secondary" onClick={() => { setSettlementTargetPool(selectedPool); setShowSettlementModal(true) }} icon={<Plus className="w-3.5 h-3.5" />}>Buat Settlement</SafeButton>
+              </div>
+              {localSettlements.filter(s => s.pool_id === selectedPool.id).length === 0
+                ? <p className="text-sm text-slate-400 text-center py-4">Belum ada settlement komisi</p>
+                : <div className="space-y-2">
+                  {localSettlements.filter(s => s.pool_id === selectedPool.id).map(s => (
+                    <div key={s.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-600">{formatDate(s.period_start)} – {formatDate(s.period_end)}</p>
+                        <p className="text-[11px] text-slate-400">{s.total_tickets} tiket · Revenue {formatRupiah(s.total_revenue)} · Komisi {s.commission_pct}%</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="font-bold text-slate-700">{formatRupiah(s.commission_amount)}</p>
+                          <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full',
+                            s.status === 'DIBAYAR' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                          )}>{s.status}</span>
+                        </div>
+                        {s.status === 'PENDING' && <SafeButton size="sm" onClick={() => handleMarkPaid(s)} icon={<BadgeCheck className="w-3.5 h-3.5" />}>Bayar</SafeButton>}
+                      </div>
+                    </div>
+                  ))}
+                </div>}
+            </SectionCard>
+          </div>
+        )
+      })()}
+
       {/* ═══ MODALS ════════════════════════════════════════════════════════════ */}
 
       <Modal open={showUnitModal} onClose={() => { setShowUnitModal(false); setSelectedFixedAsset(null); setEditingUnit(null) }} title={editingUnit ? 'Edit Unit Bus' : 'Tambah Unit Bus'}>
@@ -1065,6 +1451,12 @@ export function POBusClient({
       <Modal open={showAgenModal} onClose={() => { setShowAgenModal(false); setEditingAgent(null) }} title={editingAgent ? 'Edit Agen' : 'Tambah Agen'}>
         <form onSubmit={handleSaveAgent} className="space-y-4">
           <FormField label="Nama Agen *"><Input name="name" defaultValue={editingAgent?.name || ''} placeholder="Agen Tiket Maju" required /></FormField>
+          <FormField label="Pool Induk (opsional)">
+            <Select name="pool_id" defaultValue={editingAgent?.pool_id || ''}>
+              <option value="">— Independen / Tanpa Pool —</option>
+              {localPools.filter(p => p.is_active).map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
+            </Select>
+          </FormField>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="No. HP"><Input name="phone" defaultValue={editingAgent?.phone || ''} placeholder="08123456789" /></FormField>
             <FormField label="Email"><Input name="email" defaultValue={editingAgent?.email || ''} type="email" /></FormField>
@@ -1089,6 +1481,114 @@ export function POBusClient({
           <div className="flex gap-3 justify-end pt-2">
             <SafeButton type="button" variant="ghost" onClick={() => setShowCheckpointModal(false)}>Batal</SafeButton>
             <SafeButton type="submit" icon={<CheckCircle2 className="w-4 h-4" />}>Simpan</SafeButton>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Pool Modal ── */}
+      <Modal open={showPoolModal} onClose={() => { setShowPoolModal(false); setEditingPool(null) }} title={editingPool ? 'Edit Pool / Agen' : 'Registrasi Pool / Agen'}>
+        <form onSubmit={handleSavePool} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Kode Pool *"><Input name="code" defaultValue={editingPool?.code || ''} placeholder="BWK-JKT" required /></FormField>
+            <FormField label="Tipe Pool">
+              <Select name="pool_type" defaultValue={editingPool?.pool_type || 'AGEN_RESMI'}>
+                <option value="POOL_UTAMA">Pool Utama</option>
+                <option value="AGEN_RESMI">Agen Resmi</option>
+                <option value="SUB_AGEN">Sub-Agen</option>
+              </Select>
+            </FormField>
+          </div>
+          <FormField label="Nama Pool / Agen *"><Input name="name" defaultValue={editingPool?.name || ''} placeholder="Agen Tiket Bintang Jaya Jakarta" required /></FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Nama Pemilik"><Input name="owner_name" defaultValue={editingPool?.owner_name || ''} placeholder="Budi Santoso" /></FormField>
+            <FormField label="Nama PIC (Koordinator)"><Input name="pic_name" defaultValue={editingPool?.pic_name || ''} placeholder="Siti Rahayu" /></FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="No. HP"><Input name="phone" defaultValue={editingPool?.phone || ''} placeholder="08123456789" /></FormField>
+            <FormField label="WhatsApp"><Input name="whatsapp" defaultValue={editingPool?.whatsapp || ''} placeholder="08123456789" /></FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Email"><Input name="email" type="email" defaultValue={editingPool?.email || ''} /></FormField>
+            <FormField label="Kota"><Input name="city" defaultValue={editingPool?.city || ''} placeholder="Jakarta" /></FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Provinsi"><Input name="province" defaultValue={editingPool?.province || ''} placeholder="DKI Jakarta" /></FormField>
+            <FormField label="Komisi (%)"><Input name="commission_pct" type="number" step="0.01" min="0" max="100" defaultValue={editingPool?.commission_pct ?? 0} /></FormField>
+          </div>
+          <FormField label="Alamat Lengkap"><Textarea name="address" defaultValue={editingPool?.address || ''} placeholder="Jl. Mangga Besar No. 12, Jakarta Barat" /></FormField>
+          <div className="pt-2 border-t border-slate-100">
+            <p className="text-xs font-semibold text-slate-500 mb-3">Rekening Bank (untuk pembayaran komisi)</p>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Nama Bank"><Input name="bank_name" defaultValue={editingPool?.bank_name || ''} placeholder="BCA / Mandiri / BNI" /></FormField>
+              <FormField label="No. Rekening"><Input name="bank_account" defaultValue={editingPool?.bank_account || ''} placeholder="1234567890" /></FormField>
+            </div>
+            <FormField label="Nama Pemilik Rekening"><Input name="bank_account_name" defaultValue={editingPool?.bank_account_name || ''} placeholder="Budi Santoso" /></FormField>
+          </div>
+          <FormField label="Kredit Limit (Rp)"><Input name="credit_limit" type="number" defaultValue={editingPool?.credit_limit ?? 0} placeholder="0" /></FormField>
+          <FormField label="Catatan"><Textarea name="notes" defaultValue={editingPool?.notes || ''} /></FormField>
+          <div className="flex gap-3 justify-end pt-2">
+            <SafeButton type="button" variant="ghost" onClick={() => { setShowPoolModal(false); setEditingPool(null) }}>Batal</SafeButton>
+            <SafeButton type="submit" icon={<CheckCircle2 className="w-4 h-4" />}>Simpan</SafeButton>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Top-up Modal ── */}
+      <Modal open={showTopUpModal} onClose={() => { setShowTopUpModal(false); setTopUpTargetPool(null) }} title={`Top-up Saldo — ${topUpTargetPool?.name || ''}`}>
+        <form onSubmit={handleTopUp} className="space-y-4">
+          <div className="bg-slate-50 rounded-xl p-3 text-sm">
+            <span className="text-slate-500">Saldo saat ini: </span>
+            <span className="font-bold text-slate-800">{formatRupiah(topUpTargetPool?.deposit_balance || 0)}</span>
+          </div>
+          <FormField label="Jumlah Top-up (Rp) *"><Input name="amount" type="number" min="1" placeholder="5000000" required /></FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Metode Pembayaran">
+              <Select name="payment_method" defaultValue="TRANSFER">
+                <option value="TRANSFER">Transfer Bank</option>
+                <option value="TUNAI">Tunai</option>
+                <option value="CAIR_KOMISI">Cairkan Komisi</option>
+              </Select>
+            </FormField>
+            <FormField label="No. Referensi / Bukti"><Input name="reference_no" placeholder="TRF2024..." /></FormField>
+          </div>
+          <FormField label="Catatan"><Textarea name="notes" rows={2} /></FormField>
+          <div className="flex gap-3 justify-end pt-2">
+            <SafeButton type="button" variant="ghost" onClick={() => { setShowTopUpModal(false); setTopUpTargetPool(null) }}>Batal</SafeButton>
+            <SafeButton type="submit" icon={<ArrowUpCircle className="w-4 h-4" />}>Top-up Sekarang</SafeButton>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Settlement Modal ── */}
+      <Modal open={showSettlementModal} onClose={() => { setShowSettlementModal(false); setSettlementTargetPool(null) }} title={`Settlement Komisi — ${settlementTargetPool?.name || ''}`}>
+        <form onSubmit={handleSettlement} className="space-y-4">
+          {settlementTargetPool && (
+            <div className="bg-blue-50 rounded-xl p-3 text-sm">
+              <span className="text-blue-600">Komisi pool ini: </span>
+              <span className="font-bold text-blue-800">{settlementTargetPool.commission_pct}% per tiket</span>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Periode Mulai *"><Input name="period_start" type="date" required /></FormField>
+            <FormField label="Periode Akhir *"><Input name="period_end" type="date" required /></FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Jumlah Tiket Terjual"><Input name="total_tickets" type="number" min="0" placeholder="0" /></FormField>
+            <FormField label="Total Revenue (Rp)"><Input name="total_revenue" type="number" min="0" placeholder="0" /></FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Metode Bayar">
+              <Select name="payment_method" defaultValue="TRANSFER">
+                <option value="TRANSFER">Transfer Bank</option>
+                <option value="TUNAI">Tunai</option>
+              </Select>
+            </FormField>
+            <FormField label="No. Referensi"><Input name="reference_no" placeholder="TRF2024..." /></FormField>
+          </div>
+          <FormField label="Catatan"><Textarea name="notes" rows={2} /></FormField>
+          <div className="flex gap-3 justify-end pt-2">
+            <SafeButton type="button" variant="ghost" onClick={() => { setShowSettlementModal(false); setSettlementTargetPool(null) }}>Batal</SafeButton>
+            <SafeButton type="submit" icon={<Receipt className="w-4 h-4" />}>Buat Settlement</SafeButton>
           </div>
         </form>
       </Modal>
