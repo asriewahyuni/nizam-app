@@ -666,7 +666,7 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
 
 // ─── SEED DATA: PO BUS OPERATOR ───────────────────────────────────────────────
 
-export async function seedDemoBusData(supabase: any, orgId: string, branchId: string) {
+async function seedDemoBusData(supabase: any, orgId: string, branchId: string) {
   const today = new Date().toISOString().split('T')[0]
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
   const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
