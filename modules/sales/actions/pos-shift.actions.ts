@@ -786,6 +786,27 @@ async function buildPosShiftSummary(
     saleRows = salesData as PosShiftSaleRow[]
   }
 
+  // ANTI-SILO: Sertakan pelunasan piutang (AR Collection) yang dilakukan di shift ini
+  const { data: paymentsData, error: paymentsError } = await db
+    .from('sales_payments')
+    .select('pos_session_id, amount, payment_method')
+    .eq('org_id', orgId)
+    .eq('pos_session_id', sessionId)
+
+  if (!paymentsError && Array.isArray(paymentsData)) {
+    for (const payment of paymentsData) {
+      saleRows.push({
+        pos_session_id: payment.pos_session_id,
+        grand_total: payment.amount,
+        total_amount: payment.amount,
+        discount_amount: 0,
+        tax_amount: 0,
+        pos_payment_method: payment.payment_method || 'CASH',
+        pos_change_amount: 0
+      } as PosShiftSaleRow)
+    }
+  }
+
   let settlementRows: PosShiftSettlementRow[] = []
   const { data: settlementsData, error: settlementsError } = await db
     .from('pos_shift_settlements')
@@ -816,7 +837,7 @@ async function buildPosShiftSummaries(
 
   const sessionIds = normalizedRows.map((row) => String(row.id || '').trim())
 
-  const [salesResult, settlementsResult] = await Promise.all([
+  const [salesResult, settlementsResult, paymentsResult] = await Promise.all([
     db
       .from('sales')
       .select('pos_session_id, grand_total, total_amount, discount_amount, tax_amount, pos_payment_method, pos_change_amount')
@@ -827,11 +848,30 @@ async function buildPosShiftSummaries(
       .select('session_id, settlement_method, source_account_id, target_account_id, gross_amount, fee_amount, net_amount, journal_entry_id, notes, settled_by, created_at')
       .eq('org_id', orgId)
       .in('session_id', sessionIds),
+    db
+      .from('sales_payments')
+      .select('pos_session_id, amount, payment_method')
+      .eq('org_id', orgId)
+      .in('pos_session_id', sessionIds),
   ])
 
   const saleRows = !salesResult.error && Array.isArray(salesResult.data)
     ? salesResult.data as PosShiftSaleRow[]
     : []
+
+  if (!paymentsResult.error && Array.isArray(paymentsResult.data)) {
+    for (const payment of paymentsResult.data) {
+      saleRows.push({
+        pos_session_id: payment.pos_session_id,
+        grand_total: payment.amount,
+        total_amount: payment.amount,
+        discount_amount: 0,
+        tax_amount: 0,
+        pos_payment_method: payment.payment_method || 'CASH',
+        pos_change_amount: 0
+      } as PosShiftSaleRow)
+    }
+  }
   const settlementRows = !settlementsResult.error && Array.isArray(settlementsResult.data)
     ? settlementsResult.data as PosShiftSettlementRow[]
     : []
