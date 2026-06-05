@@ -2631,7 +2631,7 @@ export async function getOrgMembers(orgId: string) {
       u.email AS user_email
     FROM public.org_members m
     LEFT JOIN public.roles r ON r.id = m.role_id
-    LEFT JOIN public.users u ON u.id = m.user_id
+    LEFT JOIN public.internal_auth_users u ON u.id = m.user_id
     WHERE m.org_id = $1 AND m.is_active = true
     ORDER BY m.joined_at ASC
   `, [orgId])
