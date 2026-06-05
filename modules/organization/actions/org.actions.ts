@@ -2985,15 +2985,15 @@ export async function createBranch(orgId: string, formData: FormData) {
     return { error: 'Hanya owner atau admin yang dapat menambahkan Cabang.' }
   }
 
-  // ── Restrict: hanya organisasi induk yang dapat membuat Cabang ────────
+  // ── Restrict: hanya anak perusahaan yang dapat membuat Cabang ─────────
   const { data: callingOrgMeta } = await db
     .from('organizations')
     .select('parent_org_id')
     .eq('id', trimmedOrgId)
     .maybeSingle()
 
-  if (callingOrgMeta?.parent_org_id) {
-    return { error: 'Anak perusahaan tidak dapat membuat Cabang sendiri. Hanya organisasi induk yang dapat mengelola Cabang.' }
+  if (!callingOrgMeta?.parent_org_id) {
+    return { error: 'Organisasi induk tidak dapat membuat Cabang. Cabang hanya dapat dibuat oleh anak perusahaan.' }
   }
 
   // ── Enforce branch limit dari SaaS plan ───────────────────────────────

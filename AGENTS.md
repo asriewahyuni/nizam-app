@@ -122,9 +122,9 @@ Panduan ini ditujukan untuk asisten AI agar memahami struktur kode, konvensi, da
    - Default branch pertama saat org dibuat bernama `'Cabang Utama'` (code: `MAIN`).
 
 7. **Aturan Hierarki Organisasi**:
-   - Hanya **organisasi induk** (org tanpa `parent_org_id`) yang boleh membuat Cabang.
-   - Anak perusahaan (org dengan `parent_org_id`) **tidak boleh** membuat Cabang sendiri.
-   - Anak perusahaan **tidak boleh** memiliki anak perusahaan sendiri (hierarki maksimal 2 level).
+   - Hanya **anak perusahaan** (org dengan `parent_org_id`) yang boleh membuat Cabang.
+   - Organisasi induk (org tanpa `parent_org_id`) **tidak boleh** membuat Cabang.
+   - Anak perusahaan **tidak boleh** memiliki anak perusahaan sendiri (hierarki maksimal 2 level: induk → anak → cabang).
    - Aturan ini di-enforce di `createBranch()` dan `linkSubOrganization()` di `modules/organization/actions/org.actions.ts`.
 
 8. **Komentar Kode**:
