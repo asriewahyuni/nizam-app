@@ -399,6 +399,23 @@ export async function createBooking(orgId: string, formData: FormData) {
 
   if (bookingErr) return { error: bookingErr.message }
 
+  // ANTI-SILO: Record Deposit Receipt
+  if (deposit > 0) {
+    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Kecil
+    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '2-20001') // Hutang Deposit (Asumsi)
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordRevenue({
+        orgId, branchId: branchAccess.branchId,
+        amount: deposit,
+        date: new Date().toISOString().split('T')[0],
+        description: `Penerimaan Deposit Sewa Armada (Booking ID: ${booking.id})`,
+        referenceType: 'FLEET_BOOKING', referenceId: booking.id,
+        debitAccountId: debitAccount, creditAccountId: creditAccount
+      })
+    }
+  }
+
   // 2. Ideally, we would also mark the asset as RENTED if status is ACTIVE
   // but for reservation, we keep it as AVAILABLE until check-out.
 
@@ -666,13 +683,30 @@ export async function createTicket(orgId: string, payload: {
   const branchAccess = await ensureFleetBranchAccess(orgId, schedule.branch_id, 'Jadwal tidak ditemukan.')
   if ('error' in branchAccess) return { error: branchAccess.error }
 
-  const { error } = await supabase.from('fleet_tickets').insert({
+  const { data: ticket, error } = await supabase.from('fleet_tickets').insert({
     org_id: orgId,
     branch_id: branchAccess.branchId,
     ...payload,
     status: 'PAID'
-  })
+  }).select().single()
   if (error) return { error: error.message }
+
+  // ANTI-SILO: Record Ticket Revenue
+  if (payload.price > 0 && ticket) {
+    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Kecil
+    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '4-40001') // Pendapatan Tiket (Asumsi)
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordRevenue({
+        orgId, branchId: branchAccess.branchId,
+        amount: payload.price,
+        date: new Date().toISOString().split('T')[0],
+        description: `Pendapatan Tiket Fleet - Kursi ${payload.seat_number}`,
+        referenceType: 'FLEET_TICKET', referenceId: ticket.id,
+        debitAccountId: debitAccount, creditAccountId: creditAccount
+      })
+    }
+  }
 
   revalidatePath('/fleet')
   return { success: true }
@@ -822,6 +856,24 @@ export async function createMedicalRecord(orgId: string, payload: {
   })
 
   if (!error && data) {
+    // ANTI-SILO: Record Expense
+    const numericCost = parseNumber(payload.cost)
+    if (numericCost > 0) {
+      const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+      const debitAccount = await ERPBridge.getDefaultAccount(orgId, '6-60002') // Beban Perawatan Armada (Asumsi)
+      const creditAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Kecil
+      if (debitAccount && creditAccount) {
+        await ERPBridge.recordExpense({
+          orgId, branchId: branchAccess.branchId,
+          amount: numericCost,
+          date: serviceDate,
+          description: `Beban Perawatan Armada - ${payload.description}`,
+          referenceType: 'FLEET_MAINTENANCE', referenceId: data,
+          debitAccountId: debitAccount, creditAccountId: creditAccount
+        })
+      }
+    }
+
     revalidatePath('/fleet')
     return { success: true }
   }
@@ -850,7 +902,7 @@ export async function createMedicalRecord(orgId: string, payload: {
 
   if (assetUpdateError) return { error: assetUpdateError.message }
 
-  const { error: insertError } = await supabase
+  const { data: insertedLab, error: insertError } = await supabase
     .from('fleet_maintenance_labs')
     .insert({
       org_id: orgId,
@@ -867,7 +919,7 @@ export async function createMedicalRecord(orgId: string, payload: {
       next_service_km: payload.next_service_km ?? null,
       next_service_date: nextServiceDate,
       attachment_url: payload.attachment_url || null
-    })
+    }).select().single()
 
   if (insertError) {
     await supabase
@@ -878,6 +930,24 @@ export async function createMedicalRecord(orgId: string, payload: {
       .eq('id', payload.asset_id)
 
     return { error: insertError.message }
+  }
+
+  // ANTI-SILO: Record Expense (Fallback)
+  const numericCostFallback = parseNumber(payload.cost)
+  if (numericCostFallback > 0 && insertedLab) {
+    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '6-60002') // Beban Perawatan Armada (Asumsi)
+    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Kecil
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordExpense({
+        orgId, branchId: branchAccess.branchId,
+        amount: numericCostFallback,
+        date: serviceDate,
+        description: `Beban Perawatan Armada - ${payload.description}`,
+        referenceType: 'FLEET_MAINTENANCE', referenceId: insertedLab.id,
+        debitAccountId: debitAccount, creditAccountId: creditAccount
+      })
+    }
   }
 
   revalidatePath('/fleet')
