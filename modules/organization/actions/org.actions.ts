@@ -2639,7 +2639,7 @@ export async function getOrgMembers(orgId: string) {
       m.last_active_at,
       m.last_active_branch_id,
       r.name AS custom_role_name,
-      u.email AS user_email
+      u.login_email AS user_email
     FROM public.org_members m
     LEFT JOIN public.roles r ON r.id = m.role_id
     LEFT JOIN public.internal_auth_users u ON u.id = m.user_id

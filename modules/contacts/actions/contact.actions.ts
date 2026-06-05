@@ -12,11 +12,11 @@ export async function getOrgSalesAssignees(orgId: string) {
 
   const { queryPostgres } = await import('@/lib/db/postgres')
   const result = await queryPostgres<any>(`
-    SELECT m.user_id, u.email as user_email
+    SELECT m.user_id, u.login_email as user_email
     FROM org_members m
     JOIN internal_auth_users u ON u.id = m.user_id
     WHERE m.org_id = $1 AND m.is_active = true
-    ORDER BY u.email ASC
+    ORDER BY u.login_email ASC
   `, [orgId])
   
   return result.rows

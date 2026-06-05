@@ -183,13 +183,13 @@ export async function getCrmTickets(
     contactIds.length  > 0 ? db.from('contacts').select('id, name').in('id', contactIds).then((r: any) => r.data || []) : [],
     saleIds.length     > 0 ? db.from('sales').select('id, invoice_number').in('id', saleIds).then((r: any) => r.data || []) : [],
     purchaseIds.length > 0 ? db.from('purchases').select('id, purchase_number').in('id', purchaseIds).then((r: any) => r.data || []) : [],
-    assigneeIds.length > 0 ? db.from('internal_auth_users').select('id, full_name, email').in('id', assigneeIds).then((r: any) => r.data || []) : [],
+    assigneeIds.length > 0 ? db.from('internal_auth_users').select('id, display_name, login_email').in('id', assigneeIds).then((r: any) => r.data || []) : [],
   ])
 
   const contactMap  = new Map(contacts.map((c: any) => [c.id, c.name]))
   const saleMap     = new Map(sales.map((s: any) => [s.id, s.invoice_number]))
   const purchaseMap = new Map(purchases.map((p: any) => [p.id, p.purchase_number]))
-  const assigneeMap = new Map(assignees.map((u: any) => [u.id, u.full_name || u.email]))
+  const assigneeMap = new Map(assignees.map((u: any) => [u.id, u.display_name || u.login_email]))
 
   return data.map((row: any) => ({
     ...row,
@@ -222,7 +222,7 @@ export async function getCrmTicket(
       ? db.from('contacts').select('name').eq('id', ticketRow.contact_id).maybeSingle().then((r: any) => r.data)
       : null,
     ticketRow.assigned_to_user_id
-      ? db.from('internal_auth_users').select('full_name, email').eq('id', ticketRow.assigned_to_user_id).maybeSingle().then((r: any) => r.data)
+      ? db.from('internal_auth_users').select('display_name, login_email').eq('id', ticketRow.assigned_to_user_id).maybeSingle().then((r: any) => r.data)
       : null,
     ticketRow.reference_id && ticketRow.reference_type
       ? (ticketRow.reference_type === 'SALE'
@@ -234,7 +234,7 @@ export async function getCrmTicket(
   const ticket: CrmTicket = {
     ...ticketRow,
     contact_name:     contactRow?.name ?? null,
-    assigned_to_name: assigneeRow ? (assigneeRow.full_name || assigneeRow.email) : null,
+    assigned_to_name: assigneeRow ? (assigneeRow.display_name || assigneeRow.login_email) : null,
     reference_number: referenceRow
       ? (ticketRow.reference_type === 'SALE' ? referenceRow.invoice_number : referenceRow.purchase_number)
       : null,
