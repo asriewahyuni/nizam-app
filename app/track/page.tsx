@@ -1,4 +1,4 @@
-import { getCargoTracking } from '@/modules/fleet/actions/cargo.actions'
+import { getCargoTracking } from '@/modules/po-bus/actions/cargo.actions'
 import { Truck, Package, PackageCheck, AlertCircle, Search, MapPin, MapPinOff } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 

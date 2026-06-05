@@ -289,6 +289,35 @@ Berikut aturan minimum yang SELALU diterapkan pada setiap pekerjaan UI:
 
 ---
 
+## Aturan Wajib Integrasi ERP Core (ANTI-SILO)
+
+Nizam App adalah sebuah **Enterprise Resource Planning (ERP)**. Sistem ini memiliki modul-modul inti yang saling terkait (Akuntansi, Kas & Bank, Inventori, Penjualan, HRIS).
+**HUKUM BESI UNTUK SEMUA AI ASSISTANT:**
+Setiap kali Anda diminta untuk membuat modul baru atau fitur operasional (misal: Kargo, Tiket, Kasir, Penyewaan, Produksi), Anda **DILARANG KERAS** membuat fitur "Silo" (fitur yang hanya mencatat datanya sendiri tanpa terhubung ke modul inti).
+
+Anda **WAJIB** mematuhi aturan integrasi berikut:
+
+1. **Integrasi Finansial (Wajib untuk setiap transaksi uang)**
+   - Jika fitur Anda menerima pembayaran atau mencatat pengeluaran, Anda **TIDAK BOLEH** hanya menyimpan status `PAID` di tabel fitur Anda.
+   - Anda **WAJIB** memanggil `lib/erp-bridge/finances.ts` (atau modul akuntansi/kas yang relevan) untuk mencatat:
+     - **Jurnal Akuntansi (`journal_entries`)**: Untuk mencatat pergerakan *Debit* dan *Kredit* di Laba/Rugi.
+     - **Transaksi Kas/Bank (`cash_transactions`)**: Untuk memotong atau menambah saldo akun kas.
+     - **Faktur Penjualan (`invoices`)**: Khusus untuk transaksi B2B atau bernilai besar yang memerlukan pelacakan piutang (AR).
+
+2. **Integrasi Inventori (Wajib untuk penggunaan/perpindahan barang fisik)**
+   - Jika fitur Anda menggunakan barang fisik (misal: mekanik mengambil *sparepart*, pengiriman kargo memindahkan barang dari gudang A ke B), Anda **WAJIB** mencatatnya di modul Inventori.
+   - Panggil aksi untuk mencatat **Pergerakan Stok (`inventory_movements`)** agar stok gudang selalu *real-time* dan akurat.
+
+3. **Integrasi HRIS / Karyawan (Wajib untuk penugasan & kehadiran)**
+   - Jika fitur Anda melibatkan staf/kru (misal: supir ditugaskan ke jadwal, atau *clock-in* di proyek), Anda **WAJIB** menautkannya ke tabel `employees`.
+   - Data presensi/lembur/tugas harus bisa diakses oleh modul HRIS untuk perhitungan *Payroll* bulanan.
+
+**Gunakan `lib/erp-bridge/`**: Jika Anda bingung bagaimana cara memanggil 10 tabel akuntansi yang berbeda, periksa apakah ada *helper functions* di dalam direktori `lib/erp-bridge/`. Jika ada, panggil fungsi tersebut. Jika tidak ada, Anda wajib membuatnya sebagai *wrapper* agar kode Anda lebih rapi.
+
+**JANGAN PERNAH** mengakhiri sesi coding jika transaksi uang di fitur Anda belum masuk ke Laporan Laba/Rugi (Buku Besar).
+
+---
+
 ## Catatan Penting untuk Asisten AI
 
 1. **Jangan gunakan Supabase SDK secara langsung** — `lib/supabase/` sudah menjadi compatibility layer di atas PostgreSQL. Import dari sana tetap valid.

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Inbox, ScanBarcode, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
-import { processCargoArrivalByBarcode } from '@/modules/fleet/actions/cargo.actions'
+import { processCargoArrivalByBarcode } from '@/modules/po-bus/actions/cargo.actions'
 
 export function CargoReceiveTab({
   orgId,
