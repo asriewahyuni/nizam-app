@@ -1006,15 +1006,20 @@ export async function createBusPoolTopUp(orgId: string, payload: {
 
   const { queryPostgres } = await import('@/lib/db/postgres')
 
-  const insertResult = await queryPostgres(
-    `INSERT INTO bus_pool_top_ups (org_id, pool_id, amount, payment_method, reference_no, notes)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [orgId, payload.pool_id, payload.amount,
-     payload.payment_method || 'TRANSFER',
-     payload.reference_no?.trim() || null,
-     payload.notes?.trim() || null]
-  )
-  if (insertResult.error) return { error: (insertResult.error as any).message }
+  let insertedRow: Record<string, unknown>
+  try {
+    const insertResult = await queryPostgres(
+      `INSERT INTO bus_pool_top_ups (org_id, pool_id, amount, payment_method, reference_no, notes)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [orgId, payload.pool_id, payload.amount,
+       payload.payment_method || 'TRANSFER',
+       payload.reference_no?.trim() || null,
+       payload.notes?.trim() || null]
+    )
+    insertedRow = insertResult.rows[0]
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Gagal menyimpan top-up.' }
+  }
 
   await queryPostgres(
     `UPDATE bus_pools SET deposit_balance = deposit_balance + $1, updated_at = NOW()
@@ -1023,7 +1028,7 @@ export async function createBusPoolTopUp(orgId: string, payload: {
   )
 
   revalidatePath('/po-bus')
-  return { data: insertResult.data?.[0] }
+  return { data: insertedRow }
 }
 
 // ─── POOL SETTLEMENTS ─────────────────────────────────────────────────────────
