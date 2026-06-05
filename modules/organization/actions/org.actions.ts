@@ -42,7 +42,7 @@ import { syncParentCoAToChildOrg } from '@/modules/accounting/actions/coa.action
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 
 const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
-const DEFAULT_BRANCH_NAME = 'Unit Utama'
+const DEFAULT_BRANCH_NAME = 'Cabang Utama'
 const DEFAULT_BRANCH_CODE = 'MAIN'
 const DEMO_ACCOUNT_EMAIL = 'demo@nizam.app'
 const DEMO_SESSION_COOKIE_MAX_AGE = 60 * 60 * 12
@@ -650,7 +650,7 @@ function mapCreateOrganizationError(
     return 'Database belum lengkap. Trigger organisasi belum sinkron. Jalankan migrasi Supabase terbaru lalu coba lagi.'
   }
 
-  if (/Unit Utama organisasi .* belum tersedia/i.test(message)) {
+  if (/(?:Unit|Cabang) Utama organisasi .* belum tersedia/i.test(message)) {
     return 'Setup CoA default gagal karena trigger governance akun di database belum sinkron. Jalankan SQL migrasi 1150 (rebind accounts governance + ensure MAIN branch), lalu coba lagi.'
   }
 
@@ -944,7 +944,7 @@ async function createOrganizationRecord(
         await admin.from('organizations').delete().eq('id', orgId)
       }
       return {
-        error: mapCreateOrganizationError('Gagal menyiapkan unit default organisasi.', branchError),
+        error: mapCreateOrganizationError('Gagal menyiapkan Cabang default organisasi.', branchError),
       }
     }
 
@@ -1153,6 +1153,17 @@ export async function linkSubOrganization(parentOrgId: string, childOrgId: strin
   const holdingContext = await getHoldingManagementContext(trimmedParentOrgId, { ownerOnly: true })
   if ('error' in holdingContext) return { error: holdingContext.error }
   const { db, userId, activeOrgId } = holdingContext
+
+  // ── Restrict: Cabang (child org) tidak boleh punya anak perusahaan ───────
+  const { data: parentOrgMeta } = await db
+    .from('organizations')
+    .select('parent_org_id')
+    .eq('id', trimmedParentOrgId)
+    .maybeSingle()
+
+  if (parentOrgMeta?.parent_org_id) {
+    return { error: 'Cabang tidak dapat memiliki anak perusahaan sendiri. Hanya organisasi induk yang dapat mengelola anak perusahaan.' }
+  }
 
   // ── Enforce child org limit ────────────────────────────────────────────
   const limits = await getOrgLimits(trimmedParentOrgId)
@@ -2959,8 +2970,8 @@ export async function createBranch(orgId: string, formData: FormData) {
   const address = addressRaw || null
 
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
-  if (!name) return { error: 'Nama unit wajib diisi.' }
-  if (!code) return { error: 'Kode unit wajib diisi.' }
+  if (!name) return { error: 'Nama Cabang wajib diisi.' }
+  if (!code) return { error: 'Kode Cabang wajib diisi.' }
 
   const { data: actorMembership } = await db
     .from('org_members')
@@ -2971,14 +2982,25 @@ export async function createBranch(orgId: string, formData: FormData) {
     .maybeSingle()
 
   if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
-    return { error: 'Hanya owner atau admin yang dapat menambahkan unit.' }
+    return { error: 'Hanya owner atau admin yang dapat menambahkan Cabang.' }
+  }
+
+  // ── Restrict: hanya organisasi induk yang dapat membuat Cabang ────────
+  const { data: callingOrgMeta } = await db
+    .from('organizations')
+    .select('parent_org_id')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
+
+  if (callingOrgMeta?.parent_org_id) {
+    return { error: 'Anak perusahaan tidak dapat membuat Cabang sendiri. Hanya organisasi induk yang dapat mengelola Cabang.' }
   }
 
   // ── Enforce branch limit dari SaaS plan ───────────────────────────────
   const limits = await getOrgLimits(trimmedOrgId)
   if (limits.maxBranches !== null && limits.currentBranches >= limits.maxBranches) {
     return {
-      error: `Batas unit tercapai (${limits.currentBranches}/${limits.maxBranches}). Upgrade paket SaaS Anda untuk menambah lebih banyak unit.`,
+      error: `Batas Cabang tercapai (${limits.currentBranches}/${limits.maxBranches}). Upgrade paket SaaS Anda untuk menambah lebih banyak Cabang.`,
     }
   }
 
@@ -2990,7 +3012,7 @@ export async function createBranch(orgId: string, formData: FormData) {
     .maybeSingle()
 
   if (duplicateNameBranch?.id) {
-    return { error: 'Nama unit sudah digunakan pada organisasi ini.' }
+    return { error: 'Nama Cabang sudah digunakan pada organisasi ini.' }
   }
 
   const { data: duplicateCodeBranch } = await db
@@ -3001,7 +3023,7 @@ export async function createBranch(orgId: string, formData: FormData) {
     .maybeSingle()
 
   if (duplicateCodeBranch?.id) {
-    return { error: 'Kode unit sudah digunakan pada organisasi ini.' }
+    return { error: 'Kode Cabang sudah digunakan pada organisasi ini.' }
   }
 
   const { data: insertedBranch, error: insertError } = await db
@@ -3017,7 +3039,7 @@ export async function createBranch(orgId: string, formData: FormData) {
     .single()
 
   if (insertError || !insertedBranch?.id) {
-    return { error: insertError?.message || 'Gagal menambahkan unit baru.' }
+    return { error: insertError?.message || 'Gagal menambahkan Cabang baru.' }
   }
 
   cookieStore.set(ACTIVE_BRANCH_COOKIE, insertedBranch.id, getActiveContextCookieOptions())
@@ -3051,9 +3073,9 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
   const address = addressRaw || null
 
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
-  if (!trimmedBranchId) return { error: 'Unit tidak valid.' }
-  if (!name) return { error: 'Nama unit wajib diisi.' }
-  if (!code) return { error: 'Kode unit wajib diisi.' }
+  if (!trimmedBranchId) return { error: 'Cabang tidak valid.' }
+  if (!name) return { error: 'Nama Cabang wajib diisi.' }
+  if (!code) return { error: 'Kode Cabang wajib diisi.' }
 
   // Check actor permissions
   const { data: actorMembership } = await db
@@ -3065,7 +3087,7 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
     .maybeSingle()
 
   if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
-    return { error: 'Hanya owner atau admin yang dapat mengubah unit.' }
+    return { error: 'Hanya owner atau admin yang dapat mengubah Cabang.' }
   }
 
   // Duplicate check (ignore self)
@@ -3076,7 +3098,7 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
     .eq('name', name)
     .neq('id', trimmedBranchId)
     .maybeSingle()
-  if (dupName?.id) return { error: 'Nama unit sudah digunakan.' }
+  if (dupName?.id) return { error: 'Nama Cabang sudah digunakan.' }
 
   const { data: dupCode } = await db
     .from('branches')
@@ -3085,7 +3107,7 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
     .eq('code', code)
     .neq('id', trimmedBranchId)
     .maybeSingle()
-  if (dupCode?.id) return { error: 'Kode unit sudah digunakan.' }
+  if (dupCode?.id) return { error: 'Kode Cabang sudah digunakan.' }
 
   const { error: updateError } = await db
     .from('branches')
@@ -3093,7 +3115,7 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
     .eq('id', trimmedBranchId)
     .eq('org_id', trimmedOrgId)
 
-  if (updateError) return { error: updateError.message || 'Gagal memperbarui unit.' }
+  if (updateError) return { error: updateError.message || 'Gagal memperbarui Cabang.' }
 
   revalidatePath('/settings/branches')
   revalidatePath('/', 'layout')
@@ -3109,7 +3131,7 @@ export async function deleteBranch(orgId: string, branchId: string) {
   const trimmedOrgId = String(orgId || '').trim()
   const trimmedBranchId = String(branchId || '').trim()
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
-  if (!trimmedBranchId) return { error: 'Unit tidak valid.' }
+  if (!trimmedBranchId) return { error: 'Cabang tidak valid.' }
 
   const { data: actorMembership } = await db
     .from('org_members')
@@ -3120,7 +3142,7 @@ export async function deleteBranch(orgId: string, branchId: string) {
     .maybeSingle()
 
   if (!actorMembership || String(actorMembership.role || '') !== 'owner') {
-    return { error: 'Hanya owner yang dapat menghapus unit.' }
+    return { error: 'Hanya owner yang dapat menghapus Cabang.' }
   }
 
   // Prevent deleting the only branch
@@ -3131,7 +3153,7 @@ export async function deleteBranch(orgId: string, branchId: string) {
     .eq('is_active', true)
 
   if ((branchCount ?? 0) <= 1) {
-    return { error: 'Tidak dapat menghapus satu-satunya unit aktif.' }
+    return { error: 'Tidak dapat menghapus satu-satunya Cabang aktif.' }
   }
 
   // ── Pre-flight: cek semua tabel yang punya FK NOT NULL ke branches ──
@@ -3182,9 +3204,9 @@ export async function deleteBranch(orgId: string, branchId: string) {
   if (deleteError) {
     // Tangkap FK violation yang mungkin masih lolos dari pre-flight check
     if (deleteError.code === '23503') {
-      return { error: 'Unit masih memiliki data terkait dan tidak dapat dihapus. Hapus semua data yang menggunakan unit ini terlebih dahulu.' }
+      return { error: 'Cabang masih memiliki data terkait dan tidak dapat dihapus. Hapus semua data yang menggunakan Cabang ini terlebih dahulu.' }
     }
-    return { error: deleteError.message || 'Gagal menghapus unit.' }
+    return { error: deleteError.message || 'Gagal menghapus Cabang.' }
   }
 
   revalidatePath('/settings/branches')
@@ -3204,7 +3226,7 @@ export async function assignBranchPIC(orgId: string, branchId: string, employeeI
   const normalizedEmployeeId = String(employeeId || '').trim() || null
 
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
-  if (!trimmedBranchId) return { error: 'Unit tidak valid.' }
+  if (!trimmedBranchId) return { error: 'Cabang tidak valid.' }
 
   const { data: actorMembership } = await db
     .from('org_members')
@@ -3215,7 +3237,7 @@ export async function assignBranchPIC(orgId: string, branchId: string, employeeI
     .maybeSingle()
 
   if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
-    return { error: 'Hanya owner atau admin yang dapat mengubah PIC unit.' }
+    return { error: 'Hanya owner atau admin yang dapat mengubah PIC Cabang.' }
   }
 
   if (normalizedEmployeeId) {
@@ -3234,7 +3256,7 @@ export async function assignBranchPIC(orgId: string, branchId: string, employeeI
     .eq('id', trimmedBranchId)
     .eq('org_id', trimmedOrgId)
 
-  if (updateError) return { error: updateError.message || 'Gagal menyimpan PIC unit.' }
+  if (updateError) return { error: updateError.message || 'Gagal menyimpan PIC Cabang.' }
 
   revalidatePath('/settings/branches')
   return { success: true }
@@ -3262,7 +3284,7 @@ export async function updateMemberUnitAccess(orgId: string, memberId: string, br
     .maybeSingle()
 
   if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
-    return { error: 'Hanya owner atau admin yang dapat mengatur akses unit.' }
+    return { error: 'Hanya owner atau admin yang dapat mengatur akses Cabang.' }
   }
 
   const { data: targetMembership } = await db
@@ -3278,7 +3300,7 @@ export async function updateMemberUnitAccess(orgId: string, memberId: string, br
   }
 
   if (['owner', 'admin'].includes(String(targetMembership.role || ''))) {
-    return { error: 'Owner dan admin selalu memiliki akses ke semua unit.' }
+    return { error: 'Owner dan admin selalu memiliki akses ke semua Cabang.' }
   }
 
   const normalizedBranchIds = Array.from(
@@ -3290,7 +3312,7 @@ export async function updateMemberUnitAccess(orgId: string, memberId: string, br
   )
 
   if (normalizedBranchIds.length === 0) {
-    return { error: 'Minimal satu unit harus dipilih untuk anggota non-owner/admin.' }
+    return { error: 'Minimal satu Cabang harus dipilih untuk anggota non-owner/admin.' }
   }
 
   let validBranches: Array<{ id: string; name: string; code: string }> = []
@@ -3303,12 +3325,12 @@ export async function updateMemberUnitAccess(orgId: string, memberId: string, br
       .in('id', normalizedBranchIds)
 
     if (branchError) {
-      return { error: 'Gagal memverifikasi unit yang dipilih.' }
+      return { error: 'Gagal memverifikasi Cabang yang dipilih.' }
     }
 
     validBranches = Array.isArray(branchRows) ? branchRows : []
     if (validBranches.length !== normalizedBranchIds.length) {
-      return { error: 'Satu atau lebih unit yang dipilih tidak valid.' }
+      return { error: 'Satu atau lebih Cabang yang dipilih tidak valid.' }
     }
   }
 
@@ -3319,7 +3341,7 @@ export async function updateMemberUnitAccess(orgId: string, memberId: string, br
     .eq('org_member_id', trimmedMemberId)
 
   if (deleteError) {
-    return { error: 'Gagal menghapus akses unit sebelumnya.' }
+    return { error: 'Gagal menghapus akses Cabang sebelumnya.' }
   }
 
   if (normalizedBranchIds.length > 0) {
@@ -3335,7 +3357,7 @@ export async function updateMemberUnitAccess(orgId: string, memberId: string, br
       )
 
     if (insertError) {
-      return { error: 'Gagal menyimpan akses unit anggota.' }
+      return { error: 'Gagal menyimpan akses Cabang anggota.' }
     }
   }
 

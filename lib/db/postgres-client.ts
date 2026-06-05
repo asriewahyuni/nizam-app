@@ -731,15 +731,23 @@ class PostgresQueryBuilder {
     return rows
   }
 
-  // pg serializes plain JS arrays as PostgreSQL array literals ({item1,item2}), not JSON
-  // arrays ([item1,item2]). For JSONB columns this causes "invalid input syntax for type json".
-  // Explicitly JSON.stringify any array or plain object so the JSONB column always receives
-  // a valid JSON string regardless of the target column type.
+  // Serialize a payload value for a PostgreSQL parameterized query.
+  // - Primitive arrays (string[], uuid[], etc.) → kept as JS array so pg binds them as
+  //   PostgreSQL array literals ({item1,item2}) for text[]/uuid[] columns.
+  // - Structured arrays (array of objects/arrays) → JSON.stringify for jsonb columns.
+  // - Plain objects → JSON.stringify for jsonb columns.
   private _serializeDbParam(value: unknown): unknown {
     if (value == null) return null
     if (value instanceof Date) return value.toISOString()
     if (Buffer.isBuffer(value)) return value
-    if (Array.isArray(value) || (typeof value === 'object')) return JSON.stringify(value)
+    if (Array.isArray(value)) {
+      const normalized = value.map((item) => item instanceof Date ? item.toISOString() : item)
+      const hasStructured = normalized.some(
+        (item) => Array.isArray(item) || (item !== null && typeof item === 'object')
+      )
+      return hasStructured ? JSON.stringify(normalized) : normalized
+    }
+    if (typeof value === 'object') return JSON.stringify(value)
     return value
   }
 

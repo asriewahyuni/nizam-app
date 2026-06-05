@@ -106,13 +106,28 @@ Panduan ini ditujukan untuk asisten AI agar memahami struktur kode, konvensi, da
    - Jangan pernah import `@supabase/supabase-js` langsung untuk query data.
    - Gunakan `createClient()` dari `lib/supabase/server.ts` (server) atau `lib/supabase/client.ts` (browser), yang sudah diredirect ke PostgreSQL.
    - Atau gunakan `queryPostgres()` dari `lib/db/postgres.ts` untuk query raw.
+   - **Array serialization di `postgres-client.ts`**: `_serializeDbParam()` membedakan dua jenis array:
+     - *Primitive array* (`string[]`, `uuid[]`, dll.) → dikirim sebagai JS array native agar pg bind ke kolom `text[]` / `uuid[]`.
+     - *Structured array* (item berupa object/array) → di-`JSON.stringify` untuk kolom `jsonb`.
+     Jangan mengubah logika ini; mengubahnya ke `JSON.stringify` semua array akan menyebabkan error `malformed array literal` pada kolom `text[]`.
 
 5. **Auth**:
    - Tidak ada Supabase Auth. Autentikasi menggunakan internal auth session berbasis cookie.
    - Gunakan `getInternalAuthSession()` dari `lib/auth/internal-auth.server.ts` di server.
    - `AUTH_PROVIDER=internal` adalah satu-satunya mode yang aktif.
 
-6. **Komentar Kode**:
+6. **Terminologi Branch**:
+   - Istilah yang dipakai pengguna untuk `branches` adalah **"Cabang"** (bukan "unit").
+   - Semua error message, label UI, dan teks yang mengacu ke entitas `branches` harus menggunakan "Cabang".
+   - Default branch pertama saat org dibuat bernama `'Cabang Utama'` (code: `MAIN`).
+
+7. **Aturan Hierarki Organisasi**:
+   - Hanya **organisasi induk** (org tanpa `parent_org_id`) yang boleh membuat Cabang.
+   - Anak perusahaan (org dengan `parent_org_id`) **tidak boleh** membuat Cabang sendiri.
+   - Anak perusahaan **tidak boleh** memiliki anak perusahaan sendiri (hierarki maksimal 2 level).
+   - Aturan ini di-enforce di `createBranch()` dan `linkSubOrganization()` di `modules/organization/actions/org.actions.ts`.
+
+8. **Komentar Kode**:
    - Setiap modul wajib memiliki komentar singkat dengan deskripsi fungsinya.
 
 ---
