@@ -932,7 +932,7 @@ export async function createBusPool(orgId: string, payload: {
   address?: string; city?: string; province?: string
   commission_pct?: number; credit_limit?: number
   bank_name?: string; bank_account?: string; bank_account_name?: string
-  notes?: string
+  notes?: string; terminal_id?: string | null
 }) {
   const supabase = await createClient()
   const resolvedBranchId = await resolveBranchId(orgId)
@@ -963,6 +963,7 @@ export async function createBusPool(orgId: string, payload: {
       bank_account_name: payload.bank_account_name?.trim() || null,
       is_active: true,
       notes: payload.notes?.trim() || null,
+      terminal_id: payload.terminal_id || null,
     }])
     .select().single()
 
@@ -977,7 +978,7 @@ export async function updateBusPool(orgId: string, poolId: string, payload: Part
   address: string; city: string; province: string
   commission_pct: number; credit_limit: number
   bank_name: string; bank_account: string; bank_account_name: string
-  is_active: boolean; notes: string
+  is_active: boolean; notes: string; terminal_id: string | null
 }>) {
   const supabase = await createClient()
 
@@ -991,6 +992,7 @@ export async function updateBusPool(orgId: string, poolId: string, payload: Part
   if ('commission_pct' in payload) updates.commission_pct = payload.commission_pct
   if ('credit_limit' in payload) updates.credit_limit = payload.credit_limit
   if ('is_active' in payload) updates.is_active = payload.is_active
+  if ('terminal_id' in payload) updates.terminal_id = payload.terminal_id || null
 
   const { data, error } = await (supabase as any)
     .from('bus_pools')

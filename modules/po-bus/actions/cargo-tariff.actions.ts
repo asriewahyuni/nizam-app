@@ -13,8 +13,8 @@ export async function getCargoTariffs(orgId: string) {
     .from('fleet_cargo_tariffs')
     .select(`
       *,
-      origin:fleet_terminals!origin_terminal_id(id, name, location_name),
-      destination:fleet_terminals!destination_terminal_id(id, name, location_name)
+      origin_pool:bus_pools!origin_pool_id(id, name, city),
+      destination_pool:bus_pools!destination_pool_id(id, name, city)
     `)
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
@@ -30,7 +30,7 @@ export async function upsertCargoTariff(orgId: string, payload: any) {
     ...payload,
     org_id: orgId,
     updated_at: new Date().toISOString()
-  }, { onConflict: 'org_id, origin_terminal_id, destination_terminal_id' })
+  }, { onConflict: 'org_id, origin_pool_id, destination_pool_id' })
   
   if (error) return { error: error.message }
   

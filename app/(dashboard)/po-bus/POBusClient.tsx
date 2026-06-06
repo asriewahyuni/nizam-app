@@ -5,7 +5,7 @@ import {
   Bus, Users, Wrench, AlertTriangle, MapPin, Ticket, Building2,
   Navigation, Plus, Phone, Mail, Edit2, CheckCircle2, Clock,
   XCircle, TruckIcon, Settings, ChevronRight, Flame,
-  Banknote, Wallet, Store, ArrowUpCircle, Receipt, BadgeCheck, Package
+  Banknote, Wallet, Store, ArrowUpCircle, Receipt, BadgeCheck, Package, ExternalLink
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -217,7 +217,7 @@ export function POBusClient({
       bank_name: fd.get('bank_name') as string,
       bank_account: fd.get('bank_account') as string,
       bank_account_name: fd.get('bank_account_name') as string,
-      notes: fd.get('notes') as string,
+      notes: fd.get('notes') as string
     }
     startTransition(async () => {
       let res: any
@@ -540,7 +540,18 @@ export function POBusClient({
         </div>
       )}
 
-      <PageHeader tag="PO Bus" title="Manajemen Perusahaan Otobus" subtitle="Armada, kru, servis, emergency, ticketing, dan pool" icon={<Bus className="w-6 h-6" />} iconColor="text-blue-600" />
+      <PageHeader 
+        tag="PO Bus" 
+        title="Manajemen Perusahaan Otobus" 
+        subtitle="Armada, kru, servis, emergency, ticketing, dan pool" 
+        icon={<Bus className="w-6 h-6" />} 
+        iconColor="text-blue-600" 
+        actions={
+          <a href="/pos-cargo" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-sm text-sm">
+            Buka POS Kargo <ExternalLink className="w-4 h-4" />
+          </a>
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Total Armada" value={localUnits.length} icon={Bus} color="blue" sub={`${localUnits.filter(u => u.status === 'TERSEDIA').length} tersedia`} />
@@ -730,10 +741,11 @@ export function POBusClient({
       {activeTab === 'KARGO' && (
         <CargoClient 
           orgId={orgId}
-          initialShipments={cargoShipments}
-          terminals={terminals}
+          cargoShipments={cargoShipments}
+          pools={localPools}
           schedules={schedules}
-          tariffs={cargoTariffs}
+          cargoTariffs={cargoTariffs}
+          defaultOriginPoolId={localPools.length === 1 ? localPools[0].id : null}
           role="admin" // Simplifikasi untuk sementara
           permissions={[]} // Asumsikan admin punya full akses, validasi detail di dalam CargoClient
         />
@@ -1260,7 +1272,9 @@ export function POBusClient({
               </Select>
             </FormField>
           </div>
-          <FormField label="Nama Pool / Agen *"><Input name="name" defaultValue={editingPool?.name || ''} placeholder="Agen Tiket Bintang Jaya Jakarta" required /></FormField>
+          <div className="grid grid-cols-1 gap-4">
+            <FormField label="Nama Pool / Agen *"><Input name="name" defaultValue={editingPool?.name || ''} placeholder="Agen Tiket Bintang Jaya Jakarta" required /></FormField>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Nama Pemilik"><Input name="owner_name" defaultValue={editingPool?.owner_name || ''} placeholder="Budi Santoso" /></FormField>
             <FormField label="Nama PIC (Koordinator)"><Input name="pic_name" defaultValue={editingPool?.pic_name || ''} placeholder="Siti Rahayu" /></FormField>

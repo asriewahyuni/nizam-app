@@ -26,10 +26,9 @@ export default async function CargoPage() {
     <div className="p-4 md:p-8 min-h-screen bg-slate-50/30">
       <CargoClient
         orgId={orgId}
-        initialShipments={shipments}
-        terminals={terminals}
+        cargoShipments={shipments}
         schedules={schedules}
-        tariffs={tariffs}
+        cargoTariffs={tariffs}
         pools={pools}
         role={orgData.role || ''}
         permissions={orgData.permissions || []}

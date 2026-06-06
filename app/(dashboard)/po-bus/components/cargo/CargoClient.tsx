@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Package, Truck, Inbox, CheckCircle, Search, ScanBarcode, CreditCard } from 'lucide-react'
+import { Plus, Truck, Inbox, CheckCircle, CreditCard } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
-import type { FleetCargoShipment, FleetTerminal, FleetSchedule } from '@/types/database.types'
 import { CargoPosTab } from './CargoPosTab'
 import { CargoManifestTab } from './CargoManifestTab'
 import { CargoReceiveTab } from './CargoReceiveTab'
@@ -13,23 +13,24 @@ import { CargoTariffTab } from './CargoTariffTab'
 
 export function CargoClient({
   orgId,
-  initialShipments,
-  terminals,
-  schedules,
-  tariffs = [],
+  cargoShipments,
   pools = [],
+  schedules,
+  cargoTariffs = [],
+  defaultOriginPoolId,
   role = '',
   permissions = []
 }: {
   orgId: string
-  initialShipments: any[]
-  terminals: FleetTerminal[]
-  schedules: any[]
-  tariffs?: any[]
+  cargoShipments: any[]
   pools?: Array<{ id: string; code: string; name: string; pool_type: string; city?: string | null }>
+  schedules: any[]
+  cargoTariffs?: any[]
+  defaultOriginPoolId?: string | null
   role?: string
   permissions?: string[]
 }) {
+  const router = useRouter()
   const isSuper = role === 'owner' || role === 'admin' || permissions.includes('fleet:write')
   const canAccessPos = isSuper || permissions.includes('pos:write') || permissions.includes('pos:read')
 
@@ -46,6 +47,10 @@ export function CargoClient({
 
   const defaultTab = availableTabs.length > 0 ? availableTabs[0].id : ''
   const [activeTab, setActiveTab] = useState<string>(defaultTab)
+
+  const handleRefresh = () => {
+    router.refresh()
+  }
 
   useEffect(() => {
     if (!activeTab && defaultTab) {
@@ -99,13 +104,11 @@ export function CargoClient({
           {activeTab === 'pos' && canAccessPos && (
             <CargoPosTab
               orgId={orgId}
-              terminals={terminals}
-              shipments={initialShipments}
-              tariffs={tariffs}
               pools={pools}
-              onRefresh={() => {
-                window.location.reload()
-              }}
+              shipments={cargoShipments}
+              tariffs={cargoTariffs}
+              onRefresh={handleRefresh}
+              defaultOriginPoolId={defaultOriginPoolId}
             />
           )}
           
@@ -113,7 +116,7 @@ export function CargoClient({
              <CargoManifestTab
                 orgId={orgId}
                 schedules={schedules}
-                shipments={initialShipments}
+                shipments={cargoShipments}
                 onRefresh={() => window.location.reload()}
              />
           )}
@@ -121,7 +124,7 @@ export function CargoClient({
           {activeTab === 'receive' && isSuper && (
              <CargoReceiveTab
                 orgId={orgId}
-                shipments={initialShipments}
+                shipments={cargoShipments}
                 onRefresh={() => window.location.reload()}
              />
           )}
@@ -129,7 +132,7 @@ export function CargoClient({
           {activeTab === 'delivery' && isSuper && (
              <CargoDeliveryTab
                 orgId={orgId}
-                shipments={initialShipments}
+                shipments={cargoShipments}
                 onRefresh={() => window.location.reload()}
              />
           )}
@@ -137,9 +140,9 @@ export function CargoClient({
           {activeTab === 'tariff' && isSuper && (
              <CargoTariffTab
                 orgId={orgId}
-                terminals={terminals}
-                tariffs={tariffs}
-                onRefresh={() => window.location.reload()}
+                pools={pools}
+                tariffs={cargoTariffs}
+                onRefresh={handleRefresh}
              />
           )}
         </motion.div>

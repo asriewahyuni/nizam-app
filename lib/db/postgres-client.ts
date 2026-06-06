@@ -582,7 +582,7 @@ class PostgresQueryBuilder {
 
       const alias = aliasRaw.split('!')[0]
       const relTable = relTableRaw.split('!')[0]
-      // fkHint is ignored in this simple adapter, but we successfully extract the real table name.
+      const fkHint = relTableRaw.includes('!') ? relTableRaw.split('!')[1] : null
 
       // Isolate nested sub-relations to resolve them recursively later.
       const topLevelParts = relCols.trim() === '*' ? [] : splitTopLevel(relCols)
@@ -609,11 +609,14 @@ class PostgresQueryBuilder {
           if (rows.length === 0) return null
           const sampleRow = rows[0]
 
-          // 1a. Try alias_id first (e.g., alias='account' → check 'account_id')
+          // 1. If explicit fkHint is provided via PostgREST syntax (e.g. table!fkHint)
+          if (fkHint && fkHint in sampleRow) return fkHint
+
+          // 2. Try alias_id first (e.g., alias='account' → check 'account_id')
           const aliasIdCol = alias + '_id'
           if (aliasIdCol in sampleRow) return aliasIdCol
 
-          // 1b. Check all _id columns against FK cache
+          // 3. Check all _id columns against FK cache
           for (const col of Object.keys(sampleRow)) {
             if (!col.endsWith('_id')) continue
             const cachedRef = _fkCache.get(this._table + '.' + col)
