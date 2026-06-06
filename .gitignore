@@ -68,3 +68,4 @@ fix_*.js
 scratch/db-backups/
 .next
 .backups/
+__pycache__/
