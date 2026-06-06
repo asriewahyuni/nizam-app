@@ -228,10 +228,12 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
 type AnggotaForm = {
   nama: string; nik: string; email: string; phone: string
   alamat: string; pekerjaan: string; joined_at: string; notes: string
+  is_verified: boolean; status: string
 }
 
 const emptyAnggotaForm: AnggotaForm = {
-  nama: '', nik: '', email: '', phone: '', alamat: '', pekerjaan: '', joined_at: '', notes: ''
+  nama: '', nik: '', email: '', phone: '', alamat: '', pekerjaan: '', joined_at: '', notes: '',
+  is_verified: false, status: 'CALON',
 }
 
 function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggota[] }) {
@@ -250,7 +252,8 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
     setSelected(a)
     setForm({ nama: a.nama, nik: a.nik ?? '', email: a.email ?? '', phone: a.phone ?? '',
               alamat: a.alamat ?? '', pekerjaan: a.pekerjaan ?? '',
-              joined_at: a.joined_at ?? '', notes: a.notes ?? '' })
+              joined_at: a.joined_at ?? '', notes: a.notes ?? '',
+              is_verified: a.is_verified, status: a.status })
     setModalOpen(true)
   }
 
@@ -263,7 +266,10 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
   function handleSave() {
     startTransition(async () => {
       if (selected) {
-        await updateAnggota(selected.id, { ...selected, ...form })
+        await updateAnggota(selected.id, {
+          ...selected, ...form,
+          status: form.status as KojasmatAnggota['status'],
+        })
       } else {
         await createAnggota({ org_id: orgId, ...form })
       }
@@ -375,6 +381,40 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
               onChange={e => setForm(f => ({ ...f, alamat: e.target.value }))}
             />
           </div>
+          {selected && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Status Keanggotaan</label>
+                <select
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  value={form.status}
+                  onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                  <option value="CALON">Calon</option>
+                  <option value="AKTIF">Aktif</option>
+                  <option value="TIDAK_AKTIF">Tidak Aktif</option>
+                  <option value="DIBEKUKAN">Dibekukan</option>
+                </select>
+              </div>
+              <div className="flex flex-col justify-end">
+                <label className="flex items-center gap-2.5 cursor-pointer rounded-xl border border-gray-200 px-3 py-2.5">
+                  <div className={cn(
+                    'relative h-5 w-9 rounded-full transition-colors',
+                    form.is_verified ? 'bg-emerald-500' : 'bg-gray-200'
+                  )}>
+                    <div className={cn(
+                      'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform',
+                      form.is_verified ? 'translate-x-4' : 'translate-x-0.5'
+                    )} />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">Terverifikasi</span>
+                  <input type="checkbox" className="hidden"
+                    checked={form.is_verified}
+                    onChange={e => setForm(f => ({ ...f, is_verified: e.target.checked }))} />
+                </label>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <button onClick={() => setModalOpen(false)}
               className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
