@@ -3,8 +3,13 @@
 // Kojasmat — alur keanggotaan lengkap: pendaftaran, dokumen, laporan proyek, tindakan/sanksi
 
 import { queryPostgres } from '@/lib/db/postgres'
-import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
+import { getInternalAuthSession, createInternalAuthUser } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
+
+function generateTempPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -185,6 +190,31 @@ export async function setujuiPendaftaran(pendaftaranId: string) {
       [pendaftaranId, anggota.id]
     )
 
+    // Buat akun login untuk anggota baru
+    let tempPassword: string | null = null
+    let loginIdentifier: string | null = null
+    if (pend.email || pend.nik) {
+      tempPassword = generateTempPassword()
+      const userResult = await createInternalAuthUser({
+        email: pend.email ?? null,
+        nik: pend.nik ?? null,
+        password: tempPassword,
+        fullName: pend.nama_lengkap,
+        userType: 'member',
+      })
+      if ('error' in userResult) {
+        // Akun mungkin sudah ada — lanjutkan tanpa error fatal
+        tempPassword = null
+      } else if ('data' in userResult && userResult.data) {
+        const authUserId = (userResult.data as { id: string }).id
+        await queryPostgres(
+          `UPDATE kojasmat_anggota SET user_id=$2 WHERE id=$1`,
+          [anggota.id, authUserId]
+        )
+        loginIdentifier = pend.email ?? pend.nik ?? null
+      }
+    }
+
     // Update pendaftaran
     await queryPostgres(
       `UPDATE kojasmat_pendaftaran
@@ -194,7 +224,14 @@ export async function setujuiPendaftaran(pendaftaranId: string) {
     )
 
     revalidatePath('/kojasmat')
-    return { data: { anggota_id: anggota.id, kode_anggota: kode } }
+    return {
+      data: {
+        anggota_id: anggota.id,
+        kode_anggota: kode,
+        temp_password: tempPassword,
+        login_identifier: loginIdentifier,
+      }
+    }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Gagal menyetujui pendaftaran' }
   }

@@ -1151,6 +1151,13 @@ const STATUS_PEND: Record<string, { label: string; color: string }> = {
   DIREVISI:  { label: 'Revisi',    color: 'bg-blue-100 text-blue-700' },
 }
 
+type KredensialAnggota = {
+  kode_anggota: string
+  nama: string
+  login_identifier: string | null
+  temp_password: string | null
+}
+
 function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: KojasmatPendaftaran[] }) {
   const [pending, startTransition] = useTransition()
   const [selected, setSelected] = useState<KojasmatPendaftaran | null>(null)
@@ -1159,6 +1166,8 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
   const [catatanForm, setCatatanForm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('MENUNGGU')
   const [actionResult, setActionResult] = useState<string | null>(null)
+  const [kredensial, setKredensial] = useState<KredensialAnggota | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const filtered = pendaftaran.filter(p =>
     filterStatus === 'SEMUA' || p.status === filterStatus
@@ -1185,8 +1194,26 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
     window.open(url, '_blank')
   }
 
+  function buildWaText(k: KredensialAnggota) {
+    const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    return [
+      `Halo ${k.nama},`,
+      ``,
+      `Pendaftaran keanggotaan koperasi Anda telah *DISETUJUI* ✅`,
+      ``,
+      `*Kode Anggota:* ${k.kode_anggota}`,
+      `*Login di:* ${appUrl}/login`,
+      k.login_identifier ? `*Email/NIK:* ${k.login_identifier}` : null,
+      k.temp_password ? `*Password:* ${k.temp_password}` : null,
+      ``,
+      `Silakan login dan ganti password setelah masuk pertama kali.`,
+      `Selamat bergabung! 🤝`,
+    ].filter(Boolean).join('\n')
+  }
+
   function handleAction(action: 'setujui' | 'tolak' | 'revisi') {
     if (!selected) return
+    const nama = selected.nama_lengkap
     startTransition(async () => {
       let res
       if (action === 'setujui') res = await setujuiPendaftaran(selected.id)
@@ -1194,13 +1221,28 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
       else res = await mintaRevisiPendaftaran(selected.id, catatanForm)
 
       if (res.error) { setActionResult(`Gagal: ${res.error}`); return }
+
       if (action === 'setujui' && 'data' in res && res.data) {
-        setActionResult(`Disetujui! Anggota baru: ${(res.data as { kode_anggota: string }).kode_anggota}`)
+        const d = res.data as { kode_anggota: string; temp_password: string | null; login_identifier: string | null }
+        setSelected(null)
+        setKredensial({
+          kode_anggota: d.kode_anggota,
+          nama,
+          login_identifier: d.login_identifier,
+          temp_password: d.temp_password,
+        })
       } else {
         setActionResult('Berhasil diproses.')
+        setSelected(null)
       }
-      setSelected(null)
     })
+  }
+
+  async function handleCopyWa() {
+    if (!kredensial) return
+    await navigator.clipboard.writeText(buildWaText(kredensial))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
   }
 
   return (
@@ -1369,6 +1411,70 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
                 Permohonan sudah disetujui. Anggota sudah terdaftar.
               </div>
             )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal Kredensial WA */}
+      <Modal open={!!kredensial} onClose={() => setKredensial(null)} title="Anggota Disetujui — Info Login">
+        {kredensial && (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-center">
+              <p className="text-xs text-emerald-600 mb-1">Kode Anggota</p>
+              <p className="text-2xl font-bold font-mono text-emerald-700">{kredensial.kode_anggota}</p>
+              <p className="text-sm text-emerald-600 mt-0.5">{kredensial.nama}</p>
+            </div>
+
+            {kredensial.temp_password ? (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Kredensial Login</p>
+                <div className="rounded-xl border border-gray-100 bg-gray-50 divide-y divide-gray-100">
+                  {kredensial.login_identifier && (
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <span className="text-xs text-gray-400">Email / NIK</span>
+                      <span className="font-mono text-sm font-medium text-gray-800">{kredensial.login_identifier}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="text-xs text-gray-400">Password Sementara</span>
+                    <span className="font-mono text-sm font-bold text-gray-900 tracking-widest">{kredensial.temp_password}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400">Anggota bisa login di halaman <strong>/login</strong> lalu akses dashboard mereka.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3 text-sm text-amber-700">
+                Anggota tidak memiliki email/NIK — akun login tidak dibuat. Tambahkan email/NIK di tab Anggota untuk membuat akun.
+              </div>
+            )}
+
+            {/* Preview pesan WA */}
+            {kredensial.temp_password && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Pesan WhatsApp Siap Kirim</p>
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-wrap font-mono text-xs leading-relaxed">
+                  {buildWaText(kredensial)}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={() => setKredensial(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Tutup
+              </button>
+              {kredensial.temp_password && (
+                <button onClick={handleCopyWa}
+                  className={cn(
+                    'flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors cursor-pointer',
+                    copied
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  )}>
+                  {copied ? '✓ Tersalin!' : 'Salin Pesan WA'}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </Modal>
