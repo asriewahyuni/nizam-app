@@ -277,14 +277,14 @@ function TabProyek({ anggota, orgId, proyekDiajukan, pembiayaan }: {
           <h3 className="font-semibold text-gray-800 mb-3">Proyek yang Saya Biayai</h3>
           <div className="space-y-3">
             {pembiayaan.map((pm: KojasmatPembiayaan & {
-              nama_proyek?: string; jenis_akad?: string; proyek_status?: string; nisbah_pemodal?: number
+              nama_proyek?: string; jenis_akad?: string; proyek_status?: string; ujrah_pct?: number
             }) => (
               <div key={pm.id} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-gray-900 text-sm">{pm.nama_proyek ?? '—'}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Porsi: {Number(pm.porsi_pct).toFixed(1)}% · Nisbah pemodal: {pm.nisbah_pemodal ?? 70}%
+                      Porsi: {Number(pm.porsi_pct).toFixed(1)}% · 100% keuntungan untuk pemodal
                     </p>
                   </div>
                   <div className="text-right">
@@ -426,7 +426,7 @@ function TabPenawaran({ anggota, penawaran, orgId }: {
                 </p>
                 <div className="mt-2 flex gap-3 text-xs text-gray-600">
                   <span>Modal: <strong>{fmt(Number(p.kebutuhan_modal ?? 0))}</strong></span>
-                  <span>Nisbah pemodal: <strong>{p.nisbah_pemodal ?? 70}%</strong></span>
+                  <span>Ujrah koperasi: <strong>{p.ujrah_pct ?? 5}%</strong> dari modal</span>
                 </div>
                 <p className="text-xs text-emerald-600 mt-1">Sisa kebutuhan: {fmt(sisa)}</p>
               </div>
@@ -466,7 +466,7 @@ function TabPenawaran({ anggota, penawaran, orgId }: {
                 Sisa kebutuhan: {fmt(Number(modalBiayai.kebutuhan_modal ?? 0) - Number(modalBiayai.modal_terkumpul ?? 0))}
               </p>
               <p className="text-xs text-emerald-600 mt-0.5">
-                Nisbah bagi hasil untuk pemodal: {modalBiayai.nisbah_pemodal ?? 70}%
+                100% keuntungan untuk pemodal · Ujrah koperasi: {modalBiayai.ujrah_pct ?? 5}% dari modal
               </p>
             </div>
             <div>

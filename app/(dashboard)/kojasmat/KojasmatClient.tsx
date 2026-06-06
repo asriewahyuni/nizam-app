@@ -386,14 +386,14 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
 type ProyekForm = {
   pengaju_id: string; nama_proyek: string; deskripsi: string
   jenis_akad: string; kebutuhan_modal: string
-  nisbah_koperasi: string; nisbah_pemodal: string
+  ujrah_pct: string
   durasi_bulan: string; agunan: string; notes: string
 }
 
 const emptyProyekForm: ProyekForm = {
   pengaju_id: '', nama_proyek: '', deskripsi: '',
   jenis_akad: 'MUDHARABAH', kebutuhan_modal: '',
-  nisbah_koperasi: '30', nisbah_pemodal: '70',
+  ujrah_pct: '5',
   durasi_bulan: '6', agunan: '', notes: ''
 }
 
@@ -421,8 +421,7 @@ function TabProyek({ orgId, proyek, anggota }: {
         deskripsi: form.deskripsi || undefined,
         jenis_akad: form.jenis_akad as 'MURABAHAH' | 'MUDHARABAH' | 'INAN',
         kebutuhan_modal: Number(form.kebutuhan_modal),
-        nisbah_koperasi: Number(form.nisbah_koperasi),
-        nisbah_pemodal: Number(form.nisbah_pemodal),
+        ujrah_pct: Number(form.ujrah_pct),
         durasi_bulan: Number(form.durasi_bulan),
         agunan: form.agunan || undefined,
         notes: form.notes || undefined,
@@ -607,21 +606,18 @@ function TabProyek({ orgId, proyek, anggota }: {
                 value={form.durasi_bulan} onChange={e => setForm(f => ({ ...f, durasi_bulan: e.target.value }))} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Nisbah Koperasi (%)</label>
-              <input type="number"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                value={form.nisbah_koperasi}
-                onChange={e => setForm(f => ({ ...f, nisbah_koperasi: e.target.value }))} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Nisbah Pemodal (%)</label>
-              <input type="number"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                value={form.nisbah_pemodal}
-                onChange={e => setForm(f => ({ ...f, nisbah_pemodal: e.target.value }))} />
-            </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Ujrah Wakalah (% dari modal)
+              <span className="ml-1 font-normal text-gray-400 text-xs">— fee agen koperasi, bukan nisbah bagi hasil</span>
+            </label>
+            <input type="number" min="0" max="100" step="0.5"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              value={form.ujrah_pct}
+              onChange={e => setForm(f => ({ ...f, ujrah_pct: e.target.value }))} />
+            <p className="mt-1 text-xs text-gray-400">
+              Seluruh keuntungan proyek menjadi hak pemodal. Koperasi hanya menerima ujrah ini sebagai biaya layanan wakalah.
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Agunan / Jaminan</label>
