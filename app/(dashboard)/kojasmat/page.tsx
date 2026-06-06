@@ -1,6 +1,8 @@
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
-import { getAllProyek, getAllTabungan, getAllAnggota } from '@/modules/kojasmat/actions/kojasmat.actions'
+import {
+  getAllAnggota, getAllProyek, getAllPelatihan, getKojasmatStats,
+} from '@/modules/kojasmat/actions/kojasmat.actions'
 import KojasmatClient from './KojasmatClient'
 
 export const revalidate = 0
@@ -11,18 +13,18 @@ export default async function KojasmatPage() {
 
   const orgId = orgData.org.id
 
-  const [proyek, tabungan, anggota] = await Promise.all([
-    getAllProyek(orgId),
-    getAllTabungan(orgId),
-    getAllAnggota(orgId),
-  ])
+  const stats    = await getKojasmatStats(orgId)
+  const anggota  = await getAllAnggota(orgId)
+  const proyek   = await getAllProyek(orgId)
+  const pelatihan = await getAllPelatihan(orgId)
 
   return (
     <KojasmatClient
       orgId={orgId}
-      proyek={proyek}
-      tabungan={tabungan}
+      stats={stats}
       anggota={anggota}
+      proyek={proyek}
+      pelatihan={pelatihan}
     />
   )
 }
