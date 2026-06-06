@@ -296,6 +296,23 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     ],
     requires: ['Finance'],
   },
+  {
+    key: 'Kojasmat',
+    name: 'Kojasmat',
+    tagline: 'Koperasi Jasa & Tabungan Anggota',
+    description: 'Untuk koperasi jasa: manajemen proyek anggota, buku tabungan, pembiayaan proyek, dan verifikasi anggota terintegrasi dengan buku besar keuangan.',
+    icon: '🤲',
+    color: 'bg-teal-600',
+    href: '/kojasmat',
+    isCore: false,
+    category: 'business_type',
+    onboardingSteps: [
+      { id: 'settings', title: 'Pengaturan Koperasi', description: 'Daftarkan anggota, struktur simpanan, dan jenis proyek yang dikelola.' },
+      { id: 'coa', title: 'Install CoA Koperasi', description: 'Pasang akun Simpanan Anggota, Dana Proyek, dan Pendapatan Jasa Koperasi.' },
+    ],
+    tags: ['koperasi', 'tabungan', 'anggota', 'proyek', 'jasa'],
+    requires: ['Finance'],
+  },
 ]
 
 // ── SYIRKAH PILLAR ─────────────────────────────────────────────────────────
