@@ -80,6 +80,8 @@ export type KojasmatProyek = {
   kebutuhan_modal: number
   modal_terkumpul: number
   ujrah_nominal: number
+  nisbah_pengaju: number
+  nisbah_pemodal: number
   durasi_bulan: number
   tanggal_mulai?: string
   tanggal_selesai?: string
@@ -356,6 +358,8 @@ export async function createProyek(payload: {
   jenis_akad: 'MURABAHAH' | 'MUDHARABAH' | 'INAN'
   kebutuhan_modal: number
   ujrah_nominal?: number
+  nisbah_pengaju?: number
+  nisbah_pemodal?: number
   durasi_bulan?: number
   agunan?: string
   notes?: string
@@ -377,14 +381,17 @@ export async function createProyek(payload: {
   const { rows } = await queryPostgres(
     `INSERT INTO kojasmat_proyek
        (org_id, pengaju_id, kode_proyek, nama_proyek, deskripsi, jenis_akad,
-        kebutuhan_modal, ujrah_nominal, durasi_bulan, agunan, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        kebutuhan_modal, ujrah_nominal, nisbah_pengaju, nisbah_pemodal,
+        durasi_bulan, agunan, notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      RETURNING *`,
     [
       payload.org_id, payload.pengaju_id, kode, payload.nama_proyek,
       payload.deskripsi ?? null, payload.jenis_akad,
       payload.kebutuhan_modal,
       payload.ujrah_nominal ?? 0,
+      payload.nisbah_pengaju ?? 30,
+      payload.nisbah_pemodal ?? 70,
       payload.durasi_bulan ?? 6,
       payload.agunan ?? null, payload.notes ?? null,
     ]
@@ -687,6 +694,7 @@ export type KojasmatStats = {
   total_proyek: number
   proyek_berjalan: number
   antrian_dps: number
+  antrian_pendaftaran: number
   total_simpanan: number
   total_pembiayaan: number
 }
@@ -699,6 +707,7 @@ export async function getKojasmatStats(orgId: string): Promise<KojasmatStats> {
        (SELECT COUNT(*) FROM kojasmat_proyek  WHERE org_id=$1)::int               AS total_proyek,
        (SELECT COUNT(*) FROM kojasmat_proyek  WHERE org_id=$1 AND status='BERJALAN')::int AS proyek_berjalan,
        (SELECT COUNT(*) FROM kojasmat_proyek  WHERE org_id=$1 AND status='REVIEW_DPS')::int AS antrian_dps,
+       (SELECT COUNT(*) FROM kojasmat_pendaftaran WHERE org_id=$1 AND status IN ('MENUNGGU','DIREVISI'))::int AS antrian_pendaftaran,
        (SELECT COALESCE(SUM(s.saldo),0)
         FROM kojasmat_simpanan s JOIN kojasmat_anggota a ON a.id=s.anggota_id
         WHERE a.org_id=$1)::numeric AS total_simpanan,
@@ -708,6 +717,7 @@ export async function getKojasmatStats(orgId: string): Promise<KojasmatStats> {
   )
   return (rows[0] ?? {
     total_anggota: 0, anggota_aktif: 0, total_proyek: 0,
-    proyek_berjalan: 0, antrian_dps: 0, total_simpanan: 0, total_pembiayaan: 0,
+    proyek_berjalan: 0, antrian_dps: 0, antrian_pendaftaran: 0,
+    total_simpanan: 0, total_pembiayaan: 0,
   }) as KojasmatStats
 }
