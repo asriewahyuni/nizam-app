@@ -160,6 +160,30 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
         </div>
       </div>
 
+      {/* Link Pendaftaran */}
+      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 flex items-center justify-between gap-4">
+        <div>
+          <p className="font-semibold text-emerald-800 text-sm">Link Pendaftaran Anggota</p>
+          <p className="text-xs text-emerald-600 mt-0.5">Bagikan link ini kepada calon anggota untuk mendaftar secara mandiri.</p>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={async () => {
+              const url = `${window.location.origin}/anggota/daftar?org=${orgId}`
+              await navigator.clipboard.writeText(url)
+            }}
+            className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer">
+            <Link2 className="h-3.5 w-3.5" /> Salin Link
+          </button>
+          <a
+            href={`/anggota/daftar?org=${orgId}`}
+            target="_blank"
+            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700 transition-colors cursor-pointer">
+            Buka Formulir
+          </a>
+        </div>
+      </div>
+
       {/* Dummy Data Section */}
       {stats.total_anggota === 0 && (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6">
@@ -326,9 +350,21 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
                   <td className="px-4 py-3 text-gray-500">{a.phone ?? '—'}</td>
                   <td className="px-4 py-3"><Badge text={a.status} cls={statusColor[a.status] ?? 'bg-gray-100 text-gray-600'} /></td>
                   <td className="px-4 py-3">
-                    {a.is_verified
-                      ? <CheckCircle className="h-4 w-4 text-emerald-500" />
-                      : <XCircle className="h-4 w-4 text-gray-300" />}
+                    <button
+                      title={a.is_verified ? 'Klik untuk cabut verifikasi' : 'Klik untuk verifikasi anggota'}
+                      onClick={() => startTransition(async () => {
+                        await updateAnggota(a.id, { ...a, is_verified: !a.is_verified, status: !a.is_verified ? 'AKTIF' : a.status })
+                      })}
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition-colors cursor-pointer',
+                        a.is_verified
+                          ? 'bg-emerald-50 text-emerald-700 hover:bg-red-50 hover:text-red-600'
+                          : 'bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-700'
+                      )}>
+                      {a.is_verified
+                        ? <><CheckCircle className="h-3.5 w-3.5" /> Terverifikasi</>
+                        : <><XCircle className="h-3.5 w-3.5" /> Belum</>}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-gray-500">{a.joined_at ? String(a.joined_at).split('T')[0] : '—'}</td>
                   <td className="px-4 py-3">
