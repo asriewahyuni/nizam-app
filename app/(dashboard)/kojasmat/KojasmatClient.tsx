@@ -7,7 +7,7 @@ import {
   Plus, Search, ChevronRight, CheckCircle, XCircle,
   ArrowUpCircle, Shield, Send, RefreshCw,
   TrendingUp, Banknote, Star, Clock, FileText,
-  AlertTriangle, ClipboardList, Eye, Link2
+  AlertTriangle, ClipboardList, Eye, Link2, ExternalLink
 } from 'lucide-react'
 import {
   createAnggota, updateAnggota,
@@ -368,10 +368,18 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
                   </td>
                   <td className="px-4 py-3 text-gray-500">{a.joined_at ? String(a.joined_at).split('T')[0] : '—'}</td>
                   <td className="px-4 py-3">
-                    <button onClick={() => openEdit(a)}
-                      className="rounded-lg p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer">
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <a href={`/anggota/${a.kode_anggota}`} target="_blank"
+                        title="Buka portal anggota"
+                        className="rounded-lg p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer">
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                      <button onClick={() => openEdit(a)}
+                        title="Edit anggota"
+                        className="rounded-lg p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer">
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
