@@ -455,6 +455,25 @@ export async function createInventoryAdjustment(
 
   if (procErr) return { error: 'Gagal memproses penyesuaian: ' + procErr.message }
 
+  // ANTI-SILO: Record Inventory Write-Off/Loss
+  const totalLossValue = payload.items.reduce((sum: number, it: any) => sum + (it.diff_quantity < 0 ? Math.abs(it.diff_quantity) * it.unit_cost : 0), 0)
+  
+  if (totalLossValue > 0) {
+    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '5-50002') // Beban Penyesuaian Persediaan (Asumsi)
+    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '1-10003') // Persediaan Barang (Asumsi)
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordExpense({
+        orgId, branchId: activeBranchId,
+        amount: totalLossValue,
+        date: payload.adj_date,
+        description: `Penyesuaian Persediaan (Loss/Write-Off) - ${payload.notes}`,
+        referenceType: 'INVENTORY_ADJ', referenceId: adj.id,
+        debitAccountId: debitAccount, creditAccountId: creditAccount
+      })
+    }
+  }
+
   revalidatePath('/inventory')
   return { success: true, adj_id: adj.id }
 }

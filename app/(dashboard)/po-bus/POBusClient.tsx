@@ -5,7 +5,7 @@ import {
   Bus, Users, Wrench, AlertTriangle, MapPin, Ticket, Building2,
   Navigation, Plus, Phone, Mail, Edit2, CheckCircle2, Clock,
   XCircle, TruckIcon, Settings, ChevronRight, Flame,
-  Banknote, Wallet, Store, ArrowUpCircle, Receipt, BadgeCheck,
+  Banknote, Wallet, Store, ArrowUpCircle, Receipt, BadgeCheck, Package
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -33,11 +33,14 @@ import type {
 import { TimBusTab } from './TimBusTab'
 import { PoolAgenTab } from './PoolAgenTab'
 
-type Tab = 'ARMADA' | 'CREW' | 'MEKANIK' | 'PERAWATAN' | 'EMERGENCY' | 'OPERASIONAL' | 'CHECKPOINT' | 'POOL'
+type Tab = 'ARMADA' | 'CREW' | 'MEKANIK' | 'PERAWATAN' | 'EMERGENCY' | 'OPERASIONAL' | 'CHECKPOINT' | 'POOL' | 'KARGO'
 type PerawatanTab = 'SERVIS' | 'BAN'
 type OperasionalTab = 'RUTE' | 'JADWAL' | 'TIKET' | 'AGEN'
 
 type ServiceRecord = { id: string; asset_id: string; service_date: string; description: string; maintenance_type: string; cost: number; odometer_at: number; technician_name: string | null; next_service_km: number | null; next_service_date: string | null; asset?: { plate_number: string; model: string } | null }
+
+import { CargoClient } from './components/cargo/CargoClient'
+import type { FleetTerminal } from '@/types/database.types'
 
 interface POBusClientProps {
   orgId: string
@@ -56,6 +59,9 @@ interface POBusClientProps {
   pools: BusPool[]
   poolTopUps: BusPoolTopUp[]
   poolSettlements: BusPoolSettlement[]
+  cargoShipments: any[]
+  terminals: FleetTerminal[]
+  cargoTariffs: any[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -137,6 +143,7 @@ export function POBusClient({
   orgId, units, crew, mechanics, serviceRecords, tireRecords,
   emergencyCalls, agents, routes, schedules, tickets, checkpoints, fixedAssets,
   pools, poolTopUps, poolSettlements,
+  cargoShipments, terminals, cargoTariffs
 }: POBusClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>('ARMADA')
   const [perawatanTab, setPerawatanTab] = useState<PerawatanTab>('SERVIS')
@@ -227,7 +234,7 @@ export function POBusClient({
   }
 
   async function handleDeletePool(pool: BusPool) {
-    const ok = await confirm({ title: `Nonaktifkan pool "${pool.name}"?`, message: 'Pool akan dinonaktifkan. Data tiket dan top-up tetap tersimpan.' })
+    const ok = await confirm({ title: `Nonaktifkan pool "${pool.name}"?`, message: 'Pool akan dinonaktifkan. Data tiket dan top-up tetap tersimpan.', confirmLabel: 'Nonaktifkan' })
     if (!ok) return
     startTransition(async () => {
       const res = await deleteBusPool(orgId, pool.id)
@@ -285,7 +292,7 @@ export function POBusClient({
   }
 
   async function handleMarkPaid(settlement: BusPoolSettlement) {
-    const ok = await confirm({ title: 'Tandai settlement ini sebagai DIBAYAR?', message: `Komisi ${formatRupiah(settlement.commission_amount)} akan ditandai sudah dibayarkan.` })
+    const ok = await confirm({ title: `Tandai settlement ini sebagai DIBAYAR?`, message: `Komisi ${formatRupiah(settlement.commission_amount)} akan ditandai sudah dibayarkan.`, confirmLabel: 'Tandai Dibayar' })
     if (!ok) return
     startTransition(async () => {
       const res = await markSettlementPaid(orgId, settlement.id)
@@ -303,6 +310,7 @@ export function POBusClient({
     { id: 'PERAWATAN', label: 'Perawatan', icon: <Settings className="w-4 h-4" /> },
     { id: 'EMERGENCY', label: 'Emergency', icon: <Flame className="w-4 h-4" /> },
     { id: 'OPERASIONAL', label: 'Operasional', icon: <TruckIcon className="w-4 h-4" /> },
+    { id: 'KARGO', label: 'Kargo', icon: <Package className="w-4 h-4" /> },
     { id: 'CHECKPOINT', label: 'Checkpoint', icon: <Navigation className="w-4 h-4" /> },
     { id: 'POOL', label: 'Pool / Agen', icon: <Store className="w-4 h-4" /> },
   ]
@@ -468,7 +476,7 @@ export function POBusClient({
     if (editingAgent) {
       const r = await updateBusAgent(orgId, editingAgent.id, payload)
       if (r.error) { showError(r.error); return }
-      setLocalAgents(prev => prev.map(a => a.id === editingAgent.id ? ({ ...a, ...payload } as BusAgent) : a))
+      setLocalAgents(prev => prev.map(a => a.id === editingAgent.id ? { ...a, ...payload } as BusAgent : a))
     } else {
       const r = await createBusAgent(orgId, payload)
       if (r.error) { showError(r.error); return }
@@ -718,6 +726,19 @@ export function POBusClient({
         </SectionCard>
       )}
 
+      {/* KARGO */}
+      {activeTab === 'KARGO' && (
+        <CargoClient 
+          orgId={orgId}
+          initialShipments={cargoShipments}
+          terminals={terminals}
+          schedules={schedules}
+          tariffs={cargoTariffs}
+          role="admin" // Simplifikasi untuk sementara
+          permissions={[]} // Asumsikan admin punya full akses, validasi detail di dalam CargoClient
+        />
+      )}
+
       {/* EMERGENCY */}
       {activeTab === 'EMERGENCY' && (
         <SectionCard>
@@ -910,6 +931,8 @@ export function POBusClient({
             ticketsByPool={ticketsByPool}
             schedules={localSchedules}
             routes={localRoutes}
+            cargoShipments={cargoShipments}
+            terminals={terminals}
           />
         )
       })()}

@@ -1,8 +1,8 @@
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
-import { getCargoShipments } from '@/modules/fleet/actions/cargo.actions'
+import { getCargoShipments } from '@/modules/po-bus/actions/cargo.actions'
 import { getTerminals, getSchedules } from '@/modules/fleet/actions/fleet.actions'
-import { getCargoTariffs } from '@/modules/fleet/actions/cargo-tariff.actions'
+import { getCargoTariffs } from '@/modules/po-bus/actions/cargo-tariff.actions'
 import { getBusPools } from '@/modules/po-bus/actions/po-bus.actions'
 import { CargoClient } from './CargoClient'
 

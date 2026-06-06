@@ -452,6 +452,24 @@ export async function createBusServiceRecord(orgId: string, payload: {
     .select().single()
 
   if (error) return { error: (error as DbError).message }
+
+  // ANTI-SILO: Record Service Expense
+  if (data && payload.cost > 0) {
+    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '6-60002') // Beban Perawatan (Asumsi)
+    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Kecil
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordExpense({
+        orgId, branchId: bus.branch_id,
+        amount: payload.cost,
+        date: payload.service_date,
+        description: `Beban Perawatan Bus - ${payload.description}`,
+        referenceType: 'BUS_SERVICE', referenceId: data.id,
+        debitAccountId: debitAccount, creditAccountId: creditAccount
+      })
+    }
+  }
+
   revalidatePath('/po-bus')
   return { data }
 }
@@ -823,6 +841,24 @@ export async function createBusTicket(orgId: string, payload: {
     .select().single()
 
   if (error) return { error: (error as DbError).message }
+
+  // ANTI-SILO: Record Ticket Revenue
+  if (data && payload.price > 0) {
+    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Kecil
+    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '4-40001') // Pendapatan Tiket (Asumsi)
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordRevenue({
+        orgId, branchId: resolvedBranchId || undefined,
+        amount: payload.price,
+        date: new Date().toISOString().split('T')[0],
+        description: `Pendapatan Tiket Bus - Kursi ${payload.seat_number} - ${payload.passenger_name}`,
+        referenceType: 'BUS_TICKET', referenceId: data.id,
+        debitAccountId: debitAccount, creditAccountId: creditAccount
+      })
+    }
+  }
+
   revalidatePath('/po-bus')
   return { data }
 }
@@ -1028,6 +1064,23 @@ export async function createBusPoolTopUp(orgId: string, payload: {
     [payload.amount, payload.pool_id, orgId]
   )
 
+  // ANTI-SILO: Record Pool Top-Up as Liability/Revenue-like transaction
+  if (insertedRow && payload.amount > 0) {
+    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Kecil
+    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '2-20001') // Hutang Deposit (Asumsi)
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordRevenue({
+        orgId, branchId: undefined,
+        amount: payload.amount,
+        date: new Date().toISOString().split('T')[0],
+        description: `Penerimaan Deposit Agen Pool - ${payload.reference_no || 'Cash'}`,
+        referenceType: 'POOL_TOPUP', referenceId: String(insertedRow.id),
+        debitAccountId: debitAccount, creditAccountId: creditAccount
+      })
+    }
+  }
+
   revalidatePath('/po-bus')
   return { data: insertedRow }
 }
@@ -1171,6 +1224,24 @@ export async function markSettlementPaid(orgId: string, settlementId: string, re
     .select().single()
 
   if (error) return { error: (error as DbError).message }
+
+  // ANTI-SILO: Record Commission Expense
+  if (data && data.commission_amount > 0) {
+    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '6-60003') // Beban Komisi (Asumsi)
+    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Kecil
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordExpense({
+        orgId, branchId: undefined,
+        amount: data.commission_amount,
+        date: new Date().toISOString().split('T')[0],
+        description: `Beban Komisi Agen Pool Settlement - ${referenceNo || ''}`,
+        referenceType: 'POOL_SETTLEMENT', referenceId: data.id,
+        debitAccountId: debitAccount, creditAccountId: creditAccount
+      })
+    }
+  }
+
   revalidatePath('/po-bus')
   return { data }
 }

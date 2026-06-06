@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Truck, ScanBarcode, CheckCircle2, ChevronRight, MapPin } from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
-import { assignCargoToScheduleByBarcode } from '@/modules/fleet/actions/cargo.actions'
+import { assignCargoToScheduleByBarcode } from '@/modules/po-bus/actions/cargo.actions'
 import { printManifest } from '@/lib/print-helper'
 
 export function CargoManifestTab({

@@ -142,6 +142,23 @@ export async function processArCollection(orgId: string, payload: {
     return { error: 'Gagal memperbarui status tagihan: ' + updateError.message };
   }
 
+  // ANTI-SILO: Record AR Collection Journal
+  if (payload.amount > 0) {
+    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Kecil
+    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '1-10002') // Piutang Usaha
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordRevenue({
+        orgId, branchId: activeBranch.id,
+        amount: payload.amount,
+        date: new Date().toISOString().split('T')[0],
+        description: `Penerimaan Piutang Canvassing - ${payload.notes || 'Pembayaran Tagihan'}`,
+        referenceType: 'AR_COLLECTION', referenceId: payload.saleId,
+        debitAccountId: debitAccount, creditAccountId: creditAccount
+      })
+    }
+  }
+
   revalidatePath('/pos-mobile');
   return { success: true, paymentStatus: newPaymentStatus };
 }

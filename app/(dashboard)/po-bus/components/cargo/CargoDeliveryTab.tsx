@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { CheckCircle, Search, CreditCard, Box } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
-import { processCargoDelivery } from '@/modules/fleet/actions/cargo.actions'
+import { processCargoDelivery } from '@/modules/po-bus/actions/cargo.actions'
 
 export function CargoDeliveryTab({
   orgId,

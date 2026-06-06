@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { Plus, Trash2, Save, CreditCard, ChevronRight } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
-import { upsertCargoTariff, deleteCargoTariff } from '@/modules/fleet/actions/cargo-tariff.actions'
+import { upsertCargoTariff, deleteCargoTariff } from '@/modules/po-bus/actions/cargo-tariff.actions'
 
 export function CargoTariffTab({
   orgId,

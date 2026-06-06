@@ -439,11 +439,30 @@ export async function addWorkOrderCost(orgId: string, woId: string, payload: { d
     return { error: 'SPK tidak ditemukan pada unit aktif.' }
   }
 
-  const { error } = await (supabase as any)
+  const { data: insertedCost, error } = await (supabase as any)
     .from('production_wo_costs')
     .insert([{ ...payload, wo_id: accessibleWorkOrder.id }])
+    .select().single()
 
   if (error) return { error: error.message }
+
+  // ANTI-SILO: Record Expense for Factory Overhead
+  if (payload.amount > 0 && insertedCost) {
+    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '5-50002') // Beban Pabrikasi / Overhead (Asumsi)
+    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Kecil
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordExpense({
+        orgId, branchId: activeBranchResult.branchId,
+        amount: payload.amount,
+        date: new Date().toISOString().split('T')[0],
+        description: `Beban Overhead Produksi (${payload.cost_type}) - ${payload.description}`,
+        referenceType: 'PRODUCTION_COST', referenceId: insertedCost.id,
+        debitAccountId: debitAccount, creditAccountId: creditAccount
+      })
+    }
+  }
+
   revalidatePath('/factory')
   return { success: true }
 }

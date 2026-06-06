@@ -286,15 +286,6 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <button 
-            type="button"
-            onClick={() => router.push('/fleet/cargo')}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl shadow-sm text-xs font-bold hover:bg-blue-600 transition-colors"
-          >
-            <Package size={14} />
-            Kargo & Ekspedisi
-          </button>
-          
           <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-sm w-full md:w-auto">
              {[
                { id: 'PO_BUS', label: 'Operasional Bus (PO)', icon: Bus },

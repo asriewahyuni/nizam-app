@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { ERPBridge } from '@/lib/erp-bridge/finances'
 import type { FleetCargoShipment, CargoStatus, CargoPaymentStatus } from '@/types/database.types'
 
 type DbError = { message: string; code?: string }
@@ -147,7 +148,28 @@ export async function createCargoShipment(orgId: string, formData: FormData) {
 
   if (error) return { error: error.message }
 
+  // ANTI-SILO: Record revenue directly into GL if paid
+  if (payload.payment_status === 'PAID' && payload.grand_total > 0) {
+    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Kecil (Asumsi)
+    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '4-40001') // Pendapatan (Asumsi)
+    
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordRevenue({
+        orgId,
+        branchId: activeBranch.branchId,
+        amount: payload.grand_total,
+        date: new Date().toISOString().split('T')[0],
+        description: `Pendapatan POS Kargo AWB ${trackingNumber}`,
+        referenceType: 'CARGO_RECEIPT',
+        referenceId: data.id,
+        debitAccountId: debitAccount,
+        creditAccountId: creditAccount
+      })
+    }
+  }
+
   revalidatePath('/fleet/cargo')
+  revalidatePath('/po-bus')
   return { success: true, trackingNumber, id: data.id }
 }
 
@@ -266,6 +288,35 @@ export async function processCargoDelivery(orgId: string, cargoId: string) {
 
   if (error) return { error: error.message }
 
+  // ANTI-SILO: Record revenue if the cargo was UNPAID and paid upon delivery
+  if (cargo.payment_status !== 'PAID') {
+    // Wait, we need the amount. We should select grand_total in fetchErr query
+    const { data: cargoDetail } = await supabase
+      .from('fleet_cargo_shipments')
+      .select('tracking_number, grand_total, branch_id')
+      .eq('id', cargo.id)
+      .single()
+
+    if (cargoDetail && cargoDetail.grand_total > 0) {
+      const debitAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001')
+      const creditAccount = await ERPBridge.getDefaultAccount(orgId, '4-40001')
+      if (debitAccount && creditAccount) {
+        await ERPBridge.recordRevenue({
+          orgId,
+          branchId: cargoDetail.branch_id,
+          amount: cargoDetail.grand_total,
+          date: new Date().toISOString().split('T')[0],
+          description: `Pendapatan Kargo Bayar Tujuan AWB ${cargoDetail.tracking_number}`,
+          referenceType: 'CARGO_RECEIPT',
+          referenceId: cargo.id,
+          debitAccountId: debitAccount,
+          creditAccountId: creditAccount
+        })
+      }
+    }
+  }
+
   revalidatePath('/fleet/cargo')
+  revalidatePath('/po-bus')
   return { success: true }
 }

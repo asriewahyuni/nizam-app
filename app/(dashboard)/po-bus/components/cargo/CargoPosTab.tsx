@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react'
 import { Plus, Printer, Save, Package, QrCode, User, Navigation, CreditCard, ChevronRight, X, History, FileText, Search, Store } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
-import { createCargoShipment } from '@/modules/fleet/actions/cargo.actions'
+import { createCargoShipment } from '@/modules/po-bus/actions/cargo.actions'
 import { printSticker, printShiftClosing } from '@/lib/print-helper'
 
 export function CargoPosTab({
