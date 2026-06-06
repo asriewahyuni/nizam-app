@@ -4,14 +4,18 @@ import { useState, useTransition } from 'react'
 import { cn } from '@/lib/utils'
 import {
   PiggyBank, Briefcase, Bell, LogOut, TrendingUp,
-  CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle,
-  ChevronRight, Star, GraduationCap
+  CheckCircle, ArrowUpCircle, ArrowDownCircle,
+  Star, GraduationCap, FileText, Send, Upload, XCircle,
 } from 'lucide-react'
 import {
   createProyek, updateStatusPenawaran, createPembiayaan,
   type KojasmatAnggota, type KojasmatProyek, type KojasmatSimpanan,
   type KojasmatPenawaran, type KojasmatPembiayaan,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
+import {
+  kirimLaporanProyek, simpanDokumen,
+  type KojasmatLaporanProyek, type KojasmatDokumen,
+} from '@/modules/kojasmat/actions/kojasmat-membership.actions'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -21,10 +25,11 @@ type Props = {
   proyekDiajukan: KojasmatProyek[]
   pembiayaan: KojasmatPembiayaan[]
   penawaran: KojasmatPenawaran[]
+  laporan: KojasmatLaporanProyek[]
   orgNama: string
 }
 
-type ActiveTab = 'beranda' | 'simpanan' | 'proyek' | 'penawaran'
+type ActiveTab = 'beranda' | 'simpanan' | 'proyek' | 'penawaran' | 'laporan'
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -186,21 +191,60 @@ function TabSimpanan({ simpanan }: { simpanan: KojasmatSimpanan[] }) {
 
 // ─── TAB: PROYEK ──────────────────────────────────────────────────────────────
 
+// Upload satu dokumen proyek ke S3 lalu simpan metadata
+async function uploadDokumenProyek(
+  file: File,
+  orgId: string,
+  refType: string,
+): Promise<{ key: string; name: string } | null> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('org_id', orgId)
+  fd.append('ref_type', refType)
+  const res = await fetch('/api/kojasmat/upload', { method: 'POST', body: fd })
+  if (!res.ok) return null
+  const { key, name } = await res.json() as { key: string; name: string }
+  return { key, name }
+}
+
 function TabProyek({ anggota, orgId, proyekDiajukan, pembiayaan }: {
   anggota: KojasmatAnggota; orgId?: string; proyekDiajukan: KojasmatProyek[]; pembiayaan: KojasmatPembiayaan[]
 }) {
   const [pending, startTransition] = useTransition()
   const [modalNew, setModalNew] = useState(false)
+  const [uploadingDok, setUploadingDok] = useState(false)
+  const [uploadedDoks, setUploadedDoks] = useState<{ key: string; name: string; jenis: string }[]>([])
   const [form, setForm] = useState({
     nama_proyek: '', deskripsi: '',
     jenis_akad: 'MUDHARABAH', kebutuhan_modal: '',
     durasi_bulan: '6', agunan: '',
+    nisbah_pengaju: 30,
   })
+
+  const nisbah_pemodal = 100 - form.nisbah_pengaju
+
+  async function handleDokUpload(jenis: string, file: File) {
+    if (!orgId) return
+    setUploadingDok(true)
+    const result = await uploadDokumenProyek(file, orgId, 'PROYEK')
+    setUploadingDok(false)
+    if (result) setUploadedDoks(prev => [...prev.filter(d => d.jenis !== jenis), { ...result, jenis }])
+  }
+
+  function removeDok(jenis: string) {
+    setUploadedDoks(prev => prev.filter(d => d.jenis !== jenis))
+  }
+
+  function resetModal() {
+    setModalNew(false)
+    setForm({ nama_proyek: '', deskripsi: '', jenis_akad: 'MUDHARABAH', kebutuhan_modal: '', durasi_bulan: '6', agunan: '', nisbah_pengaju: 30 })
+    setUploadedDoks([])
+  }
 
   function handleCreate() {
     if (!orgId) return
     startTransition(async () => {
-      await createProyek({
+      const res = await createProyek({
         org_id: orgId,
         pengaju_id: anggota.id,
         nama_proyek: form.nama_proyek,
@@ -209,9 +253,24 @@ function TabProyek({ anggota, orgId, proyekDiajukan, pembiayaan }: {
         kebutuhan_modal: Number(form.kebutuhan_modal),
         durasi_bulan: Number(form.durasi_bulan),
         agunan: form.agunan || undefined,
+        nisbah_pengaju: form.nisbah_pengaju,
+        nisbah_pemodal: nisbah_pemodal,
       })
-      setModalNew(false)
-      setForm({ nama_proyek: '', deskripsi: '', jenis_akad: 'MUDHARABAH', kebutuhan_modal: '', durasi_bulan: '6', agunan: '' })
+      // Simpan dokumen yang sudah di-upload ke referensi proyek baru
+      if (res.data && 'id' in res.data && uploadedDoks.length > 0) {
+        const proyekId = (res.data as { id: string }).id
+        for (const dok of uploadedDoks) {
+          await simpanDokumen({
+            org_id: orgId,
+            referensi_type: 'PROYEK',
+            referensi_id: proyekId,
+            jenis_dokumen: dok.jenis as KojasmatDokumen['jenis_dokumen'],
+            nama_file: dok.name,
+            file_key: dok.key,
+          })
+        }
+      }
+      resetModal()
     })
   }
 
@@ -302,19 +361,19 @@ function TabProyek({ anggota, orgId, proyekDiajukan, pembiayaan }: {
       )}
 
       {/* Modal Ajukan Proyek */}
-      <Modal open={modalNew} onClose={() => setModalNew(false)} title="Ajukan Proyek Baru">
+      <Modal open={modalNew} onClose={resetModal} title="Ajukan Proyek Baru">
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Nama Proyek *</label>
             <input
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
               placeholder="Contoh: Usaha Konveksi"
               value={form.nama_proyek} onChange={e => setForm(f => ({ ...f, nama_proyek: e.target.value }))} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Jenis Akad *</label>
             <select
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
               value={form.jenis_akad} onChange={e => setForm(f => ({ ...f, jenis_akad: e.target.value }))}>
               <option value="MUDHARABAH">Mudharabah — Modal dari Koperasi</option>
               <option value="MURABAHAH">Murabahah — Pembelian Cicil</option>
@@ -325,40 +384,105 @@ function TabProyek({ anggota, orgId, proyekDiajukan, pembiayaan }: {
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Kebutuhan Modal (Rp) *</label>
               <input type="number"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
                 placeholder="5000000"
                 value={form.kebutuhan_modal} onChange={e => setForm(f => ({ ...f, kebutuhan_modal: e.target.value }))} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Durasi (bulan)</label>
               <input type="number"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
                 value={form.durasi_bulan} onChange={e => setForm(f => ({ ...f, durasi_bulan: e.target.value }))} />
             </div>
           </div>
+
+          {/* Nisbah Syirkah */}
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+            <label className="mb-2 block text-sm font-semibold text-blue-800">
+              Pembagian Keuntungan (Nisbah Syirkah)
+            </label>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-xs text-blue-700 w-28">Pengaju (Anda)</span>
+              <input type="range" min={10} max={90} step={5}
+                className="flex-1 accent-emerald-600 cursor-pointer"
+                value={form.nisbah_pengaju}
+                onChange={e => setForm(f => ({ ...f, nisbah_pengaju: Number(e.target.value) }))} />
+              <span className="text-sm font-bold text-emerald-700 w-8 text-right">{form.nisbah_pengaju}%</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-blue-700 w-28">Pemodal</span>
+              <div className="flex-1 h-2 rounded-full bg-blue-200">
+                <div className="h-2 rounded-full bg-blue-500 transition-all"
+                  style={{ width: `${nisbah_pemodal}%` }} />
+              </div>
+              <span className="text-sm font-bold text-blue-700 w-8 text-right">{nisbah_pemodal}%</span>
+            </div>
+            <p className="mt-1.5 text-xs text-blue-600">
+              Koperasi menerima ujrah (biaya layanan) nominal tetap — tidak mengambil bagian dari keuntungan.
+            </p>
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Agunan / Jaminan</label>
             <input
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
               placeholder="Contoh: BPKB Motor"
               value={form.agunan} onChange={e => setForm(f => ({ ...f, agunan: e.target.value }))} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Deskripsi Usaha</label>
             <textarea rows={3}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 resize-none"
               placeholder="Jelaskan usaha Anda secara singkat..."
               value={form.deskripsi} onChange={e => setForm(f => ({ ...f, deskripsi: e.target.value }))} />
           </div>
+
+          {/* Dokumen Proyek */}
+          <div>
+            <p className="mb-2 text-sm font-medium text-gray-700">Dokumen Pendukung (opsional)</p>
+            <div className="space-y-2">
+              {(['PROYEKSI_KEUANGAN', 'ANALISA_BISNIS', 'PENAWARAN_SYIRKAH'] as const).map(jenis => {
+                const jenisLabel: Record<string, string> = {
+                  PROYEKSI_KEUANGAN: 'Proyeksi Keuangan',
+                  ANALISA_BISNIS: 'Analisa Bisnis',
+                  PENAWARAN_SYIRKAH: 'Penawaran Syirkah',
+                }
+                const uploaded = uploadedDoks.find(d => d.jenis === jenis)
+                return (
+                  <div key={jenis} className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                    <span className="flex-1 text-xs text-gray-600">{jenisLabel[jenis]}</span>
+                    {uploaded ? (
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                        <span className="text-xs text-emerald-600 max-w-[100px] truncate">{uploaded.name}</span>
+                        <button onClick={() => removeDok(jenis)}
+                          className="text-gray-400 hover:text-red-500 cursor-pointer transition-colors">
+                          <XCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 transition-colors cursor-pointer">
+                        <Upload className="h-3 w-3" /> Upload
+                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={e => { if (e.target.files?.[0]) handleDokUpload(jenis, e.target.files[0]) }} />
+                      </label>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {uploadingDok && <p className="mt-1 text-xs text-gray-400">Mengunggah dokumen...</p>}
+          </div>
+
           <p className="text-xs text-gray-400">
             Proyek Anda akan diajukan ke DPS untuk ditinjau sebelum dibuka pendanaan.
           </p>
           <div className="flex gap-3 pt-2">
-            <button onClick={() => setModalNew(false)}
+            <button onClick={resetModal}
               className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
               Batal
             </button>
-            <button onClick={handleCreate} disabled={!form.nama_proyek || !form.kebutuhan_modal || pending}
+            <button onClick={handleCreate} disabled={!form.nama_proyek || !form.kebutuhan_modal || pending || uploadingDok}
               className="flex-1 rounded-xl bg-emerald-600 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
               {pending ? 'Mengajukan...' : 'Ajukan Proyek'}
             </button>
@@ -496,11 +620,189 @@ function TabPenawaran({ anggota, penawaran, orgId }: {
   )
 }
 
+// ─── TAB: LAPORAN ─────────────────────────────────────────────────────────────
+
+function TabLaporan({ anggota, proyekDiajukan, laporan }: {
+  anggota: KojasmatAnggota
+  proyekDiajukan: KojasmatProyek[]
+  laporan: KojasmatLaporanProyek[]
+}) {
+  const [pending, startTransition] = useTransition()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    proyek_id: '',
+    periode_mulai: '',
+    periode_akhir: '',
+    omzet_periode: '',
+    ringkasan: '',
+    kendala: '',
+    rencana_kedepan: '',
+  })
+
+  const proyekBerjalan = proyekDiajukan.filter(p => p.status === 'BERJALAN')
+
+  function resetForm() {
+    setForm({ proyek_id: '', periode_mulai: '', periode_akhir: '', omzet_periode: '', ringkasan: '', kendala: '', rencana_kedepan: '' })
+    setError(null)
+    setModalOpen(false)
+  }
+
+  function handleKirim() {
+    startTransition(async () => {
+      const res = await kirimLaporanProyek({
+        org_id: anggota.org_id,
+        proyek_id: form.proyek_id,
+        pengaju_id: anggota.id,
+        periode_mulai: form.periode_mulai,
+        periode_akhir: form.periode_akhir,
+        omzet_periode: Number(form.omzet_periode),
+        ringkasan: form.ringkasan,
+        kendala: form.kendala || undefined,
+        rencana_kedepan: form.rencana_kedepan || undefined,
+      })
+      if ('error' in res && res.error) { setError(res.error); return }
+      resetForm()
+    })
+  }
+
+  const statusColor: Record<string, string> = {
+    DIKIRIM: 'bg-blue-100 text-blue-700',
+    DITINJAU: 'bg-amber-100 text-amber-700',
+    DIVERIFIKASI: 'bg-emerald-100 text-emerald-700',
+  }
+
+  return (
+    <div className="space-y-4">
+      {proyekBerjalan.length > 0 && (
+        <button onClick={() => { setModalOpen(true); setError(null) }}
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer">
+          <Send className="h-4 w-4" /> Kirim Laporan Mingguan
+        </button>
+      )}
+
+      {proyekBerjalan.length === 0 && laporan.length === 0 && (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 py-10 text-center text-sm text-gray-400">
+          Tidak ada proyek berjalan — laporan mingguan hanya untuk proyek berstatus Berjalan.
+        </div>
+      )}
+
+      {laporan.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Riwayat Laporan</p>
+          {laporan.map(l => (
+            <div key={l.id} className={cn('rounded-xl border bg-white p-4 shadow-sm',
+              l.is_terlambat ? 'border-red-200 bg-red-50/30' : 'border-gray-100')}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge text={l.status} cls={statusColor[l.status] ?? 'bg-gray-100 text-gray-600'} />
+                    {l.is_terlambat && <Badge text="Terlambat" cls="bg-red-100 text-red-600" />}
+                  </div>
+                  <p className="font-medium text-gray-900 text-sm">{l.proyek_nama ?? '—'}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {String(l.periode_mulai).split('T')[0]} — {String(l.periode_akhir).split('T')[0]}
+                  </p>
+                  <p className="text-xs text-emerald-700 mt-1 font-medium">
+                    Omzet: {fmt(Number(l.omzet_periode))}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1 line-clamp-2">{l.ringkasan}</p>
+                  {l.catatan_pengurus && (
+                    <p className="mt-1.5 text-xs text-amber-700 rounded-lg bg-amber-50 px-2 py-1">
+                      Catatan pengurus: {l.catatan_pengurus}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal Kirim Laporan */}
+      <Modal open={modalOpen} onClose={resetForm} title="Laporan Mingguan Proyek">
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Proyek *</label>
+            <select
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              value={form.proyek_id} onChange={e => setForm(f => ({ ...f, proyek_id: e.target.value }))}>
+              <option value="">— pilih proyek —</option>
+              {proyekBerjalan.map(p => (
+                <option key={p.id} value={p.id}>{p.nama_proyek}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Periode Mulai *</label>
+              <input type="date"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                value={form.periode_mulai} onChange={e => setForm(f => ({ ...f, periode_mulai: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Periode Akhir *</label>
+              <input type="date"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                value={form.periode_akhir} onChange={e => setForm(f => ({ ...f, periode_akhir: e.target.value }))} />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Omzet Periode (Rp) *</label>
+            <input type="number"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              placeholder="0"
+              value={form.omzet_periode} onChange={e => setForm(f => ({ ...f, omzet_periode: e.target.value }))} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Ringkasan Kegiatan *</label>
+            <textarea rows={3}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 resize-none"
+              placeholder="Ceritakan kegiatan usaha minggu ini..."
+              value={form.ringkasan} onChange={e => setForm(f => ({ ...f, ringkasan: e.target.value }))} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Kendala (opsional)</label>
+            <textarea rows={2}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 resize-none"
+              placeholder="Masalah yang dihadapi..."
+              value={form.kendala} onChange={e => setForm(f => ({ ...f, kendala: e.target.value }))} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Rencana Ke Depan (opsional)</label>
+            <textarea rows={2}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 resize-none"
+              placeholder="Target minggu depan..."
+              value={form.rencana_kedepan} onChange={e => setForm(f => ({ ...f, rencana_kedepan: e.target.value }))} />
+          </div>
+          {error && (
+            <p className="rounded-xl bg-red-50 border border-red-100 px-3 py-2 text-sm text-red-600">{error}</p>
+          )}
+          <div className="flex gap-3 pt-2">
+            <button onClick={resetForm}
+              className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+              Batal
+            </button>
+            <button onClick={handleKirim}
+              disabled={!form.proyek_id || !form.periode_mulai || !form.periode_akhir || !form.ringkasan || pending}
+              className="flex-1 rounded-xl bg-emerald-600 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+              {pending ? 'Mengirim...' : 'Kirim Laporan'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 
 export default function AnggotaPortalClient(props: Props) {
-  const { anggota, simpanan, proyekDiajukan, pembiayaan, penawaran, orgNama } = props
+  const { anggota, simpanan, proyekDiajukan, pembiayaan, penawaran, laporan, orgNama } = props
   const [activeTab, setActiveTab] = useState<ActiveTab>('beranda')
+
+  const laporanBelumVerifikasi = laporan.filter(l => l.status !== 'DIVERIFIKASI').length
+  const proyekBerjalan = proyekDiajukan.filter(p => p.status === 'BERJALAN')
 
   const tabs: { key: ActiveTab; label: string; icon: React.ElementType; badge?: number }[] = [
     { key: 'beranda',   label: 'Beranda',   icon: Star },
@@ -508,6 +810,10 @@ export default function AnggotaPortalClient(props: Props) {
     { key: 'proyek',    label: 'Proyek',    icon: Briefcase },
     { key: 'penawaran', label: 'Penawaran', icon: Bell,
       badge: penawaran.filter(p => p.status === 'TERKIRIM').length || undefined },
+    ...(proyekBerjalan.length > 0 ? [{
+      key: 'laporan' as ActiveTab, label: 'Laporan', icon: FileText,
+      badge: laporanBelumVerifikasi || undefined,
+    }] : []),
   ]
 
   return (
@@ -545,6 +851,9 @@ export default function AnggotaPortalClient(props: Props) {
         {activeTab === 'penawaran' && (
           <TabPenawaran anggota={anggota} penawaran={penawaran} orgId={anggota.org_id} />
         )}
+        {activeTab === 'laporan' && (
+          <TabLaporan anggota={anggota} proyekDiajukan={proyekDiajukan} laporan={laporan} />
+        )}
       </div>
 
       {/* Bottom Nav */}
@@ -556,7 +865,7 @@ export default function AnggotaPortalClient(props: Props) {
                 activeTab === t.key ? 'text-emerald-600' : 'text-gray-400')}>
               <t.icon className="h-5 w-5" />
               <span className="text-xs font-medium">{t.label}</span>
-              {t.badge !== undefined && (
+              {t.badge !== undefined && t.badge > 0 && (
                 <span className="absolute top-2 right-1/4 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
                   {t.badge}
                 </span>

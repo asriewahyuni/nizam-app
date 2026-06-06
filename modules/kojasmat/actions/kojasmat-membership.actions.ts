@@ -390,6 +390,19 @@ export async function getAllLaporan(orgId: string): Promise<KojasmatLaporanProye
   return rows as KojasmatLaporanProyek[]
 }
 
+export async function getLaporanByAnggota(anggotaId: string): Promise<KojasmatLaporanProyek[]> {
+  const { rows } = await queryPostgres(
+    `SELECT l.*, p.nama_proyek AS proyek_nama
+     FROM kojasmat_laporan_proyek l
+     LEFT JOIN kojasmat_proyek p ON p.id = l.proyek_id
+     WHERE l.pengaju_id = $1
+     ORDER BY l.created_at DESC
+     LIMIT 50`,
+    [anggotaId]
+  )
+  return rows as KojasmatLaporanProyek[]
+}
+
 export async function getLaporanByProyek(proyekId: string): Promise<KojasmatLaporanProyek[]> {
   const { rows } = await queryPostgres(
     `SELECT l.*, a.nama AS pengaju_nama

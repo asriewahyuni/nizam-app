@@ -8,6 +8,7 @@ import {
   getPembiayaanByAnggota,
   getPenawaranByAnggota,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
+import { getLaporanByAnggota } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
 import AnggotaPortalClient from './AnggotaPortalClient'
 
 export const revalidate = 0
@@ -31,11 +32,12 @@ export default async function AnggotaPortalPage({ params }: { params: Promise<{ 
     [anggota.org_id]
   )
 
-  const [simpanan, proyekSemua, pembiayaan, penawaran] = await Promise.all([
+  const [simpanan, proyekSemua, pembiayaan, penawaran, laporan] = await Promise.all([
     getSimpananByAnggota(anggota.id),
     getAllProyek(anggota.org_id),
     getPembiayaanByAnggota(anggota.id),
     getPenawaranByAnggota(anggota.id),
+    getLaporanByAnggota(anggota.id),
   ])
 
   const proyekDiajukan = proyekSemua.filter(p => p.pengaju_id === anggota.id)
@@ -47,6 +49,7 @@ export default async function AnggotaPortalPage({ params }: { params: Promise<{ 
       proyekDiajukan={proyekDiajukan}
       pembiayaan={pembiayaan}
       penawaran={penawaran}
+      laporan={laporan}
       orgNama={org?.nama ?? 'Koperasi'}
     />
   )
