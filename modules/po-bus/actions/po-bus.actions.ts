@@ -797,7 +797,7 @@ export async function getBusTickets(orgId: string, scheduleId?: string | null): 
 
 export async function createBusTicket(orgId: string, payload: {
   schedule_id: string; passenger_name: string; passenger_phone?: string
-  seat_number: string; price: number; agent_id?: string; notes?: string
+  seat_number: string; price: number; agent_id?: string; pool_id?: string; notes?: string
 }) {
   const supabase = await createClient()
   const resolvedBranchId = await resolveBranchId(orgId)
@@ -816,6 +816,7 @@ export async function createBusTicket(orgId: string, payload: {
       seat_number: payload.seat_number.trim(),
       price: payload.price || 0,
       agent_id: payload.agent_id || null,
+      pool_id: payload.pool_id || null,
       notes: payload.notes?.trim() || null,
       status: 'DIPESAN',
     }])
@@ -1079,6 +1080,85 @@ export async function createBusPoolSettlement(orgId: string, payload: {
   if (error) return { error: (error as DbError).message }
   revalidatePath('/po-bus')
   return { data }
+}
+
+// ─── SINGLE-RECORD FETCHES (for detail pages) ─────────────────────────────────
+
+export async function getBusPoolById(orgId: string, poolId: string): Promise<BusPool | null> {
+  const supabase = await createClient()
+  const { data, error } = await (supabase as any)
+    .from('bus_pools')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('id', poolId)
+    .single()
+  if (error || !data) return null
+  return data as BusPool
+}
+
+export async function getBusPoolByCode(orgId: string, code: string): Promise<BusPool | null> {
+  const supabase = await createClient()
+  const { data, error } = await (supabase as any)
+    .from('bus_pools')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('code', code.toUpperCase())
+    .single()
+  if (error || !data) return null
+  return data as BusPool
+}
+
+export async function getBusCrewById(orgId: string, crewId: string): Promise<BusCrew | null> {
+  const supabase = await createClient()
+  const { data, error } = await (supabase as any)
+    .from('bus_crew')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('id', crewId)
+    .single()
+  if (error || !data) return null
+  return data as BusCrew
+}
+
+export async function getBusCrewByNik(orgId: string, nik: string): Promise<BusCrew | null> {
+  const supabase = await createClient()
+  const { data, error } = await (supabase as any)
+    .from('bus_crew')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('nik', nik)
+    .single()
+  if (error || !data) return null
+  return data as BusCrew
+}
+
+export async function getSchedulesByCrewId(orgId: string, crewId: string): Promise<BusSchedule[]> {
+  const supabase = await createClient()
+  const { data, error } = await (supabase as any)
+    .from('bus_schedules')
+    .select('*, route:bus_routes(id,name,origin,destination,base_price), bus:bus_units(id,plate_number,model)')
+    .eq('org_id', orgId)
+    .or(`driver_id.eq.${crewId},helper_id.eq.${crewId}`)
+    .order('departure_time', { ascending: false })
+    .limit(50)
+  if (error) return []
+  return (data || []) as BusSchedule[]
+}
+
+export async function getCargoCountByPool(orgId: string): Promise<Record<string, number>> {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  try {
+    const result = await queryPostgres(
+      `SELECT bus_pool_id, COUNT(*) as cnt
+       FROM fleet_cargo_shipments
+       WHERE org_id = $1 AND bus_pool_id IS NOT NULL
+       GROUP BY bus_pool_id`,
+      [orgId]
+    )
+    return Object.fromEntries((result.rows as { bus_pool_id: string; cnt: string }[]).map(r => [r.bus_pool_id, Number(r.cnt)]))
+  } catch {
+    return {}
+  }
 }
 
 export async function markSettlementPaid(orgId: string, settlementId: string, referenceNo?: string) {

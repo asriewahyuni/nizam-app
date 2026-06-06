@@ -30,6 +30,8 @@ import type {
   BusPool, BusPoolTopUp, BusPoolSettlement,
   FixedAssetSummary,
 } from '@/modules/po-bus/lib/po-bus-types'
+import { TimBusTab } from './TimBusTab'
+import { PoolAgenTab } from './PoolAgenTab'
 
 type Tab = 'ARMADA' | 'CREW' | 'MEKANIK' | 'PERAWATAN' | 'EMERGENCY' | 'OPERASIONAL' | 'CHECKPOINT' | 'POOL'
 type PerawatanTab = 'SERVIS' | 'BAN'
@@ -225,7 +227,7 @@ export function POBusClient({
   }
 
   async function handleDeletePool(pool: BusPool) {
-    const ok = await confirm(`Nonaktifkan pool "${pool.name}"?`, 'Pool akan dinonaktifkan. Data tiket dan top-up tetap tersimpan.')
+    const ok = await confirm({ title: `Nonaktifkan pool "${pool.name}"?`, message: 'Pool akan dinonaktifkan. Data tiket dan top-up tetap tersimpan.' })
     if (!ok) return
     startTransition(async () => {
       const res = await deleteBusPool(orgId, pool.id)
@@ -283,7 +285,7 @@ export function POBusClient({
   }
 
   async function handleMarkPaid(settlement: BusPoolSettlement) {
-    const ok = await confirm(`Tandai settlement ini sebagai DIBAYAR?`, `Komisi ${formatRupiah(settlement.commission_amount)} akan ditandai sudah dibayarkan.`)
+    const ok = await confirm({ title: 'Tandai settlement ini sebagai DIBAYAR?', message: `Komisi ${formatRupiah(settlement.commission_amount)} akan ditandai sudah dibayarkan.` })
     if (!ok) return
     startTransition(async () => {
       const res = await markSettlementPaid(orgId, settlement.id)
@@ -462,11 +464,11 @@ export function POBusClient({
   async function handleSaveAgent(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
-    const payload = { name: fd.get('name') as string, phone: fd.get('phone') as string, email: fd.get('email') as string, address: fd.get('address') as string, city: fd.get('city') as string, commission_pct: Number(fd.get('commission_pct')) || 0, notes: fd.get('notes') as string, pool_id: (fd.get('pool_id') as string) || undefined }
+    const payload = { name: fd.get('name') as string, phone: fd.get('phone') as string, email: fd.get('email') as string, address: fd.get('address') as string, city: fd.get('city') as string, commission_pct: Number(fd.get('commission_pct')) || 0, notes: (fd.get('notes') as string) || undefined, pool_id: (fd.get('pool_id') as string) || undefined }
     if (editingAgent) {
       const r = await updateBusAgent(orgId, editingAgent.id, payload)
       if (r.error) { showError(r.error); return }
-      setLocalAgents(prev => prev.map(a => a.id === editingAgent.id ? { ...a, ...payload } : a))
+      setLocalAgents(prev => prev.map(a => a.id === editingAgent.id ? ({ ...a, ...payload } as BusAgent) : a))
     } else {
       const r = await createBusAgent(orgId, payload)
       if (r.error) { showError(r.error); return }
@@ -617,32 +619,10 @@ export function POBusClient({
         </SectionCard>
       )}
 
-      {/* CREW */}
+      {/* CREW — TimBusTab */}
       {activeTab === 'CREW' && (
         <SectionCard>
-          <SectionHeader title="Daftar Kru" subtitle="Driver, co-driver, kernet, kondektur" icon={Users} actions={<SafeButton onClick={() => setShowCrewModal(true)} icon={<Plus className="w-4 h-4" />} size="sm">Tambah Kru</SafeButton>} />
-          {localCrew.length === 0
-            ? <EmptyState icon={Users} title="Belum ada kru" description="Tambahkan driver, kernet, atau kondektur." action={<SafeButton onClick={() => setShowCrewModal(true)} icon={<Plus className="w-4 h-4" />}>Tambah Kru</SafeButton>} />
-            : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                {localCrew.map(c => (
-                  <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-semibold text-slate-800">{c.name}</p>
-                        <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full mt-1 inline-block">{CREW_ROLE_LABELS[c.role] || c.role}</span>
-                      </div>
-                      <button onClick={() => handleDeleteCrew(c.id, c.name)} className="p-1.5 text-slate-300 hover:text-rose-500 cursor-pointer transition-colors rounded-lg hover:bg-rose-50"><XCircle className="w-4 h-4" /></button>
-                    </div>
-                    <div className="mt-3 space-y-1 text-xs text-slate-500">
-                      {c.phone && <p className="flex items-center gap-1.5"><Phone className="w-3 h-3" />{c.phone}</p>}
-                      {c.license_number && <p>SIM: {c.license_number}{c.license_expiry ? ` (exp: ${formatDate(c.license_expiry)})` : ''}</p>}
-                      {c.blood_type && <p>Gol. Darah: {c.blood_type}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+          <TimBusTab orgId={orgId} initialCrew={localCrew} />
         </SectionCard>
       )}
 
@@ -916,265 +896,24 @@ export function POBusClient({
         </SectionCard>
       )}
 
-      {/* POOL */}
+      {/* POOL — PoolAgenTab */}
       {activeTab === 'POOL' && (() => {
-        const POOL_TYPE_LABELS: Record<string, string> = { POOL_UTAMA: 'Pool Utama', AGEN_RESMI: 'Agen Resmi', SUB_AGEN: 'Sub-Agen' }
-        const POOL_TYPE_COLORS: Record<string, string> = {
-          POOL_UTAMA: 'bg-blue-50 text-blue-700 border border-blue-200',
-          AGEN_RESMI: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-          SUB_AGEN: 'bg-slate-100 text-slate-600 border border-slate-200',
-        }
-        const activePools = localPools.filter(p => p.is_active)
-        const totalBalance = activePools.reduce((s, p) => s + p.deposit_balance, 0)
-        const pendingSettlements = localSettlements.filter(s => s.status === 'PENDING')
-        const pendingCommission = pendingSettlements.reduce((s, s2) => s + s2.commission_amount, 0)
-
-        return !selectedPool ? (
-          <div className="space-y-6">
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard label="Total Pool Aktif" value={activePools.length} icon={Store} color="blue" />
-              <StatCard label="Total Saldo Deposit" value={formatRupiah(totalBalance)} icon={Wallet} color="green" />
-              <StatCard label="Komisi Tertunggak" value={formatRupiah(pendingCommission)} icon={Banknote} color="amber" />
-              <StatCard label="Settlement Pending" value={pendingSettlements.length} icon={Receipt} color="red" />
-            </div>
-
-            <SectionCard>
-              <SectionHeader
-                title="Daftar Pool / Agen"
-                subtitle="Manajemen kantor agen dan titik penjualan tiket terafiliasi"
-                icon={Store}
-                actions={<SafeButton onClick={() => { setEditingPool(null); setShowPoolModal(true) }} icon={<Plus className="w-4 h-4" />} size="sm">Registrasi Pool</SafeButton>}
-              />
-              {localPools.length === 0
-                ? <EmptyState icon={Store} title="Belum ada pool terdaftar" description="Daftarkan pool atau kantor agen penjualan tiket." action={<SafeButton onClick={() => { setEditingPool(null); setShowPoolModal(true) }} icon={<Plus className="w-4 h-4" />}>Registrasi Pool</SafeButton>} />
-                : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
-                    {localPools.map(pool => {
-                      const poolAgents = localAgents.filter(a => a.pool_id === pool.id && a.is_active)
-                      const poolTickets = localTickets.filter(t => t.pool_id === pool.id)
-                      return (
-                        <div key={pool.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group" onClick={() => setSelectedPool(pool)}>
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <div className="p-2 bg-blue-50 rounded-lg shrink-0"><Store className="w-4 h-4 text-blue-600" /></div>
-                              <div>
-                                <p className="font-semibold text-slate-800 text-sm leading-tight">{pool.name}</p>
-                                <p className="text-[11px] text-slate-400 font-mono">{pool.code}</p>
-                              </div>
-                            </div>
-                            <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', POOL_TYPE_COLORS[pool.pool_type] || POOL_TYPE_COLORS.AGEN_RESMI)}>
-                              {POOL_TYPE_LABELS[pool.pool_type] || pool.pool_type}
-                            </span>
-                          </div>
-
-                          {pool.city && <p className="text-xs text-slate-500 mb-3 flex items-center gap-1"><MapPin className="w-3 h-3" />{pool.city}{pool.province ? `, ${pool.province}` : ''}</p>}
-
-                          <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                            <div className="bg-slate-50 rounded-lg p-2">
-                              <p className="text-[10px] text-slate-400 font-medium">Komisi</p>
-                              <p className="font-bold text-slate-700 text-sm">{pool.commission_pct}%</p>
-                            </div>
-                            <div className="bg-slate-50 rounded-lg p-2">
-                              <p className="text-[10px] text-slate-400 font-medium">Agen</p>
-                              <p className="font-bold text-slate-700 text-sm">{poolAgents.length}</p>
-                            </div>
-                            <div className="bg-slate-50 rounded-lg p-2">
-                              <p className="text-[10px] text-slate-400 font-medium">Tiket</p>
-                              <p className="font-bold text-slate-700 text-sm">{poolTickets.length}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                            <div>
-                              <p className="text-[10px] text-slate-400">Saldo Deposit</p>
-                              <p className={cn('text-sm font-bold', pool.deposit_balance > 0 ? 'text-emerald-600' : 'text-slate-500')}>{formatRupiah(pool.deposit_balance)}</p>
-                            </div>
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                              <button className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
-                                onClick={() => { setTopUpTargetPool(pool); setShowTopUpModal(true) }} title="Top-up saldo">
-                                <ArrowUpCircle className="w-4 h-4" />
-                              </button>
-                              <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                                onClick={() => { setEditingPool(pool); setShowPoolModal(true) }}>
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-                                onClick={() => handleDeletePool(pool)}>
-                                <XCircle className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-            </SectionCard>
-
-            {/* Settlement Pending */}
-            {pendingSettlements.length > 0 && (
-              <SectionCard>
-                <SectionHeader title="Settlement Komisi Tertunggak" subtitle="Komisi yang belum dibayarkan ke pool" icon={Receipt} />
-                <div className="mt-4 space-y-2">
-                  {pendingSettlements.map(s => (
-                    <div key={s.id} className="flex items-center justify-between p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                      <div>
-                        <p className="font-semibold text-slate-800 text-sm">{s.pool?.name || s.pool_id}</p>
-                        <p className="text-xs text-slate-500">{formatDate(s.period_start)} – {formatDate(s.period_end)} · {s.total_tickets} tiket</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="text-xs text-slate-400">Komisi {s.commission_pct}%</p>
-                          <p className="font-bold text-amber-700">{formatRupiah(s.commission_amount)}</p>
-                        </div>
-                        <SafeButton size="sm" onClick={() => handleMarkPaid(s)} icon={<BadgeCheck className="w-3.5 h-3.5" />}>Bayar</SafeButton>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
-            )}
-          </div>
-        ) : (
-          /* ── Pool Detail View ── */
-          <div className="space-y-6">
-            <div className="flex items-center gap-3">
-              <button onClick={() => setSelectedPool(null)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer transition-colors"><ChevronRight className="w-4 h-4 rotate-180" /></button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-semibold text-slate-800">{selectedPool.name}</h2>
-                  <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full',
-                    selectedPool.pool_type === 'POOL_UTAMA' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                    selectedPool.pool_type === 'AGEN_RESMI' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                    'bg-slate-100 text-slate-600 border border-slate-200'
-                  )}>{POOL_TYPE_LABELS[selectedPool.pool_type] || selectedPool.pool_type}</span>
-                </div>
-                <p className="text-xs text-slate-400 font-mono">{selectedPool.code}{selectedPool.city ? ` · ${selectedPool.city}` : ''}</p>
-              </div>
-              <div className="ml-auto flex gap-2">
-                <SafeButton size="sm" variant="secondary" onClick={() => { setTopUpTargetPool(selectedPool); setShowTopUpModal(true) }} icon={<ArrowUpCircle className="w-3.5 h-3.5" />}>Top-up</SafeButton>
-                <SafeButton size="sm" variant="secondary" onClick={() => { setSettlementTargetPool(selectedPool); setShowSettlementModal(true) }} icon={<Receipt className="w-3.5 h-3.5" />}>Settlement</SafeButton>
-                <SafeButton size="sm" onClick={() => { setEditingPool(selectedPool); setShowPoolModal(true) }} icon={<Edit2 className="w-3.5 h-3.5" />}>Edit</SafeButton>
-              </div>
-            </div>
-
-            {/* Info cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <p className="text-xs text-slate-400 mb-1">Saldo Deposit</p>
-                <p className={cn('text-xl font-bold', selectedPool.deposit_balance > 0 ? 'text-emerald-600' : 'text-slate-500')}>{formatRupiah(selectedPool.deposit_balance)}</p>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <p className="text-xs text-slate-400 mb-1">Komisi</p>
-                <p className="text-xl font-bold text-slate-700">{selectedPool.commission_pct}%</p>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <p className="text-xs text-slate-400 mb-1">Tiket Terjual</p>
-                <p className="text-xl font-bold text-slate-700">{localTickets.filter(t => t.pool_id === selectedPool.id).length}</p>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <p className="text-xs text-slate-400 mb-1">Agen Aktif</p>
-                <p className="text-xl font-bold text-slate-700">{localAgents.filter(a => a.pool_id === selectedPool.id && a.is_active).length}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Info Pool */}
-              <SectionCard>
-                <h3 className="font-semibold text-slate-800 mb-3">Informasi Pool</h3>
-                <div className="space-y-2 text-sm">
-                  {selectedPool.owner_name && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">Pemilik</span><span className="text-slate-700">{selectedPool.owner_name}</span></div>}
-                  {selectedPool.pic_name && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">PIC</span><span className="text-slate-700">{selectedPool.pic_name}</span></div>}
-                  {selectedPool.phone && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">Telepon</span><span className="text-slate-700">{selectedPool.phone}</span></div>}
-                  {selectedPool.whatsapp && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">WhatsApp</span><span className="text-slate-700">{selectedPool.whatsapp}</span></div>}
-                  {selectedPool.email && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">Email</span><span className="text-slate-700">{selectedPool.email}</span></div>}
-                  {selectedPool.address && <div className="flex gap-2"><span className="text-slate-400 w-28 shrink-0">Alamat</span><span className="text-slate-700">{selectedPool.address}</span></div>}
-                  {selectedPool.bank_name && (
-                    <div className="mt-3 pt-3 border-t border-slate-100">
-                      <p className="text-xs font-semibold text-slate-500 mb-2">Rekening Bank</p>
-                      <p className="text-slate-700">{selectedPool.bank_name} — {selectedPool.bank_account}</p>
-                      {selectedPool.bank_account_name && <p className="text-slate-500 text-xs">{selectedPool.bank_account_name}</p>}
-                    </div>
-                  )}
-                </div>
-              </SectionCard>
-
-              {/* Top-up history */}
-              <SectionCard>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-slate-800">Riwayat Top-up Saldo</h3>
-                  <SafeButton size="sm" variant="secondary" onClick={() => { setTopUpTargetPool(selectedPool); setShowTopUpModal(true) }} icon={<Plus className="w-3.5 h-3.5" />}>Top-up</SafeButton>
-                </div>
-                {localTopUps.filter(t => t.pool_id === selectedPool.id).length === 0
-                  ? <p className="text-sm text-slate-400 text-center py-4">Belum ada top-up</p>
-                  : <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {localTopUps.filter(t => t.pool_id === selectedPool.id).map(tu => (
-                      <div key={tu.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                        <div>
-                          <p className="text-xs font-semibold text-emerald-600">+{formatRupiah(tu.amount)}</p>
-                          <p className="text-[11px] text-slate-400">{tu.payment_method} · {formatDate(tu.created_at)}</p>
-                          {tu.reference_no && <p className="text-[11px] text-slate-400 font-mono">{tu.reference_no}</p>}
-                        </div>
-                        {tu.notes && <p className="text-[11px] text-slate-400 max-w-[120px] truncate">{tu.notes}</p>}
-                      </div>
-                    ))}
-                  </div>}
-              </SectionCard>
-            </div>
-
-            {/* Agen di pool ini */}
-            <SectionCard>
-              <h3 className="font-semibold text-slate-800 mb-3">Agen dalam Pool Ini</h3>
-              {localAgents.filter(a => a.pool_id === selectedPool.id).length === 0
-                ? <p className="text-sm text-slate-400 text-center py-4">Belum ada agen yang ditetapkan ke pool ini. Assign agen dari tab Operasional → Agen.</p>
-                : <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {localAgents.filter(a => a.pool_id === selectedPool.id).map(ag => (
-                    <div key={ag.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
-                        <span className="text-blue-700 font-semibold text-xs">{ag.name.slice(0,2).toUpperCase()}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-800 text-sm">{ag.name}</p>
-                        <p className="text-xs text-slate-400">{ag.phone || ag.city || 'Tanpa kota'} · Komisi {ag.commission_pct}%</p>
-                      </div>
-                      {!ag.is_active && <span className="ml-auto text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Non-aktif</span>}
-                    </div>
-                  ))}
-                </div>}
-            </SectionCard>
-
-            {/* Settlement history */}
-            <SectionCard>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-slate-800">Riwayat Settlement Komisi</h3>
-                <SafeButton size="sm" variant="secondary" onClick={() => { setSettlementTargetPool(selectedPool); setShowSettlementModal(true) }} icon={<Plus className="w-3.5 h-3.5" />}>Buat Settlement</SafeButton>
-              </div>
-              {localSettlements.filter(s => s.pool_id === selectedPool.id).length === 0
-                ? <p className="text-sm text-slate-400 text-center py-4">Belum ada settlement komisi</p>
-                : <div className="space-y-2">
-                  {localSettlements.filter(s => s.pool_id === selectedPool.id).map(s => (
-                    <div key={s.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl">
-                      <div>
-                        <p className="text-xs font-semibold text-slate-600">{formatDate(s.period_start)} – {formatDate(s.period_end)}</p>
-                        <p className="text-[11px] text-slate-400">{s.total_tickets} tiket · Revenue {formatRupiah(s.total_revenue)} · Komisi {s.commission_pct}%</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="font-bold text-slate-700">{formatRupiah(s.commission_amount)}</p>
-                          <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full',
-                            s.status === 'DIBAYAR' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                          )}>{s.status}</span>
-                        </div>
-                        {s.status === 'PENDING' && <SafeButton size="sm" onClick={() => handleMarkPaid(s)} icon={<BadgeCheck className="w-3.5 h-3.5" />}>Bayar</SafeButton>}
-                      </div>
-                    </div>
-                  ))}
-                </div>}
-            </SectionCard>
-          </div>
+        const ticketsByPool: Record<string, number> = {}
+        localTickets.forEach(t => { if (t.pool_id) ticketsByPool[t.pool_id] = (ticketsByPool[t.pool_id] ?? 0) + 1 })
+        return (
+          <PoolAgenTab
+            orgId={orgId}
+            initialPools={localPools}
+            initialTopUps={localTopUps}
+            initialSettlements={localSettlements}
+            agents={localAgents}
+            ticketsByPool={ticketsByPool}
+            schedules={localSchedules}
+            routes={localRoutes}
+          />
         )
       })()}
+
 
       {/* ═══ MODALS ════════════════════════════════════════════════════════════ */}
 

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef } from 'react'
-import { Plus, Printer, Save, Package, QrCode, User, Navigation, CreditCard, ChevronRight, X, History, FileText, Search } from 'lucide-react'
+import { Plus, Printer, Save, Package, QrCode, User, Navigation, CreditCard, ChevronRight, X, History, FileText, Search, Store } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import { createCargoShipment } from '@/modules/fleet/actions/cargo.actions'
 import { printSticker, printShiftClosing } from '@/lib/print-helper'
@@ -11,20 +11,23 @@ export function CargoPosTab({
   terminals,
   shipments,
   tariffs = [],
+  pools = [],
   onRefresh
 }: {
   orgId: string
   terminals: any[]
   shipments: any[]
   tariffs?: any[]
+  pools?: Array<{ id: string; code: string; name: string; pool_type: string; city?: string | null }>
   onRefresh: () => void
 }) {
   const [loading, setLoading] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
-  
+  const [selectedPoolId, setSelectedPoolId] = useState('')
+
   // State for detail modal
   const [selectedShipment, setSelectedShipment] = useState<any | null>(null)
-  
+
   // States for calculator
   const [weight, setWeight] = useState(1)
   const [volume, setVolume] = useState(0)
@@ -89,6 +92,7 @@ export function CargoPosTab({
     formData.append('shipping_cost', shippingCost.toString())
     formData.append('handling_fee', handlingFee.toString())
     formData.append('grand_total', grandTotal.toString())
+    if (selectedPoolId) formData.append('bus_pool_id', selectedPoolId)
     
     const res = await createCargoShipment(orgId, formData)
     
@@ -296,6 +300,44 @@ export function CargoPosTab({
                  </div>
               </div>
            </div>
+
+           {/* Section Pool / Agen (Expedisi Integration) */}
+           {pools.length > 0 && (
+             <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+               <div className="flex items-center gap-3 mb-4">
+                 <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
+                   <Store size={16} strokeWidth={3} />
+                 </div>
+                 <div>
+                   <h4 className="font-bold text-slate-800">Pool / Agen Pengirim</h4>
+                   <p className="text-[10px] text-slate-400">Opsional — jika dikirim via agen terafiliasi</p>
+                 </div>
+               </div>
+               <div className="relative">
+                 <select
+                   value={selectedPoolId}
+                   onChange={e => setSelectedPoolId(e.target.value)}
+                   className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent focus:border-blue-400 rounded-2xl text-base font-semibold focus:ring-4 focus:ring-blue-100 outline-none transition-all appearance-none cursor-pointer"
+                 >
+                   <option value="">— Tanpa pool (langsung) —</option>
+                   {pools.map(p => (
+                     <option key={p.id} value={p.id}>
+                       {p.name}{p.city ? ` · ${p.city}` : ''}
+                     </option>
+                   ))}
+                 </select>
+                 <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
+               </div>
+               {selectedPoolId && (
+                 <div className="mt-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl">
+                   <p className="text-xs text-blue-700 font-medium">
+                     ✓ Kargo ini akan dicatat di bawah pool{' '}
+                     <span className="font-bold">{pools.find(p => p.id === selectedPoolId)?.name}</span>
+                   </p>
+                 </div>
+               )}
+             </div>
+           )}
 
            {/* Section Paket & Biaya */}
            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">

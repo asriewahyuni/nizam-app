@@ -11,20 +11,22 @@ import { CargoReceiveTab } from './CargoReceiveTab'
 import { CargoDeliveryTab } from './CargoDeliveryTab'
 import { CargoTariffTab } from './CargoTariffTab'
 
-export function CargoClient({ 
-  orgId, 
+export function CargoClient({
+  orgId,
   initialShipments,
   terminals,
   schedules,
   tariffs = [],
+  pools = [],
   role = '',
   permissions = []
-}: { 
+}: {
   orgId: string
   initialShipments: any[]
   terminals: FleetTerminal[]
   schedules: any[]
   tariffs?: any[]
+  pools?: Array<{ id: string; code: string; name: string; pool_type: string; city?: string | null }>
   role?: string
   permissions?: string[]
 }) {
@@ -100,6 +102,7 @@ export function CargoClient({
               terminals={terminals}
               shipments={initialShipments}
               tariffs={tariffs}
+              pools={pools}
               onRefresh={() => {
                 window.location.reload()
               }}

@@ -139,6 +139,7 @@ export async function createCargoShipment(orgId: string, formData: FormData) {
     payment_status: (formData.get('payment_status') as CargoPaymentStatus) || 'UNPAID',
     payment_method: formData.get('payment_method') as string,
     koli_count: Number(formData.get('koli_count')) || 1,
+    bus_pool_id: (formData.get('bus_pool_id') as string) || null,
     status: 'DRAFT' as CargoStatus
   }
 
