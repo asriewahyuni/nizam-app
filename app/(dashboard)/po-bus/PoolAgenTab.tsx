@@ -7,7 +7,8 @@ import {
   ArrowUpCircle, Receipt, Wallet, Users, Ticket, ChevronLeft,
   Building2, CreditCard, History, BadgeCheck, TrendingUp,
   Banknote, Package, Share2, ShoppingCart, BarChart3, Clock,
-  Printer, MessageCircle, X, CheckCheck, Copy, Check,
+  Printer, MessageCircle, X, CheckCheck, Copy, Check, Truck, MoveRight,
+  Box, Weight,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -23,10 +24,12 @@ import {
   createBusAgent, updateBusAgent, deleteBusAgent,
   createBusTicket,
 } from '@/modules/po-bus/actions/po-bus.actions'
+import { createCargoShipment, updateCargoStatus } from '@/modules/po-bus/actions/cargo.actions'
 import type {
   BusPool, BusPoolTopUp, BusPoolSettlement, BusAgent,
   BusSchedule, BusRoute, BusTicket,
 } from '@/modules/po-bus/lib/po-bus-types'
+import type { FleetCargoShipment, CargoStatus, FleetTerminal } from '@/types/database.types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -116,7 +119,7 @@ const POOL_TYPE_CONFIG = {
   SUB_AGEN:   { label: 'Sub-Agen',    color: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400'  },
 } as const
 
-type PoolDetailTab = 'INFO' | 'HISTORY' | 'AGEN' | 'TOPUP' | 'SETTLEMENT'
+type PoolDetailTab = 'INFO' | 'HISTORY' | 'AGEN' | 'TOPUP' | 'SETTLEMENT' | 'KARGO'
 
 // ─── Revenue Chart ────────────────────────────────────────────────────────────
 
@@ -520,6 +523,145 @@ function TicketSellForm({
   )
 }
 
+// ─── Cargo Create Form ────────────────────────────────────────────────────────
+
+function CargoCreateForm({
+  orgId, pool, terminals, onSaved, onClose,
+}: {
+  orgId: string
+  pool: BusPool
+  terminals: FleetTerminal[]
+  onSaved: (s: FleetCargoShipment & { bus_pool_id?: string | null }) => void
+  onClose: () => void
+}) {
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    fd.set('bus_pool_id', pool.id)
+    startTransition(async () => {
+      const res = await createCargoShipment(orgId, fd)
+      if ('error' in res && res.error) { setError(res.error as string); return }
+      onSaved({
+        id: (res as any).id ?? '',
+        org_id: orgId,
+        branch_id: null,
+        tracking_number: (res as any).trackingNumber ?? '',
+        sender_name:   fd.get('sender_name')   as string,
+        sender_phone:  fd.get('sender_phone')  as string,
+        receiver_name: fd.get('receiver_name') as string,
+        receiver_phone: fd.get('receiver_phone') as string,
+        origin_terminal_id:      fd.get('origin_terminal_id')      as string,
+        destination_terminal_id: fd.get('destination_terminal_id') as string,
+        item_description: fd.get('item_description') as string,
+        weight_kg:    Number(fd.get('weight_kg'))    || 0,
+        volume_m3:    Number(fd.get('volume_m3'))    || 0,
+        shipping_cost: Number(fd.get('shipping_cost')) || 0,
+        handling_fee:  Number(fd.get('handling_fee'))  || 0,
+        grand_total:   Number(fd.get('grand_total'))   || 0,
+        payment_status: (fd.get('payment_status') as any) || 'UNPAID',
+        payment_method: fd.get('payment_method') as string,
+        schedule_id: null,
+        status: 'DRAFT',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        bus_pool_id: pool.id,
+      })
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{error}</div>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Pengirim *">
+          <Input name="sender_name" required placeholder="Nama pengirim" />
+        </FormField>
+        <FormField label="No. HP Pengirim">
+          <Input name="sender_phone" placeholder="08xxx" />
+        </FormField>
+        <FormField label="Penerima *">
+          <Input name="receiver_name" required placeholder="Nama penerima" />
+        </FormField>
+        <FormField label="No. HP Penerima">
+          <Input name="receiver_phone" placeholder="08xxx" />
+        </FormField>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Terminal Asal *">
+          <Select name="origin_terminal_id" required defaultValue="">
+            <option value="" disabled>Pilih terminal...</option>
+            {terminals.map(t => (
+              <option key={t.id} value={t.id}>{t.name}{t.location_name ? ` — ${t.location_name}` : ''}</option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Terminal Tujuan *">
+          <Select name="destination_terminal_id" required defaultValue="">
+            <option value="" disabled>Pilih terminal...</option>
+            {terminals.map(t => (
+              <option key={t.id} value={t.id}>{t.name}{t.location_name ? ` — ${t.location_name}` : ''}</option>
+            ))}
+          </Select>
+        </FormField>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <FormField label="Deskripsi Barang">
+          <Input name="item_description" placeholder="Mis: Elektronik, Pakaian..." />
+        </FormField>
+        <FormField label="Berat (kg) *">
+          <Input type="number" name="weight_kg" required min="0.1" step="0.1" defaultValue="1" />
+        </FormField>
+        <FormField label="Koli">
+          <Input type="number" name="koli_count" defaultValue="1" min="1" />
+        </FormField>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <FormField label="Ongkir (Rp)">
+          <Input type="number" name="shipping_cost" defaultValue="0" min="0" />
+        </FormField>
+        <FormField label="Handling (Rp)">
+          <Input type="number" name="handling_fee" defaultValue="0" min="0" />
+        </FormField>
+        <FormField label="Total (Rp) *">
+          <Input type="number" name="grand_total" required defaultValue="0" min="0" />
+        </FormField>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Pembayaran">
+          <Select name="payment_status" defaultValue="UNPAID">
+            <option value="UNPAID">Belum Lunas</option>
+            <option value="PAID">Lunas</option>
+          </Select>
+        </FormField>
+        <FormField label="Metode Bayar">
+          <Select name="payment_method" defaultValue="CASH">
+            <option value="CASH">Cash</option>
+            <option value="TRANSFER">Transfer</option>
+            <option value="COD">COD</option>
+          </Select>
+        </FormField>
+      </div>
+
+      <div className="flex gap-2 pt-2">
+        <SafeButton type="submit" isLoading={pending} icon={<Package className="w-4 h-4" />}>
+          {pending ? 'Menyimpan...' : 'Buat Resi Kargo'}
+        </SafeButton>
+        <SafeButton type="button" variant="ghost" onClick={onClose}>Batal</SafeButton>
+      </div>
+    </form>
+  )
+}
+
 // ─── Pool Card (sidebar item) ─────────────────────────────────────────────────
 
 function PoolListItem({
@@ -609,7 +751,7 @@ function PoolListItem({
 
 function PoolDetail({
   orgId, pool, agents, topUps, settlements, ticketCount, cargoCount,
-  schedules, onBack, onUpdated, onDeleted,
+  schedules, initialCargoShipments, terminals, onBack, onUpdated, onDeleted,
 }: {
   orgId: string
   pool: BusPool
@@ -619,6 +761,8 @@ function PoolDetail({
   ticketCount: number
   cargoCount: number
   schedules: BusSchedule[]
+  initialCargoShipments: (FleetCargoShipment & { bus_pool_id?: string | null })[]
+  terminals: FleetTerminal[]
   onBack: () => void
   onUpdated: (p: BusPool) => void
   onDeleted: (id: string) => void
@@ -635,6 +779,8 @@ function PoolDetail({
   const [localAgents, setLocalAgents] = useState(agents)
   const [localTopUps, setLocalTopUps] = useState(topUps)
   const [localSettlements, setLocalSettlements] = useState(settlements)
+  const [localCargo, setLocalCargo] = useState(initialCargoShipments)
+  const [showCargoModal, setShowCargoModal] = useState(false)
   const [, startTransition] = useTransition()
   const { confirm, ConfirmUI } = useConfirm()
 
@@ -661,6 +807,7 @@ function PoolDetail({
     { id: 'AGEN',       label: 'Agen',       icon: Users,         badge: localAgents.length },
     { id: 'TOPUP',      label: 'Top-up',     icon: ArrowUpCircle, badge: localTopUps.length },
     { id: 'SETTLEMENT', label: 'Settlement', icon: Receipt,       badge: pendingSettlements.length || undefined },
+    { id: 'KARGO',      label: 'Kargo',      icon: Package,       badge: localCargo.length || undefined },
   ]
 
   async function handleMarkPaid(s: BusPoolSettlement) {
@@ -683,8 +830,8 @@ function PoolDetail({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Detail Header */}
-      <div className="flex items-center gap-3 pb-4 border-b border-slate-100 mb-4">
+      {/* Detail Header — row 1: identity */}
+      <div className="flex items-center gap-3 pt-1 pb-3">
         <button
           onClick={onBack}
           className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 cursor-pointer transition-colors shrink-0 md:hidden"
@@ -693,7 +840,7 @@ function PoolDetail({
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="font-bold text-slate-800 text-lg leading-tight">{pool.name}</h2>
+            <h2 className="font-bold text-slate-800 text-base leading-tight">{pool.name}</h2>
             <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full border', cfg.color)}>
               {cfg.label}
             </span>
@@ -707,29 +854,8 @@ function PoolDetail({
             {pool.code}{pool.city ? ` · ${pool.city}` : ''}
           </p>
         </div>
-        <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-          {/* Primary CTA — Jual Tiket */}
-          <button
-            onClick={() => setShowTicketModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 transition-all cursor-pointer shadow-sm shadow-blue-200"
-          >
-            <Ticket className="w-3.5 h-3.5" />
-            Jual Tiket
-          </button>
-          <button
-            onClick={() => setShowTopUpModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-all cursor-pointer"
-          >
-            <ArrowUpCircle className="w-3.5 h-3.5" />
-            Top-up
-          </button>
-          <button
-            onClick={() => setShowSettlementModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-all cursor-pointer"
-          >
-            <Receipt className="w-3.5 h-3.5" />
-            Settlement
-          </button>
+        {/* icon-only secondary */}
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => setShowShortcut(true)}
             className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-all cursor-pointer"
@@ -745,6 +871,38 @@ function PoolDetail({
             <Edit2 className="w-3.5 h-3.5" />
           </button>
         </div>
+      </div>
+
+      {/* Detail Header — row 2: action buttons (scrollable) */}
+      <div className="flex items-center gap-2 pb-4 border-b border-slate-100 mb-4 overflow-x-auto">
+        <button
+          onClick={() => setShowTicketModal(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 text-xs font-bold text-white hover:bg-blue-700 active:scale-95 transition-all cursor-pointer shadow-sm shadow-blue-200 shrink-0"
+        >
+          <Ticket className="w-3.5 h-3.5" />
+          Jual Tiket
+        </button>
+        <button
+          onClick={() => { setDetailTab('KARGO'); setShowCargoModal(true) }}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 text-xs font-bold text-white hover:bg-indigo-700 active:scale-95 transition-all cursor-pointer shadow-sm shadow-indigo-200 shrink-0"
+        >
+          <Package className="w-3.5 h-3.5" />
+          Buat Kargo
+        </button>
+        <button
+          onClick={() => setShowTopUpModal(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-all cursor-pointer shrink-0"
+        >
+          <ArrowUpCircle className="w-3.5 h-3.5" />
+          Top-up
+        </button>
+        <button
+          onClick={() => setShowSettlementModal(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-all cursor-pointer shrink-0"
+        >
+          <Receipt className="w-3.5 h-3.5" />
+          Settlement
+        </button>
       </div>
 
       {/* KPI strip — 6 cards */}
@@ -1167,9 +1325,172 @@ function PoolDetail({
             )}
           </div>
         )}
+
+        {/* ── KARGO ── */}
+        {detailTab === 'KARGO' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Kargo Pool</p>
+                <p className="text-xs text-slate-400 mt-0.5">Pengiriman & penerimaan barang via pool ini</p>
+              </div>
+              <SafeButton size="sm" onClick={() => setShowCargoModal(true)} icon={<Plus className="w-3.5 h-3.5" />}>
+                Buat Pengiriman
+              </SafeButton>
+            </div>
+
+            {/* Mini stats */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                {
+                  label: 'Total Kargo',
+                  val: localCargo.length,
+                  cls: 'text-slate-800',
+                },
+                {
+                  label: 'Dalam Proses',
+                  val: localCargo.filter(c => ['DRAFT','MANIFESTED','IN_TRANSIT'].includes(c.status)).length,
+                  cls: 'text-blue-600',
+                },
+                {
+                  label: 'Terkirim',
+                  val: localCargo.filter(c => c.status === 'DELIVERED').length,
+                  cls: 'text-emerald-600',
+                },
+              ].map(item => (
+                <div key={item.label} className="bg-white border border-slate-100 rounded-xl p-4 text-center shadow-sm">
+                  <p className={cn('text-2xl font-bold', item.cls)}>{item.val}</p>
+                  <p className="text-[10px] font-semibold text-slate-400 mt-1">{item.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {localCargo.length === 0 ? (
+              <EmptyState
+                icon={Package}
+                title="Belum ada kargo"
+                description="Buat pengiriman kargo yang terhubung ke pool ini."
+                action={
+                  <SafeButton size="sm" onClick={() => setShowCargoModal(true)} icon={<Plus className="w-3.5 h-3.5" />}>
+                    Buat Pengiriman
+                  </SafeButton>
+                }
+              />
+            ) : (
+              <div className="space-y-2">
+                {localCargo.map(cargo => {
+                  const STATUS_CFG: Record<CargoStatus, { label: string; cls: string }> = {
+                    DRAFT:      { label: 'Draft',       cls: 'bg-slate-100 text-slate-600'    },
+                    MANIFESTED: { label: 'Dimanifes',   cls: 'bg-blue-50 text-blue-700'       },
+                    IN_TRANSIT: { label: 'Dalam Jalan', cls: 'bg-amber-50 text-amber-700'     },
+                    ARRIVED:    { label: 'Tiba',        cls: 'bg-indigo-50 text-indigo-700'   },
+                    DELIVERED:  { label: 'Terkirim',    cls: 'bg-emerald-50 text-emerald-700' },
+                    CANCELLED:  { label: 'Dibatal',     cls: 'bg-red-50 text-red-600'         },
+                  }
+                  const sc = STATUS_CFG[cargo.status]
+                  const originName = (cargo as any).origin?.name ?? terminals.find(t => t.id === cargo.origin_terminal_id)?.name ?? '-'
+                  const destName   = (cargo as any).destination?.name ?? terminals.find(t => t.id === cargo.destination_terminal_id)?.name ?? '-'
+
+                  const NEXT_STATUS: Partial<Record<CargoStatus, CargoStatus>> = {
+                    DRAFT:      'IN_TRANSIT',
+                    IN_TRANSIT: 'ARRIVED',
+                    ARRIVED:    'DELIVERED',
+                  }
+                  const nextStatus = NEXT_STATUS[cargo.status]
+                  const NEXT_LABEL: Partial<Record<CargoStatus, string>> = {
+                    DRAFT:      'Kirim',
+                    IN_TRANSIT: 'Tandai Tiba',
+                    ARRIVED:    'Tandai Terima',
+                  }
+
+                  return (
+                    <div key={cargo.id} className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:border-slate-200 transition-colors">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                            <span className="font-mono text-xs font-bold text-slate-700">{cargo.tracking_number}</span>
+                            <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', sc.cls)}>
+                              {sc.label}
+                            </span>
+                            <span className={cn(
+                              'text-[10px] font-semibold px-2 py-0.5 rounded-full',
+                              cargo.payment_status === 'PAID' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600',
+                            )}>
+                              {cargo.payment_status === 'PAID' ? 'Lunas' : 'Belum Lunas'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                            <span className="font-medium">{originName}</span>
+                            <MoveRight className="w-3 h-3 shrink-0 text-slate-300" />
+                            <span className="font-medium">{destName}</span>
+                          </div>
+
+                          <p className="text-xs text-slate-500">
+                            <span className="font-medium">{cargo.sender_name}</span>
+                            <span className="text-slate-300 mx-1">→</span>
+                            <span className="font-medium">{cargo.receiver_name}</span>
+                          </p>
+
+                          <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400">
+                            {cargo.item_description && <span className="flex items-center gap-1"><Box className="w-3 h-3" />{cargo.item_description}</span>}
+                            <span className="flex items-center gap-1"><Weight className="w-3 h-3" />{cargo.weight_kg} kg</span>
+                            <span>{formatDate(cargo.created_at)}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-slate-800 text-sm">{formatRupiah(cargo.grand_total)}</p>
+                          {nextStatus && (
+                            <SafeButton
+                              size="sm" variant="secondary" className="mt-2"
+                              icon={<Truck className="w-3 h-3" />}
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: `Update status kargo?`,
+                                  message: `Ubah ke "${NEXT_LABEL[cargo.status]}"?`,
+                                  confirmLabel: NEXT_LABEL[cargo.status],
+                                  variant: 'primary',
+                                })
+                                if (!ok) return
+                                startTransition(async () => {
+                                  const res = await updateCargoStatus(orgId, cargo.id, nextStatus)
+                                  if (!('error' in res)) {
+                                    setLocalCargo(prev => prev.map(c => c.id === cargo.id ? { ...c, status: nextStatus } : c))
+                                  }
+                                })
+                              }}
+                            >
+                              {NEXT_LABEL[cargo.status]}
+                            </SafeButton>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Modals ── */}
+
+      {showCargoModal && (
+        <QuickModal title={`Buat Pengiriman — ${pool.name}`} onClose={() => setShowCargoModal(false)} wide>
+          <CargoCreateForm
+            orgId={orgId}
+            pool={pool}
+            terminals={terminals}
+            onSaved={(shipment) => {
+              setLocalCargo(prev => [shipment, ...prev])
+              setShowCargoModal(false)
+            }}
+            onClose={() => setShowCargoModal(false)}
+          />
+        </QuickModal>
+      )}
 
       {showTicketModal && (
         <QuickModal title={`Jual Tiket — ${pool.name}`} onClose={() => setShowTicketModal(false)} wide>
@@ -1537,6 +1858,8 @@ interface PoolAgenTabProps {
   cargoByPool?: Record<string, number>
   schedules?: BusSchedule[]
   routes?: BusRoute[]
+  cargoShipments?: (FleetCargoShipment & { bus_pool_id?: string | null })[]
+  terminals?: FleetTerminal[]
 }
 
 export function PoolAgenTab({
@@ -1548,6 +1871,8 @@ export function PoolAgenTab({
   ticketsByPool,
   cargoByPool = {},
   schedules = [],
+  cargoShipments = [],
+  terminals = [],
 }: PoolAgenTabProps) {
   const [pools, setPools] = useState(initialPools)
   const [allTopUps, setAllTopUps] = useState(initialTopUps)
@@ -1624,8 +1949,10 @@ export function PoolAgenTab({
               topUps={allTopUps.filter(t => t.pool_id === selectedPool.id)}
               settlements={allSettlements.filter(s => s.pool_id === selectedPool.id)}
               ticketCount={ticketsByPool[selectedPool.id] ?? 0}
-              cargoCount={cargoByPool[selectedPool.id] ?? 0}
+              cargoCount={cargoByPool[selectedPool.id] ?? cargoShipments.filter(c => c.bus_pool_id === selectedPool.id).length}
               schedules={schedules}
+              initialCargoShipments={cargoShipments.filter(c => c.bus_pool_id === selectedPool.id)}
+              terminals={terminals}
               onBack={() => setSelectedPool(null)}
               onUpdated={(updated) => {
                 setPools(prev => prev.map(p => p.id === updated.id ? updated : p))

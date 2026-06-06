@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useTransition } from 'react'
 import {
   Store, Ticket, Receipt, Users, TrendingUp,
   CheckCircle2, Clock, ArrowUpCircle, Phone, Mail, MapPin,
-  AlertTriangle, Building2, CreditCard, Package,
+  AlertTriangle, Building2, Package, X, Loader2, MoveRight, Printer,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip as ReTooltip,
@@ -12,7 +12,10 @@ import {
 } from 'recharts'
 import { cn } from '@/lib/utils'
 import { StatCard, SectionCard, SectionHeader, EmptyState, StatusBadge } from '@/components/ui/NizamUI'
-import type { BusPool, BusPoolTopUp, BusPoolSettlement, BusTicket, BusAgent } from '@/modules/po-bus/lib/po-bus-types'
+import type { BusPool, BusPoolTopUp, BusPoolSettlement, BusTicket, BusAgent, BusSchedule } from '@/modules/po-bus/lib/po-bus-types'
+import type { FleetTerminal } from '@/types/database.types'
+import { createBusTicket } from '@/modules/po-bus/actions/po-bus.actions'
+import { createCargoShipment } from '@/modules/po-bus/actions/cargo.actions'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,12 +63,16 @@ const STATUS_CFG: Record<string, { label: string; badge: 'success' | 'info' | 'e
 
 type Tab = 'RINGKASAN' | 'TIKET' | 'SETTLEMENT' | 'TOPUP' | 'AGEN'
 
+type PortalSchedule = BusSchedule & { route_name?: string; origin?: string; destination?: string; base_price?: number; plate_number?: string; model?: string }
+
 interface Props {
   pool: BusPool
   agents: BusAgent[]
   topUps: BusPoolTopUp[]
   settlements: BusPoolSettlement[]
   tickets: (BusTicket & { departure_time?: string; origin?: string; destination?: string })[]
+  schedules?: PortalSchedule[]
+  terminals?: FleetTerminal[]
 }
 
 // ─── Revenue Chart ────────────────────────────────────────────────────────────
@@ -148,8 +155,10 @@ function RevenueChart({ settlements, topUps }: { settlements: BusPoolSettlement[
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function PoolPortalClient({ pool, agents, topUps, settlements, tickets }: Props) {
+export function PoolPortalClient({ pool, agents, topUps, settlements, tickets, schedules = [], terminals = [] }: Props) {
   const [tab, setTab] = useState<Tab>('RINGKASAN')
+  const [showTicketModal, setShowTicketModal] = useState(false)
+  const [showCargoModal, setShowCargoModal] = useState(false)
 
   const cfg = POOL_TYPE_CFG[pool.pool_type] ?? POOL_TYPE_CFG.AGEN_RESMI
 
@@ -232,7 +241,53 @@ export function PoolPortalClient({ pool, agents, topUps, settlements, tickets }:
               </p>
             </div>
           )}
+
+          {/* Action buttons */}
+          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 overflow-x-auto">
+            <button
+              onClick={() => setShowTicketModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-sm font-bold text-white hover:bg-blue-700 active:scale-95 transition-all cursor-pointer shadow-sm shadow-blue-200 shrink-0"
+            >
+              <Ticket className="w-4 h-4" />
+              Jual Tiket
+            </button>
+            <button
+              onClick={() => setShowCargoModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-sm font-bold text-white hover:bg-indigo-700 active:scale-95 transition-all cursor-pointer shadow-sm shadow-indigo-200 shrink-0"
+            >
+              <Package className="w-4 h-4" />
+              Buat Kargo
+            </button>
+            <a
+              href={`/print/manifest/${pool.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer shrink-0"
+            >
+              <Printer className="w-4 h-4" />
+              Manifest Kargo
+            </a>
+          </div>
         </div>
+
+        {/* ── Modal: Jual Tiket ── */}
+        {showTicketModal && (
+          <TicketModal
+            pool={pool}
+            schedules={schedules}
+            agents={agents}
+            onClose={() => setShowTicketModal(false)}
+          />
+        )}
+
+        {/* ── Modal: Buat Kargo ── */}
+        {showCargoModal && (
+          <CargoModal
+            pool={pool}
+            terminals={terminals}
+            onClose={() => setShowCargoModal(false)}
+          />
+        )}
 
         {/* ── KPI strip ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -407,11 +462,11 @@ export function PoolPortalClient({ pool, agents, topUps, settlements, tickets }:
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100">
-                      {['Penumpang', 'Rute', 'Kursi', 'Harga', 'Tanggal', 'Status'].map((h, i) => (
-                        <th key={h} className={cn(
+                      {['Penumpang', 'Rute', 'Kursi', 'Harga', 'Tanggal', 'Status', ''].map((h, i) => (
+                        <th key={i} className={cn(
                           'py-3 px-4 text-xs font-semibold text-slate-400',
                           i === 0 ? 'text-left pl-5' : i === 3 ? 'text-right' : 'text-left',
-                          i === 5 ? 'pr-5' : '',
+                          i === 5 ? '' : i === 6 ? 'pr-5 w-8' : '',
                         )}>{h}</th>
                       ))}
                     </tr>
@@ -431,8 +486,19 @@ export function PoolPortalClient({ pool, agents, topUps, settlements, tickets }:
                           <td className="py-3 px-4 font-mono text-xs font-semibold text-slate-600">{t.seat_number}</td>
                           <td className="py-3 px-4 text-right font-semibold text-slate-700">{formatRupiah(t.price)}</td>
                           <td className="py-3 px-4 text-xs text-slate-400">{formatDate(t.created_at)}</td>
-                          <td className="py-3 px-4 pr-5">
+                          <td className="py-3 px-4">
                             <StatusBadge label={sc.label} variant={sc.badge} />
+                          </td>
+                          <td className="py-3 px-4 pr-5">
+                            <a
+                              href={`/print/ticket/${t.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Cetak Tiket"
+                              className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300 transition-colors cursor-pointer inline-flex items-center"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </a>
                           </td>
                         </tr>
                       )
@@ -558,6 +624,394 @@ export function PoolPortalClient({ pool, agents, topUps, settlements, tickets }:
         )}
 
         <p className="text-center text-xs text-slate-300 pb-4">{pool.name} · {pool.code}</p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Ticket Modal ─────────────────────────────────────────────────────────────
+
+function TicketModal({ pool, schedules, agents, onClose }: {
+  pool: BusPool
+  schedules: PortalSchedule[]
+  agents: BusAgent[]
+  onClose: () => void
+}) {
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [lastTicketId, setLastTicketId] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    schedule_id: schedules[0]?.id ?? '',
+    passenger_name: '',
+    passenger_phone: '',
+    seat_number: '',
+    price: schedules[0]?.base_price ? String(n(schedules[0].base_price)) : '',
+    agent_id: '',
+    notes: '',
+  })
+
+  const selectedSched = schedules.find(s => s.id === form.schedule_id)
+
+  function handleScheduleChange(id: string) {
+    const s = schedules.find(x => x.id === id)
+    setForm(f => ({
+      ...f,
+      schedule_id: id,
+      price: s?.base_price ? String(n(s.base_price)) : f.price,
+    }))
+  }
+
+  function handleSubmit() {
+    if (!form.schedule_id || !form.passenger_name.trim() || !form.seat_number.trim()) {
+      setError('Jadwal, nama penumpang, dan nomor kursi wajib diisi.')
+      return
+    }
+    setError(null)
+    startTransition(async () => {
+      const res = await createBusTicket(pool.org_id, {
+        schedule_id: form.schedule_id,
+        passenger_name: form.passenger_name.trim(),
+        passenger_phone: form.passenger_phone.trim() || undefined,
+        seat_number: form.seat_number.trim(),
+        price: n(form.price),
+        agent_id: form.agent_id || undefined,
+        pool_id: pool.id,
+        notes: form.notes.trim() || undefined,
+      })
+      if (res.error) {
+        setError(res.error)
+      } else {
+        setSuccess(`Tiket berhasil dibuat untuk ${form.passenger_name}!`)
+        setLastTicketId(res.data?.id ?? null)
+        setForm(f => ({ ...f, passenger_name: '', passenger_phone: '', seat_number: '', notes: '' }))
+      }
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Ticket className="w-4 h-4 text-blue-600" />
+            <h3 className="font-bold text-slate-800 text-sm">Jual Tiket</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          {success && (
+            <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-emerald-700 font-medium">{success}</p>
+                {lastTicketId && (
+                  <a
+                    href={`/print/ticket/${lastTicketId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 font-semibold mt-1 underline cursor-pointer"
+                  >
+                    <Printer className="w-3 h-3" />
+                    Cetak Tiket
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+          {error && (
+            <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2.5">
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+              <p className="text-sm text-rose-700">{error}</p>
+            </div>
+          )}
+
+          {/* Jadwal */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Jadwal Keberangkatan</label>
+            {schedules.length === 0 ? (
+              <p className="text-xs text-slate-400 py-2">Tidak ada jadwal tersedia.</p>
+            ) : (
+              <select
+                value={form.schedule_id}
+                onChange={e => handleScheduleChange(e.target.value)}
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 cursor-pointer"
+              >
+                {schedules.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.origin ?? s.route_name ?? '—'} → {s.destination ?? '—'} · {new Date(s.departure_time).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {s.plate_number ? ` (${s.plate_number})` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+            {selectedSched && (
+              <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                <MoveRight className="w-3 h-3" />
+                {selectedSched.route_name ?? `${selectedSched.origin} - ${selectedSched.destination}`}
+                {selectedSched.base_price ? ` · Base: ${formatRupiah(selectedSched.base_price)}` : ''}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Nama Penumpang *</label>
+              <input value={form.passenger_name} onChange={e => setForm(f => ({ ...f, passenger_name: e.target.value }))}
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                placeholder="Nama lengkap" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">No. HP</label>
+              <input value={form.passenger_phone} onChange={e => setForm(f => ({ ...f, passenger_phone: e.target.value }))}
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                placeholder="08xx..." />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">No. Kursi *</label>
+              <input value={form.seat_number} onChange={e => setForm(f => ({ ...f, seat_number: e.target.value }))}
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                placeholder="A1, 12, dsb" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Harga (Rp)</label>
+              <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                placeholder="0" />
+            </div>
+          </div>
+
+          {agents.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Agen (opsional)</label>
+              <select value={form.agent_id} onChange={e => setForm(f => ({ ...f, agent_id: e.target.value }))}
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer">
+                <option value="">— Tanpa agen —</option>
+                {agents.filter(a => a.is_active).map(a => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Catatan</label>
+            <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+              placeholder="Opsional..." />
+          </div>
+        </div>
+
+        <div className="px-5 pb-5 flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors">
+            Batal
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isPending}
+            className="flex-1 py-2.5 rounded-xl bg-blue-600 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60 cursor-pointer transition-colors flex items-center justify-center gap-2"
+          >
+            {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isPending ? 'Menyimpan...' : 'Jual Tiket'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Cargo Modal ──────────────────────────────────────────────────────────────
+
+function CargoModal({ pool, terminals, onClose }: {
+  pool: BusPool
+  terminals: FleetTerminal[]
+  onClose: () => void
+}) {
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [lastCargoId, setLastCargoId] = useState<string | null>(null)
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setError(null)
+    const fd = new FormData(e.currentTarget)
+    fd.set('bus_pool_id', pool.id)
+    startTransition(async () => {
+      const res = await createCargoShipment(pool.org_id, fd)
+      if (res.error) {
+        setError(res.error)
+      } else {
+        setSuccess(`Resi kargo ${res.trackingNumber} berhasil dibuat!`)
+        setLastCargoId(res.id ?? null)
+        ;(e.target as HTMLFormElement).reset()
+      }
+    })
+  }
+
+  const inputCls = 'w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400'
+  const labelCls = 'block text-xs font-semibold text-slate-500 mb-1'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-2">
+            <Package className="w-4 h-4 text-indigo-600" />
+            <h3 className="font-bold text-slate-800 text-sm">Buat Resi Kargo</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1">
+          <div className="p-5 space-y-3">
+            {success && (
+              <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-emerald-700 font-medium">{success}</p>
+                  {lastCargoId && (
+                    <a
+                      href={`/print/manifest/${pool.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800 font-semibold mt-1 underline cursor-pointer"
+                    >
+                      <Printer className="w-3 h-3" />
+                      Cetak Manifest Pool
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+            {error && (
+              <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2.5">
+                <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+                <p className="text-sm text-rose-700">{error}</p>
+              </div>
+            )}
+
+            {/* Pengirim & Penerima */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Nama Pengirim *</label>
+                <input name="sender_name" required className={inputCls} placeholder="Nama lengkap" />
+              </div>
+              <div>
+                <label className={labelCls}>HP Pengirim</label>
+                <input name="sender_phone" className={inputCls} placeholder="08xx..." />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Nama Penerima *</label>
+                <input name="receiver_name" required className={inputCls} placeholder="Nama lengkap" />
+              </div>
+              <div>
+                <label className={labelCls}>HP Penerima</label>
+                <input name="receiver_phone" className={inputCls} placeholder="08xx..." />
+              </div>
+            </div>
+
+            {/* Terminal */}
+            {terminals.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Terminal Asal</label>
+                  <select name="origin_terminal_id" className={cn(inputCls, 'bg-white cursor-pointer')}>
+                    <option value="">— Pilih —</option>
+                    {terminals.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Terminal Tujuan</label>
+                  <select name="destination_terminal_id" className={cn(inputCls, 'bg-white cursor-pointer')}>
+                    <option value="">— Pilih —</option>
+                    {terminals.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Kota Asal</label>
+                  <input name="origin_terminal_id" className={inputCls} placeholder="Contoh: Jakarta" />
+                </div>
+                <div>
+                  <label className={labelCls}>Kota Tujuan</label>
+                  <input name="destination_terminal_id" className={inputCls} placeholder="Contoh: Surabaya" />
+                </div>
+              </div>
+            )}
+
+            {/* Barang */}
+            <div>
+              <label className={labelCls}>Deskripsi Barang *</label>
+              <input name="item_description" required className={inputCls} placeholder="Cth: Elektronik, Pakaian..." />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className={labelCls}>Berat (kg)</label>
+                <input name="weight_kg" type="number" step="0.1" min="0" className={inputCls} placeholder="0" defaultValue="1" />
+              </div>
+              <div>
+                <label className={labelCls}>Koli</label>
+                <input name="koli_count" type="number" min="1" className={inputCls} placeholder="1" defaultValue="1" />
+              </div>
+              <div>
+                <label className={labelCls}>Volume (m³)</label>
+                <input name="volume_m3" type="number" step="0.01" min="0" className={inputCls} placeholder="0" defaultValue="0" />
+              </div>
+            </div>
+
+            {/* Biaya */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Ongkos Kirim (Rp)</label>
+                <input name="shipping_cost" type="number" min="0" className={inputCls} placeholder="0" defaultValue="0" />
+              </div>
+              <div>
+                <label className={labelCls}>Biaya Handling</label>
+                <input name="handling_fee" type="number" min="0" className={inputCls} placeholder="0" defaultValue="0" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Total (Rp)</label>
+                <input name="grand_total" type="number" min="0" className={inputCls} placeholder="0" defaultValue="0" />
+              </div>
+              <div>
+                <label className={labelCls}>Status Bayar</label>
+                <select name="payment_status" className={cn(inputCls, 'bg-white cursor-pointer')}>
+                  <option value="UNPAID">Belum Bayar</option>
+                  <option value="PAID">Sudah Bayar</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-5 pb-5 flex gap-2 shrink-0">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors">
+              Batal
+            </button>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60 cursor-pointer transition-colors flex items-center justify-center gap-2"
+            >
+              {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isPending ? 'Menyimpan...' : 'Buat Resi'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )
