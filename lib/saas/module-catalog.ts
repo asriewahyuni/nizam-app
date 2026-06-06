@@ -380,7 +380,7 @@ export const SAAS_LITE_PACKAGE_MODULES = [...SAAS_LITE_CORE_MODULES, 'Config'] a
 export const SAAS_BASE_PACKAGE_MODULES = [...SAAS_CORE_MODULES, 'Config'] as const
 export const SAAS_PRO_PACKAGE_MODULES = [...SAAS_CORE_MODULES, ...SAAS_PREMIUM_MODULES, 'Config'] as const
 export const SAAS_ENTERPRISE_PACKAGE_MODULES = [...SAAS_PRO_PACKAGE_MODULES] as const
-export const SAAS_DEMO_PACKAGE_MODULES = [...SAAS_PRO_PACKAGE_MODULES, 'Fleet & Rental', 'Job Order (Jasa)', 'Project & Construction', 'Syirkah', 'Warehouse', 'Sales Page', 'Integrasi API'] as const
+export const SAAS_DEMO_PACKAGE_MODULES = [...SAAS_PRO_PACKAGE_MODULES, 'Job Order (Jasa)', 'Project & Construction', 'Syirkah', 'Warehouse', 'Sales Page', 'Integrasi API'] as const
 export const SAAS_ABS_SPECIAL_MODULES = [
   ...SAAS_CORE_MODULES,
   'HRIS',

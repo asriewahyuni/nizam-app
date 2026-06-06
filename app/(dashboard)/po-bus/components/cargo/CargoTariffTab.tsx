@@ -7,12 +7,12 @@ import { upsertCargoTariff, deleteCargoTariff } from '@/modules/po-bus/actions/c
 
 export function CargoTariffTab({
   orgId,
-  terminals,
+  pools,
   tariffs,
   onRefresh
 }: {
   orgId: string
-  terminals: any[]
+  pools: any[]
   tariffs: any[]
   onRefresh: () => void
 }) {
@@ -24,17 +24,17 @@ export function CargoTariffTab({
     const formData = new FormData(e.currentTarget)
     
     const payload = {
-      origin_terminal_id: formData.get('origin_terminal_id'),
-      destination_terminal_id: formData.get('destination_terminal_id'),
+      origin_pool_id: formData.get('origin_pool_id'),
+      destination_pool_id: formData.get('destination_pool_id'),
       base_price: Number(formData.get('base_price')),
       price_per_kg: Number(formData.get('price_per_kg')),
       price_per_m3: Number(formData.get('price_per_m3')),
     }
     
-    if (payload.origin_terminal_id === payload.destination_terminal_id) {
-       alert('Asal dan Tujuan tidak boleh sama')
-       setLoading(false)
-       return
+    if (payload.origin_pool_id === payload.destination_pool_id) {
+      alert('Pool asal dan tujuan tidak boleh sama')
+      setLoading(false)
+      return
     }
 
     const res = await upsertCargoTariff(orgId, payload)
@@ -67,18 +67,23 @@ export function CargoTariffTab({
             
             <form onSubmit={handleSubmit} className="space-y-4">
                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Terminal Asal</label>
-                  <select name="origin_terminal_id" required className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-blue-400 rounded-2xl text-sm font-semibold focus:ring-4 focus:ring-blue-100 outline-none">
-                     <option value="">-- Pilih --</option>
-                     {terminals.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Pool Asal</label>
+                  <div className="relative">
+                    <select name="origin_pool_id" required className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-blue-400 rounded-2xl text-sm font-semibold focus:ring-4 focus:ring-blue-100 outline-none">
+                       <option value="">Pilih asal</option>
+                       {pools.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
                </div>
                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Terminal Tujuan</label>
-                  <select name="destination_terminal_id" required className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-blue-400 rounded-2xl text-sm font-semibold focus:ring-4 focus:ring-blue-100 outline-none">
-                     <option value="">-- Pilih --</option>
-                     {terminals.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Pool Tujuan</label>
+                  <div className="relative">
+                    <select name="destination_pool_id" required className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-blue-400 rounded-2xl text-sm font-semibold focus:ring-4 focus:ring-blue-100 outline-none">
+                       <option value="">Pilih tujuan</option>
+                       {pools.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
                </div>
                
                <div className="pt-4 border-t border-slate-100">
@@ -120,8 +125,10 @@ export function CargoTariffTab({
                  {tariffs.map(t => (
                    <div key={t.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
                       <div>
-                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
-                            {t.origin?.location_name || t.origin?.name} <ChevronRight size={12} className="inline text-slate-300 mx-1" /> {t.destination?.location_name || t.destination?.name}
+                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+                            <span className="font-bold text-slate-800">{t.origin_pool?.name || '-'}</span>
+                            <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />
+                            <span className="font-bold text-slate-800">{t.destination_pool?.name || '-'}</span>
                          </p>
                          <div className="flex gap-4">
                             <span className="text-sm font-black text-slate-900">Dasar: {formatRupiah(t.base_price)}</span>

@@ -54,8 +54,8 @@ export async function getCargoShipments(orgId: string, branchId?: string | null)
     .from('fleet_cargo_shipments')
     .select(`
       *,
-      origin:fleet_terminals!origin_terminal_id(id, name, location_name),
-      destination:fleet_terminals!destination_terminal_id(id, name, location_name),
+      origin_pool:bus_pools!origin_pool_id(id, name, city),
+      destination_pool:bus_pools!destination_pool_id(id, name, city),
       schedule:fleet_schedules(id, departure_time, route_id)
     `)
     .eq('org_id', orgId)
@@ -92,8 +92,8 @@ export async function getCargoTracking(trackingNumber: string) {
     .select(`
       id, tracking_number, sender_name, receiver_name, 
       status, created_at, payment_status,
-      origin:fleet_terminals!origin_terminal_id(name, location_name),
-      destination:fleet_terminals!destination_terminal_id(name, location_name)
+      origin_pool:bus_pools!origin_pool_id(name, city),
+      destination_pool:bus_pools!destination_pool_id(name, city)
     `)
     .eq('tracking_number', trackingNumber)
     .single()
@@ -110,7 +110,7 @@ export async function createCargoShipment(orgId: string, formData: FormData) {
   const supabase = await getSupabase()
   const activeBranch = await requireFleetCreateBranchId(
     orgId,
-    'Pilih unit aktif (Terminal) terlebih dahulu untuk membuat resi kargo.'
+    'Pilih unit aktif (Pool) terlebih dahulu untuk membuat resi kargo.'
   )
   if ('error' in activeBranch) return { error: activeBranch.error }
 
@@ -129,8 +129,8 @@ export async function createCargoShipment(orgId: string, formData: FormData) {
     sender_phone: formData.get('sender_phone') as string,
     receiver_name: formData.get('receiver_name') as string,
     receiver_phone: formData.get('receiver_phone') as string,
-    origin_terminal_id: formData.get('origin_terminal_id') as string,
-    destination_terminal_id: formData.get('destination_terminal_id') as string,
+    origin_pool_id: formData.get('origin_pool_id') as string,
+    destination_pool_id: formData.get('destination_pool_id') as string,
     item_description: formData.get('item_description') as string,
     weight_kg: Number(formData.get('weight_kg')) || 0,
     volume_m3: Number(formData.get('volume_m3')) || 0,
@@ -184,9 +184,9 @@ export async function updateCargoStatus(orgId: string, cargoId: string, status: 
     
   if (fetchErr) return { error: 'Kargo tidak ditemukan.' }
   
-  // Verifikasi branch access (di terminal manapun user berada, asalkan punya akses)
-  const branchAccess = await ensureFleetBranchAccess(orgId, cargo.branch_id, 'Akses ditolak.')
-  if ('error' in branchAccess) return { error: branchAccess.error }
+  // Verifikasi branch access (di pool manapun user berada, asalkan punya akses)
+  const branchSelection = await resolveFleetBranchSelection(orgId, null)
+  if ('error' in branchSelection) return { error: branchSelection.error }
 
   const { error } = await supabase
     .from('fleet_cargo_shipments')
@@ -237,7 +237,7 @@ export async function processCargoArrivalByBarcode(orgId: string, trackingNumber
   
   const { data: cargo, error: fetchErr } = await supabase
     .from('fleet_cargo_shipments')
-    .select('id, destination_terminal_id, status')
+    .select('id, destination_pool_id, status')
     .eq('org_id', orgId)
     .eq('tracking_number', trackingNumber)
     .single()
@@ -267,7 +267,7 @@ export async function processCargoDelivery(orgId: string, cargoId: string) {
   
   const { data: cargo, error: fetchErr } = await supabase
     .from('fleet_cargo_shipments')
-    .select('id, status, payment_status')
+    .select('id, destination_pool_id, status')
     .eq('org_id', orgId)
     .eq('id', cargoId)
     .single()

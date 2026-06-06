@@ -215,7 +215,7 @@ export function POBusClient({
       bank_name: fd.get('bank_name') as string,
       bank_account: fd.get('bank_account') as string,
       bank_account_name: fd.get('bank_account_name') as string,
-      notes: fd.get('notes') as string,
+      notes: fd.get('notes') as string
     }
     startTransition(async () => {
       let res: any
@@ -750,10 +750,11 @@ export function POBusClient({
       {activeTab === 'KARGO' && (
         <CargoClient 
           orgId={orgId}
-          initialShipments={cargoShipments}
-          terminals={terminals}
+          cargoShipments={cargoShipments}
+          pools={localPools}
           schedules={schedules}
-          tariffs={cargoTariffs}
+          cargoTariffs={cargoTariffs}
+          defaultOriginPoolId={localPools.length === 1 ? localPools[0].id : null}
           role="admin" // Simplifikasi untuk sementara
           permissions={[]} // Asumsikan admin punya full akses, validasi detail di dalam CargoClient
         />
@@ -1519,7 +1520,9 @@ export function POBusClient({
               </Select>
             </FormField>
           </div>
-          <FormField label="Nama Pool / Agen *"><Input name="name" defaultValue={editingPool?.name || ''} placeholder="Agen Tiket Bintang Jaya Jakarta" required /></FormField>
+          <div className="grid grid-cols-1 gap-4">
+            <FormField label="Nama Pool / Agen *"><Input name="name" defaultValue={editingPool?.name || ''} placeholder="Agen Tiket Bintang Jaya Jakarta" required /></FormField>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Nama Pemilik"><Input name="owner_name" defaultValue={editingPool?.owner_name || ''} placeholder="Budi Santoso" /></FormField>
             <FormField label="Nama PIC (Koordinator)"><Input name="pic_name" defaultValue={editingPool?.pic_name || ''} placeholder="Siti Rahayu" /></FormField>

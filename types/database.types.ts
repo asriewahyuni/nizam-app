@@ -195,19 +195,12 @@ export type CargoStatus = 'DRAFT' | 'MANIFESTED' | 'IN_TRANSIT' | 'ARRIVED' | 'D
 export type CargoPaymentStatus = 'UNPAID' | 'PAID'
 
 export type FleetCargoShipment = {
-  id: string
-  org_id: string
-  branch_id?: string | null
-  tracking_number: string
-  sender_name: string
-  sender_phone: string
-  receiver_name: string
-  receiver_phone: string
-  origin_terminal_id: string
-  destination_terminal_id: string
-  item_description?: string | null
-  weight_kg: number
-  volume_m3: number
+  id: string; org_id: string; branch_id: string | null; tracking_number: string
+  sender_name: string; sender_phone: string
+  receiver_name: string; receiver_phone: string
+  origin_terminal_id: string | null; destination_terminal_id: string | null
+  origin_pool_id: string | null; destination_pool_id: string | null
+  item_description: string | null; weight_kg: number; volume_m3: number
   shipping_cost: number
   handling_fee: number
   grand_total: number

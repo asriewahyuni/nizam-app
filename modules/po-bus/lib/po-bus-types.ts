@@ -209,6 +209,7 @@ export type BusPool = {
   id: string
   org_id: string
   branch_id: string | null
+  terminal_id?: string | null
   code: string
   name: string
   pool_type: BusPoolType

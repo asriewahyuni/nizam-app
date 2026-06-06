@@ -8,16 +8,20 @@ import { printSticker, printShiftClosing } from '@/lib/print-helper'
 
 export function CargoPosTab({
   orgId,
-  terminals,
+  pools,
   shipments,
-  tariffs = [],
-  onRefresh
+  tariffs,
+  onRefresh,
+  isFullScreen,
+  defaultOriginPoolId
 }: {
   orgId: string
-  terminals: any[]
+  pools: any[]
   shipments: any[]
   tariffs?: any[]
   onRefresh: () => void
+  isFullScreen?: boolean
+  defaultOriginPoolId?: string | null
 }) {
   const [loading, setLoading] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
@@ -30,13 +34,13 @@ export function CargoPosTab({
   const [volume, setVolume] = useState(0)
   const [shippingCost, setShippingCost] = useState(0)
   const [handlingFee, setHandlingFee] = useState(0)
-  const [originId, setOriginId] = useState('')
+  const [originId, setOriginId] = useState(defaultOriginPoolId || '')
   const [destId, setDestId] = useState('')
 
   const grandTotal = shippingCost + handlingFee
 
   const calculateCost = (w: number, v: number, o: string, d: string) => {
-    const tariff = tariffs?.find(t => t.origin_terminal_id === o && t.destination_terminal_id === d)
+    const tariff = tariffs?.find(t => t.origin_pool_id === o && t.destination_pool_id === d)
     if (!tariff) {
       setShippingCost(0) // Belum ada tarif atau belum dipilih
       return
@@ -214,8 +218,15 @@ export function CargoPosTab({
                 <h3 className="text-xl font-bold tracking-tight">Kirim Kargo</h3>
                 <p className="text-blue-200 text-sm font-medium">Buat resi baru</p>
              </div>
-             <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                <Package className="text-white w-6 h-6" />
+             <div className="flex gap-2">
+                {!isFullScreen && (
+                  <a href="/pos-cargo" target="_blank" rel="noreferrer" className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-all cursor-pointer" title="Buka Layar Penuh">
+                     <Navigation className="text-white w-5 h-5" />
+                  </a>
+                )}
+                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                   <Package className="text-white w-6 h-6" />
+                </div>
              </div>
            </div>
            
@@ -256,12 +267,25 @@ export function CargoPosTab({
                  <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Terminal Asal</label>
                     <div className="relative">
-                       <select name="origin_terminal_id" value={originId} onChange={handleOriginChange} required className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent focus:border-amber-400 rounded-2xl text-base font-semibold focus:ring-4 focus:ring-amber-100 outline-none transition-all appearance-none cursor-pointer">
-                         <option value="">Pilih terminal asal</option>
-                         {terminals.map(t => <option key={t.id} value={t.id}>{t.name} ({t.location_name || '-'})</option>)}
+                       <select 
+                         disabled={!!defaultOriginPoolId}
+                         name={defaultOriginPoolId ? undefined : "origin_pool_id"} 
+                         value={originId} 
+                         onChange={handleOriginChange} 
+                         required 
+                         className={`w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-2xl text-base font-semibold outline-none transition-all appearance-none ${defaultOriginPoolId ? 'opacity-80 cursor-not-allowed' : 'focus:border-amber-400 focus:ring-4 focus:ring-amber-100 cursor-pointer'}`}
+                       >
+                         <option value="">Pilih pool asal</option>
+                         {pools.map(t => <option key={t.id} value={t.id}>{t.name} ({t.city || '-'})</option>)}
                        </select>
-                       <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
+                       {!defaultOriginPoolId && <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />}
                     </div>
+                    {defaultOriginPoolId && (
+                       <>
+                         <input type="hidden" name="origin_pool_id" value={defaultOriginPoolId} />
+                         <p className="text-[10px] font-bold text-amber-600 mt-2">*Pool asal otomatis dikunci sesuai profil lokasi Agen Anda.</p>
+                       </>
+                    )}
                  </div>
               </div>
            </div>
@@ -285,11 +309,11 @@ export function CargoPosTab({
                     <input name="receiver_phone" required type="tel" className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent focus:border-emerald-400 rounded-2xl text-base font-semibold focus:ring-4 focus:ring-emerald-100 outline-none transition-all" placeholder="0856..." />
                  </div>
                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Terminal Tujuan</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Pool Tujuan</label>
                     <div className="relative">
-                       <select name="destination_terminal_id" value={destId} onChange={handleDestChange} required className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent focus:border-emerald-400 rounded-2xl text-base font-semibold focus:ring-4 focus:ring-emerald-100 outline-none transition-all appearance-none cursor-pointer">
-                         <option value="">Pilih terminal tujuan</option>
-                         {terminals.map(t => <option key={t.id} value={t.id}>{t.name} ({t.location_name || '-'})</option>)}
+                       <select name="destination_pool_id" value={destId} onChange={handleDestChange} required className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent focus:border-emerald-400 rounded-2xl text-base font-semibold focus:ring-4 focus:ring-emerald-100 outline-none transition-all appearance-none cursor-pointer">
+                         <option value="">Pilih pool tujuan</option>
+                         {pools.map(t => <option key={t.id} value={t.id}>{t.name} ({t.city || '-'})</option>)}
                        </select>
                        <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
                     </div>
