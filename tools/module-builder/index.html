@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nizam Module Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0F172A;
+    --surface:   #1E293B;
+    --surface2:  #334155;
+    --border:    #475569;
+    --green:     #22C55E;
+    --green-dim: #16A34A;
+    --blue:      #3B82F6;
+    --purple:    #A855F7;
+    --amber:     #F59E0B;
+    --red:       #EF4444;
+    --text:      #F8FAFC;
+    --muted:     #94A3B8;
+    --font-sans: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Layout ── */
+  .app { display: flex; height: 100vh; overflow: hidden; }
+
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 0;
+  }
+
+  .sidebar-logo {
+    padding: 0 20px 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .sidebar-logo .logo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--green), var(--blue));
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    font-family: var(--font-mono);
+  }
+  .sidebar-logo p {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .step-list { padding: 0 12px; flex: 1; }
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 200ms;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .step-item:hover { background: var(--surface2); color: var(--text); }
+  .step-item.active { background: rgba(34,197,94,0.12); color: var(--green); }
+  .step-item.done { color: var(--text); }
+  .step-item.done .step-dot { background: var(--green); }
+
+  .step-dot {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    transition: background 200ms;
+  }
+  .step-item.active .step-dot { background: var(--green); color: #000; }
+
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .topbar {
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+  }
+  .topbar h1 { font-size: 16px; font-weight: 600; }
+  .topbar .breadcrumb { font-size: 12px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }
+
+  .progress-bar {
+    height: 3px;
+    background: var(--surface2);
+    position: relative;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--blue));
+    transition: width 400ms ease;
+  }
+
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    gap: 0;
+  }
+
+  .form-panel {
+    flex: 1;
+    padding: 32px;
+    overflow-y: auto;
+  }
+
+  .preview-panel {
+    width: 480px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    background: #080E1A;
+    display: flex;
+    flex-direction: column;
+  }
+  .preview-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .preview-tabs {
+    display: flex;
+    gap: 4px;
+  }
+  .preview-tab {
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    transition: background 150ms;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+  }
+  .preview-tab.active { background: var(--surface2); color: var(--text); }
+  .preview-tab:hover { background: var(--surface2); color: var(--text); }
+
+  .code-output {
+    flex: 1;
+    padding: 16px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.7;
+    overflow-y: auto;
+    white-space: pre;
+    color: #CBD5E1;
+  }
+  .code-output .kw  { color: #C792EA; }
+  .code-output .fn  { color: #82AAFF; }
+  .code-output .str { color: #C3E88D; }
+  .code-output .cmt { color: #546E7A; font-style: italic; }
+  .code-output .typ { color: #FFCB6B; }
+  .code-output .num { color: #F78C6C; }
+
+  .copy-btn {
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 11px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    transition: background 150ms;
+  }
+  .copy-btn:hover { background: var(--border); }
+
+  /* ── Form Components ── */
+  .section-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .section-desc {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 28px;
+  }
+
+  .field { margin-bottom: 20px; }
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: var(--font-sans);
+    outline: none;
+    transition: border-color 200ms, box-shadow 200ms;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.12);
+  }
+  .field input::placeholder { color: var(--border); }
+  .field textarea { resize: vertical; min-height: 80px; }
+  .field select option { background: var(--surface); }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  .field .hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .field .mono-hint {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--green);
+    margin-top: 5px;
+  }
+
+  /* ── Type Cards ── */
+  .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .type-card {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 200ms;
+    position: relative;
+  }
+  .type-card:hover { border-color: var(--surface2); background: var(--surface2); }
+  .type-card.selected { border-color: var(--green); background: rgba(34,197,94,0.08); }
+  .type-card input[type="radio"] { display: none; }
+  .type-card .type-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 10px;
+  }
+  .type-card .type-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .type-card .type-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .type-card .selected-mark {
+    position: absolute;
+    top: 10px; right: 10px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--green);
+    display: none;
+    align-items: center; justify-content: center;
+  }
+  .type-card.selected .selected-mark { display: flex; }
+
+  /* ── Integration Checkboxes ── */
+  .integration-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .integration-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 200ms;
+    user-select: none;
+  }
+  .integration-item:hover { border-color: var(--surface2); }
+  .integration-item.checked { border-color: var(--green); background: rgba(34,197,94,0.06); }
+  .integration-item input[type="checkbox"] { display: none; }
+  .integration-icon {
+    width: 32px; height: 32px;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .integration-item .int-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .integration-item .int-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .checkmark {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    border: 1.5px solid var(--border);
+    flex-shrink: 0;
+    margin-top: 2px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 150ms;
+  }
+  .integration-item.checked .checkmark {
+    background: var(--green);
+    border-color: var(--green);
+  }
+
+  /* ── Entity Builder ── */
+  .entity-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .entity-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .entity-row input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font-mono);
+    outline: none;
+  }
+  .entity-row input::placeholder { color: var(--border); }
+  .entity-tag {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--muted);
+  }
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--border);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 150ms;
+  }
+  .remove-btn:hover { color: var(--red); }
+
+  .add-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--font-sans);
+    transition: all 150ms;
+    width: 100%;
+  }
+  .add-btn:hover { border-color: var(--green); color: var(--green); }
+
+  /* ── Buttons ── */
+  .btn-row { display: flex; justify-content: space-between; align-items: center; margin-top: 32px; }
+  .btn {
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 200ms;
+    border: none;
+    font-family: var(--font-sans);
+  }
+  .btn-primary {
+    background: var(--green);
+    color: #000;
+  }
+  .btn-primary:hover { background: var(--green-dim); }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+  }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+
+  .btn-generate {
+    background: linear-gradient(135deg, var(--green), var(--blue));
+    color: #fff;
+    font-size: 15px;
+    padding: 12px 32px;
+    letter-spacing: 0.02em;
+  }
+  .btn-generate:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  /* ── Tag Input ── */
+  .tag-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: text;
+    min-height: 44px;
+    align-items: center;
+    transition: border-color 200ms, box-shadow 200ms;
+  }
+  .tag-wrap:focus-within {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.12);
+  }
+  .tag {
+    background: rgba(59,130,246,0.2);
+    color: #93C5FD;
+    border: 1px solid rgba(59,130,246,0.3);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    display: flex; align-items: center; gap: 4px;
+    cursor: default;
+  }
+  .tag .tag-remove {
+    background: none; border: none;
+    color: inherit; cursor: pointer;
+    font-size: 14px; line-height: 1;
+    opacity: 0.6;
+  }
+  .tag .tag-remove:hover { opacity: 1; }
+  .tag-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font-mono);
+    flex: 1;
+    min-width: 120px;
+  }
+
+  /* ── Summary cards ── */
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .summary-card .sc-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .summary-card .sc-value { font-size: 14px; font-weight: 600; font-family: var(--font-mono); color: var(--green); }
+
+  .file-list { display: flex; flex-direction: column; gap: 6px; }
+  .file-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .file-item:hover { border-color: var(--green); }
+  .file-item.active { border-color: var(--green); background: rgba(34,197,94,0.08); }
+  .file-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .file-item .file-size { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 24px 0;
+    opacity: 0.5;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--green);
+    color: var(--text);
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 300ms;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── Step visibility ── */
+  .step-content { display: none; }
+  .step-content.active { display: block; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        NIZAM BUILDER
+      </div>
+      <p>Module &amp; Add-on Scaffolder v1.0</p>
+    </div>
+
+    <nav class="step-list">
+      <div class="step-item active" id="nav-1" onclick="goToStep(1)">
+        <div class="step-dot">1</div>
+        <span>Identitas Modul</span>
+      </div>
+      <div class="step-item" id="nav-2" onclick="goToStep(2)">
+        <div class="step-dot">2</div>
+        <span>Tipe &amp; Integrasi</span>
+      </div>
+      <div class="step-item" id="nav-3" onclick="goToStep(3)">
+        <div class="step-dot">3</div>
+        <span>Entitas &amp; Aksi</span>
+      </div>
+      <div class="step-item" id="nav-4" onclick="goToStep(4)">
+        <div class="step-dot">4</div>
+        <span>Konfigurasi CoA</span>
+      </div>
+      <div class="step-item" id="nav-5" onclick="goToStep(5)">
+        <div class="step-dot">5</div>
+        <span>Generate &amp; Export</span>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar h1" style="font-size:16px;font-weight:600;" id="topbar-title">Identitas Modul</div>
+        <div class="breadcrumb" id="topbar-crumb">nizam-app / modules / <span id="crumb-name">new-module</span></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:12px;color:var(--muted);font-family:var(--font-mono);" id="step-indicator">Step 1 / 5</span>
+      </div>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width:20%"></div>
+    </div>
+
+    <div class="content">
+      <div class="form-panel">
+
+        <!-- Step 1: Identitas -->
+        <div class="step-content active" id="step-1">
+          <div class="section-title">Identitas Modul</div>
+          <div class="section-desc">Tentukan nama, slug, dan deskripsi modul yang akan dibuat.</div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>Nama Modul</label>
+              <input type="text" id="mod-name" placeholder="cth: Workshop, Rental, Kargo" oninput="syncName()" />
+              <div class="hint">Nama yang tampil di UI</div>
+            </div>
+            <div class="field">
+              <label>Slug (auto)</label>
+              <input type="text" id="mod-slug" placeholder="workshop" oninput="updatePreview()" style="font-family:var(--font-mono);" />
+              <div class="mono-hint" id="slug-path">modules/new-module/</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Deskripsi Singkat</label>
+            <textarea id="mod-desc" placeholder="Modul untuk mengelola order perbaikan kendaraan..." oninput="updatePreview()"></textarea>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>Prefix Tabel DB</label>
+              <input type="text" id="mod-prefix" placeholder="wksp_" oninput="updatePreview()" style="font-family:var(--font-mono);" />
+              <div class="hint">Prefix untuk tabel PostgreSQL</div>
+            </div>
+            <div class="field">
+              <label>Nomor Migrasi</label>
+              <input type="number" id="mod-migration" placeholder="1350" oninput="updatePreview()" />
+              <div class="hint">Urutan migrasi (cek supabase/migrations/)</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Author / Tim</label>
+            <input type="text" id="mod-author" placeholder="nizam-dev" oninput="updatePreview()" />
+          </div>
+
+          <div class="btn-row">
+            <span></span>
+            <button class="btn btn-primary" onclick="goToStep(2)">Lanjut: Tipe &amp; Integrasi →</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Tipe & Integrasi -->
+        <div class="step-content" id="step-2">
+          <div class="section-title">Tipe &amp; Integrasi ERP</div>
+          <div class="section-desc">Pilih tipe modul dan integrasi ke modul inti yang dibutuhkan.</div>
+
+          <div class="field">
+            <label>Tipe Modul</label>
+            <div class="type-grid">
+              <label class="type-card selected" onclick="selectType('operational', this)">
+                <input type="radio" name="mod-type" value="operational" checked />
+                <div class="type-icon" style="background:rgba(59,130,246,0.15);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                </div>
+                <div class="type-name">Modul Operasional</div>
+                <div class="type-desc">Mengelola proses bisnis utama. Harus terhubung ke Financial, Inventory, atau HRIS.</div>
+                <div class="selected-mark">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+
+              <label class="type-card" onclick="selectType('addon', this)">
+                <input type="radio" name="mod-type" value="addon" />
+                <div class="type-icon" style="background:rgba(168,85,247,0.15);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                </div>
+                <div class="type-name">Add-on / Portal</div>
+                <div class="type-desc">Ekstensi fungsional atau portal eksternal. Boleh tanpa integrasi inti jika non-transaksional.</div>
+                <div class="selected-mark">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+
+              <label class="type-card" onclick="selectType('core', this)">
+                <input type="radio" name="mod-type" value="core" />
+                <div class="type-icon" style="background:rgba(245,158,11,0.15);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+                </div>
+                <div class="type-name">Modul Inti (Core)</div>
+                <div class="type-desc">Modul fundamental ERP. Dipakai sebagai dependency oleh modul lain.</div>
+                <div class="selected-mark">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+
+              <label class="type-card" onclick="selectType('print', this)">
+                <input type="radio" name="mod-type" value="print" />
+                <div class="type-icon" style="background:rgba(34,197,94,0.15);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                </div>
+                <div class="type-name">Print / Report Page</div>
+                <div class="type-desc">Halaman cetak atau laporan. Minimal UI, fokus pada layout print-optimized.</div>
+                <div class="selected-mark">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="field">
+            <label>Integrasi ERP Core</label>
+            <div class="integration-grid">
+
+              <label class="integration-item" id="int-financial" onclick="toggleIntegration('financial', this)">
+                <input type="checkbox" id="cb-financial" />
+                <div class="integration-icon" style="background:rgba(34,197,94,0.15);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                </div>
+                <div>
+                  <div class="int-name">Financial / Akuntansi</div>
+                  <div class="int-desc">Journal entries, CoA, Laba/Rugi. Wajib jika ada transaksi uang.</div>
+                </div>
+                <div class="checkmark" style="margin-left:auto;">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+
+              <label class="integration-item" id="int-inventory" onclick="toggleIntegration('inventory', this)">
+                <input type="checkbox" id="cb-inventory" />
+                <div class="integration-icon" style="background:rgba(59,130,246,0.15);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                </div>
+                <div>
+                  <div class="int-name">Inventori</div>
+                  <div class="int-desc">Stok barang, pergerakan gudang. Wajib jika ada konsumsi barang fisik.</div>
+                </div>
+                <div class="checkmark" style="margin-left:auto;">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+
+              <label class="integration-item" id="int-hris" onclick="toggleIntegration('hris', this)">
+                <input type="checkbox" id="cb-hris" />
+                <div class="integration-icon" style="background:rgba(245,158,11,0.15);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                </div>
+                <div>
+                  <div class="int-name">HRIS / Karyawan</div>
+                  <div class="int-desc">Penugasan staf, absensi, payroll. Wajib jika melibatkan karyawan.</div>
+                </div>
+                <div class="checkmark" style="margin-left:auto;">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+
+              <label class="integration-item" id="int-crm" onclick="toggleIntegration('crm', this)">
+                <input type="checkbox" id="cb-crm" />
+                <div class="integration-icon" style="background:rgba(168,85,247,0.15);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div>
+                  <div class="int-name">CRM / Kontak</div>
+                  <div class="int-desc">Pelanggan, vendor, tiket layanan. Wajib jika ada transaksi B2C/B2B.</div>
+                </div>
+                <div class="checkmark" style="margin-left:auto;">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-ghost" onclick="goToStep(1)">← Kembali</button>
+            <button class="btn btn-primary" onclick="goToStep(3)">Lanjut: Entitas &amp; Aksi →</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Entitas & Aksi -->
+        <div class="step-content" id="step-3">
+          <div class="section-title">Entitas &amp; Aksi</div>
+          <div class="section-desc">Definisikan tabel database dan server actions yang akan di-generate.</div>
+
+          <div class="field">
+            <label>Entitas (Tabel Database)</label>
+            <div class="entity-list" id="entity-list"></div>
+            <button class="add-btn" onclick="addEntity()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Tambah Entitas
+            </button>
+            <div class="hint" style="margin-top:8px;">Contoh: orders, order_items, payments</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="field">
+            <label>Actions yang di-generate</label>
+            <div class="integration-grid" id="action-grid">
+              <label class="integration-item checked" onclick="toggleAction('getAll', this)">
+                <input type="checkbox" checked />
+                <div><div class="int-name" style="font-family:var(--font-mono);font-size:12px;">getAll()</div><div class="int-desc">List semua record dengan filter org</div></div>
+                <div class="checkmark" style="margin-left:auto;background:var(--green);border-color:var(--green);">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+              <label class="integration-item checked" onclick="toggleAction('getById', this)">
+                <input type="checkbox" checked />
+                <div><div class="int-name" style="font-family:var(--font-mono);font-size:12px;">getById()</div><div class="int-desc">Ambil satu record by ID</div></div>
+                <div class="checkmark" style="margin-left:auto;background:var(--green);border-color:var(--green);">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+              <label class="integration-item checked" onclick="toggleAction('create', this)">
+                <input type="checkbox" checked />
+                <div><div class="int-name" style="font-family:var(--font-mono);font-size:12px;">create()</div><div class="int-desc">Buat record baru + trigger integrasi</div></div>
+                <div class="checkmark" style="margin-left:auto;background:var(--green);border-color:var(--green);">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+              <label class="integration-item checked" onclick="toggleAction('update', this)">
+                <input type="checkbox" checked />
+                <div><div class="int-name" style="font-family:var(--font-mono);font-size:12px;">update()</div><div class="int-desc">Update record + revalidate cache</div></div>
+                <div class="checkmark" style="margin-left:auto;background:var(--green);border-color:var(--green);">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+              <label class="integration-item" onclick="toggleAction('delete', this)">
+                <input type="checkbox" />
+                <div><div class="int-name" style="font-family:var(--font-mono);font-size:12px;">delete()</div><div class="int-desc">Hapus record (soft delete jika ada deleted_at)</div></div>
+                <div class="checkmark" style="margin-left:auto;">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+              <label class="integration-item" onclick="toggleAction('updateStatus', this)">
+                <input type="checkbox" />
+                <div><div class="int-name" style="font-family:var(--font-mono);font-size:12px;">updateStatus()</div><div class="int-desc">Ubah status + record finansial jika PAID</div></div>
+                <div class="checkmark" style="margin-left:auto;">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="field">
+            <label>Status Enum (opsional)</label>
+            <div class="tag-wrap" id="status-wrap" onclick="document.getElementById('status-input').focus()">
+              <input type="text" id="status-input" class="tag-input" placeholder="ketik lalu Enter: PENDING, PAID, DONE..." onkeydown="addStatusTag(event)" />
+            </div>
+            <div class="hint">Tekan Enter untuk tambah status</div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-ghost" onclick="goToStep(2)">← Kembali</button>
+            <button class="btn btn-primary" onclick="goToStep(4)">Lanjut: Konfigurasi CoA →</button>
+          </div>
+        </div>
+
+        <!-- Step 4: CoA -->
+        <div class="step-content" id="step-4">
+          <div class="section-title">Konfigurasi Chart of Accounts</div>
+          <div class="section-desc">Tentukan akun debit/kredit yang dipakai saat transaksi dicatat ke General Ledger.</div>
+
+          <div id="coa-section">
+            <div id="coa-not-needed" style="display:none;">
+              <div style="padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;text-align:center;color:var(--muted);">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 12px;display:block;opacity:0.4;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Integrasi Financial tidak dipilih</div>
+                <div style="font-size:12px;">Konfigurasi CoA tidak diperlukan untuk modul ini.</div>
+              </div>
+            </div>
+
+            <div id="coa-form">
+              <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:12px;color:#86EFAC;">
+                <strong>Pola Jurnal:</strong> Debit akun penerima (Kas/Piutang) → Kredit akun sumber (Pendapatan/Hutang).<br/>
+                Untuk beban: Debit Beban → Kredit Kas.
+              </div>
+
+              <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;">Penerimaan / Pendapatan</div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Debit Account (Kode CoA)</label>
+                  <input type="text" id="coa-rev-debit" value="1-10001" placeholder="1-10001" oninput="updatePreview()" style="font-family:var(--font-mono);" />
+                  <div class="hint">Biasanya Kas atau Bank</div>
+                </div>
+                <div class="field">
+                  <label>Kredit Account (Kode CoA)</label>
+                  <input type="text" id="coa-rev-credit" value="4-40001" placeholder="4-40001" oninput="updatePreview()" style="font-family:var(--font-mono);" />
+                  <div class="hint">Biasanya Akun Pendapatan</div>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>Reference Type (untuk Jurnal)</label>
+                <input type="text" id="coa-ref-type" placeholder="MODULE_RECEIPT" oninput="updatePreview()" style="font-family:var(--font-mono);" />
+                <div class="mono-hint" id="ref-type-preview"></div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;">Pengeluaran / Beban (opsional)</div>
+              <div class="field-row">
+                <div class="field">
+                  <label>Debit Account Beban</label>
+                  <input type="text" id="coa-exp-debit" placeholder="6-60001" oninput="updatePreview()" style="font-family:var(--font-mono);" />
+                </div>
+                <div class="field">
+                  <label>Kredit Account Beban</label>
+                  <input type="text" id="coa-exp-credit" placeholder="1-10001" oninput="updatePreview()" style="font-family:var(--font-mono);" />
+                </div>
+              </div>
+
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-size:11px;">
+                <div style="font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">Referensi Kode CoA Umum</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-family:var(--font-mono);">
+                  <span><span style="color:var(--green);">1-10001</span> <span style="color:var(--muted);">→ Kas Kecil</span></span>
+                  <span><span style="color:var(--green);">4-40001</span> <span style="color:var(--muted);">→ Pendapatan</span></span>
+                  <span><span style="color:var(--green);">1-10002</span> <span style="color:var(--muted);">→ Kas Bank</span></span>
+                  <span><span style="color:var(--green);">4-40002</span> <span style="color:var(--muted);">→ Pendapatan Lain</span></span>
+                  <span><span style="color:var(--green);">2-20001</span> <span style="color:var(--muted);">→ Hutang Deposit</span></span>
+                  <span><span style="color:var(--green);">6-60001</span> <span style="color:var(--muted);">→ Beban Operasional</span></span>
+                  <span><span style="color:var(--green);">1-13001</span> <span style="color:var(--muted);">→ Piutang Usaha</span></span>
+                  <span><span style="color:var(--green);">6-60002</span> <span style="color:var(--muted);">→ Beban Perawatan</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-ghost" onclick="goToStep(3)">← Kembali</button>
+            <button class="btn btn-generate" onclick="generateCode()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;display:inline;vertical-align:middle;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              Generate Scaffold
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 5: Export -->
+        <div class="step-content" id="step-5">
+          <div class="section-title">Scaffold Siap!</div>
+          <div class="section-desc">File-file berikut sudah di-generate. Klik file untuk melihat kodenya di panel kanan.</div>
+
+          <div class="summary-grid" id="summary-grid"></div>
+
+          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">File yang Di-generate</div>
+          <div class="file-list" id="file-list"></div>
+
+          <div class="divider"></div>
+
+          <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:10px;padding:16px 20px;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+              Langkah Selanjutnya
+            </div>
+            <ol style="font-size:12px;color:var(--muted);line-height:2;padding-left:18px;" id="next-steps">
+            </ol>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-ghost" onclick="goToStep(4)">← Kembali Edit</button>
+            <button class="btn btn-primary" onclick="resetBuilder()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;display:inline;vertical-align:middle;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+              Buat Modul Baru
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Preview Panel -->
+      <div class="preview-panel">
+        <div class="preview-header">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            <span id="preview-filename">actions.ts</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="preview-tabs" id="preview-tabs"></div>
+            <button class="copy-btn" onclick="copyCode()">Copy</button>
+          </div>
+        </div>
+        <div class="code-output" id="code-output"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toast-msg">Disalin!</span>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+const state = {
+  step: 1,
+  modType: 'operational',
+  integrations: { financial: false, inventory: false, hris: false, crm: false },
+  actions: { getAll: true, getById: true, create: true, update: true, delete: false, updateStatus: false },
+  entities: [],
+  statuses: [],
+  generatedFiles: {},
+  activeFile: null,
+}
+
+// ─── Navigation ──────────────────────────────────────────────────────────────
+function goToStep(n) {
+  document.getElementById('step-' + state.step).classList.remove('active')
+  document.getElementById('nav-' + state.step).classList.remove('active')
+  if (state.step < n) document.getElementById('nav-' + state.step).classList.add('done')
+
+  state.step = n
+  document.getElementById('step-' + n).classList.add('active')
+  document.querySelectorAll('.step-item').forEach((el, i) => {
+    if (i + 1 === n) el.classList.add('active')
+  })
+  document.getElementById('progress-fill').style.width = (n * 20) + '%'
+  document.getElementById('step-indicator').textContent = 'Step ' + n + ' / 5'
+
+  const titles = ['Identitas Modul', 'Tipe & Integrasi ERP', 'Entitas & Aksi', 'Konfigurasi CoA', 'Generate & Export']
+  document.getElementById('topbar-title').textContent = titles[n-1]
+
+  if (n === 4) checkCoaSection()
+  updatePreview()
+}
+
+// ─── Sync name → slug ────────────────────────────────────────────────────────
+function syncName() {
+  const name = document.getElementById('mod-name').value
+  const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+  document.getElementById('mod-slug').value = slug
+  document.getElementById('slug-path').textContent = 'modules/' + (slug || 'new-module') + '/'
+  document.getElementById('crumb-name').textContent = slug || 'new-module'
+
+  const prefix = slug.replace(/-/g, '_') + '_'
+  if (!document.getElementById('mod-prefix').value || document.getElementById('mod-prefix').value === '_') {
+    document.getElementById('mod-prefix').value = prefix
+  }
+
+  const refType = slug.toUpperCase().replace(/-/g, '_') + '_RECEIPT'
+  if (!document.getElementById('coa-ref-type').value) {
+    document.getElementById('coa-ref-type').value = refType
+  }
+  document.getElementById('ref-type-preview').textContent = '→ Akan muncul di kolom reference_type pada journal_entries'
+
+  updatePreview()
+}
+
+// ─── Type selection ──────────────────────────────────────────────────────────
+function selectType(type, el) {
+  document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'))
+  el.classList.add('selected')
+  state.modType = type
+  updatePreview()
+}
+
+// ─── Integration toggles ─────────────────────────────────────────────────────
+function toggleIntegration(key, el) {
+  state.integrations[key] = !state.integrations[key]
+  el.classList.toggle('checked', state.integrations[key])
+  updatePreview()
+}
+
+// ─── Action toggles ──────────────────────────────────────────────────────────
+function toggleAction(key, el) {
+  state.actions[key] = !state.actions[key]
+  el.classList.toggle('checked', state.actions[key])
+  updatePreview()
+}
+
+// ─── Entity management ───────────────────────────────────────────────────────
+function addEntity(name = '') {
+  const id = Date.now()
+  state.entities.push({ id, name })
+  renderEntities()
+}
+
+function removeEntity(id) {
+  state.entities = state.entities.filter(e => e.id !== id)
+  renderEntities()
+  updatePreview()
+}
+
+function renderEntities() {
+  const list = document.getElementById('entity-list')
+  list.innerHTML = state.entities.map(e => `
+    <div class="entity-row">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="flex-shrink:0"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      <input type="text" value="${e.name}" placeholder="nama_tabel" onchange="updateEntityName(${e.id}, this.value)" oninput="updateEntityName(${e.id}, this.value)" />
+      <span class="entity-tag">TABLE</span>
+      <button class="remove-btn" onclick="removeEntity(${e.id})">×</button>
+    </div>
+  `).join('')
+}
+
+function updateEntityName(id, val) {
+  const e = state.entities.find(e => e.id === id)
+  if (e) e.name = val.toLowerCase().replace(/\s+/g, '_')
+  updatePreview()
+}
+
+// ─── Status tags ─────────────────────────────────────────────────────────────
+function addStatusTag(e) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault()
+    const val = e.target.value.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '')
+    if (val && !state.statuses.includes(val)) {
+      state.statuses.push(val)
+      renderTags()
+    }
+    e.target.value = ''
+    updatePreview()
+  }
+}
+
+function removeTag(val) {
+  state.statuses = state.statuses.filter(s => s !== val)
+  renderTags()
+  updatePreview()
+}
+
+function renderTags() {
+  const wrap = document.getElementById('status-wrap')
+  const input = document.getElementById('status-input')
+  wrap.innerHTML = ''
+  state.statuses.forEach(s => {
+    const tag = document.createElement('span')
+    tag.className = 'tag'
+    tag.innerHTML = s + `<button class="tag-remove" onclick="removeTag('${s}')">×</button>`
+    wrap.appendChild(tag)
+  })
+  wrap.appendChild(input)
+}
+
+// ─── CoA section visibility ──────────────────────────────────────────────────
+function checkCoaSection() {
+  const show = state.integrations.financial
+  document.getElementById('coa-not-needed').style.display = show ? 'none' : 'block'
+  document.getElementById('coa-form').style.display = show ? 'block' : 'none'
+}
+
+// ─── Code Generation ─────────────────────────────────────────────────────────
+function getValues() {
+  return {
+    name:       document.getElementById('mod-name').value || 'NewModule',
+    slug:       document.getElementById('mod-slug').value || 'new-module',
+    desc:       document.getElementById('mod-desc').value || 'Modul baru',
+    prefix:     document.getElementById('mod-prefix').value || 'mod_',
+    migration:  document.getElementById('mod-migration').value || '1350',
+    author:     document.getElementById('mod-author').value || 'nizam-dev',
+    coaRevDebit:  document.getElementById('coa-rev-debit').value || '1-10001',
+    coaRevCredit: document.getElementById('coa-rev-credit').value || '4-40001',
+    coaRefType:   document.getElementById('coa-ref-type').value || 'MODULE_RECEIPT',
+    coaExpDebit:  document.getElementById('coa-exp-debit').value || '',
+    coaExpCredit: document.getElementById('coa-exp-credit').value || '',
+  }
+}
+
+function generateActionsTs(v) {
+  const slug = v.slug
+  const Name = v.name.replace(/\s+/g, '')
+  const mainEntity = state.entities[0]?.name || slug.replace(/-/g, '_') + 's'
+  const hasFinancial = state.integrations.financial
+  const hasHRIS = state.integrations.hris
+  const hasInventory = state.integrations.inventory
+  const hasCRM = state.integrations.crm
+  const statusEnum = state.statuses.length ? state.statuses.join(' | ') : 'PENDING | ACTIVE | DONE'
+
+  let imports = `'use server'\n\n/**\n * ${slug}.actions.ts\n * ${v.desc}\n * @author ${v.author}\n */\n\nimport { createClient } from '@/lib/supabase/server'\nimport { revalidatePath } from 'next/cache'\nimport { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'`
+  if (hasFinancial) imports += `\nimport { ERPBridge } from '@/lib/erp-bridge/finances'`
+  imports += `\n`
+
+  let typeSection = `\nexport type ${Name}Status = '${statusEnum.replace(/ \| /g, "' | '")}'\n\nexport interface Create${Name}Input {\n  org_id: string\n  branch_id?: string\n`
+  if (hasCRM) typeSection += `  contact_id?: string\n`
+  if (hasHRIS) typeSection += `  employee_id?: string\n`
+  typeSection += `  // TODO: tambahkan field lainnya\n  [key: string]: unknown\n}\n`
+
+  let getAll = ''
+  if (state.actions.getAll) {
+    getAll = `\nexport async function getAll${Name}s(orgId: string, branchId?: string | null) {\n  const supabase = await createClient()\n  const { data, error } = await supabase\n    .from('${mainEntity}')\n    .select('*')\n    .eq('org_id', orgId)\n    .order('created_at', { ascending: false })\n  if (error) return { data: [], error: error.message }\n  return { data: data ?? [], error: null }\n}\n`
+  }
+
+  let getById = ''
+  if (state.actions.getById) {
+    getById = `\nexport async function get${Name}ById(id: string, orgId: string) {\n  const supabase = await createClient()\n  const { data, error } = await supabase\n    .from('${mainEntity}')\n    .select('*')\n    .eq('id', id)\n    .eq('org_id', orgId)\n    .maybeSingle()\n  if (error) return { data: null, error: error.message }\n  return { data, error: null }\n}\n`
+  }
+
+  let create = ''
+  if (state.actions.create) {
+    create = `\nexport async function create${Name}(input: Create${Name}Input) {\n  const supabase = await createClient()\n  const { org_id, branch_id, ...rest } = input\n\n  const { data, error } = await supabase\n    .from('${mainEntity}')\n    .insert({ org_id, branch_id, ...rest })\n    .select()\n    .single()\n\n  if (error) return { data: null, error: error.message }\n`
+    if (hasFinancial) {
+      create += `\n  // ── ERPBridge: Catat pendapatan ke General Ledger ──────────────────\n  if (rest.amount && Number(rest.amount) > 0) {\n    const debitAcc  = await ERPBridge.getDefaultAccount(org_id, '${v.coaRevDebit}')\n    const creditAcc = await ERPBridge.getDefaultAccount(org_id, '${v.coaRevCredit}')\n    if (debitAcc && creditAcc) {\n      await ERPBridge.recordRevenue({\n        orgId: org_id, branchId: branch_id,\n        amount: Number(rest.amount),\n        date: new Date().toISOString().split('T')[0],\n        description: \`${Name} #\${data.id}\`,\n        referenceType: '${v.coaRefType}',\n        referenceId: data.id,\n        debitAccountId: debitAcc,\n        creditAccountId: creditAcc,\n        autoPost: true,\n      }).catch(console.error) // Non-blocking — jangan rollback jika jurnal gagal\n    }\n  }\n`
+    }
+    if (hasInventory) {
+      create += `\n  // ── Inventory: Catat pergerakan stok ──────────────────────────────\n  // TODO: panggil inventory movement jika ada barang yang digunakan\n  // await supabase.from('inventory_movements').insert({ org_id, ... })\n`
+    }
+    if (hasHRIS && state.integrations.hris) {
+      create += `\n  // ── HRIS: Tugaskan karyawan ───────────────────────────────────────\n  // TODO: link ke employee_id jika ada penugasan\n`
+    }
+    create += `\n  revalidatePath('/(dashboard)/${slug}')\n  return { data, error: null }\n}\n`
+  }
+
+  let update = ''
+  if (state.actions.update) {
+    update = `\nexport async function update${Name}(id: string, orgId: string, updates: Partial<Create${Name}Input>) {\n  const supabase = await createClient()\n  const { data, error } = await supabase\n    .from('${mainEntity}')\n    .update(updates)\n    .eq('id', id)\n    .eq('org_id', orgId)\n    .select()\n    .single()\n  if (error) return { data: null, error: error.message }\n  revalidatePath('/(dashboard)/${slug}')\n  return { data, error: null }\n}\n`
+  }
+
+  let del = ''
+  if (state.actions.delete) {
+    del = `\nexport async function delete${Name}(id: string, orgId: string) {\n  const supabase = await createClient()\n  const { error } = await supabase\n    .from('${mainEntity}')\n    .delete()\n    .eq('id', id)\n    .eq('org_id', orgId)\n  if (error) return { error: error.message }\n  revalidatePath('/(dashboard)/${slug}')\n  return { error: null }\n}\n`
+  }
+
+  let updateStatus = ''
+  if (state.actions.updateStatus) {
+    updateStatus = `\nexport async function update${Name}Status(id: string, orgId: string, status: ${Name}Status) {\n  const supabase = await createClient()\n  const { data, error } = await supabase\n    .from('${mainEntity}')\n    .update({ status })\n    .eq('id', id)\n    .eq('org_id', orgId)\n    .select()\n    .single()\n  if (error) return { data: null, error: error.message }\n`
+    if (hasFinancial) {
+      updateStatus += `\n  // ── ERPBridge: Catat ke GL saat status menjadi PAID ──────────────\n  if (status === 'PAID' && data.amount) {\n    const debitAcc  = await ERPBridge.getDefaultAccount(orgId, '${v.coaRevDebit}')\n    const creditAcc = await ERPBridge.getDefaultAccount(orgId, '${v.coaRevCredit}')\n    if (debitAcc && creditAcc) {\n      await ERPBridge.recordRevenue({\n        orgId, amount: Number(data.amount),\n        date: new Date().toISOString().split('T')[0],\n        description: \`${Name} #\${id} - Pembayaran\`,\n        referenceType: '${v.coaRefType}',\n        referenceId: id,\n        debitAccountId: debitAcc,\n        creditAccountId: creditAcc,\n        autoPost: true,\n      }).catch(console.error)\n    }\n  }\n`
+    }
+    updateStatus += `\n  revalidatePath('/(dashboard)/${slug}')\n  return { data, error: null }\n}\n`
+  }
+
+  return imports + typeSection + getAll + getById + create + update + del + updateStatus
+}
+
+function generateTypesTs(v) {
+  const Name = v.name.replace(/\s+/g, '')
+  const slug = v.slug
+  const statusEnum = state.statuses.length ? state.statuses : ['PENDING', 'ACTIVE', 'DONE']
+
+  return `/**\n * ${slug}-types.ts\n * Tipe dan konstanta untuk modul ${v.name}\n * @author ${v.author}\n */\n\nexport const ${Name.toUpperCase()}_STATUS = {\n${statusEnum.map(s => `  ${s}: '${s}' as const,`).join('\n')}\n} as const\n\nexport type ${Name}Status = typeof ${Name.toUpperCase()}_STATUS[keyof typeof ${Name.toUpperCase()}_STATUS]\n\nexport interface ${Name} {\n  id: string\n  org_id: string\n  branch_id: string | null\n${state.integrations.crm ? '  contact_id: string | null\n' : ''}${state.integrations.hris ? '  employee_id: string | null\n' : ''}  status: ${Name}Status\n  // TODO: tambah field sesuai kebutuhan\n  created_at: string\n  updated_at: string | null\n}\n\nexport interface ${Name}Filters {\n  status?: ${Name}Status\n  search?: string\n  branchId?: string\n  limit?: number\n  offset?: number\n}\n`
+}
+
+function generateMigrationSql(v) {
+  const slug = v.slug
+  const prefix = v.prefix || slug.replace(/-/g, '_') + '_'
+  const mainEntity = state.entities[0]?.name || prefix + 'orders'
+  const statusVals = state.statuses.length ? state.statuses : ['PENDING', 'ACTIVE', 'DONE']
+  const enumName = prefix.replace(/_$/, '') + '_status'
+
+  let sql = `-- Migration ${v.migration}: ${v.desc}\n-- Author: ${v.author}\n-- Created: ${new Date().toISOString().split('T')[0]}\n\n`
+
+  sql += `-- 1. Buat ENUM status\nDO $$ BEGIN\n  CREATE TYPE ${enumName} AS ENUM (${statusVals.map(s => `'${s}'`).join(', ')});\nEXCEPTION WHEN duplicate_object THEN NULL;\nEND $$;\n\n`
+
+  state.entities.forEach((e, i) => {
+    const tbl = e.name || `${prefix}table_${i + 1}`
+    sql += `-- Tabel: ${tbl}\nCREATE TABLE IF NOT EXISTS public.${tbl} (\n  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  org_id        uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,\n  branch_id     uuid REFERENCES public.branches(id),\n`
+    if (state.integrations.crm) sql += `  contact_id    uuid REFERENCES public.contacts(id),\n`
+    if (state.integrations.hris) sql += `  employee_id   uuid REFERENCES public.employees(id),\n`
+    if (i === 0) sql += `  status        ${enumName} NOT NULL DEFAULT '${statusVals[0]}',\n  amount        numeric(15,2),\n`
+    sql += `  -- TODO: tambah kolom sesuai kebutuhan\n  created_at    timestamptz NOT NULL DEFAULT now(),\n  updated_at    timestamptz\n);\n\n-- RLS\nALTER TABLE public.${tbl} ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "${tbl}_org_isolation" ON public.${tbl}\n  USING (org_id = (SELECT org_id FROM public.internal_auth_sessions WHERE user_id = auth.uid() LIMIT 1));\n\n-- Index\nCREATE INDEX IF NOT EXISTS ${tbl}_org_id_idx ON public.${tbl}(org_id);\nCREATE INDEX IF NOT EXISTS ${tbl}_created_idx ON public.${tbl}(created_at DESC);\n\n`
+  })
+
+  return sql
+}
+
+function generatePageTsx(v) {
+  const Name = v.name.replace(/\s+/g, '')
+  const slug = v.slug
+  const mainEntity = state.entities[0]?.name || slug.replace(/-/g, '_') + 's'
+
+  return `import { createClient } from '@/lib/supabase/server'\nimport { getActiveOrg } from '@/modules/organization/actions/org.actions'\nimport { redirect } from 'next/navigation'\nimport ${Name}Client from './${Name}Client'\n\nexport default async function ${Name}Page() {\n  const supabase = await createClient()\n  const org = await getActiveOrg()\n  if (!org) redirect('/onboarding')\n\n  const { data: records } = await supabase\n    .from('${mainEntity}')\n    .select('*')\n    .eq('org_id', org.id)\n    .order('created_at', { ascending: false })\n\n  return <${Name}Client records={records ?? []} orgId={org.id} />\n}\n`
+}
+
+function generateClientTsx(v) {
+  const Name = v.name.replace(/\s+/g, '')
+  return `'use client'\n\nimport { useState } from 'react'\n\ninterface ${Name}ClientProps {\n  records: any[]\n  orgId: string\n}\n\nexport default function ${Name}Client({ records, orgId }: ${Name}ClientProps) {\n  const [items, setItems] = useState(records)\n\n  return (\n    <div className="p-6">\n      <div className="flex items-center justify-between mb-6">\n        <div>\n          <h1 className="text-2xl font-bold">${v.name}</h1>\n          <p className="text-muted-foreground text-sm mt-1">${v.desc}</p>\n        </div>\n        {/* TODO: tambah tombol aksi utama */}\n      </div>\n\n      {/* TODO: implementasi tabel/list */}\n      <div className="border rounded-lg">\n        {items.length === 0 ? (\n          <div className="p-12 text-center text-muted-foreground">\n            Belum ada data.\n          </div>\n        ) : (\n          <pre className="p-4 text-xs overflow-auto">\n            {JSON.stringify(items, null, 2)}\n          </pre>\n        )}\n      </div>\n    </div>\n  )\n}\n`
+}
+
+// ─── Generate & go to step 5 ─────────────────────────────────────────────────
+function generateCode() {
+  const v = getValues()
+  const Name = v.name.replace(/\s+/g, '')
+  const slug = v.slug
+
+  if (!v.name.trim()) { showToast('Isi Nama Modul terlebih dahulu'); goToStep(1); return }
+  if (state.entities.length === 0) addEntity(slug.replace(/-/g, '_') + 's')
+
+  state.generatedFiles = {
+    [`modules/${slug}/actions/${slug}.actions.ts`]: generateActionsTs(v),
+    [`modules/${slug}/lib/${slug}-types.ts`]: generateTypesTs(v),
+    [`supabase/migrations/${v.migration}_${slug.replace(/-/g, '_')}.sql`]: generateMigrationSql(v),
+    [`app/(dashboard)/${slug}/page.tsx`]: generatePageTsx(v),
+    [`app/(dashboard)/${slug}/${Name}Client.tsx`]: generateClientTsx(v),
+  }
+
+  // Summary
+  const intCount = Object.values(state.integrations).filter(Boolean).length
+  const actionCount = Object.values(state.actions).filter(Boolean).length
+  document.getElementById('summary-grid').innerHTML = `
+    <div class="summary-card"><div class="sc-label">Tipe Modul</div><div class="sc-value">${state.modType}</div></div>
+    <div class="summary-card"><div class="sc-label">Integrasi</div><div class="sc-value">${intCount} modul</div></div>
+    <div class="summary-card"><div class="sc-label">Entitas DB</div><div class="sc-value">${state.entities.length} tabel</div></div>
+    <div class="summary-card"><div class="sc-label">Actions</div><div class="sc-value">${actionCount} fungsi</div></div>
+  `
+
+  // File list
+  const colors = { 'ts': '#3B82F6', 'tsx': '#A855F7', 'sql': '#F59E0B' }
+  const fileListEl = document.getElementById('file-list')
+  const files = Object.keys(state.generatedFiles)
+  fileListEl.innerHTML = files.map(f => {
+    const ext = f.split('.').pop()
+    const color = colors[ext] || '#94A3B8'
+    const lines = state.generatedFiles[f].split('\n').length
+    return `<div class="file-item" onclick="selectFile('${f}')" id="fitem-${CSS.escape(f)}">
+      <div class="file-dot" style="background:${color}"></div>
+      <span style="font-family:var(--font-mono)">${f}</span>
+      <span class="file-size">${lines}L</span>
+    </div>`
+  }).join('')
+
+  // Next steps
+  const steps = [
+    `Buat direktori: <code style="font-family:var(--font-mono);color:var(--green);">modules/${slug}/actions/</code> dan <code style="font-family:var(--font-mono);color:var(--green);">modules/${slug}/lib/</code>`,
+    `Salin file yang di-generate ke path masing-masing`,
+    `Apply migrasi: <code style="font-family:var(--font-mono);color:var(--green);">npx supabase db push</code> atau via Railway`,
+    ...(state.integrations.financial ? [`Verifikasi kode CoA <code style="font-family:var(--font-mono);color:var(--green);">${v.coaRevDebit}</code> dan <code style="font-family:var(--font-mono);color:var(--green);">${v.coaRevCredit}</code> ada di org Chart of Accounts`] : []),
+    ...(state.integrations.hris ? [`Pastikan tabel <code style="font-family:var(--font-mono);color:var(--green);">employees</code> sudah terisi dengan data karyawan`] : []),
+    `Tambahkan navigasi ke <code style="font-family:var(--font-mono);color:var(--green);">app/(dashboard)/layout.tsx</code>`,
+    `Jalankan: <code style="font-family:var(--font-mono);color:var(--green);">npm run test</code> untuk memastikan tidak ada regresi`,
+  ]
+  document.getElementById('next-steps').innerHTML = steps.map(s => `<li style="margin-bottom:4px;">${s}</li>`).join('')
+
+  goToStep(5)
+
+  // Select first file
+  state.activeFile = files[0]
+  selectFile(files[0])
+}
+
+function selectFile(path) {
+  state.activeFile = path
+  document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'))
+  const el = document.getElementById('fitem-' + CSS.escape(path))
+  if (el) el.classList.add('active')
+  renderCode(state.generatedFiles[path], path)
+}
+
+// ─── Syntax Highlight (simple) ───────────────────────────────────────────────
+function highlight(code) {
+  return code
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/('use server'|'use client')/g, '<span class="str">$1</span>')
+    .replace(/\b(import|export|from|const|let|var|async|await|return|if|else|function|interface|type|extends|implements|as|default|true|false|null|undefined|typeof|keyof)\b/g, '<span class="kw">$1</span>')
+    .replace(/\b(string|number|boolean|void|unknown|never|any|Promise)\b/g, '<span class="typ">$1</span>')
+    .replace(/(\/\/.*)/g, '<span class="cmt">$1</span>')
+    .replace(/('[\w\-\.\/\@]*')/g, '<span class="str">$1</span>')
+    .replace(/(--.*)/g, '<span class="cmt">$1</span>')
+    .replace(/\b(\d+)\b/g, '<span class="num">$1</span>')
+}
+
+function renderCode(code, path) {
+  document.getElementById('code-output').innerHTML = highlight(code)
+  document.getElementById('preview-filename').textContent = path ? path.split('/').pop() : ''
+}
+
+function updatePreview() {
+  if (state.step < 5) {
+    const v = getValues()
+    const Name = v.name.replace(/\s+/g, '') || 'NewModule'
+    const preview = `'use server'\n\n/**\n * ${v.slug || 'new-module'}.actions.ts\n * ${v.desc || 'Modul baru Nizam ERP'}\n */\n\nimport { createClient } from '@/lib/supabase/server'${state.integrations.financial ? "\nimport { ERPBridge } from '@/lib/erp-bridge/finances'" : ''}\n\n// Preview akan ter-generate saat kamu klik "Generate Scaffold"\n// Konfigurasi saat ini:\n// Tipe     : ${state.modType}\n// Financial: ${state.integrations.financial ? 'YA ✓' : 'tidak'}\n// Inventory: ${state.integrations.inventory ? 'YA ✓' : 'tidak'}\n// HRIS     : ${state.integrations.hris ? 'YA ✓' : 'tidak'}\n// CRM      : ${state.integrations.crm ? 'YA ✓' : 'tidak'}\n// Entitas  : ${state.entities.map(e=>e.name||'?').join(', ') || '(belum ada)'}\n// Statuses : ${state.statuses.join(', ') || '(belum ada)'}`
+    renderCode(preview)
+  }
+}
+
+// ─── Copy ────────────────────────────────────────────────────────────────────
+function copyCode() {
+  const code = state.activeFile ? state.generatedFiles[state.activeFile] : document.getElementById('code-output').innerText
+  navigator.clipboard.writeText(code).then(() => showToast('Kode disalin ke clipboard!')).catch(() => showToast('Gagal menyalin'))
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast')
+  document.getElementById('toast-msg').textContent = msg
+  t.classList.add('show')
+  setTimeout(() => t.classList.remove('show'), 2500)
+}
+
+function resetBuilder() {
+  state.step = 1; state.modType = 'operational'
+  state.integrations = { financial: false, inventory: false, hris: false, crm: false }
+  state.actions = { getAll: true, getById: true, create: true, update: true, delete: false, updateStatus: false }
+  state.entities = []; state.statuses = []; state.generatedFiles = {}; state.activeFile = null
+  document.querySelectorAll('.step-item').forEach((el,i) => { el.classList.remove('active','done'); if(i===0) el.classList.add('active') })
+  document.querySelectorAll('.type-card').forEach((el,i) => { el.classList.toggle('selected', i===0) })
+  document.querySelectorAll('.integration-item').forEach(el => el.classList.remove('checked'))
+  document.querySelectorAll('.step-content').forEach((el,i) => { el.classList.toggle('active', i===0) })
+  document.getElementById('progress-fill').style.width = '20%'
+  document.getElementById('mod-name').value = ''
+  document.getElementById('mod-slug').value = ''
+  document.getElementById('mod-desc').value = ''
+  document.getElementById('mod-prefix').value = ''
+  document.getElementById('mod-migration').value = ''
+  renderTags(); renderEntities(); updatePreview()
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+renderEntities()
+updatePreview()
+</script>
+</body>
+</html>
