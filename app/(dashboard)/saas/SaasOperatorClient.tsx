@@ -758,6 +758,12 @@ export default function SaasOperatorClient({
           >
             Penjualan
           </Link>
+          <Link
+            href="/saas/modul"
+            className="rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:bg-slate-50"
+          >
+            Modul
+          </Link>
         </div>
       </div>
 
