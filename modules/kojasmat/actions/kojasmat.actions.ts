@@ -79,7 +79,7 @@ export type KojasmatProyek = {
   jenis_akad: 'MURABAHAH' | 'MUDHARABAH' | 'INAN'
   kebutuhan_modal: number
   modal_terkumpul: number
-  ujrah_pct: number
+  ujrah_nominal: number
   durasi_bulan: number
   tanggal_mulai?: string
   tanggal_selesai?: string
@@ -104,7 +104,7 @@ export type KojasmatPembiayaan = {
   proyek_status?: string
   kebutuhan_modal?: number
   modal_terkumpul?: number
-  ujrah_pct?: number
+  ujrah_nominal?: number
 }
 
 export type KojasmatPelatihan = {
@@ -139,7 +139,7 @@ export type KojasmatPenawaran = {
   jenis_akad?: string
   kebutuhan_modal?: number
   modal_terkumpul?: number
-  ujrah_pct?: number
+  ujrah_nominal?: number
   durasi_bulan?: number
   proyek_status?: string
 }
@@ -355,7 +355,7 @@ export async function createProyek(payload: {
   deskripsi?: string
   jenis_akad: 'MURABAHAH' | 'MUDHARABAH' | 'INAN'
   kebutuhan_modal: number
-  ujrah_pct?: number
+  ujrah_nominal?: number
   durasi_bulan?: number
   agunan?: string
   notes?: string
@@ -377,14 +377,14 @@ export async function createProyek(payload: {
   const { rows } = await queryPostgres(
     `INSERT INTO kojasmat_proyek
        (org_id, pengaju_id, kode_proyek, nama_proyek, deskripsi, jenis_akad,
-        kebutuhan_modal, ujrah_pct, durasi_bulan, agunan, notes)
+        kebutuhan_modal, ujrah_nominal, durasi_bulan, agunan, notes)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
      RETURNING *`,
     [
       payload.org_id, payload.pengaju_id, kode, payload.nama_proyek,
       payload.deskripsi ?? null, payload.jenis_akad,
       payload.kebutuhan_modal,
-      payload.ujrah_pct ?? 5,
+      payload.ujrah_nominal ?? 0,
       payload.durasi_bulan ?? 6,
       payload.agunan ?? null, payload.notes ?? null,
     ]
@@ -497,7 +497,7 @@ export async function getPembiayaanByProyek(proyekId: string): Promise<KojasmatP
 export async function getPembiayaanByAnggota(anggotaId: string): Promise<KojasmatPembiayaan[]> {
   const { rows } = await queryPostgres(
     `SELECT p.*, pr.nama_proyek, pr.jenis_akad, pr.status AS proyek_status,
-            pr.kebutuhan_modal, pr.modal_terkumpul, pr.ujrah_pct
+            pr.kebutuhan_modal, pr.modal_terkumpul, pr.ujrah_nominal
      FROM kojasmat_pembiayaan p
      LEFT JOIN kojasmat_proyek pr ON pr.id = p.proyek_id
      WHERE p.pemodal_id=$1 ORDER BY p.created_at DESC`,
@@ -662,7 +662,7 @@ export async function kirimPenawaranProyek(payload: {
 export async function getPenawaranByAnggota(anggotaId: string): Promise<KojasmatPenawaran[]> {
   const { rows } = await queryPostgres(
     `SELECT pn.*, p.nama_proyek, p.jenis_akad, p.kebutuhan_modal,
-            p.modal_terkumpul, p.ujrah_pct, p.durasi_bulan, p.status AS proyek_status
+            p.modal_terkumpul, p.ujrah_nominal, p.durasi_bulan, p.status AS proyek_status
      FROM kojasmat_penawaran pn
      LEFT JOIN kojasmat_proyek p ON p.id = pn.proyek_id
      WHERE pn.anggota_id=$1 ORDER BY pn.sent_at DESC`,

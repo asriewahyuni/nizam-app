@@ -208,11 +208,11 @@ export async function seedKojasmatDummyData(orgId: string) {
   const { rows: [py1] } = await queryPostgres(
     `INSERT INTO kojasmat_proyek
        (org_id, pengaju_id, kode_proyek, nama_proyek, deskripsi, jenis_akad,
-        kebutuhan_modal, modal_terkumpul, ujrah_pct,
+        kebutuhan_modal, modal_terkumpul, ujrah_nominal,
         durasi_bulan, tanggal_mulai, agunan, status)
      VALUES ($1,$2,'PY-0001','Warung Makan Bu Siti',
        'Pengembangan usaha warung makan dengan menu masakan Jawa. Modal untuk renovasi dan tambah peralatan masak.',
-       'MUDHARABAH', 5000000, 5000000, 5, 6, $3, 'Sertifikat Tanah SHM No.1234', 'BERJALAN')
+       'MUDHARABAH', 5000000, 5000000, 150000, 6, $3, 'Sertifikat Tanah SHM No.1234', 'BERJALAN')
      RETURNING id`,
     [orgId, anggotaMap['KJM-002'], daysAgo(90)]
   )
@@ -221,11 +221,11 @@ export async function seedKojasmatDummyData(orgId: string) {
   const { rows: [py2] } = await queryPostgres(
     `INSERT INTO kojasmat_proyek
        (org_id, pengaju_id, kode_proyek, nama_proyek, deskripsi, jenis_akad,
-        kebutuhan_modal, modal_terkumpul, ujrah_pct,
+        kebutuhan_modal, modal_terkumpul, ujrah_nominal,
         durasi_bulan, agunan, status)
      VALUES ($1,$2,'PY-0002','Konveksi Pak Budi',
        'Pengembangan usaha konveksi seragam sekolah. Modal untuk 2 unit mesin jahit industri dan bahan baku awal.',
-       'INAN', 15000000, 5000000, 4, 12, 'BPKB Motor Revo 2019', 'OPEN')
+       'INAN', 15000000, 5000000, 300000, 12, 'BPKB Motor Revo 2019', 'OPEN')
      RETURNING id`,
     [orgId, anggotaMap['KJM-003']]
   )
@@ -234,11 +234,11 @@ export async function seedKojasmatDummyData(orgId: string) {
   const { rows: [py3] } = await queryPostgres(
     `INSERT INTO kojasmat_proyek
        (org_id, pengaju_id, kode_proyek, nama_proyek, deskripsi, jenis_akad,
-        kebutuhan_modal, modal_terkumpul, ujrah_pct,
+        kebutuhan_modal, modal_terkumpul, ujrah_nominal,
         durasi_bulan, agunan, status)
      VALUES ($1,$2,'PY-0003','Usaha Ternak Ayam Kampung',
        'Pengembangan usaha ternak ayam kampung 500 ekor. Modal untuk kandang, bibit, dan pakan 3 bulan pertama.',
-       'MUDHARABAH', 8000000, 0, 5, 6, 'Agunan berupa lahan kandang 200m²', 'REVIEW_DPS')
+       'MUDHARABAH', 8000000, 0, 200000, 6, 'Agunan berupa lahan kandang 200m²', 'REVIEW_DPS')
      RETURNING id`,
     [orgId, anggotaMap['KJM-001']]
   )
@@ -247,11 +247,11 @@ export async function seedKojasmatDummyData(orgId: string) {
   const { rows: [py4] } = await queryPostgres(
     `INSERT INTO kojasmat_proyek
        (org_id, pengaju_id, kode_proyek, nama_proyek, deskripsi, jenis_akad,
-        kebutuhan_modal, modal_terkumpul, ujrah_pct,
+        kebutuhan_modal, modal_terkumpul, ujrah_nominal,
         durasi_bulan, tanggal_mulai, tanggal_selesai, agunan, status)
      VALUES ($1,$2,'PY-0004','Laundry Express Hendra',
        'Pengembangan usaha laundry kiloan: mesin cuci baru dan pengering. Sudah berjalan 6 bulan dan berhasil.',
-       'MURABAHAH', 3000000, 3000000, 5, 6, $3, $4, 'BPKB Mesin Cuci Samsung', 'SELESAI')
+       'MURABAHAH', 3000000, 3000000, 100000, 6, $3, $4, 'BPKB Mesin Cuci Samsung', 'SELESAI')
      RETURNING id`,
     [orgId, anggotaMap['KJM-005'], daysAgo(200), daysAgo(20)]
   )
@@ -260,11 +260,11 @@ export async function seedKojasmatDummyData(orgId: string) {
   await queryPostgres(
     `INSERT INTO kojasmat_proyek
        (org_id, pengaju_id, kode_proyek, nama_proyek, deskripsi, jenis_akad,
-        kebutuhan_modal, modal_terkumpul, ujrah_pct,
+        kebutuhan_modal, modal_terkumpul, ujrah_nominal,
         durasi_bulan, agunan, status)
      VALUES ($1,$2,'PY-0005','Toko Sembako Bu Dewi',
        'Modal awal untuk stok sembako: beras, minyak, gula, dan kebutuhan pokok lainnya.',
-       'MURABAHAH', 10000000, 0, 5, 12, 'Tidak ada agunan (calon anggota)', 'DRAFT')`,
+       'MURABAHAH', 10000000, 0, 250000, 12, 'Tidak ada agunan (calon anggota)', 'DRAFT')`,
     [orgId, anggotaMap['KJM-004']]
   )
 
@@ -335,12 +335,10 @@ export async function seedKojasmatDummyData(orgId: string) {
   }
 
   // ─── 7. DISTRIBUSI PROFIT PY-0004 (Wakalah bil Ujrah) ───────────────────────
-  // Model: 100% laba → pemodal proporsional. Koperasi terima ujrah = modal × ujrah_pct.
-  // PY-0004 ujrah_pct=5%, modal=3.000.000 → ujrah koperasi = 150.000 (flat, per proyek)
-  const labaProyekPy4  = 900_000
-  const ujrahPctPy4    = 0.05
-  const totalModalPy4  = 3_000_000
-  const ujrahKoperasi  = totalModalPy4 * ujrahPctPy4  // 150.000
+  // Model: 100% laba → pemodal proporsional. Koperasi terima ujrah nominal tetap.
+  // PY-0004 ujrah_nominal = Rp 100.000 (flat, disepakati di akad wakalah)
+  const labaProyekPy4 = 900_000
+  const ujrahKoperasi = 100_000  // nominal tetap sesuai akad
 
   // Pemodal PY-0004: KJM-002 60%, KJM-001 40% — keduanya mendapat 100% laba proporsional
   const bagiHasilPy4 = [

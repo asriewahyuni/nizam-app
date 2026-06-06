@@ -386,14 +386,14 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
 type ProyekForm = {
   pengaju_id: string; nama_proyek: string; deskripsi: string
   jenis_akad: string; kebutuhan_modal: string
-  ujrah_pct: string
+  ujrah_nominal: string
   durasi_bulan: string; agunan: string; notes: string
 }
 
 const emptyProyekForm: ProyekForm = {
   pengaju_id: '', nama_proyek: '', deskripsi: '',
   jenis_akad: 'MUDHARABAH', kebutuhan_modal: '',
-  ujrah_pct: '5',
+  ujrah_nominal: '150000',
   durasi_bulan: '6', agunan: '', notes: ''
 }
 
@@ -421,7 +421,7 @@ function TabProyek({ orgId, proyek, anggota }: {
         deskripsi: form.deskripsi || undefined,
         jenis_akad: form.jenis_akad as 'MURABAHAH' | 'MUDHARABAH' | 'INAN',
         kebutuhan_modal: Number(form.kebutuhan_modal),
-        ujrah_pct: Number(form.ujrah_pct),
+        ujrah_nominal: Number(form.ujrah_nominal),
         durasi_bulan: Number(form.durasi_bulan),
         agunan: form.agunan || undefined,
         notes: form.notes || undefined,
@@ -608,15 +608,16 @@ function TabProyek({ orgId, proyek, anggota }: {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Ujrah Wakalah (% dari modal)
+              Ujrah Wakalah (Rp, nominal tetap)
               <span className="ml-1 font-normal text-gray-400 text-xs">— fee agen koperasi, bukan nisbah bagi hasil</span>
             </label>
-            <input type="number" min="0" max="100" step="0.5"
+            <input type="number" min="0" step="1000"
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              value={form.ujrah_pct}
-              onChange={e => setForm(f => ({ ...f, ujrah_pct: e.target.value }))} />
+              placeholder="Contoh: 150000"
+              value={form.ujrah_nominal}
+              onChange={e => setForm(f => ({ ...f, ujrah_nominal: e.target.value }))} />
             <p className="mt-1 text-xs text-gray-400">
-              Seluruh keuntungan proyek menjadi hak pemodal. Koperasi hanya menerima ujrah ini sebagai biaya layanan wakalah.
+              Seluruh keuntungan proyek menjadi hak pemodal. Koperasi hanya menerima ujrah nominal ini sebagai biaya layanan wakalah.
             </p>
           </div>
           <div>
