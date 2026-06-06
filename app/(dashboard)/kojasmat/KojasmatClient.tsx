@@ -336,7 +336,7 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Terverifikasi</th>
                 <th className="px-4 py-3 text-left font-medium">Bergabung</th>
-                <th className="px-4 py-3 w-10" />
+                <th className="px-4 py-3 w-20" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -368,14 +368,12 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
                   </td>
                   <td className="px-4 py-3 text-gray-500">{a.joined_at ? String(a.joined_at).split('T')[0] : '—'}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5">
                       <a href={`/anggota/${a.kode_anggota}`} target="_blank"
-                        title="Buka portal anggota"
-                        className="rounded-lg p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer">
-                        <ExternalLink className="h-4 w-4" />
+                        className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer whitespace-nowrap">
+                        <ExternalLink className="h-3.5 w-3.5" /> Portal
                       </a>
                       <button onClick={() => openEdit(a)}
-                        title="Edit anggota"
                         className="rounded-lg p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer">
                         <ChevronRight className="h-4 w-4" />
                       </button>
