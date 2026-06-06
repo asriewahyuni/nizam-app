@@ -4,29 +4,12 @@
 
 import { queryPostgres } from '@/lib/db/postgres'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
-import { ERPBridge } from '@/lib/erp-bridge/finances'
 import { revalidatePath } from 'next/cache'
-
-// Non-fatal ERP journal helper — silently skips if default accounts are not configured
-async function tryRecordRevenue(orgId: string, amount: number, description: string, refId: string) {
-  try {
-    const [debitAcct, creditAcct] = await Promise.all([
-      ERPBridge.getDefaultAccount(orgId, '1-10001'),
-      ERPBridge.getDefaultAccount(orgId, '4-10001'),
-    ])
-    if (!debitAcct || !creditAcct) return
-    await ERPBridge.recordRevenue({
-      orgId,
-      amount,
-      date: new Date().toISOString().split('T')[0],
-      description,
-      referenceType: 'KOJASMAT',
-      referenceId: refId,
-      debitAccountId: debitAcct,
-      creditAccountId: creditAcct,
-    })
-  } catch (_) { /* non-fatal */ }
-}
+import {
+  jurnalSetorSimpanan,
+  jurnalTarikSimpanan,
+  jurnalPenerimaanDanaPemodal,
+} from '@/lib/erp-bridge/kojasmat-journals'
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -172,6 +155,14 @@ export async function getAnggotaByUserId(userId: string): Promise<KojasmatAnggot
   return (rows[0] ?? null) as KojasmatAnggota | null
 }
 
+export async function getAnggotaByKodeOnly(kode: string): Promise<KojasmatAnggota | null> {
+  const { rows } = await queryPostgres(
+    `SELECT * FROM kojasmat_anggota WHERE UPPER(kode_anggota) = UPPER($1) LIMIT 1`,
+    [kode]
+  )
+  return (rows[0] ?? null) as KojasmatAnggota | null
+}
+
 export async function createAnggota(payload: {
   org_id: string
   nama: string
@@ -309,13 +300,19 @@ export async function catatSimpananMutasi(payload: {
       ]
     )
 
-    if (payload.jenis_mutasi === 'SETOR') {
-      await tryRecordRevenue(
-        payload.org_id, payload.jumlah,
-        `Setoran simpanan ${payload.jenis_simpanan} anggota ${payload.anggota_id}`,
-        String(simpanan.id),
-      )
-    }
+    try {
+      if (payload.jenis_mutasi === 'SETOR') {
+        await jurnalSetorSimpanan(
+          payload.org_id, payload.jenis_simpanan, payload.jumlah,
+          String(simpanan.id), payload.keterangan,
+        )
+      } else if (payload.jenis_mutasi === 'TARIK') {
+        await jurnalTarikSimpanan(
+          payload.org_id, payload.jenis_simpanan, payload.jumlah,
+          String(simpanan.id), payload.keterangan,
+        )
+      }
+    } catch (_) { /* jurnal non-fatal — transaksi simpanan tetap tercatat */ }
 
     revalidatePath('/kojasmat')
     return { data: { saldo: sesudah } }
@@ -550,11 +547,12 @@ export async function createPembiayaan(payload: {
     [payload.proyek_id, newModal, newStatus]
   )
 
-  await tryRecordRevenue(
-    payload.org_id, payload.jumlah,
-    `Pembiayaan proyek ${String(proyek.kode_proyek)}`,
-    String(rows[0].id),
-  )
+  try {
+    await jurnalPenerimaanDanaPemodal(
+      payload.org_id, proyek.jenis_akad as 'MUDHARABAH' | 'MURABAHAH' | 'INAN',
+      payload.jumlah, String(rows[0].id), String(proyek.kode_proyek),
+    )
+  } catch (_) { /* jurnal non-fatal */ }
 
   revalidatePath('/kojasmat')
   return { data: rows[0] as KojasmatPembiayaan }

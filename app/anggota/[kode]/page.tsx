@@ -3,6 +3,7 @@ import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { queryPostgres } from '@/lib/db/postgres'
 import {
   getAnggotaByUserId,
+  getAnggotaByKodeOnly,
   getSimpananByAnggota,
   getAllProyek,
   getPembiayaanByAnggota,
@@ -17,13 +18,16 @@ export default async function AnggotaPortalPage({ params }: { params: Promise<{ 
   const { kode } = await params
 
   const session = await getInternalAuthSession()
-  if (!session) redirect('/login')
+  if (!session) redirect(`/anggota/login?redirectTo=/anggota/${kode}`)
 
-  // Cari anggota by user_id session
-  const anggota = await getAnggotaByUserId(session.user.id)
+  // Cari anggota by user_id (login sebagai anggota), fallback by kode (admin preview)
+  let anggota = await getAnggotaByUserId(session.user.id)
+  if (!anggota) {
+    anggota = await getAnggotaByKodeOnly(kode)
+  }
 
   if (!anggota || anggota.kode_anggota.toUpperCase() !== kode.toUpperCase()) {
-    redirect('/login')
+    redirect(`/anggota/login?redirectTo=/anggota/${kode}`)
   }
 
   // Fetch nama organisasi

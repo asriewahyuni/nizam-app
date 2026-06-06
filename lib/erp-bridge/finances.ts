@@ -1,5 +1,5 @@
 import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
-import { createClient } from '@/lib/supabase/server'
+import { queryPostgres } from '@/lib/db/postgres'
 
 export interface RecordRevenueInput {
   orgId: string
@@ -79,18 +79,14 @@ export const ERPBridge = {
   },
   
   /**
-   * Helper to fetch default system accounts (e.g., '1-10001' for Kas Kecil)
-   * This can be expanded to dynamically query `chart_of_accounts` based on predefined mapping codes.
+   * Fetch account id from `accounts` table by org_id + code.
+   * Returns null if account not yet seeded — caller decides whether to skip or throw.
    */
-  async getDefaultAccount(orgId: string, accountCode: string) {
-    const supabase = await createClient()
-    const { data } = await supabase
-      .from('chart_of_accounts')
-      .select('id, name')
-      .eq('org_id', orgId)
-      .eq('account_code', accountCode)
-      .maybeSingle()
-    
-    return data?.id || null
+  async getDefaultAccount(orgId: string, accountCode: string): Promise<string | null> {
+    const { rows } = await queryPostgres(
+      `SELECT id FROM accounts WHERE org_id = $1 AND code = $2 AND is_active = TRUE LIMIT 1`,
+      [orgId, accountCode]
+    )
+    return (rows[0]?.id as string) ?? null
   }
 }
