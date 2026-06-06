@@ -24,7 +24,7 @@ export default async function DaftarPage({
   }
 
   const { rows: [orgData] } = await queryPostgres(
-    `SELECT id, nama FROM organizations WHERE id=$1 LIMIT 1`,
+    `SELECT id, name FROM organizations WHERE id=$1 LIMIT 1`,
     [org]
   )
 
@@ -41,5 +41,5 @@ export default async function DaftarPage({
     )
   }
 
-  return <DaftarClient orgId={orgData.id} orgNama={orgData.nama} />
+  return <DaftarClient orgId={orgData.id} orgNama={orgData.name} />
 }

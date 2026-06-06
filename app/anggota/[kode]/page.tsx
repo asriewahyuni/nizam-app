@@ -28,7 +28,7 @@ export default async function AnggotaPortalPage({ params }: { params: Promise<{ 
 
   // Fetch nama organisasi
   const { rows: [org] } = await queryPostgres(
-    `SELECT nama FROM organizations WHERE id=$1 LIMIT 1`,
+    `SELECT name FROM organizations WHERE id=$1 LIMIT 1`,
     [anggota.org_id]
   )
 
@@ -50,7 +50,7 @@ export default async function AnggotaPortalPage({ params }: { params: Promise<{ 
       pembiayaan={pembiayaan}
       penawaran={penawaran}
       laporan={laporan}
-      orgNama={org?.nama ?? 'Koperasi'}
+      orgNama={org?.name ?? 'Koperasi'}
     />
   )
 }
