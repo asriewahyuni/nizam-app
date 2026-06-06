@@ -270,52 +270,57 @@ export async function catatSimpananMutasi(payload: {
   keterangan?: string
   tanggal?: string
 }) {
-  const session = await getInternalAuthSession()
-  if (!session) return { error: 'Tidak terautentikasi' }
+  try {
+    const session = await getInternalAuthSession()
+    if (!session) return { error: 'Tidak terautentikasi' }
 
-  const { rows: [simpanan] } = await queryPostgres(
-    `SELECT * FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis=$2`,
-    [payload.anggota_id, payload.jenis_simpanan]
-  )
-  if (!simpanan) return { error: 'Rekening simpanan tidak ditemukan' }
-
-  if (payload.jenis_mutasi === 'TARIK' && Number(simpanan.saldo) < payload.jumlah) {
-    return { error: 'Saldo tidak mencukupi' }
-  }
-
-  const sebelum = Number(simpanan.saldo)
-  const sesudah = payload.jenis_mutasi === 'TARIK'
-    ? sebelum - payload.jumlah
-    : sebelum + payload.jumlah
-
-  await queryPostgres(
-    `UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`,
-    [simpanan.id, sesudah]
-  )
-  await queryPostgres(
-    `INSERT INTO kojasmat_simpanan_mutasi
-       (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, tanggal, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-    [
-      payload.org_id, simpanan.id, payload.anggota_id,
-      payload.jenis_mutasi, payload.jumlah,
-      sebelum, sesudah,
-      payload.keterangan ?? null,
-      payload.tanggal ?? new Date().toISOString().split('T')[0],
-      session.user.id,
-    ]
-  )
-
-  if (payload.jenis_mutasi === 'SETOR') {
-    await tryRecordRevenue(
-      payload.org_id, payload.jumlah,
-      `Setoran simpanan ${payload.jenis_simpanan} anggota ${payload.anggota_id}`,
-      String(simpanan.id),
+    const { rows: [simpanan] } = await queryPostgres(
+      `SELECT * FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis=$2`,
+      [payload.anggota_id, payload.jenis_simpanan]
     )
-  }
+    if (!simpanan) return { error: 'Rekening simpanan tidak ditemukan' }
 
-  revalidatePath('/kojasmat')
-  return { data: { saldo: sesudah } }
+    if (payload.jenis_mutasi === 'TARIK' && Number(simpanan.saldo) < payload.jumlah) {
+      return { error: 'Saldo tidak mencukupi' }
+    }
+
+    const sebelum = Number(simpanan.saldo)
+    const sesudah = payload.jenis_mutasi === 'TARIK'
+      ? sebelum - payload.jumlah
+      : sebelum + payload.jumlah
+
+    await queryPostgres(
+      `UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`,
+      [simpanan.id, sesudah]
+    )
+    await queryPostgres(
+      `INSERT INTO kojasmat_simpanan_mutasi
+         (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, tanggal, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [
+        payload.org_id, simpanan.id, payload.anggota_id,
+        payload.jenis_mutasi, payload.jumlah,
+        sebelum, sesudah,
+        payload.keterangan ?? null,
+        payload.tanggal ?? new Date().toISOString().split('T')[0],
+        session.user.id,
+      ]
+    )
+
+    if (payload.jenis_mutasi === 'SETOR') {
+      await tryRecordRevenue(
+        payload.org_id, payload.jumlah,
+        `Setoran simpanan ${payload.jenis_simpanan} anggota ${payload.anggota_id}`,
+        String(simpanan.id),
+      )
+    }
+
+    revalidatePath('/kojasmat')
+    return { data: { saldo: sesudah } }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Terjadi kesalahan server'
+    return { error: msg }
+  }
 }
 
 // ─── PROYEK ───────────────────────────────────────────────────────────────────

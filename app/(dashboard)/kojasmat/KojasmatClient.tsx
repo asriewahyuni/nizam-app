@@ -741,6 +741,8 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
   const [pending, startTransition] = useTransition()
   const [selectedAnggota, setSelectedAnggota] = useState<KojasmatAnggota | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [mutasiError, setMutasiError] = useState<string | null>(null)
+  const [mutasiSuccess, setMutasiSuccess] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [form, setForm] = useState({
     jenis_simpanan: 'WAJIB', jenis_mutasi: 'SETOR',
@@ -754,8 +756,9 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
 
   function handleMutasi() {
     if (!selectedAnggota) return
+    setMutasiError(null)
     startTransition(async () => {
-      await catatSimpananMutasi({
+      const res = await catatSimpananMutasi({
         org_id: orgId,
         anggota_id: selectedAnggota.id,
         jenis_simpanan: form.jenis_simpanan as 'POKOK' | 'WAJIB' | 'SUKARELA',
@@ -764,6 +767,14 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
         keterangan: form.keterangan || undefined,
         tanggal: form.tanggal,
       })
+      if (res.error) {
+        setMutasiError(res.error)
+        return
+      }
+      setMutasiError(null)
+      setMutasiSuccess(
+        `${form.jenis_mutasi === 'SETOR' ? 'Setoran' : form.jenis_mutasi === 'TARIK' ? 'Penarikan' : 'Koreksi'} berhasil dicatat`
+      )
       setModalOpen(false)
       setForm({ jenis_simpanan: 'WAJIB', jenis_mutasi: 'SETOR', jumlah: '', keterangan: '', tanggal: new Date().toISOString().split('T')[0] })
     })
@@ -779,6 +790,13 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
           value={search} onChange={e => setSearch(e.target.value)}
         />
       </div>
+
+      {mutasiSuccess && (
+        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <span>{mutasiSuccess}</span>
+          <button onClick={() => setMutasiSuccess(null)} className="ml-4 text-emerald-500 hover:text-emerald-700 cursor-pointer">✕</button>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -817,9 +835,14 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
         </div>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)}
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setMutasiError(null) }}
         title={`Transaksi Simpanan — ${selectedAnggota?.nama ?? ''}`}>
         <div className="space-y-3">
+          {mutasiError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {mutasiError}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Jenis Simpanan</label>
