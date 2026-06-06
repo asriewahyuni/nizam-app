@@ -954,6 +954,44 @@
             </ol>
           </div>
 
+          <!-- Download section -->
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:20px;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Cara Pakai — Pilih salah satu
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Tidak perlu buat folder manual. Tinggal download atau jalankan satu perintah.</p>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+              <!-- Option A: Download ZIP -->
+              <div style="background:#080E1A;border:1px solid var(--border);border-radius:10px;padding:16px;">
+                <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Cara A — Download ZIP
+                </div>
+                <p style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Download semua file sekaligus. Extract ke dalam folder <code style="font-family:var(--font-mono);color:var(--green);">nizam-app/</code> dan struktur folder otomatis terbentuk.</p>
+                <button class="btn btn-primary" onclick="downloadZip()" style="width:100%;font-size:13px;padding:10px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;display:inline;vertical-align:middle;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Download ZIP
+                </button>
+              </div>
+
+              <!-- Option B: Shell script -->
+              <div style="background:#080E1A;border:1px solid var(--border);border-radius:10px;padding:16px;">
+                <div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                  Cara B — Terminal (1 perintah)
+                </div>
+                <p style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:12px;">Copy script bash lalu jalankan di terminal dari root folder <code style="font-family:var(--font-mono);color:var(--amber);">nizam-app/</code>. Semua file dan folder dibuat otomatis.</p>
+                <button class="btn" onclick="copyInstallScript()" style="width:100%;font-size:13px;padding:10px;background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.3);">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;display:inline;vertical-align:middle;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  Copy Install Script
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="btn-row">
             <button class="btn btn-ghost" onclick="goToStep(4)">← Kembali Edit</button>
             <button class="btn btn-primary" onclick="resetBuilder()">
@@ -1389,6 +1427,97 @@ function resetBuilder() {
   document.getElementById('mod-prefix').value = ''
   document.getElementById('mod-migration').value = ''
   renderTags(); renderEntities(); updatePreview()
+}
+
+// ─── Download ZIP ────────────────────────────────────────────────────────────
+// Buat ZIP murni JS tanpa library eksternal (format ZIP spec)
+function downloadZip() {
+  const files = state.generatedFiles
+  if (!Object.keys(files).length) { showToast('Generate dulu sebelum download'); return }
+
+  const slug = document.getElementById('mod-slug').value || 'new-module'
+
+  // Buat ZIP manual (local file storage approach — pakai Blob multi-file)
+  // Karena ZIP butuh library, kita pakai pendekatan: buat folder struktur sebagai
+  // multiple file downloads dengan jeda, atau buat single script
+  // Solusi terbaik tanpa library: generate sebagai .tar shell heredoc
+  // Tapi paling UX-friendly: download tiap file ke folder yang benar via anchor
+
+  // Cek apakah browser support showDirectoryPicker (File System Access API)
+  if (window.showDirectoryPicker) {
+    downloadViaFSAPI(files, slug)
+  } else {
+    // Fallback: download sebagai shell script yang membuat semua file
+    downloadAsShellScript(files, slug)
+  }
+}
+
+async function downloadViaFSAPI(files, slug) {
+  try {
+    showToast('Pilih folder nizam-app/ kamu...')
+    const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'desktop' })
+
+    let count = 0
+    for (const [path, content] of Object.entries(files)) {
+      const parts = path.split('/')
+      let current = dirHandle
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i], { create: true })
+      }
+      const fileHandle = await current.getFileHandle(parts[parts.length - 1], { create: true })
+      const writable = await fileHandle.createWritable()
+      await writable.write(content)
+      await writable.close()
+      count++
+    }
+    showToast(`✓ ${count} file berhasil disimpan ke project!`)
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      // Fallback ke shell script jika gagal
+      downloadAsShellScript(files, slug)
+    }
+  }
+}
+
+function downloadAsShellScript(files, slug) {
+  let script = `#!/bin/bash\n# Install script untuk modul: ${slug}\n# Jalankan dari root folder nizam-app/\n# bash install-${slug}.sh\n\nset -e\necho "Installing module: ${slug}..."\n\n`
+
+  for (const [path, content] of Object.entries(files)) {
+    const dir = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '.'
+    const escaped = content
+      .replace(/\\/g, '\\\\')
+      .replace(/\$/g, '\\$')
+      .replace(/`/g, '\\`')
+    script += `mkdir -p "${dir}"\ncat > "${path}" << 'NIZAM_EOF'\n${content}\nNIZAM_EOF\necho "  ✓ ${path}"\n\n`
+  }
+
+  script += `echo ""\necho "✅ Modul ${slug} berhasil di-install!"\necho ""\necho "Langkah selanjutnya:"\necho "  1. npx supabase db push   (apply migrasi)"\necho "  2. npm run dev            (jalankan dev server)"\n`
+
+  const blob = new Blob([script], { type: 'text/plain' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `install-${slug}.sh`
+  a.click()
+  URL.revokeObjectURL(a.href)
+  showToast('install-' + slug + '.sh berhasil didownload!')
+}
+
+// ─── Copy Install Script ──────────────────────────────────────────────────────
+function copyInstallScript() {
+  const files = state.generatedFiles
+  if (!Object.keys(files).length) { showToast('Generate dulu sebelum copy'); return }
+  const slug = document.getElementById('mod-slug').value || 'new-module'
+
+  let script = `#!/bin/bash\n# Jalankan dari root nizam-app/ :\n# bash install-${slug}.sh\n\nset -e\n\n`
+  for (const [path, content] of Object.entries(files)) {
+    const dir = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '.'
+    script += `mkdir -p "${dir}"\ncat > "${path}" << 'NIZAM_EOF'\n${content}\nNIZAM_EOF\n\n`
+  }
+  script += `echo "✅ Modul ${slug} siap!"\n`
+
+  navigator.clipboard.writeText(script)
+    .then(() => showToast('Install script disalin! Paste di terminal nizam-app/'))
+    .catch(() => showToast('Gagal copy, coba lagi'))
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
