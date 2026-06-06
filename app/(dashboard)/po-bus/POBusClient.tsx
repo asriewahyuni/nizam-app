@@ -5,7 +5,7 @@ import {
   Bus, Users, Wrench, AlertTriangle, MapPin, Ticket, Building2,
   Navigation, Plus, Phone, Mail, Edit2, CheckCircle2, Clock,
   XCircle, TruckIcon, Settings, ChevronRight, Flame,
-  Banknote, Wallet, Store, ArrowUpCircle, Receipt, BadgeCheck, Package
+  Banknote, Wallet, Store, ArrowUpCircle, Receipt, BadgeCheck, Package, ExternalLink
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -538,7 +538,18 @@ export function POBusClient({
         </div>
       )}
 
-      <PageHeader tag="PO Bus" title="Manajemen Perusahaan Otobus" subtitle="Armada, kru, servis, emergency, ticketing, dan pool" icon={<Bus className="w-6 h-6" />} iconColor="text-blue-600" />
+      <PageHeader 
+        tag="PO Bus" 
+        title="Manajemen Perusahaan Otobus" 
+        subtitle="Armada, kru, servis, emergency, ticketing, dan pool" 
+        icon={<Bus className="w-6 h-6" />} 
+        iconColor="text-blue-600" 
+        actions={
+          <a href="/pos-cargo" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-sm text-sm">
+            Buka POS Kargo <ExternalLink className="w-4 h-4" />
+          </a>
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Total Armada" value={localUnits.length} icon={Bus} color="blue" sub={`${localUnits.filter(u => u.status === 'TERSEDIA').length} tersedia`} />
