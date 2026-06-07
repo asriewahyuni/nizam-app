@@ -416,3 +416,61 @@ export async function seedKojasmatDummyData(orgId: string) {
     }
   }
 }
+
+// ─── RESET ────────────────────────────────────────────────────────────────────
+
+export async function resetKojasmatData(orgId: string) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  // 1. Kumpulkan user_id anggota yang punya akun auth (untuk dihapus)
+  const { rows: authRows } = await queryPostgres(
+    `SELECT user_id FROM kojasmat_anggota WHERE org_id=$1 AND user_id IS NOT NULL`,
+    [orgId]
+  )
+  const authUserIds = authRows.map(r => r.user_id as string)
+
+  // 2. Hapus journal entries terkait kojasmat untuk org ini
+  await queryPostgres(
+    `DELETE FROM journal_lines
+     WHERE journal_id IN (
+       SELECT id FROM journal_entries
+       WHERE org_id=$1 AND reference_type LIKE 'KOJASMAT_%'
+     )`,
+    [orgId]
+  )
+  await queryPostgres(
+    `DELETE FROM journal_entries WHERE org_id=$1 AND reference_type LIKE 'KOJASMAT_%'`,
+    [orgId]
+  )
+
+  // 3. Hapus tabel-tabel yang tidak ter-cascade dari kojasmat_anggota
+  await queryPostgres(`DELETE FROM kojasmat_pelatihan   WHERE org_id=$1`, [orgId])
+  await queryPostgres(`DELETE FROM kojasmat_pendaftaran WHERE org_id=$1`, [orgId])
+  await queryPostgres(`DELETE FROM kojasmat_dokumen     WHERE org_id=$1`, [orgId])
+
+  // 4. Hapus anggota — cascade ke: simpanan, mutasi, proyek, dps_review,
+  //    pembiayaan, cicilan, bagi_hasil, penawaran, laporan_proyek, tindakan, akad
+  await queryPostgres(`DELETE FROM kojasmat_anggota WHERE org_id=$1`, [orgId])
+
+  // 5. Hapus akun auth anggota
+  if (authUserIds.length > 0) {
+    await queryPostgres(
+      `DELETE FROM internal_auth_sessions WHERE user_id = ANY($1::uuid[])`,
+      [authUserIds]
+    )
+    await queryPostgres(
+      `DELETE FROM internal_auth_users WHERE id = ANY($1::uuid[])`,
+      [authUserIds]
+    )
+  }
+
+  revalidatePath('/kojasmat')
+  return { data: { ok: true } }
+}
+
+export async function resetAndReseedKojasmat(orgId: string) {
+  const resetResult = await resetKojasmatData(orgId)
+  if (resetResult.error) return resetResult
+  return seedKojasmatDummyData(orgId)
+}

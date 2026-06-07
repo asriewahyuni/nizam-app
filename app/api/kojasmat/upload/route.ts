@@ -1,6 +1,6 @@
 // Upload dokumen Kojasmat — KTP, Passport, Surat Usaha, Proyeksi, dll.
 import { NextRequest, NextResponse } from 'next/server'
-import { uploadObjectToStorage } from '@/lib/storage/object-storage.server'
+import { uploadObjectToStorage, isObjectStorageConfigured } from '@/lib/storage/object-storage.server'
 
 export const runtime = 'nodejs'
 
@@ -8,6 +8,13 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf
 const MAX_BYTES = 10 * 1024 * 1024  // 10 MB
 
 export async function POST(req: NextRequest) {
+  if (!isObjectStorageConfigured()) {
+    return NextResponse.json(
+      { error: 'Penyimpanan file belum dikonfigurasi. Hubungi administrator.' },
+      { status: 503 }
+    )
+  }
+
   try {
     const formData = await req.formData()
     const file = formData.get('file')
@@ -16,6 +23,9 @@ export async function POST(req: NextRequest) {
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 })
+    }
+    if (!orgId) {
+      return NextResponse.json({ error: 'org_id wajib disertakan.' }, { status: 400 })
     }
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json({ error: 'Format tidak didukung. Gunakan JPG, PNG, atau PDF.' }, { status: 400 })
@@ -32,7 +42,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ key, name: file.name, size: file.size, mime: file.type })
   } catch (err) {
-    console.error('[kojasmat/upload]', err)
-    return NextResponse.json({ error: 'Upload gagal. Coba lagi.' }, { status: 500 })
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[kojasmat/upload]', msg)
+    return NextResponse.json({ error: `Upload gagal: ${msg}` }, { status: 500 })
   }
 }

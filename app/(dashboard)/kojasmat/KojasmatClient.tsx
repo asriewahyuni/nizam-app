@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { cn } from '@/lib/utils'
 import {
-  Users, Briefcase, PiggyBank, GraduationCap, LayoutDashboard,
+  Users, Briefcase, Wallet, GraduationCap, LayoutDashboard,
   Plus, Search, ChevronRight, CheckCircle, XCircle,
   ArrowUpCircle, Shield, Send, RefreshCw,
   TrendingUp, Banknote, Star, Clock, FileText,
@@ -23,7 +23,7 @@ import {
   type KojasmatPendaftaran, type KojasmatDokumen,
   type KojasmatLaporanProyek, type KojasmatTindakan,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
-import { seedKojasmatDummyData } from '@/modules/kojasmat/actions/kojasmat-seeder.actions'
+import { seedKojasmatDummyData, resetAndReseedKojasmat } from '@/modules/kojasmat/actions/kojasmat-seeder.actions'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -107,6 +107,7 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
   const [pending, startTransition] = useTransition()
   const [seedResult, setSeedResult] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
 
   function handleSeed() {
     startTransition(async () => {
@@ -123,12 +124,27 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
     })
   }
 
+  function handleResetReseed() {
+    startTransition(async () => {
+      const res = await resetAndReseedKojasmat(orgId)
+      if (res.error) {
+        setSeedResult(`Gagal reset: ${res.error}`)
+      } else {
+        setSeedResult(
+          `Reset & renew selesai! ${res.data?.anggota} anggota, ${res.data?.proyek} proyek, ` +
+          `${res.data?.pembiayaan} pembiayaan, ${res.data?.bagi_hasil} bagi hasil tersync ke ERP.`
+        )
+      }
+      setResetConfirmOpen(false)
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={Users} label="Total Anggota" value={stats.total_anggota} sub={`${stats.anggota_aktif} aktif`} />
         <StatCard icon={Briefcase} label="Total Proyek" value={stats.total_proyek} sub={`${stats.proyek_berjalan} berjalan`} />
-        <StatCard icon={PiggyBank} label="Total Simpanan" value={fmt(Number(stats.total_simpanan))} />
+        <StatCard icon={Wallet} label="Total Simpanan" value={fmt(Number(stats.total_simpanan))} />
         <StatCard icon={TrendingUp} label="Portofolio Pembiayaan" value={fmt(Number(stats.total_pembiayaan))} />
       </div>
 
@@ -185,7 +201,7 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
       </div>
 
       {/* Dummy Data Section */}
-      {stats.total_anggota === 0 && (
+      {stats.total_anggota === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
@@ -202,6 +218,23 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
             </button>
           </div>
         </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-red-200 bg-red-50 p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <p className="font-medium text-red-700 text-sm">Reset &amp; Perbarui Data Dummy</p>
+              <p className="text-xs text-red-400 mt-0.5">
+                Hapus semua data dummy (anggota, proyek, simpanan, jurnal ERP) lalu isi ulang dari awal.
+              </p>
+            </div>
+            <button
+              onClick={() => setResetConfirmOpen(true)}
+              className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <RefreshCw className="h-4 w-4" /> Reset &amp; Renew
+            </button>
+          </div>
+        </div>
       )}
 
       {seedResult && (
@@ -213,7 +246,7 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
         </div>
       )}
 
-      {/* Konfirmasi Modal */}
+      {/* Konfirmasi Modal — Seed */}
       <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)} title="Isi Data Dummy Kojasmat">
         <div className="space-y-4">
           <div className="rounded-xl bg-violet-50 border border-violet-100 p-4 text-sm text-violet-800 space-y-1">
@@ -239,6 +272,34 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
             <button onClick={handleSeed} disabled={pending}
               className="flex-1 rounded-xl bg-violet-600 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 transition-colors cursor-pointer">
               {pending ? 'Sedang mengisi...' : 'Ya, Isi Sekarang'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Konfirmasi Modal — Reset & Renew */}
+      <Modal open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} title="Reset & Renew Data Dummy">
+        <div className="space-y-4">
+          <div className="rounded-xl bg-red-50 border border-red-100 p-4 text-sm text-red-800 space-y-1">
+            <p className="font-medium mb-2">Yang akan dihapus permanen:</p>
+            <p>• Semua anggota, simpanan, dan riwayat mutasi</p>
+            <p>• Semua proyek, pembiayaan, DPS review, bagi hasil</p>
+            <p>• Semua pendaftaran, dokumen, dan laporan proyek</p>
+            <p>• Semua pelatihan dan peserta</p>
+            <p>• Akun login anggota (internal auth)</p>
+            <p>• Jurnal akuntansi ERP terkait kojasmat</p>
+          </div>
+          <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-xs text-amber-700">
+            Setelah dihapus, data dummy baru langsung diisi ulang dari awal. Tindakan ini tidak bisa dibatalkan.
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setResetConfirmOpen(false)}
+              className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+              Batal
+            </button>
+            <button onClick={handleResetReseed} disabled={pending}
+              className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer">
+              {pending ? 'Sedang memproses...' : 'Ya, Reset & Renew'}
             </button>
           </div>
         </div>
@@ -1746,7 +1807,7 @@ export default function KojasmatClient({ orgId, stats, anggota, proyek, pelatiha
     { key: 'permohonan',  label: 'Permohonan',   icon: ClipboardList,  badge: pendingPendaftaran || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
     { key: 'anggota',     label: 'Anggota',       icon: Users,          badge: stats.total_anggota },
     { key: 'proyek',      label: 'Proyek',         icon: Briefcase,      badge: stats.antrian_dps || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
-    { key: 'simpanan',    label: 'Simpanan',       icon: PiggyBank },
+    { key: 'simpanan',    label: 'Simpanan',       icon: Wallet },
     { key: 'pelatihan',   label: 'Pelatihan',      icon: GraduationCap },
     { key: 'laporan',     label: 'Laporan',         icon: FileText,      badge: laporan.filter(l => l.status === 'DIKIRIM').length || undefined },
     { key: 'tindakan',    label: 'Tindakan',        icon: AlertTriangle, badge: tindakanAktif || undefined, badgeColor: 'bg-red-100 text-red-700' },

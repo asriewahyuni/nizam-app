@@ -10,8 +10,9 @@
 //   21-5002    — DST Mudharabah (LIABILITAS)
 //   21-6000    — Simpanan Sukarela / Wadiah (LIABILITAS)
 //   22-1000    — Utang Bagi Hasil Belum Dibagikan (LIABILITAS)
-//   31-1000    — Simpanan Pokok (EKUITAS)
-//   31-2000    — Simpanan Wajib (EKUITAS)
+//   31-1000    — Simpanan Pokok / Wadiah (LIABILITAS) — titipan anggota, bukan modal permanen
+//   31-2000    — Simpanan Wajib / Wadiah (LIABILITAS) — titipan anggota, bukan modal permanen
+//   32-1000    — Cadangan Koperasi (EKUITAS)
 //   41-6001    — Ujrah Wakalah Murabahah (PENDAPATAN)
 //   41-6002    — Ujrah Wakalah Mudharabah (PENDAPATAN)
 
@@ -69,7 +70,7 @@ async function postJurnal(
 // ─── SIMPANAN ─────────────────────────────────────────────────────────────────
 
 /**
- * Setoran simpanan: Dr Kas (1101) → Cr Simpanan Anggota (31-1000/31-2000/21-6000)
+ * Setoran simpanan: Dr Kas (1101) → Cr Wadiah Anggota (31-1000/31-2000/21-6000 — semua LIABILITAS)
  */
 export async function jurnalSetorSimpanan(
   orgId: string,

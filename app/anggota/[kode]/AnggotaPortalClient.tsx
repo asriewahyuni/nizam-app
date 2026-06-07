@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { cn } from '@/lib/utils'
 import {
-  PiggyBank, Briefcase, Bell, LogOut, TrendingUp,
+  Wallet, Briefcase, Bell, LogOut, TrendingUp,
   CheckCircle, ArrowUpCircle, ArrowDownCircle,
   Star, GraduationCap, FileText, Send, Upload, XCircle,
   ChevronDown, ChevronUp, AlertCircle, Home,
@@ -853,7 +853,7 @@ export default function AnggotaPortalClient(props: Props) {
 
   const tabs: { key: ActiveTab; label: string; icon: React.ElementType; badge?: number }[] = [
     { key: 'beranda',   label: 'Beranda',   icon: Home },
-    { key: 'simpanan',  label: 'Simpanan',  icon: PiggyBank },
+    { key: 'simpanan',  label: 'Simpanan',  icon: Wallet },
     { key: 'proyek',    label: 'Proyek',    icon: Briefcase },
     { key: 'penawaran', label: 'Penawaran', icon: Bell, badge: penawaranBaru || undefined },
     ...(proyekBerjalan.length > 0 ? [{ key: 'laporan' as ActiveTab, label: 'Laporan', icon: FileText }] : []),

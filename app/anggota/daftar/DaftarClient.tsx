@@ -45,15 +45,19 @@ const JENIS_DOK: { value: KojasmatDokumen['jenis_dokumen']; label: string; wajib
 
 async function uploadFile(
   file: File, orgId: string
-): Promise<{ key: string; name: string; size: number } | null> {
+): Promise<{ key: string; name: string; size: number } | { error: string }> {
   const fd = new FormData()
   fd.append('file', file)
   fd.append('org_id', orgId)
   fd.append('ref_type', 'PENDAFTARAN')
-  const res = await fetch('/api/kojasmat/upload', { method: 'POST', body: fd })
-  if (!res.ok) return null
-  const data = await res.json() as { key: string; name: string; size: number }
-  return data
+  try {
+    const res = await fetch('/api/kojasmat/upload', { method: 'POST', body: fd })
+    const json = await res.json() as { key?: string; name?: string; size?: number; error?: string }
+    if (!res.ok || json.error) return { error: json.error ?? 'Upload gagal. Coba lagi.' }
+    return { key: json.key!, name: json.name!, size: json.size! }
+  } catch {
+    return { error: 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.' }
+  }
 }
 
 // ─── KOMPONEN UPLOAD DOKUMEN ──────────────────────────────────────────────────
@@ -80,7 +84,7 @@ function DocUploadRow({
     setUploading(true)
     try {
       const result = await uploadFile(file, orgId)
-      if (!result) { setError('Upload gagal. Coba lagi.'); return }
+      if ('error' in result) { setError(result.error); return }
       const saved = await simpanDokumenPendaftaran({
         org_id: orgId,
         referensi_id: pendaftaranId,
