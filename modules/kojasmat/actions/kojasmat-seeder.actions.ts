@@ -10,7 +10,7 @@ import { revalidatePath } from 'next/cache'
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function getInternalUserId(session: { user: { id: string; user_metadata: Record<string, unknown> } }): string {
-  return (session.user.user_metadata['internal_user_id'] as string | null) ?? getInternalUserId(session)
+  return (session.user.user_metadata['internal_user_id'] as string | null) ?? session.user.id
 }
 
 const today = () => new Date().toISOString().split('T')[0]
