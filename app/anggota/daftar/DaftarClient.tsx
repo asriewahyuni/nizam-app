@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { cn } from '@/lib/utils'
 import {
   User, Phone, MapPin, Briefcase, FileText, Upload,
-  CheckCircle, ChevronRight, Loader2, X, Eye
+  CheckCircle, ChevronRight, Loader2, X, Eye, EyeOff
 } from 'lucide-react'
 import {
   buatPendaftaran,
@@ -20,6 +20,8 @@ type FormData = {
   nama_lengkap: string
   nik: string
   email: string
+  password: string
+  confirm_password: string
   phone: string
   alamat: string
   pekerjaan: string
@@ -96,6 +98,8 @@ function DocUploadRow({
       })
       if (saved.error) { setError(saved.error); return }
       onUploaded({ jenis, nama_file: file.name, file_key: result.key, file_size: file.size })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan. Coba lagi.')
     } finally {
       setUploading(false)
       e.target.value = ''
@@ -157,10 +161,11 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   const [pendaftaranId, setPendaftaranId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dokumenMap, setDokumenMap] = useState<Record<string, DokumenUploaded>>({})
+  const [showPassword, setShowPassword] = useState(false)
 
   const [form, setForm] = useState<FormData>({
-    nama_lengkap: '', nik: '', email: '', phone: '',
-    alamat: '', pekerjaan: '', alasan_bergabung: ''
+    nama_lengkap: '', nik: '', email: '', password: '', confirm_password: '',
+    phone: '', alamat: '', pekerjaan: '', alasan_bergabung: ''
   })
 
   function setField(k: keyof FormData, v: string) {
@@ -169,6 +174,9 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
   function handleSubmitData() {
     if (!form.nama_lengkap.trim()) { setError('Nama lengkap wajib diisi'); return }
+    if (form.email && !form.password) { setError('Masukkan kata sandi untuk akun Anda'); return }
+    if (form.password && form.password.length < 8) { setError('Kata sandi minimal 8 karakter'); return }
+    if (form.password && form.password !== form.confirm_password) { setError('Konfirmasi kata sandi tidak cocok'); return }
     setError(null)
     startTransition(async () => {
       const res = await buatPendaftaran({
@@ -176,6 +184,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
         nama_lengkap: form.nama_lengkap,
         nik: form.nik || undefined,
         email: form.email || undefined,
+        password: form.password || undefined,
         phone: form.phone || undefined,
         alamat: form.alamat || undefined,
         pekerjaan: form.pekerjaan || undefined,
@@ -250,13 +259,52 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Email <span className="text-gray-400 font-normal">(untuk login portal)</span>
+              </label>
               <input type="email"
                 className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                 placeholder="email@contoh.com"
                 value={form.email} onChange={e => setField('email', e.target.value)}
               />
             </div>
+            {form.email && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Kata Sandi <span className="text-red-500 text-xs">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 pr-10 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                      placeholder="Min. 8 karakter"
+                      value={form.password} onChange={e => setField('password', e.target.value)}
+                    />
+                    <button type="button" onClick={() => setShowPassword(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer">
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Konfirmasi Sandi <span className="text-red-500 text-xs">*</span>
+                  </label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    className={cn(
+                      'w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2 transition-colors',
+                      form.confirm_password && form.confirm_password !== form.password
+                        ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                        : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100'
+                    )}
+                    placeholder="Ulangi sandi"
+                    value={form.confirm_password} onChange={e => setField('confirm_password', e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Pekerjaan / Jenis Usaha</label>
               <input

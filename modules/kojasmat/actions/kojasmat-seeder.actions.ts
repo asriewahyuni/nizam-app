@@ -9,6 +9,10 @@ import { revalidatePath } from 'next/cache'
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
+function getInternalUserId(session: { user: { id: string; user_metadata: Record<string, unknown> } }): string {
+  return (session.user.user_metadata['internal_user_id'] as string | null) ?? getInternalUserId(session)
+}
+
 const today = () => new Date().toISOString().split('T')[0]
 const daysAgo = (n: number) => {
   const d = new Date(); d.setDate(d.getDate() - n)
@@ -153,7 +157,7 @@ export async function seedKojasmatDummyData(orgId: string) {
         `INSERT INTO kojasmat_simpanan_mutasi
            (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, tanggal, created_by)
          VALUES ($1,$2,$3,'SETOR',$4,$5,$6,$7,$8,$9)`,
-        [orgId, simpanan.id, anggotaId, s.jumlah, sebelum, saldo, s.ket, s.tgl, session.user.id]
+        [orgId, simpanan.id, anggotaId, s.jumlah, sebelum, saldo, s.ket, s.tgl, getInternalUserId(session)]
       )
       // ERP — jurnal setoran simpanan
       await tryJurnal(orgId, s.jumlah, `${s.ket} — ${item.kode} (${item.jenis})`, String(simpanan.id), 'KOJASMAT_SIMPANAN')
@@ -274,19 +278,19 @@ export async function seedKojasmatDummyData(orgId: string) {
   await queryPostgres(
     `INSERT INTO kojasmat_dps_review (org_id, proyek_id, reviewer_id, keputusan, catatan, reviewed_at)
      VALUES ($1,$2,$3,'DISETUJUI','Proyek layak secara syariah. Akad mudharabah sesuai. Agunan memadai.',$4)`,
-    [orgId, py1.id, session.user.id, daysAgo(120)]
+    [orgId, py1.id, getInternalUserId(session), daysAgo(120)]
   )
   // PY-0002: disetujui
   await queryPostgres(
     `INSERT INTO kojasmat_dps_review (org_id, proyek_id, reviewer_id, keputusan, catatan, reviewed_at)
      VALUES ($1,$2,$3,'DISETUJUI','Akad inan syariah compliant. Ujrah wakalah koperasi sudah transparan dan disepakati.',$4)`,
-    [orgId, py2.id, session.user.id, daysAgo(14)]
+    [orgId, py2.id, getInternalUserId(session), daysAgo(14)]
   )
   // PY-0004: disetujui
   await queryPostgres(
     `INSERT INTO kojasmat_dps_review (org_id, proyek_id, reviewer_id, keputusan, catatan, reviewed_at)
      VALUES ($1,$2,$3,'DISETUJUI','Akad murabahah valid. Harga jual dan margin sudah transparan.',$4)`,
-    [orgId, py4.id, session.user.id, daysAgo(210)]
+    [orgId, py4.id, getInternalUserId(session), daysAgo(210)]
   )
 
   // ─── 6. PEMBIAYAAN + SYNC ERP ──────────────────────────────────────────────
@@ -379,7 +383,7 @@ export async function seedKojasmatDummyData(orgId: string) {
         [orgId, simpSuk.id, anggotaMap[bh.kode],
          bh.jumlah, sebelum, sesudah,
          `Bagi hasil PY-0004 (Laundry Hendra) periode 2025-Q4`,
-         today(), session.user.id]
+         today(), getInternalUserId(session)]
       )
     }
     // ERP — catat penerimaan ujrah wakalah koperasi (bukan dari laba, tapi dari modal)

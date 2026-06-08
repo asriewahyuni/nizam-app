@@ -430,7 +430,7 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
                   <td className="px-4 py-3 text-gray-500">{a.joined_at ? String(a.joined_at).split('T')[0] : '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
-                      <a href={`/anggota/${a.kode_anggota}`} target="_blank"
+                      <a href={`/anggota/${a.kode_anggota}?org=${orgId}`} target="_blank"
                         className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer whitespace-nowrap">
                         <ExternalLink className="h-3.5 w-3.5" /> Portal
                       </a>

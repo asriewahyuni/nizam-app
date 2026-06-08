@@ -11,6 +11,12 @@ function generateTempPassword(): string {
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
+// session.user.id bisa berisi legacy_user_id (Supabase UUID), bukan internal_auth_users.id.
+// Gunakan fungsi ini untuk FK yang merujuk ke internal_auth_users(id).
+function getInternalUserId(session: { user: { id: string; user_metadata: Record<string, unknown> } }): string {
+  return (session.user.user_metadata['internal_user_id'] as string | null) ?? session.user.id
+}
+
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 export type KojasmatPendaftaran = {
@@ -112,19 +118,38 @@ export async function buatPendaftaran(payload: {
   nama_lengkap: string
   nik?: string
   email?: string
+  password?: string
   phone?: string
   alamat?: string
   pekerjaan?: string
   alasan_bergabung?: string
 }) {
   try {
+    let authUserId: string | null = null
+
+    // Buat akun auth jika email + password disediakan
+    if (payload.email && payload.password) {
+      const authResult = await createInternalAuthUser({
+        email: payload.email,
+        nik: payload.nik ?? null,
+        password: payload.password,
+        fullName: payload.nama_lengkap,
+        userType: 'anggota',
+      })
+      if ('error' in authResult) {
+        return { error: authResult.error }
+      }
+      authUserId = (authResult as { id: string }).id ?? null
+    }
+
     const { rows } = await queryPostgres(
       `INSERT INTO kojasmat_pendaftaran
-         (org_id, nama_lengkap, nik, email, phone, alamat, pekerjaan, alasan_bergabung)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         (org_id, user_id, nama_lengkap, nik, email, phone, alamat, pekerjaan, alasan_bergabung)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING id, status, created_at`,
       [
-        payload.org_id, payload.nama_lengkap,
+        payload.org_id, authUserId,
+        payload.nama_lengkap,
         payload.nik ?? null, payload.email ?? null,
         payload.phone ?? null, payload.alamat ?? null,
         payload.pekerjaan ?? null, payload.alasan_bergabung ?? null,
@@ -220,7 +245,7 @@ export async function setujuiPendaftaran(pendaftaranId: string) {
       `UPDATE kojasmat_pendaftaran
        SET status='DISETUJUI', anggota_id=$2, ditinjau_oleh=$3, ditinjau_at=NOW(), updated_at=NOW()
        WHERE id=$1`,
-      [pendaftaranId, anggota.id, session.user.id]
+      [pendaftaranId, anggota.id, getInternalUserId(session)]
     )
 
     revalidatePath('/kojasmat')
@@ -246,7 +271,7 @@ export async function tolakPendaftaran(pendaftaranId: string, catatan: string) {
       `UPDATE kojasmat_pendaftaran
        SET status='DITOLAK', catatan_pengurus=$2, ditinjau_oleh=$3, ditinjau_at=NOW(), updated_at=NOW()
        WHERE id=$1`,
-      [pendaftaranId, catatan, session.user.id]
+      [pendaftaranId, catatan, getInternalUserId(session)]
     )
     revalidatePath('/kojasmat')
     return { data: { ok: true } }
@@ -264,7 +289,7 @@ export async function mintaRevisiPendaftaran(pendaftaranId: string, catatan: str
       `UPDATE kojasmat_pendaftaran
        SET status='DIREVISI', catatan_pengurus=$2, ditinjau_oleh=$3, ditinjau_at=NOW(), updated_at=NOW()
        WHERE id=$1`,
-      [pendaftaranId, catatan, session.user.id]
+      [pendaftaranId, catatan, getInternalUserId(session)]
     )
     revalidatePath('/kojasmat')
     return { data: { ok: true } }
@@ -287,7 +312,7 @@ export async function simpanDokumen(payload: {
 }) {
   try {
     const session = await getInternalAuthSession()
-    const uploadedBy = session?.user.id ?? null
+    const uploadedBy = session ? getInternalUserId(session) : null
 
     const { rows } = await queryPostgres(
       `INSERT INTO kojasmat_dokumen
@@ -491,7 +516,7 @@ export async function beriTindakan(payload: {
       [
         payload.org_id, payload.anggota_id,
         payload.proyek_id ?? null, payload.jenis,
-        payload.alasan, session.user.id,
+        payload.alasan, getInternalUserId(session),
       ]
     )
 

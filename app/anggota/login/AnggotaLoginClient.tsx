@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { signInAsAnggota, requestAnggotaPasswordReset } from '@/modules/kojasmat/actions/kojasmat-auth.actions'
 import { Eye, EyeOff, ArrowRight, ShieldCheck, Loader2, HandCoins } from 'lucide-react'
 
-export default function AnggotaLoginClient() {
+export default function AnggotaLoginClient({ orgId }: { orgId?: string }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const error = searchParams.get('error')
@@ -32,6 +32,7 @@ export default function AnggotaLoginClient() {
     e.preventDefault()
     const fd = new FormData()
     fd.set('kode_anggota', resetKode)
+    if (orgId) fd.set('org_id', orgId)
     setResetMsg(null)
     startResetTransition(async () => {
       const res = await requestAnggotaPasswordReset(fd)
@@ -85,6 +86,7 @@ export default function AnggotaLoginClient() {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <input type="hidden" name="redirectTo" value={redirectTo} />
+            {orgId && <input type="hidden" name="org_id" value={orgId} />}
 
             <div className="space-y-1.5">
               <label htmlFor="kode_anggota" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -159,7 +161,7 @@ export default function AnggotaLoginClient() {
         <p className="mt-6 text-center">
           <button
             type="button"
-            onClick={() => router.push('/anggota/daftar')}
+            onClick={() => router.push(orgId ? `/anggota/daftar?org=${orgId}` : '/anggota/daftar')}
             className="text-xs text-slate-500 hover:text-slate-400 transition-colors cursor-pointer"
           >
             Daftar sebagai anggota baru →

@@ -11,6 +11,12 @@ import {
   jurnalPenerimaanDanaPemodal,
 } from '@/lib/erp-bridge/kojasmat-journals'
 
+// session.user.id bisa berisi legacy_user_id (Supabase UUID), bukan internal_auth_users.id.
+// Gunakan fungsi ini untuk FK yang merujuk ke internal_auth_users(id).
+function getInternalUserId(session: { user: { id: string; user_metadata: Record<string, unknown> } }): string {
+  return (session.user.user_metadata['internal_user_id'] as string | null) ?? session.user.id
+}
+
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
 export type KojasmatAnggota = {
@@ -147,19 +153,29 @@ export async function getAnggotaByKode(orgId: string, kode: string): Promise<Koj
   return (rows[0] ?? null) as KojasmatAnggota | null
 }
 
-export async function getAnggotaByUserId(userId: string): Promise<KojasmatAnggota | null> {
-  const { rows } = await queryPostgres(
-    `SELECT * FROM kojasmat_anggota WHERE user_id = $1 LIMIT 1`,
-    [userId]
-  )
+export async function getAnggotaByUserId(userId: string, orgId?: string): Promise<KojasmatAnggota | null> {
+  const { rows } = orgId
+    ? await queryPostgres(
+        `SELECT * FROM kojasmat_anggota WHERE user_id = $1 AND org_id = $2 LIMIT 1`,
+        [userId, orgId]
+      )
+    : await queryPostgres(
+        `SELECT * FROM kojasmat_anggota WHERE user_id = $1 LIMIT 1`,
+        [userId]
+      )
   return (rows[0] ?? null) as KojasmatAnggota | null
 }
 
-export async function getAnggotaByKodeOnly(kode: string): Promise<KojasmatAnggota | null> {
-  const { rows } = await queryPostgres(
-    `SELECT * FROM kojasmat_anggota WHERE UPPER(kode_anggota) = UPPER($1) LIMIT 1`,
-    [kode]
-  )
+export async function getAnggotaByKodeOnly(kode: string, orgId?: string): Promise<KojasmatAnggota | null> {
+  const { rows } = orgId
+    ? await queryPostgres(
+        `SELECT * FROM kojasmat_anggota WHERE UPPER(kode_anggota) = UPPER($1) AND org_id = $2 LIMIT 1`,
+        [kode, orgId]
+      )
+    : await queryPostgres(
+        `SELECT * FROM kojasmat_anggota WHERE UPPER(kode_anggota) = UPPER($1) LIMIT 1`,
+        [kode]
+      )
   return (rows[0] ?? null) as KojasmatAnggota | null
 }
 
@@ -296,7 +312,7 @@ export async function catatSimpananMutasi(payload: {
         sebelum, sesudah,
         payload.keterangan ?? null,
         payload.tanggal ?? new Date().toISOString().split('T')[0],
-        session.user.id,
+        getInternalUserId(session),
       ]
     )
 
@@ -461,7 +477,7 @@ export async function submitDpsReview(payload: {
   await queryPostgres(
     `INSERT INTO kojasmat_dps_review (org_id, proyek_id, reviewer_id, keputusan, catatan)
      VALUES ($1,$2,$3,$4,$5)`,
-    [payload.org_id, payload.proyek_id, session.user.id, payload.keputusan, payload.catatan ?? null]
+    [payload.org_id, payload.proyek_id, getInternalUserId(session), payload.keputusan, payload.catatan ?? null]
   )
 
   const newStatus = payload.keputusan === 'DISETUJUI' ? 'DISETUJUI'
