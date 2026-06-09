@@ -764,6 +764,18 @@ export default function SaasOperatorClient({
           >
             Modul
           </Link>
+          <Link
+            href="/saas/uat"
+            className="rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:bg-slate-50"
+          >
+            UAT
+          </Link>
+          <Link
+            href="/saas/bast"
+            className="rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:bg-slate-50"
+          >
+            BAST
+          </Link>
         </div>
       </div>
 
