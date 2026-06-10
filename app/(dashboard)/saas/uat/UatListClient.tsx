@@ -92,6 +92,7 @@ export default function UatListClient({ sessions, templates }: Props) {
 
       {/* Nav tabs */}
       <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
+        <Link href="/saas/spk" className="rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:bg-slate-50">SPK</Link>
         <Link href="/saas/uat" className="rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-wider bg-[#003366] text-white">UAT</Link>
         <Link href="/saas/bast" className="rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:bg-slate-50">BAST</Link>
         <Link href="/saas/penjualan" className="rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:bg-slate-50">Penjualan</Link>

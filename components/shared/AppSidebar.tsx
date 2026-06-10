@@ -185,6 +185,9 @@ const SAAS_OPERATOR_GROUP: NavGroup = {
   items: [
     { label: 'Penawaran SaaS', href: '/saas/penawaran', icon: FileText, permission_key: 'sales' },
     { label: 'Penjualan SaaS', href: '/saas/penjualan', icon: TrendingUp, permission_key: 'sales' },
+    { label: 'SPK', href: '/saas/spk', icon: ClipboardCheck, permission_key: 'sales' },
+    { label: 'UAT', href: '/saas/uat', icon: Rocket, permission_key: 'sales' },
+    { label: 'BAST', href: '/saas/bast', icon: HandHeart, permission_key: 'sales' },
     { label: 'Support Ticket SaaS', href: '/saas/ticketing', icon: LifeBuoy, permission_key: 'sales' },
     { label: 'Pengaturan', href: '/saas/pengaturan', icon: Settings, permission_key: 'config:write' },
   ],
