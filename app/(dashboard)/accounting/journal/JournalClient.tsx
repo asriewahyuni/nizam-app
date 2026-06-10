@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2, Calculator, ArrowRightLeft, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2, Calculator, ArrowRightLeft, ArrowUp, ArrowDown, ArrowRight } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries, getAccountLedger, bulkPostJournalEntries, getAllMatchingJournalEntryIds } from '@/modules/accounting/actions/journal.actions'
 import type { AccountLedgerResult } from '@/modules/accounting/actions/journal.actions'
@@ -91,6 +91,8 @@ export default function JournalClient({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([])
   const [filterStatus, setFilterStatus] = useState<JournalStatusFilter>(initialFilterStatus)
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [searchText, setSearchText] = useState('')
   const [activeSearch, setActiveSearch] = useState('')
@@ -164,6 +166,19 @@ export default function JournalClient({
     : []
   const isAccountLedgerMode = Boolean(selectedAccountId)
 
+  const handleDateFilterChange = async (newStart: string, newEnd: string) => {
+    setStartDate(newStart)
+    setEndDate(newEnd)
+    setEntries([])
+    setLoadedCountByStatus({ POSTED: 0, VOIDED: 0, DRAFT: 0 })
+    
+    if (isAccountLedgerMode && selectedAccountId) {
+      await loadAccountLedgerPage(selectedAccountId, { reset: true, newStart, newEnd })
+    } else {
+      await loadJournalEntriesPage({ reset: true, newStart, newEnd })
+    }
+  }
+
   const setStatusFilter = (status: JournalStatusFilter) => {
     setFilterStatus(status)
     setSearchText('')
@@ -180,7 +195,7 @@ export default function JournalClient({
     setAccountLedger(EMPTY_ACCOUNT_LEDGER)
   }
 
-  const loadAccountLedgerPage = async (accountId = selectedAccountId, options?: { reset?: boolean }) => {
+  const loadAccountLedgerPage = async (accountId = selectedAccountId, options?: { reset?: boolean, newStart?: string, newEnd?: string }) => {
     const normalizedAccountId = String(accountId || '').trim()
     if (!normalizedAccountId) return
 
@@ -195,6 +210,8 @@ export default function JournalClient({
         status: 'POSTED',
         limit: JOURNAL_PAGE_SIZE,
         offset,
+        fromDate: options?.newStart ?? startDate || undefined,
+        toDate: options?.newEnd ?? endDate || undefined,
       })
 
       setAccountLedger((currentLedger) => {
@@ -229,7 +246,7 @@ export default function JournalClient({
     await loadAccountLedgerPage(accountId, { reset: true })
   }
 
-  const loadJournalEntriesPage = async (options?: { reset?: boolean; search?: string; sortOrder?: 'asc' | 'desc' }) => {
+  const loadJournalEntriesPage = async (options?: { reset?: boolean; search?: string; sortOrder?: 'asc' | 'desc', newStart?: string, newEnd?: string }) => {
     const reset = Boolean(options?.reset)
     const search = String(options?.search ?? activeSearch).trim()
     const effectiveSortOrder = options?.sortOrder ?? sortOrder
@@ -248,6 +265,8 @@ export default function JournalClient({
         limit: JOURNAL_PAGE_SIZE,
         offset,
         sortOrder: effectiveSortOrder,
+        fromDate: options?.newStart ?? startDate || undefined,
+        toDate: options?.newEnd ?? endDate || undefined,
       })
 
       setActiveSearch(search)
@@ -447,6 +466,8 @@ export default function JournalClient({
       type: 'gl',
       orgId,
     })
+    if (startDate) params.set('startDate', startDate)
+    if (endDate) params.set('endDate', endDate)
 
     if (activeBranchId) {
       params.set('branchId', activeBranchId)
@@ -559,6 +580,22 @@ export default function JournalClient({
               : `Menampilkan daftar jurnal entri dengan status ${filterStatus}.`
           }
           actions={
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200">
+                <input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => handleDateFilterChange(e.target.value, endDate)}
+                  className="text-xs font-bold text-slate-600 bg-transparent outline-none cursor-pointer"
+                />
+                <ArrowRight size={12} className="text-slate-300"/>
+                <input 
+                  type="date" 
+                  value={endDate}
+                  onChange={(e) => handleDateFilterChange(startDate, e.target.value)}
+                  className="text-xs font-bold text-slate-600 bg-transparent outline-none cursor-pointer"
+                />
+              </div>
             <form onSubmit={handleSearchEntries} className="flex items-center gap-2">
               <div className="relative">
                 <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -588,6 +625,7 @@ export default function JournalClient({
                 </button>
               )}
             </form>
+            </div>
           }
         />
 
@@ -659,7 +697,7 @@ export default function JournalClient({
               ].map(([label, value]) => (
                 <div key={String(label)} className="border-b border-slate-100 px-10 py-6 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-                  <div className="mt-2 font-mono text-xl font-semibold tracking-tight text-slate-900">{formatRupiah(Number(value))}</div>
+                  <div className="mt-2 tabular-nums text-xl font-semibold tracking-tight text-slate-900">{formatRupiah(Number(value))}</div>
                 </div>
               ))}
             </div>
@@ -667,7 +705,7 @@ export default function JournalClient({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-100">
-                    <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                    <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide sticky left-0 bg-slate-50 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                   <button
                     type="button"
                     onClick={handleToggleSort}
@@ -696,9 +734,9 @@ export default function JournalClient({
                   ) : (
                     accountLedger.rows.map((row) => (
                       <tr key={row.line_id} className="group hover:bg-slate-50 transition-colors">
-                        <td className="px-8 py-6 align-top">
+                        <td className="px-8 py-6 align-top sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-slate-50 transition-colors">
                           <div className="text-sm font-semibold text-slate-900 tracking-tight">{row.entry_date ? format(new Date(row.entry_date), 'yyyy-MM-dd') : ''}</div>
-                          <div className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase tracking-tighter">{row.entry_number}</div>
+                          <div className="text-[10px] font-bold text-slate-400 mt-1 tabular-nums uppercase tracking-tighter">{row.entry_number}</div>
                         </td>
                         <td className="px-6 py-6 align-top">
                           <div className="text-sm font-semibold text-slate-800 leading-tight">{row.description || '-'}</div>
@@ -707,13 +745,13 @@ export default function JournalClient({
                         <td className="px-6 py-6 align-top text-xs font-bold text-slate-500">
                           {row.counterparty_accounts || '-'}
                         </td>
-                        <td className="px-6 py-6 align-top text-right font-mono text-xs font-semibold text-emerald-600">
+                        <td className="px-6 py-6 align-top text-right tabular-nums text-xs font-semibold text-emerald-600">
                           {row.debit > 0 ? formatRupiah(row.debit) : '-'}
                         </td>
-                        <td className="px-6 py-6 align-top text-right font-mono text-xs font-semibold text-rose-600">
+                        <td className="px-6 py-6 align-top text-right tabular-nums text-xs font-semibold text-rose-600">
                           {row.credit > 0 ? formatRupiah(row.credit) : '-'}
                         </td>
-                        <td className={`px-8 py-6 align-top text-right font-mono text-xs font-semibold ${row.running_balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                        <td className={`px-8 py-6 align-top text-right tabular-nums text-xs font-semibold ${row.running_balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
                           {formatRupiah(row.running_balance)}
                         </td>
                       </tr>
@@ -756,7 +794,9 @@ export default function JournalClient({
                       const allIds = await getAllMatchingJournalEntryIds(orgId, {
                         status: 'DRAFT',
                         branch_id: activeBranchId || undefined,
-                        search: activeSearch || undefined
+                        search: activeSearch || undefined,
+                        startDate: startDate || undefined,
+                        endDate: endDate || undefined
                       })
                       if (allIds.length > 0) {
                         setSelectedEntryIds(allIds)
@@ -854,9 +894,9 @@ export default function JournalClient({
                           />
                         </td>
                       )}
-	                    <td className="px-8 py-6 align-top">
+	                    <td className="px-8 py-6 align-top sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-slate-50 transition-colors">
 	                       <div className="text-sm font-semibold text-slate-900 tracking-tight">{entry.entry_date ? format(new Date(entry.entry_date), 'yyyy-MM-dd') : ''}</div>
-	                       <div className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase tracking-tighter">{entry.entry_number}</div>
+	                       <div className="text-[10px] font-bold text-slate-400 mt-1 tabular-nums uppercase tracking-tighter">{entry.entry_number}</div>
                     </td>
                     <td className="px-6 py-6 align-top">
                        <div className="text-sm font-semibold text-slate-800 leading-tight">{entry.description}</div>
@@ -875,35 +915,35 @@ export default function JournalClient({
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Bruto Barang</span>
-                                <span className="font-mono font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotal || 0))}</span>
+                                <span className="tabular-nums font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotal || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Diskon Item</span>
-                                <span className="font-mono font-semibold text-rose-600">{formatRupiah(Number(purchaseTransparency.lineDiscount || 0))}</span>
+                                <span className="tabular-nums font-semibold text-rose-600">{formatRupiah(Number(purchaseTransparency.lineDiscount || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Diskon Header</span>
-                                <span className="font-mono font-semibold text-rose-600">{formatRupiah(Number(purchaseTransparency.headerDiscount || 0))}</span>
+                                <span className="tabular-nums font-semibold text-rose-600">{formatRupiah(Number(purchaseTransparency.headerDiscount || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Neto Barang</span>
-                                <span className="font-mono font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotalAfterDiscount || 0))}</span>
+                                <span className="tabular-nums font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotalAfterDiscount || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Landed Cost</span>
-                                <span className="font-mono font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.landedCost || 0))}</span>
+                                <span className="tabular-nums font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.landedCost || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Persediaan Tercatat</span>
-                                <span className="font-mono font-semibold text-emerald-700">{formatRupiah(Number(purchaseTransparency.inventoryValue || 0))}</span>
+                                <span className="tabular-nums font-semibold text-emerald-700">{formatRupiah(Number(purchaseTransparency.inventoryValue || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">PPN Masukan</span>
-                                <span className="font-mono font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.tax || 0))}</span>
+                                <span className="tabular-nums font-semibold text-slate-800">{formatRupiah(Number(purchaseTransparency.tax || 0))}</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-slate-600">
                                 <span className="font-semibold">Total Tagihan</span>
-                                <span className="font-mono font-semibold text-blue-700">{formatRupiah(Number(purchaseTransparency.grandTotal || 0))}</span>
+                                <span className="tabular-nums font-semibold text-blue-700">{formatRupiah(Number(purchaseTransparency.grandTotal || 0))}</span>
                               </div>
                             </div>
                           </div>
@@ -921,10 +961,10 @@ export default function JournalClient({
                              <div className="col-span-6 font-bold text-slate-600 truncate" title={line.accounts?.name}>
                                {line.accounts?.code} - {line.accounts?.name}
                              </div>
-                             <div className={`col-span-3 text-right font-mono font-semibold tracking-tight ${debitAmount > 0 ? 'text-emerald-600' : 'text-slate-200'}`}>
+                             <div className={`col-span-3 text-right tabular-nums font-semibold tracking-tight ${debitAmount > 0 ? 'text-emerald-600' : 'text-slate-200'}`}>
                                 {debitAmount > 0 ? formatRupiah(debitAmount) : '-'}
                              </div>
-                             <div className={`col-span-3 text-right font-mono font-semibold tracking-tight ${creditAmount > 0 ? 'text-rose-600' : 'text-slate-200'}`}>
+                             <div className={`col-span-3 text-right tabular-nums font-semibold tracking-tight ${creditAmount > 0 ? 'text-rose-600' : 'text-slate-200'}`}>
                                 {creditAmount > 0 ? formatRupiah(creditAmount) : '-'}
                              </div>
                            </div>
@@ -1104,7 +1144,7 @@ export default function JournalClient({
                                  </tr>
                                ))}
                             </tbody>
-                            <tfoot className="bg-slate-900 border-t border-slate-800 text-white font-mono">
+                            <tfoot className="bg-slate-900 border-t border-slate-800 text-white tabular-nums">
                                <tr>
                                   <td className="px-6 py-4 text-[10px] font-semibold uppercase tracking-wide">Consolidated Balance</td>
                                   <td className="px-4 py-4 text-right text-xs font-semibold text-emerald-400">{formatRupiah(totalDebit)}</td>
