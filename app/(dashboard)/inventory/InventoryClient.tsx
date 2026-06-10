@@ -427,7 +427,7 @@ export default function InventoryClient({
     setWriteOffForm({
       ...writeOffForm,
       product_id: product?.id || '',
-      unit_cost: Number((product as any)?.average_cost ?? product?.purchase_price ?? 0),
+      unit_cost: Number((product as any)?.average_cost) || Number(product?.purchase_price) || 0,
       quantity: 1
     })
     setIsWriteOffModalOpen(true)
@@ -1298,7 +1298,7 @@ export default function InventoryClient({
                             ...adjForm,
                             product_id: id,
                             current_qty: curQty,
-                            unit_cost: Number(p?.average_cost ?? p?.purchase_price ?? 0),
+                            unit_cost: Number(p?.average_cost) || Number(p?.purchase_price) || 0,
                           })
                         }} 
                         className="w-full px-5 py-4 bg-slate-50 rounded-xl border border-slate-100 font-bold outline-none focus:ring-2 focus:ring-emerald-100 appearance-none"
@@ -1323,10 +1323,28 @@ export default function InventoryClient({
                       </div>
                     </div>
 
-                    <div className="p-5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3">
-                       <TrendingUp className="text-emerald-500" size={16} />
-                       <div className="text-[10px] font-bold text-emerald-700">
-                         Selisih: <span className="font-semibold underline">{Number(adjForm.actual_qty) - Number(adjForm.current_qty)} Unit</span>. Sistem akan menyesuaikan secara otomatis.
+                    <div className="space-y-1">
+                        <label htmlFor="adj-unit-cost" className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                          <Info size={10} /> Nilai per Unit (Harga Modal)
+                        </label>
+                        <input
+                          id="adj-unit-cost"
+                          type="number"
+                          min={0}
+                          required
+                          value={adjForm.unit_cost}
+                          onChange={e => setAdjForm({ ...adjForm, unit_cost: Number(e.target.value) })}
+                          className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border border-slate-100 font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-100 transition-all font-mono cursor-text"
+                        />
+                        <p className="text-[9px] text-slate-400 italic">Dipakai untuk menghitung Nilai Aset &amp; jurnal akuntansi. Terisi otomatis dari harga modal produk — ubah bila perlu.</p>
+                    </div>
+
+                    <div className="p-5 rounded-xl bg-emerald-50 border border-emerald-100 flex items-start gap-3">
+                       <TrendingUp className="text-emerald-500 mt-0.5" size={16} />
+                       <div className="text-[10px] font-bold text-emerald-700 leading-relaxed">
+                         Selisih: <span className="font-semibold underline">{Number(adjForm.actual_qty) - Number(adjForm.current_qty)} Unit</span>.
+                         {' '}Dampak Nilai Aset: <span className="font-semibold underline">{formatRupiah(Math.abs(Number(adjForm.actual_qty) - Number(adjForm.current_qty)) * Number(adjForm.unit_cost))}</span>.
+                         {' '}Sistem akan menyesuaikan stok &amp; mencatat jurnal akuntansi otomatis.
                        </div>
                     </div>
 
@@ -1577,7 +1595,7 @@ export default function InventoryClient({
                    ...adjForm,
                    product_id: product.id,
                    current_qty: curQty,
-                   unit_cost: Number((product as any).average_cost ?? product.purchase_price ?? 0),
+                   unit_cost: Number((product as any).average_cost) || Number(product.purchase_price) || 0,
                  })
               } else {
                  alert("Produk tidak ditemukan!")

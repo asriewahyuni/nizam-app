@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { queryPostgres } from '@/lib/db/postgres'
 import { revalidatePath } from 'next/cache'
 import { Product } from '@/types/database.types'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
@@ -248,7 +249,8 @@ export async function getProducts(orgId: string, branchId?: string | null): Prom
 
   return products.map((product) => {
     const available = stockByProduct[product.id] || 0
-    const weightedUnitCost = Number(product.average_cost ?? product.purchase_price ?? 0)
+    // Use `||` (not `??`) so a stored cost of 0 falls back to purchase_price.
+    const weightedUnitCost = Number(product.average_cost) || Number(product.purchase_price) || 0
     const stockValue = Math.max(0, available * weightedUnitCost)
 
     return {
@@ -455,23 +457,24 @@ export async function createInventoryAdjustment(
 
   if (procErr) return { error: 'Gagal memproses penyesuaian: ' + procErr.message }
 
-  // ANTI-SILO: Record Inventory Write-Off/Loss
-  const totalLossValue = payload.items.reduce((sum: number, it: any) => sum + (it.diff_quantity < 0 ? Math.abs(it.diff_quantity) * it.unit_cost : 0), 0)
-  
-  if (totalLossValue > 0) {
-    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
-    const debitAccount = await ERPBridge.getDefaultAccount(orgId, '5-50002') // Beban Penyesuaian Persediaan (Asumsi)
-    const creditAccount = await ERPBridge.getDefaultAccount(orgId, '1-10003') // Persediaan Barang (Asumsi)
-    if (debitAccount && creditAccount) {
-      await ERPBridge.recordExpense({
-        orgId, branchId: activeBranchId,
-        amount: totalLossValue,
-        date: payload.adj_date,
-        description: `Penyesuaian Persediaan (Loss/Write-Off) - ${payload.notes}`,
-        referenceType: 'INVENTORY_ADJ', referenceId: adj.id,
-        debitAccountId: debitAccount, creditAccountId: creditAccount
-      })
-    }
+  // The accounting journal (Dr/Cr Persediaan ↔ Beban Penyesuaian) is posted inside
+  // process_inventory_adjustment() above — do NOT post it again here (would double-count).
+  //
+  // What the RPC does NOT do is write the valuation back to the products table, so the
+  // inventory "Nilai Aset" display (qty × average_cost) stays Rp 0 for previously
+  // costless items. Backfill average_cost from the opname valuation, but only when it is
+  // currently empty (0/NULL) so we never clobber an existing weighted-average cost.
+  const costByProduct = new Map<string, number>()
+  for (const it of payload.items) {
+    const cost = Number(it.unit_cost) || 0
+    if (cost > 0 && !costByProduct.has(it.product_id)) costByProduct.set(it.product_id, cost)
+  }
+  for (const [productId, cost] of costByProduct) {
+    await queryPostgres(
+      `UPDATE products SET average_cost = $1, updated_at = NOW()
+       WHERE id = $2 AND org_id = $3 AND (average_cost IS NULL OR average_cost = 0)`,
+      [cost, productId, orgId]
+    )
   }
 
   revalidatePath('/inventory')
@@ -778,7 +781,7 @@ export async function getInventoryWarehouseSnapshot(orgId: string, branchId?: st
     const key = `${productId}:${warehouseId}`
     const existing = snapshotByKey.get(key)
     const quantity = Number(row?.quantity || 0)
-    const unitCost = Number(product?.average_cost ?? product?.purchase_price ?? 0)
+    const unitCost = Number(product?.average_cost) || Number(product?.purchase_price) || 0
 
     if (existing) {
       existing.quantity += quantity
