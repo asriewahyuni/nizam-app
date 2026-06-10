@@ -210,8 +210,8 @@ export default function JournalClient({
         status: 'POSTED',
         limit: JOURNAL_PAGE_SIZE,
         offset,
-        fromDate: options?.newStart ?? startDate || undefined,
-        toDate: options?.newEnd ?? endDate || undefined,
+        fromDate: (options?.newStart ?? startDate) || undefined,
+        toDate: (options?.newEnd ?? endDate) || undefined,
       })
 
       setAccountLedger((currentLedger) => {
@@ -265,8 +265,8 @@ export default function JournalClient({
         limit: JOURNAL_PAGE_SIZE,
         offset,
         sortOrder: effectiveSortOrder,
-        fromDate: options?.newStart ?? startDate || undefined,
-        toDate: options?.newEnd ?? endDate || undefined,
+        fromDate: (options?.newStart ?? startDate) || undefined,
+        toDate: (options?.newEnd ?? endDate) || undefined,
       })
 
       setActiveSearch(search)
