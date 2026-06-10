@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { ERPBridge } from '@/lib/erp-bridge/finances'
+import { queryPostgres } from '@/lib/db/postgres'
 import { getResellerCommissionSnapshot } from '@/modules/sales/actions/commission.actions'
 import {
   calculateSalesPromoDiscount,
@@ -1832,8 +1834,52 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
     ;(console as any).warn('[deliverSale] delivered_at belum tersedia, tanggal kirim dilewati:', markDeliveredMessage)
   }
 
+  // Catat HPP ke jurnal: DR HPP (5021) / CR Persediaan (1301)
+  // Fire-and-forget — jangan gagalkan delivery hanya karena jurnal HPP gagal
+  void (async () => {
+    try {
+      const { rows: saleRows } = await queryPostgres(
+        `SELECT s.sale_date::text AS sale_date, s.sale_number,
+                si.product_id::text, si.quantity::float,
+                p.name AS product_name,
+                COALESCE(p.average_cost, p.purchase_price, 0)::float AS avg_cost
+         FROM sales s
+         JOIN sales_items si ON si.sale_id = s.id
+         JOIN products p ON p.id = si.product_id
+         WHERE s.id = $1 AND s.org_id = $2 AND p.type = 'INVENTORY'`,
+        [saleId, orgId]
+      )
+      if (saleRows.length === 0) return
+
+      const saleDate = String(saleRows[0].sale_date)
+      const saleNumber = String(saleRows[0].sale_number)
+      const cogsLines = saleRows.map(r => ({
+        productId: String(r.product_id),
+        productName: String(r.product_name),
+        quantity: Number(r.quantity),
+        avgCost: Number(r.avg_cost),
+      }))
+
+      const cogsResult = await ERPBridge.recordCOGS({
+        orgId,
+        branchId: activeBranchResult.branchId,
+        saleId,
+        saleDate,
+        saleNumber,
+        lines: cogsLines,
+      })
+
+      if ('error' in cogsResult) {
+        ;(console as any).warn('[deliverSale] recordCOGS warning:', cogsResult.error, { saleId })
+      }
+    } catch (cogsErr) {
+      ;(console as any).warn('[deliverSale] recordCOGS exception:', cogsErr, { saleId })
+    }
+  })()
+
   revalidatePath('/sales')
   revalidatePath('/inventory')
+  revalidatePath('/accounting')
   return { success: true }
 }
 

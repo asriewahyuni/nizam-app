@@ -54,6 +54,7 @@ import {
   MessageSquare,
   Bus,
   HandHeart,
+  ArrowLeftRight,
   type LucideIcon
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
@@ -107,6 +108,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Pembelian', href: '/purchasing', icon: ShoppingCart, permission_key: 'purchasing', module_key: 'Purchasing' },
       { label: 'Inventori', href: '/inventory', icon: Package, permission_key: 'inventory', module_key: 'Inventory' },
+      { label: 'Mutasi Stok', href: '/inventory/movements', icon: ArrowLeftRight, permission_key: 'inventory', module_key: 'Inventory' },
       { label: 'Gudang (WMS)', href: '/inventory/warehouses', icon: Warehouse, permission_key: 'inventory', module_key: 'Warehouse' },
       { label: 'Manufaktur (BoM)', href: '/factory', icon: Factory, permission_key: 'factory', module_key: 'Manufacturing' },
       { label: 'Fleet & Rental', href: '/fleet', icon: Truck, permission_key: 'fleet', module_key: 'Fleet & Rental' },

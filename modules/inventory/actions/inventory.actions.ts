@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { queryPostgres } from '@/lib/db/postgres'
 import { revalidatePath } from 'next/cache'
+import { queryPostgres } from '@/lib/db/postgres'
 import { Product } from '@/types/database.types'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
@@ -972,6 +973,96 @@ export async function getInventoryMutations(
       warehouse_code: resolvedWarehouse?.warehouse_code || null,
     } satisfies InventoryMutationRow
   })
+}
+
+export type StockMovementPageRow = {
+  id: string
+  product_id: string
+  product_name: string
+  product_sku: string | null
+  product_unit: string | null
+  product_category: string | null
+  movement_date: string
+  quantity: number
+  unit_price: number
+  reference_type: string
+  reference_id: string
+  notes: string | null
+  branch_id: string | null
+}
+
+export type StockMovementsPageResult = {
+  rows: StockMovementPageRow[]
+  total: number
+  page: number
+  limit: number
+}
+
+export async function getStockMovementsPage(
+  orgId: string,
+  options: {
+    branchId?: string | null
+    page?: number
+    limit?: number
+    search?: string
+    referenceType?: string | null
+    direction?: 'in' | 'out' | null
+    dateFrom?: string | null
+    dateTo?: string | null
+  } = {}
+): Promise<StockMovementsPageResult> {
+  const { branchId, search = '', referenceType, direction, dateFrom, dateTo } = options
+  const page = Math.max(1, options.page ?? 1)
+  const limit = Math.min(200, Math.max(10, options.limit ?? 50))
+  const offset = (page - 1) * limit
+
+  const directionClause =
+    direction === 'in' ? 'AND sm.quantity > 0' :
+    direction === 'out' ? 'AND sm.quantity < 0' : ''
+
+  const result = await queryPostgres<StockMovementPageRow & { total_count: string }>(
+    `SELECT
+      sm.id::text AS id,
+      sm.product_id::text AS product_id,
+      COALESCE(p.name, 'Produk Dihapus') AS product_name,
+      p.sku AS product_sku,
+      p.unit AS product_unit,
+      p.category AS product_category,
+      sm.movement_date::text AS movement_date,
+      sm.quantity::float AS quantity,
+      COALESCE(sm.unit_price, 0)::float AS unit_price,
+      COALESCE(sm.reference_type, 'MANUAL') AS reference_type,
+      sm.reference_id::text AS reference_id,
+      sm.notes,
+      sm.branch_id::text AS branch_id,
+      COUNT(*) OVER() AS total_count
+    FROM stock_movements sm
+    LEFT JOIN products p ON p.id = sm.product_id AND p.org_id = sm.org_id
+    WHERE sm.org_id = $1
+      AND ($2::uuid IS NULL OR sm.branch_id = $2::uuid)
+      AND ($3::text IS NULL OR UPPER(COALESCE(sm.reference_type,'')) = $3::text)
+      AND ($4::date IS NULL OR sm.movement_date::date >= $4::date)
+      AND ($5::date IS NULL OR sm.movement_date::date <= $5::date)
+      AND ($6::text = '' OR COALESCE(p.name,'') ILIKE '%'||$6||'%' OR COALESCE(p.sku,'') ILIKE '%'||$6||'%' OR COALESCE(sm.notes,'') ILIKE '%'||$6||'%')
+      ${directionClause}
+    ORDER BY sm.movement_date DESC, sm.created_at DESC
+    LIMIT $7 OFFSET $8`,
+    [
+      orgId,
+      branchId ?? null,
+      referenceType ? referenceType.toUpperCase() : null,
+      dateFrom ?? null,
+      dateTo ?? null,
+      search,
+      limit,
+      offset,
+    ]
+  )
+
+  const rows = result.rows.map(({ total_count: _tc, ...row }) => row as StockMovementPageRow)
+  const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count, 10) : 0
+
+  return { rows, total, page, limit }
 }
 
 export async function getProductByBarcode(orgId: string, barcode: string) {
