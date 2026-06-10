@@ -1,0 +1,451 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-bguv2lll"> <head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Blueprint: | Nizam Docs</title><link rel="canonical" href="https://docs.kliknizam.app/reference/blueprint/"/><link rel="sitemap" href="/sitemap-index.xml"/><link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v6.4.5"/><meta name="generator" content="Starlight v0.40.0"/><meta property="og:title" content="Blueprint:"/><meta property="og:type" content="article"/><meta property="og:url" content="https://docs.kliknizam.app/reference/blueprint/"/><meta property="og:locale" content="en"/><meta property="og:description" content="> Dokumen ini menjelaskan arsitektur, definisi core, dan filosofi desain sistem Nizam ERP."/><meta property="og:site_name" content="Nizam Docs"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="> Dokumen ini menjelaskan arsitektur, definisi core, dan filosofi desain sistem Nizam ERP."/><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/_astro/print.DNXP8c50.css" media="print"><link rel="stylesheet" href="/_astro/common.KeBEX_n0.css">
+<link rel="stylesheet" href="/_astro/Code.BcHZMqfA.css"><script type="module" src="/_astro/page.B_tncCx8.js"></script></head> <body class="astro-bguv2lll"> <a href="#_top" class="astro-7q3lir66">Skip to content</a> <div class="page sl-flex astro-vrdttmbt"> <header class="header astro-vrdttmbt"><div class="header astro-kmkmnagf"> <div class="title-wrapper sl-flex astro-kmkmnagf"> <a href="/" class="site-title sl-flex astro-m46x6ez3">  <img class="light:sl-hidden print:hidden astro-m46x6ez3" alt="Nizam Docs" src="/_astro/nizam-docs-wordmark.DAA3qOC5.svg" width="180" height="40"> <img class="dark:sl-hidden print:block astro-m46x6ez3" alt="Nizam Docs" src="/_astro/nizam-docs-wordmark.DAA3qOC5.svg" width="180" height="40"> <span class="astro-m46x6ez3" translate="no"> Nizam Docs </span> </a> </div> <div class="sl-flex print:hidden astro-kmkmnagf"> <site-search class="astro-kmkmnagf astro-v37mnknz" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"> <button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-v37mnknz"> <svg aria-hidden="true" class="astro-v37mnknz astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg> <span class="sl-hidden md:sl-block astro-v37mnknz" aria-hidden="true">Search</span> <kbd class="sl-hidden md:sl-flex astro-v37mnknz" style="display: none;"> <kbd class="astro-v37mnknz">Ctrl</kbd><kbd class="astro-v37mnknz">K</kbd> </kbd> </button> <dialog style="padding:0" aria-label="Search" class="astro-v37mnknz"> <div class="dialog-frame sl-flex astro-v37mnknz">  <button data-close-modal class="sl-flex md:sl-hidden astro-v37mnknz"> Cancel </button> <div class="search-container astro-v37mnknz"> <div id="starlight__search" class="astro-v37mnknz"></div> </div> </div> </dialog> </site-search>  <script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.lq3t8uE2.js"></script>  </div> <div class="sl-hidden md:sl-flex print:hidden right-group astro-kmkmnagf"> <div class="sl-flex social-icons astro-kmkmnagf"> <a href="https://github.com/asriewahyuni/nizam-app" rel="me" class="sl-flex astro-wy4te6ga"><span class="sr-only astro-wy4te6ga">GitHub</span><svg aria-hidden="true" class="astro-wy4te6ga astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a> </div> <starlight-theme-select>  <label style="--sl-select-width: 6.25em" class="astro-4yphtoen"> <span class="sr-only astro-4yphtoen">Select theme</span> <svg aria-hidden="true" class="icon label-icon astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg> <select autocomplete="off" class="astro-4yphtoen"> <option value="dark" class="astro-4yphtoen">Dark</option><option value="light" class="astro-4yphtoen">Light</option><option value="auto" selected class="astro-4yphtoen">Auto</option> </select> <svg aria-hidden="true" class="icon caret astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg> </label> </starlight-theme-select>  <script>
+	StarlightThemeProvider.updatePickers();
+</script> <script type="module">const r="starlight-theme",o=e=>e==="auto"||e==="dark"||e==="light"?e:"auto",c=()=>o(typeof localStorage<"u"&&localStorage.getItem(r));function n(e){typeof localStorage<"u"&&localStorage.setItem(r,e==="light"||e==="dark"?e:"")}const l=()=>matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";function t(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e==="auto"?l():e,n(e)}matchMedia("(prefers-color-scheme: light)").addEventListener("change",()=>{c()==="auto"&&t("auto")});class s extends HTMLElement{constructor(){super(),t(c()),this.querySelector("select")?.addEventListener("change",a=>{a.currentTarget instanceof HTMLSelectElement&&t(o(a.currentTarget.value))})}}customElements.define("starlight-theme-select",s);</script> <script type="module">class s extends HTMLElement{constructor(){super();const e=this.querySelector("select");e&&(e.addEventListener("change",t=>{t.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=t.currentTarget.value)}),window.addEventListener("pageshow",t=>{if(!t.persisted)return;const n=e.querySelector("option[selected]")?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}}customElements.define("starlight-lang-select",s);</script> </div> </div></header> <nav class="sidebar print:hidden astro-vrdttmbt" aria-label="Main"> <starlight-menu-button class="print:hidden astro-jif73yzw"> <button aria-expanded="false" aria-label="Menu" aria-controls="starlight__sidebar" class="sl-flex md:sl-hidden astro-jif73yzw"> <svg aria-hidden="true" class="open-menu astro-jif73yzw astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg> <svg aria-hidden="true" class="close-menu astro-jif73yzw astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg> </button> </starlight-menu-button> <script type="module">class s extends HTMLElement{constructor(){super(),this.btn=this.querySelector("button"),this.btn.addEventListener("click",()=>this.toggleExpanded());const t=this.closest("nav");t&&t.addEventListener("keyup",e=>this.closeOnEscape(e))}setExpanded(t){this.setAttribute("aria-expanded",String(t)),document.body.toggleAttribute("data-mobile-menu-expanded",t)}toggleExpanded(){this.setExpanded(this.getAttribute("aria-expanded")!=="true")}closeOnEscape(t){t.code==="Escape"&&(this.setExpanded(!1),this.btn.focus())}}customElements.define("starlight-menu-button",s);</script>  <div id="starlight__sidebar" class="sidebar-pane astro-vrdttmbt"> <div class="sidebar-content sl-flex astro-vrdttmbt"> <sl-sidebar-state-persist data-hash="0x2tgro" class="astro-kku4brbg"> <script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script>  <ul class="top-level astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/" class="large astro-3ii7xxms"> <span class="astro-3ii7xxms">Home</span>  </a> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Start Here</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="0"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/guides/getting-started/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Getting Started</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/guides/product-map/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Peta Produk</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/guides/core-concepts/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Konsep Inti</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/guides/docs-roadmap/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Roadmap Docs Platform</span>  </a> </li> </ul> </details> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Technical Reference</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="1"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/reference/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Reference Library</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/architecture/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Arsitektur Sistem</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/blueprint/" aria-current="page" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Blueprint:</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/blueprint-bintang-marwah/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Blueprint: BINTANG MARWAH</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/blueprint-tirta-marwah/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Blueprint: TIRTA MARWAH</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/core/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Referensi Modul Inti</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/database-mode-switching/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Mode Database dan Runtime</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/developer-guide/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Panduan Developer</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/ecommerce-implementation/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Implementasi E-Commerce</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/ecommerce-next-steps/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Rencana Lanjutan E-Commerce</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/modules/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Peta Modul dan Route</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/penawaran-bintang-marwah-enterprise/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Penawaran: BINTANG MARWAH ENTERPRISE</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/penawaran-tirta-marwah-canvasser/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Penawaran: TIRTA MARWAH CANVASSER</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/readme/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Ringkasan Dokumentasi</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/roadmap-8-10/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Roadmap: 8 10</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/roadmap-modul-addon-global-v3-2026/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Roadmap: MODUL ADDON GLOBAL V3 2026</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/roadmap-module-addon-global/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Roadmap: MODULE ADDON GLOBAL</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/syirkah-accounting/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Akuntansi Syirkah</span>  </a> </li> </ul> </details> </li> </ul>  <script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script> </sl-sidebar-state-persist> <div class="md:sl-hidden"> <div class="mobile-preferences sl-flex astro-wu23bvmt"> <div class="social-icons astro-wu23bvmt"> <a href="https://github.com/asriewahyuni/nizam-app" rel="me" class="sl-flex astro-wy4te6ga"><span class="sr-only astro-wy4te6ga">GitHub</span><svg aria-hidden="true" class="astro-wy4te6ga astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a> </div> <starlight-theme-select>  <label style="--sl-select-width: 6.25em" class="astro-4yphtoen"> <span class="sr-only astro-4yphtoen">Select theme</span> <svg aria-hidden="true" class="icon label-icon astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg> <select autocomplete="off" class="astro-4yphtoen"> <option value="dark" class="astro-4yphtoen">Dark</option><option value="light" class="astro-4yphtoen">Light</option><option value="auto" selected class="astro-4yphtoen">Auto</option> </select> <svg aria-hidden="true" class="icon caret astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg> </label> </starlight-theme-select>  <script>
+	StarlightThemeProvider.updatePickers();
+</script>   </div> </div> </div> </div> </nav> <div class="main-frame astro-vrdttmbt">  <script type="module">const a=document.getElementById("starlight__sidebar"),n=a?.querySelector("sl-sidebar-state-persist"),o="sl-sidebar-state",i=()=>{let t=[];const e=n?.dataset.hash||"";try{const s=sessionStorage.getItem(o),r=JSON.parse(s||"{}");Array.isArray(r.open)&&r.hash===e&&(t=r.open)}catch{}return{hash:e,open:t,scroll:a?.scrollTop||0}},c=t=>{try{sessionStorage.setItem(o,JSON.stringify(t))}catch{}},d=()=>c(i()),l=(t,e)=>{const s=i();s.open[e]=t,c(s)};n?.addEventListener("click",t=>{if(!(t.target instanceof Element))return;const e=t.target.closest("summary")?.closest("details");if(!e)return;const s=e.querySelector("sl-sidebar-restore"),r=parseInt(s?.dataset.index||"");isNaN(r)||l(!e.open,r)});addEventListener("visibilitychange",()=>{document.visibilityState==="hidden"&&d()});addEventListener("pageHide",d);</script> <div class="lg:sl-flex astro-67yu43on"> <aside class="right-sidebar-container print:hidden astro-67yu43on"> <div class="right-sidebar astro-67yu43on"> <div class="lg:sl-hidden astro-pb3aqygn"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-doynk5tl"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-doynk5tl"><details id="starlight__mobile-toc" class="astro-doynk5tl"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-doynk5tl"><span class="toggle sl-flex astro-doynk5tl">On this page<svg aria-hidden="true" class="caret astro-doynk5tl astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-doynk5tl"></span></summary><div class="dropdown astro-doynk5tl"><ul class="isMobile astro-gnoq344e" style="--depth: 0;"> <li class="astro-gnoq344e" style="--depth: 0;"> <a href="#_top" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Overview</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#filosofi-dasar" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Filosofi Dasar</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#layer-arsitektur" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Layer Arsitektur</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#core-erp--definisi--alasan" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Core ERP — Definisi &amp; Alasan</span> </a> <ul class="isMobile astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#1-️-accounting-akuntansi" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">1. 🏛️ Accounting (Akuntansi)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#2--finance-kas--bank" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">2. 💰 Finance (Kas &amp; Bank)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#3--inventory-persediaan" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3. 📦 Inventory (Persediaan)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#4--purchasing-pembelian" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4. 🛒 Purchasing (Pembelian)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#5-️-sales-penjualan" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">5. 🏷️ Sales (Penjualan)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#6--hris-human-resource--payroll" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">6. 👥 HRIS (Human Resource &amp; Payroll)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#7--syirkah-kemitraan-bisnis-syariah" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7. 🤝 Syirkah (Kemitraan Bisnis Syariah)</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#governance-layer" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Governance Layer</span> </a> <ul class="isMobile astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#organization--branch" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">Organization &amp; Branch</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#rbac-role-based-access-control" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">RBAC (Role-Based Access Control)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#approval-system" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">Approval System</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#audit-log" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">Audit Log</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#vertical-modules--industry-pack" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Vertical Modules — Industry Pack</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#platform-layer--nizam-sebagai-saas" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Platform Layer — Nizam sebagai SaaS</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#shariah-first-design" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Shariah-First Design</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#tech-stack" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Tech Stack</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#ringkasan" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Ringkasan</span> </a>  </li> </ul></div></details></nav></mobile-starlight-toc><script type="module" src="/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.hwBsy0Mo.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-pb3aqygn"><div class="sl-container astro-pb3aqygn"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-gnoq344e" style="--depth: 0;"> <li class="astro-gnoq344e" style="--depth: 0;"> <a href="#_top" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Overview</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#filosofi-dasar" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Filosofi Dasar</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#layer-arsitektur" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Layer Arsitektur</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#core-erp--definisi--alasan" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Core ERP — Definisi &amp; Alasan</span> </a> <ul class="astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#1-️-accounting-akuntansi" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">1. 🏛️ Accounting (Akuntansi)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#2--finance-kas--bank" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">2. 💰 Finance (Kas &amp; Bank)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#3--inventory-persediaan" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3. 📦 Inventory (Persediaan)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#4--purchasing-pembelian" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4. 🛒 Purchasing (Pembelian)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#5-️-sales-penjualan" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">5. 🏷️ Sales (Penjualan)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#6--hris-human-resource--payroll" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">6. 👥 HRIS (Human Resource &amp; Payroll)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#7--syirkah-kemitraan-bisnis-syariah" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7. 🤝 Syirkah (Kemitraan Bisnis Syariah)</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#governance-layer" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Governance Layer</span> </a> <ul class="astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#organization--branch" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">Organization &amp; Branch</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#rbac-role-based-access-control" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">RBAC (Role-Based Access Control)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#approval-system" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">Approval System</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#audit-log" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">Audit Log</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#vertical-modules--industry-pack" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Vertical Modules — Industry Pack</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#platform-layer--nizam-sebagai-saas" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Platform Layer — Nizam sebagai SaaS</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#shariah-first-design" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Shariah-First Design</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#tech-stack" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Tech Stack</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#ringkasan" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Ringkasan</span> </a>  </li> </ul></nav></starlight-toc><script type="module" src="/_astro/TableOfContents.astro_astro_type_script_index_0_lang.FuRcXuRY.js"></script></div></div> </div> </aside> <div class="main-pane astro-67yu43on">  <main data-pagefind-body class="astro-bguv2lll" lang="en" dir="ltr">    <div class="content-panel astro-7nkwcw3z"> <div class="sl-container astro-7nkwcw3z"> <h1 id="_top" class="astro-j6tvhyss">Blueprint:</h1> </div> </div> <div class="content-panel astro-7nkwcw3z"> <div class="sl-container astro-7nkwcw3z"> <div class="sl-markdown-content"> <blockquote>
+<p>Dokumen ini disinkronkan otomatis dari file sumber <code dir="auto">BLUEPRINT.md</code> di root project docs.</p>
+</blockquote>
+<blockquote>
+<p>Dokumen ini menjelaskan arsitektur, definisi core, dan filosofi desain sistem Nizam ERP.
+Ditujukan untuk developer, product manager, dan stakeholder teknis.</p>
+</blockquote>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="filosofi-dasar">Filosofi Dasar</h2><a class="sl-anchor-link" href="#filosofi-dasar"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Filosofi Dasar”</span></a></div>
+<p>Nizam dibangun di atas satu prinsip teknis fundamental:</p>
+<blockquote>
+<p><strong>Setiap baris data di-scope ke <code dir="auto">org_id</code>.</strong></p>
+</blockquote>
+<p>Migration pertama (<code dir="auto">001_organizations.sql</code>) sudah menetapkan ini — <code dir="auto">organizations</code> adalah <em>root entity</em>, bukan user. User hanya “anggota” dari sebuah org. Ini bukan kebetulan; ini keputusan arsitektur yang menentukan seluruh bentuk sistem dan memungkinkan Nizam beroperasi sebagai platform <strong>multi-tenant sejati</strong>.</p>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="layer-arsitektur">Layer Arsitektur</h2><a class="sl-anchor-link" href="#layer-arsitektur"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Layer Arsitektur”</span></a></div>
+<div class="expressive-code"><link rel="stylesheet" href="/_astro/ec.v4551.css"><script type="module" src="/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="plaintext"><code><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">┌─────────────────────────────────────────────────────────────┐</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│  PLATFORM LAYER                                             │</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│  SaaS Billing · Paket Langganan · Auth · Multi-tenant       │</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├─────────────────────────────────────────────────────────────┤</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│  GOVERNANCE LAYER                                           │</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│  Org Hierarchy · RBAC · Branch · Approval · Audit Log       │</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├─────────────────────────────────────────────────────────────┤</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│  CORE ERP LAYER          ← "otak" sistem                    │</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│  Accounting · Finance · Inventory                           │</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│  Purchasing · Sales · HRIS · Syirkah                        │</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├─────────────────────────────────────────────────────────────┤</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│  VERTICAL MODULE LAYER                                      │</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│  Fleet · Factory · Construction · Workshop                  │</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│  Koperasi · LMS · Services · E-Commerce · Marketplace       │</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">└─────────────────────────────────────────────────────────────┘</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="┌─────────────────────────────────────────────────────────────┐│  PLATFORM LAYER                                             ││  SaaS Billing · Paket Langganan · Auth · Multi-tenant       │├─────────────────────────────────────────────────────────────┤│  GOVERNANCE LAYER                                           ││  Org Hierarchy · RBAC · Branch · Approval · Audit Log       │├─────────────────────────────────────────────────────────────┤│  CORE ERP LAYER          ← &#x22;otak&#x22; sistem                    ││  Accounting · Finance · Inventory                           ││  Purchasing · Sales · HRIS · Syirkah                        │├─────────────────────────────────────────────────────────────┤│  VERTICAL MODULE LAYER                                      ││  Fleet · Factory · Construction · Workshop                  ││  Koperasi · LMS · Services · E-Commerce · Marketplace       │└─────────────────────────────────────────────────────────────┘"><div></div></button></div></figure></div>
+<p>Prinsip dependensi antar layer:</p>
+<ul>
+<li><strong>Core</strong> bergantung pada Governance, tidak pada Vertical.</li>
+<li><strong>Vertical</strong> bergantung pada Core (semua posting ke journal_lines, menggunakan accounts, inventory, dll).</li>
+<li><strong>Governance</strong> tidak bergantung pada siapapun — dia yang mengontrol semua.</li>
+<li><strong>Platform</strong> adalah wrapper eksternal yang memonetisasi keseluruhan sistem.</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="core-erp--definisi--alasan">Core ERP — Definisi &#x26; Alasan</h2><a class="sl-anchor-link" href="#core-erp--definisi--alasan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Core ERP — Definisi &#x26; Alasan”</span></a></div>
+<p>Kriteria sebuah modul disebut <strong>Core</strong>:</p>
+<ol>
+<li><strong>Modul lain bergantung padanya</strong> — ada FK, trigger, atau join dari modul lain ke sini.</li>
+<li><strong>Sistem tidak bisa beroperasi tanpanya</strong> — bukan fitur opsional, tapi prasyarat.</li>
+</ol>
+<p>Berdasarkan dua kriteria ini, ada <strong>7 modul Core</strong>:</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="1-️-accounting-akuntansi">1. 🏛️ Accounting (Akuntansi)</h3><a class="sl-anchor-link" href="#1-️-accounting-akuntansi"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “1. 🏛️ Accounting (Akuntansi)”</span></a></div>
+<p><strong>Mengapa Core:</strong>
+Semua modul lain pada akhirnya <em>posting</em> ke sini. Sales menghasilkan jurnal pendapatan. Payroll menghasilkan jurnal beban gaji. Fleet, Factory, Construction — semuanya berakhir di <code dir="auto">journal_lines</code>. Tabel <code dir="auto">accounts</code> (Chart of Accounts) adalah hub FK terbesar di sistem — <strong>28+ tabel</strong> me-reference-nya langsung. Tanpa CoA aktif, tidak ada yang bisa diposting.</p>
+<p><strong>Isi modul:</strong></p>
+<ul>
+<li>Chart of Accounts (CoA) — standar PSAK</li>
+<li>Journal Entries &#x26; Journal Lines</li>
+<li>General Ledger</li>
+<li>Bank Reconciliation</li>
+<li>Opening Balances</li>
+<li>Fiscal Period Closing</li>
+<li>Budgeting</li>
+<li>Multi-currency</li>
+<li>Tax Engine (PPN/PPh 21/PPh 23)</li>
+<li>Shariah Account Mapping</li>
+</ul>
+<p><strong>Standar:</strong> PSAK (Pernyataan Standar Akuntansi Keuangan) Indonesia. Hierarki 3 level: Root → Group → Detail/Posting.</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="2--finance-kas--bank">2. 💰 Finance (Kas &#x26; Bank)</h3><a class="sl-anchor-link" href="#2--finance-kas--bank"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “2. 💰 Finance (Kas &#x26; Bank)”</span></a></div>
+<p><strong>Mengapa Core:</strong>
+<code dir="auto">bank_accounts</code> dan <code dir="auto">cash_transactions</code> adalah titik masuk/keluar uang nyata. Setiap pembayaran dari modul manapun (Sales Payment, Purchase Payment, Payroll Disbursement) bermuara ke sini. Berbeda dari Accounting yang mencatat <em>pencatatan</em>, Finance mencatat <em>pergerakan kas aktual</em>.</p>
+<p><strong>Isi modul:</strong></p>
+<ul>
+<li>Bank Accounts &#x26; Petty Cash</li>
+<li>Cash Transactions (masuk/keluar)</li>
+<li>Sales Payments (penerimaan piutang)</li>
+<li>Purchase Payments (pelunasan hutang)</li>
+<li>Aging Receivables &#x26; Payables</li>
+<li>Cash Flow reporting</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="3--inventory-persediaan">3. 📦 Inventory (Persediaan)</h3><a class="sl-anchor-link" href="#3--inventory-persediaan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3. 📦 Inventory (Persediaan)”</span></a></div>
+<p><strong>Mengapa Core:</strong>
+Sales tidak bisa delivery tanpa stok. Purchasing tidak bisa receive tanpa menambah stok. Factory tidak bisa produksi tanpa raw material. Semua modul operasional bergantung pada stock level dan valuasi. Ada mekanisme <code dir="auto">inventory_movements</code> yang auto-trigger dari setiap transaksi barang di seluruh sistem.</p>
+<p><strong>Isi modul:</strong></p>
+<ul>
+<li>Products &#x26; Product Categories</li>
+<li>Stock Movements (otomatis dari transaksi)</li>
+<li>Inventory Adjustments</li>
+<li>Inventory Transfers (antar cabang)</li>
+<li>Landed Cost (biaya pengiriman ke HPP)</li>
+<li>Average Cost Valuation</li>
+<li>Warehouse Management (add-on)</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="4--purchasing-pembelian">4. 🛒 Purchasing (Pembelian)</h3><a class="sl-anchor-link" href="#4--purchasing-pembelian"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4. 🛒 Purchasing (Pembelian)”</span></a></div>
+<p><strong>Mengapa Core:</strong>
+Supply chain dimulai dari sini. Siklus <code dir="auto">PO → Goods Receipt → AP → Payment</code> menyentuh tiga modul sekaligus: Inventory (tambah stok), Accounting (catat hutang &#x26; HPP), dan Finance (kas keluar). Hampir tidak ada bisnis yang tidak punya proses pembelian.</p>
+<p><strong>Isi modul:</strong></p>
+<ul>
+<li>Purchase Orders (PO)</li>
+<li>Goods Receipt / Penerimaan Barang</li>
+<li>Purchase Returns</li>
+<li>Purchase Payments</li>
+<li>Supplier Management</li>
+<li>Purchase Reporting</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="5-️-sales-penjualan">5. 🏷️ Sales (Penjualan)</h3><a class="sl-anchor-link" href="#5-️-sales-penjualan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “5. 🏷️ Sales (Penjualan)”</span></a></div>
+<p><strong>Mengapa Core:</strong>
+Revenue entry point utama. Siklus <code dir="auto">Sales Order → Delivery → Invoice → Payment</code> menyentuh: Inventory (kurangi stok), Accounting (catat pendapatan &#x26; piutang), dan Finance (kas masuk). Bersama Purchasing membentuk <strong>siklus bisnis penuh</strong> (buy-sell cycle).</p>
+<p><strong>Isi modul:</strong></p>
+<ul>
+<li>Sales Orders</li>
+<li>Delivery / Pengiriman</li>
+<li>Sales Invoices</li>
+<li>Sales Returns</li>
+<li>Sales Payments</li>
+<li>Point of Sale (POS)</li>
+<li>CRM (kontak pelanggan)</li>
+<li>Shariah Sales Mode (murabahah, dll)</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="6--hris-human-resource--payroll">6. 👥 HRIS (Human Resource &#x26; Payroll)</h3><a class="sl-anchor-link" href="#6--hris-human-resource--payroll"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “6. 👥 HRIS (Human Resource &#x26; Payroll)”</span></a></div>
+<p><strong>Mengapa Core:</strong>
+Di hampir semua bisnis Indonesia, payroll adalah pengeluaran terbesar dan paling reguler. HRIS di Nizam bukan sekadar data karyawan — proses payroll secara otomatis men-generate <code dir="auto">journal_lines</code> (beban gaji, hutang PPh 21, disbursement ke bank). Integrasi akuntansi yang dalam ini yang membuatnya Core, bukan add-on.</p>
+<p><strong>Isi modul:</strong></p>
+<ul>
+<li>Employees &#x26; Departments</li>
+<li>Payroll &#x26; Payslips</li>
+<li>Payroll Components (gaji pokok, tunjangan, potongan)</li>
+<li>Leave Management</li>
+<li>Expense Claims &#x26; Reimbursement</li>
+<li>Attendance</li>
+<li>PPh 21 Integration</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="7--syirkah-kemitraan-bisnis-syariah">7. 🤝 Syirkah (Kemitraan Bisnis Syariah)</h3><a class="sl-anchor-link" href="#7--syirkah-kemitraan-bisnis-syariah"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “7. 🤝 Syirkah (Kemitraan Bisnis Syariah)”</span></a></div>
+<p><strong>Mengapa Core:</strong>
+Syirkah bukan sekadar modul transaksi — ia menyentuh <strong>struktur kepemilikan</strong> bisnis itu sendiri. Akad Syirkah menentukan siapa pemilik dan berapa persentase bagi hasilnya, lalu mem-posting langsung ke akun <strong>Ekuitas</strong> di General Ledger. Di bisnis syariah Indonesia, akad ini mendahului semua transaksi operasional lainnya. Tidak ada modul Vertical lain yang menyentuh Ekuitas secara langsung.</p>
+<p><strong>Isi modul:</strong></p>
+<ul>
+<li>Akad Syirkah (kontrak kemitraan)</li>
+<li>Manajemen Mitra (% bagi hasil, porsi modal)</li>
+<li>Saksi Akad</li>
+<li>Ijab-Qobul Digital (tanda tangan via link token)</li>
+<li>Posting Modal ke Ekuitas (otomatis)</li>
+<li>Posting Bagi Hasil ke GL (otomatis)</li>
+<li>Dashboard Syirkah</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="governance-layer">Governance Layer</h2><a class="sl-anchor-link" href="#governance-layer"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Governance Layer”</span></a></div>
+<p>Bukan modul bisnis, tapi <strong>wajib ada</strong> — sistem tidak bisa berjalan tanpa layer ini.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="organization--branch">Organization &#x26; Branch</h3><a class="sl-anchor-link" href="#organization--branch"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Organization &#x26; Branch”</span></a></div>
+<ul>
+<li><strong>Multi-tenant:</strong> Satu user bisa memiliki beberapa org (PT, CV, Koperasi, Yayasan).</li>
+<li><strong>Multi-entity (Holding):</strong> Org bisa punya <code dir="auto">parent_org_id</code> — struktur holding company. CoA child org bisa diwarisi dari parent (<code dir="auto">mode: INHERITED</code>) atau mandiri (<code dir="auto">mode: LOCAL</code>).</li>
+<li><strong>Branch (Cabang):</strong> Di dalam satu org bisa ada banyak cabang. Data transaksi bisa di-filter per branch. Laporan konsolidasi tersedia di level org.</li>
+</ul>
+<div class="sl-heading-wrapper level-h3"><h3 id="rbac-role-based-access-control">RBAC (Role-Based Access Control)</h3><a class="sl-anchor-link" href="#rbac-role-based-access-control"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “RBAC (Role-Based Access Control)”</span></a></div>
+<p>Hierarki role: <code dir="auto">owner → admin → manager → staff → viewer</code></p>
+<p>Setiap server action mengecek role sebelum eksekusi. Ada granular <code dir="auto">permissions</code> array per-role untuk kontrol yang lebih detail (misal: <code dir="auto">manage_accounting</code>, <code dir="auto">approve_purchase</code>, dll).</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="approval-system">Approval System</h3><a class="sl-anchor-link" href="#approval-system"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Approval System”</span></a></div>
+<p>Workflow approval multi-level untuk transaksi kritis (PO di atas threshold, void jurnal yang sudah posted, dll). Built-in sejak awal — bukan plugin.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="audit-log">Audit Log</h3><a class="sl-anchor-link" href="#audit-log"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Audit Log”</span></a></div>
+<p>Setiap operasi <code dir="auto">INSERT / UPDATE / DELETE</code> pada tabel kritis terekam dengan <code dir="auto">old_data</code> dan <code dir="auto">new_data</code> dalam format JSONB. Forensic trail yang tidak bisa dimatikan dari aplikasi.</p>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="vertical-modules--industry-pack">Vertical Modules — Industry Pack</h2><a class="sl-anchor-link" href="#vertical-modules--industry-pack"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Vertical Modules — Industry Pack”</span></a></div>
+<p>Modul yang menjawab kebutuhan industri spesifik. Semuanya <strong>bergantung pada Core</strong> untuk pencatatan keuangan, tapi Core tidak bergantung pada mereka. Bisa diaktifkan sebagai add-on per org.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Modul</th><th>Target Industri</th><th>Integrasi Core</th></tr></thead><tbody><tr><td><strong>Fleet &#x26; Rental</strong></td><td>Transportasi, bus, ambulans, kapal, kendaraan sewa</td><td>Depreciation → Accounting; Fuel/Maintenance → Purchasing</td></tr><tr><td><strong>Factory / Manufacturing</strong></td><td>Pabrik, produksi, BOM</td><td>BOM → Inventory; Work Order → Accounting (WIP)</td></tr><tr><td><strong>Construction</strong></td><td>Kontraktor, RAB, progress billing</td><td>Budget → Accounting; Progress Invoice → Sales</td></tr><tr><td><strong>Workshop / Bengkel</strong></td><td>Bengkel motor, service center</td><td>Service Order → Sales; Sparepart → Inventory</td></tr><tr><td><strong>Services / Job Order</strong></td><td>Jasa umum, proyek, billing per-jam</td><td>Job Billing → Sales; Resource Cost → Accounting</td></tr><tr><td><strong>Koperasi Syariah</strong></td><td>Simpan pinjam, murabahah, mudharabah</td><td>Simpanan → Accounting; Pembiayaan → Finance</td></tr><tr><td><strong>LMS</strong></td><td>Lembaga pelatihan, kursus berbayar</td><td>Enrollment Fee → Sales; Instructor Cost → HRIS</td></tr><tr><td><strong>E-Commerce</strong></td><td>Toko online dengan theme builder</td><td>Orders → Sales; Stock → Inventory</td></tr><tr><td><strong>Marketplace</strong></td><td>Platform multi-seller</td><td>Komisi → Accounting; Seller Settlement → Finance</td></tr></tbody></table>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="platform-layer--nizam-sebagai-saas">Platform Layer — Nizam sebagai SaaS</h2><a class="sl-anchor-link" href="#platform-layer--nizam-sebagai-saas"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Platform Layer — Nizam sebagai SaaS”</span></a></div>
+<p>Nizam <strong>menjual dirinya sendiri</strong> melalui infrastruktur SaaS bawaan:</p>
+<ul>
+<li><code dir="auto">saas_packages</code> — Paket langganan: <strong>Mini, Pro, Enterprise, ABS Special</strong></li>
+<li><code dir="auto">saas_invoices</code> — Penagihan otomatis ke tenant</li>
+<li><code dir="auto">saas_vouchers</code> — Diskon/trial voucher</li>
+<li>Sistem <strong>reseller</strong> — mitra yang bisa menjual Nizam ke klien mereka</li>
+<li><code dir="auto">org_module_instances</code> — Tracking status onboarding per modul per org</li>
+</ul>
+<p><strong>Distribusi modul per paket:</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Modul</th><th align="center">Mini</th><th align="center">Pro</th><th align="center">Enterprise</th></tr></thead><tbody><tr><td>Accounting</td><td align="center">✅</td><td align="center">✅</td><td align="center">✅</td></tr><tr><td>Finance</td><td align="center">✅</td><td align="center">✅</td><td align="center">✅</td></tr><tr><td>Inventory</td><td align="center">✅</td><td align="center">✅</td><td align="center">✅</td></tr><tr><td>Purchasing</td><td align="center">✅</td><td align="center">✅</td><td align="center">✅</td></tr><tr><td>Sales + POS</td><td align="center">✅</td><td align="center">✅</td><td align="center">✅</td></tr><tr><td>CRM</td><td align="center">✅</td><td align="center">✅</td><td align="center">✅</td></tr><tr><td>Reports</td><td align="center">✅</td><td align="center">✅</td><td align="center">✅</td></tr><tr><td>HRIS</td><td align="center">add-on</td><td align="center">✅</td><td align="center">✅</td></tr><tr><td>Manufacturing</td><td align="center">add-on</td><td align="center">✅</td><td align="center">✅</td></tr><tr><td>Audit</td><td align="center">add-on</td><td align="center">✅</td><td align="center">✅</td></tr><tr><td>Fleet &#x26; Rental</td><td align="center">add-on</td><td align="center">add-on</td><td align="center">✅</td></tr><tr><td>Construction</td><td align="center">add-on</td><td align="center">add-on</td><td align="center">✅</td></tr><tr><td>Multi-Entity</td><td align="center">add-on</td><td align="center">add-on</td><td align="center">add-on</td></tr></tbody></table>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="shariah-first-design">Shariah-First Design</h2><a class="sl-anchor-link" href="#shariah-first-design"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Shariah-First Design”</span></a></div>
+<p>Hampir semua modul keuangan punya mode syariah. Ini bukan afterthought — built-in sejak desain awal:</p>
+<ul>
+<li><strong><code dir="auto">shariah_settings</code></strong> per-org: toggle aktif/nonaktif akun syariah</li>
+<li><strong>CoA Syariah:</strong> dedicated akun murabahah, mudharabah, musyarakah, zakat</li>
+<li><strong>Sales Mode Syariah:</strong> invoice dengan akad murabahah</li>
+<li><strong>Syirkah (Core):</strong> kemitraan dengan bagi hasil, ijab-qobul digital, signing lifecycle — posting langsung ke Ekuitas</li>
+<li><strong>Koperasi Syariah:</strong> simpanan pokok/wajib, pembiayaan IMBT, sertifikasi DPS</li>
+<li><strong>Zakat Engine:</strong> kalkulasi zakat maal, zakat perusahaan</li>
+</ul>
+<p>Ada dedicated migrations untuk injeksi akun-akun syariah ke dalam CoA standar PSAK. Ini menunjukkan Nizam dirancang sejak awal untuk pasar Indonesia yang religius — bukan konversi dari sistem konvensional.</p>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="tech-stack">Tech Stack</h2><a class="sl-anchor-link" href="#tech-stack"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Tech Stack”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Layer</th><th>Teknologi</th></tr></thead><tbody><tr><td>Framework</td><td>Next.js 16 (App Router) + TypeScript 5.9</td></tr><tr><td>Database</td><td>Railway PostgreSQL (via <code dir="auto">pg</code> native client)</td></tr><tr><td>Auth</td><td>Internal auth berbasis cookie session</td></tr><tr><td>Styling</td><td>TailwindCSS v4 + Framer Motion</td></tr><tr><td>Storage</td><td>AWS S3</td></tr><tr><td>Email</td><td>Mailketing API</td></tr><tr><td>AI</td><td>Google Vertex AI + Google AI Studio</td></tr><tr><td>Monitoring</td><td>Sentry + Microsoft Clarity</td></tr><tr><td>Testing</td><td>Vitest</td></tr></tbody></table>
+<p><strong>Catatan penting:</strong> Supabase tidak lagi digunakan sebagai runtime. <code dir="auto">lib/supabase/</code> adalah compatibility layer di atas Railway PostgreSQL. Semua query data dan auth berjalan penuh di Railway dengan internal auth session.</p>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="ringkasan">Ringkasan</h2><a class="sl-anchor-link" href="#ringkasan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Ringkasan”</span></a></div>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="plaintext"><code><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">Core Nizam = Accounting + Finance + Inventory + Purchasing + Sales + HRIS + Syirkah</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="Core Nizam = Accounting + Finance + Inventory + Purchasing + Sales + HRIS + Syirkah"><div></div></button></div></figure></div>
+<p>Dengan <strong>Governance Layer</strong> (Org, RBAC, Approval, Audit) sebagai fondasi wajib di bawahnya, dan <strong>Vertical Modules</strong> sebagai ekstensi yang <em>menulis ke Core</em> — bukan sistem terpisah.</p>
+<p>Satu sumber kebenaran untuk semua pencatatan keuangan: <strong><code dir="auto">journal_lines</code></strong>.
+Satu root entity untuk semua data: <strong><code dir="auto">organizations</code></strong>.</p>
+<hr>
+<p><em>Dokumen ini di-generate berdasarkan analisis codebase nizam-app per Mei 2026.</em></p> </div> <footer class="sl-flex astro-3yyafb3n"> <div class="meta sl-flex astro-3yyafb3n">   </div> <div class="pagination-links print:hidden astro-u2l5gyhi" dir="ltr"> <a href="/reference/architecture/" rel="prev" class="astro-u2l5gyhi"> <svg aria-hidden="true" class="astro-u2l5gyhi astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg> <span class="astro-u2l5gyhi"> Previous <br class="astro-u2l5gyhi"> <span class="link-title astro-u2l5gyhi">Arsitektur Sistem</span> </span> </a> <a href="/reference/blueprint-bintang-marwah/" rel="next" class="astro-u2l5gyhi"> <svg aria-hidden="true" class="astro-u2l5gyhi astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg> <span class="astro-u2l5gyhi"> Next <br class="astro-u2l5gyhi"> <span class="link-title astro-u2l5gyhi">Blueprint: BINTANG MARWAH</span> </span> </a> </div>  </footer> </div> </div>  </main> </div> </div> </div> </div> </body></html>

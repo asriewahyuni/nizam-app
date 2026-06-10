@@ -1,0 +1,27 @@
+---
+title: Konsep Inti
+description: Konsep lintas modul yang wajib dipahami sebelum membaca detail fitur Nizam.
+---
+
+## Organisasi, anak perusahaan, dan Cabang
+
+Nizam membedakan organisasi induk, anak perusahaan, dan **Cabang**. Berdasarkan aturan produk saat ini, hanya anak perusahaan yang boleh membuat Cabang, dan hierarki maksimal adalah **induk → anak perusahaan → Cabang**.
+
+## Anti-silo ERP
+
+Setiap transaksi harus dilihat sebagai bagian dari sistem ERP:
+
+- uang masuk/keluar berdampak ke accounting dan cash/bank,
+- pergerakan barang berdampak ke inventory,
+- penugasan staf dan payroll berdampak ke HRIS,
+- approval dan audit menempel ke seluruh modul yang relevan.
+
+## Approval dan audit
+
+Approval Center adalah penghubung penting untuk purchase order, sales order, reimbursement, change order proyek, dan leave request. Audit log melengkapi jejak perubahan agar koreksi operasional tidak menjadi blind spot.
+
+## Referensi lanjutan
+
+- [Referensi Modul Inti](/reference/core/)
+- [Arsitektur Sistem](/reference/architecture/)
+- [Peta Modul dan Route](/reference/modules/)

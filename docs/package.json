@@ -1,0 +1,23 @@
+{
+  "name": "nizam-docs",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "sync-content": "node ./scripts/sync-content.mjs",
+    "dev": "npm run sync-content && astro dev --host 0.0.0.0 --port 4321",
+    "build": "npm run sync-content && astro build",
+    "preview": "npm run build && astro preview --host 0.0.0.0 --port 4321",
+    "start": "astro preview --host 0.0.0.0 --port ${PORT:-4321}"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.40.0",
+    "astro": "^6.4.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

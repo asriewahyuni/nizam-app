@@ -1086,7 +1086,7 @@ export default function PurchasingClient({
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowModal(false); resetPurchaseForm() }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-xl shadow-md p-8 overflow-hidden max-h-[90vh] overflow-y-auto">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-[95vw] xl:max-w-7xl bg-white rounded-xl shadow-md p-8 overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="absolute top-0 left-0 w-2 h-full bg-rose-500" />
                 <h3 className="text-xl font-bold mb-6">
                   {editingDraftPurchaseId ? 'Edit Draft Purchase Order (PO)' : 'Buat Purchase Order (PO) & Update Master Barang'}

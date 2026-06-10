@@ -1,0 +1,1193 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-bguv2lll"> <head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Roadmap: MODULE ADDON GLOBAL | Nizam Docs</title><link rel="canonical" href="https://docs.kliknizam.app/reference/roadmap-module-addon-global/"/><link rel="sitemap" href="/sitemap-index.xml"/><link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v6.4.5"/><meta name="generator" content="Starlight v0.40.0"/><meta property="og:title" content="Roadmap: MODULE ADDON GLOBAL"/><meta property="og:type" content="article"/><meta property="og:url" content="https://docs.kliknizam.app/reference/roadmap-module-addon-global/"/><meta property="og:locale" content="en"/><meta property="og:description" content="**Branch Sumber Analisis:** `feat_multi`"/><meta property="og:site_name" content="Nizam Docs"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="**Branch Sumber Analisis:** `feat_multi`"/><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/_astro/print.DNXP8c50.css" media="print"><link rel="stylesheet" href="/_astro/common.KeBEX_n0.css">
+<link rel="stylesheet" href="/_astro/Code.BcHZMqfA.css"><script type="module" src="/_astro/page.B_tncCx8.js"></script></head> <body class="astro-bguv2lll"> <a href="#_top" class="astro-7q3lir66">Skip to content</a> <div class="page sl-flex astro-vrdttmbt"> <header class="header astro-vrdttmbt"><div class="header astro-kmkmnagf"> <div class="title-wrapper sl-flex astro-kmkmnagf"> <a href="/" class="site-title sl-flex astro-m46x6ez3">  <img class="light:sl-hidden print:hidden astro-m46x6ez3" alt="Nizam Docs" src="/_astro/nizam-docs-wordmark.DAA3qOC5.svg" width="180" height="40"> <img class="dark:sl-hidden print:block astro-m46x6ez3" alt="Nizam Docs" src="/_astro/nizam-docs-wordmark.DAA3qOC5.svg" width="180" height="40"> <span class="astro-m46x6ez3" translate="no"> Nizam Docs </span> </a> </div> <div class="sl-flex print:hidden astro-kmkmnagf"> <site-search class="astro-kmkmnagf astro-v37mnknz" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"> <button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-v37mnknz"> <svg aria-hidden="true" class="astro-v37mnknz astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg> <span class="sl-hidden md:sl-block astro-v37mnknz" aria-hidden="true">Search</span> <kbd class="sl-hidden md:sl-flex astro-v37mnknz" style="display: none;"> <kbd class="astro-v37mnknz">Ctrl</kbd><kbd class="astro-v37mnknz">K</kbd> </kbd> </button> <dialog style="padding:0" aria-label="Search" class="astro-v37mnknz"> <div class="dialog-frame sl-flex astro-v37mnknz">  <button data-close-modal class="sl-flex md:sl-hidden astro-v37mnknz"> Cancel </button> <div class="search-container astro-v37mnknz"> <div id="starlight__search" class="astro-v37mnknz"></div> </div> </div> </dialog> </site-search>  <script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script> <script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.lq3t8uE2.js"></script>  </div> <div class="sl-hidden md:sl-flex print:hidden right-group astro-kmkmnagf"> <div class="sl-flex social-icons astro-kmkmnagf"> <a href="https://github.com/asriewahyuni/nizam-app" rel="me" class="sl-flex astro-wy4te6ga"><span class="sr-only astro-wy4te6ga">GitHub</span><svg aria-hidden="true" class="astro-wy4te6ga astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a> </div> <starlight-theme-select>  <label style="--sl-select-width: 6.25em" class="astro-4yphtoen"> <span class="sr-only astro-4yphtoen">Select theme</span> <svg aria-hidden="true" class="icon label-icon astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg> <select autocomplete="off" class="astro-4yphtoen"> <option value="dark" class="astro-4yphtoen">Dark</option><option value="light" class="astro-4yphtoen">Light</option><option value="auto" selected class="astro-4yphtoen">Auto</option> </select> <svg aria-hidden="true" class="icon caret astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg> </label> </starlight-theme-select>  <script>
+	StarlightThemeProvider.updatePickers();
+</script> <script type="module">const r="starlight-theme",o=e=>e==="auto"||e==="dark"||e==="light"?e:"auto",c=()=>o(typeof localStorage<"u"&&localStorage.getItem(r));function n(e){typeof localStorage<"u"&&localStorage.setItem(r,e==="light"||e==="dark"?e:"")}const l=()=>matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";function t(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e==="auto"?l():e,n(e)}matchMedia("(prefers-color-scheme: light)").addEventListener("change",()=>{c()==="auto"&&t("auto")});class s extends HTMLElement{constructor(){super(),t(c()),this.querySelector("select")?.addEventListener("change",a=>{a.currentTarget instanceof HTMLSelectElement&&t(o(a.currentTarget.value))})}}customElements.define("starlight-theme-select",s);</script> <script type="module">class s extends HTMLElement{constructor(){super();const e=this.querySelector("select");e&&(e.addEventListener("change",t=>{t.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=t.currentTarget.value)}),window.addEventListener("pageshow",t=>{if(!t.persisted)return;const n=e.querySelector("option[selected]")?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}}customElements.define("starlight-lang-select",s);</script> </div> </div></header> <nav class="sidebar print:hidden astro-vrdttmbt" aria-label="Main"> <starlight-menu-button class="print:hidden astro-jif73yzw"> <button aria-expanded="false" aria-label="Menu" aria-controls="starlight__sidebar" class="sl-flex md:sl-hidden astro-jif73yzw"> <svg aria-hidden="true" class="open-menu astro-jif73yzw astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg> <svg aria-hidden="true" class="close-menu astro-jif73yzw astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg> </button> </starlight-menu-button> <script type="module">class s extends HTMLElement{constructor(){super(),this.btn=this.querySelector("button"),this.btn.addEventListener("click",()=>this.toggleExpanded());const t=this.closest("nav");t&&t.addEventListener("keyup",e=>this.closeOnEscape(e))}setExpanded(t){this.setAttribute("aria-expanded",String(t)),document.body.toggleAttribute("data-mobile-menu-expanded",t)}toggleExpanded(){this.setExpanded(this.getAttribute("aria-expanded")!=="true")}closeOnEscape(t){t.code==="Escape"&&(this.setExpanded(!1),this.btn.focus())}}customElements.define("starlight-menu-button",s);</script>  <div id="starlight__sidebar" class="sidebar-pane astro-vrdttmbt"> <div class="sidebar-content sl-flex astro-vrdttmbt"> <sl-sidebar-state-persist data-hash="0x2tgro" class="astro-kku4brbg"> <script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script>  <ul class="top-level astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/" class="large astro-3ii7xxms"> <span class="astro-3ii7xxms">Home</span>  </a> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Start Here</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="0"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/guides/getting-started/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Getting Started</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/guides/product-map/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Peta Produk</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/guides/core-concepts/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Konsep Inti</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/guides/docs-roadmap/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Roadmap Docs Platform</span>  </a> </li> </ul> </details> </li><li class="astro-3ii7xxms"> <details open class="astro-3ii7xxms"> <summary class="astro-3ii7xxms"> <span class="group-label astro-3ii7xxms"> <span class="large astro-3ii7xxms">Technical Reference</span>  </span> <svg aria-hidden="true" class="caret astro-3ii7xxms astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg> </summary> <sl-sidebar-restore data-index="1"></sl-sidebar-restore> <ul class="astro-3ii7xxms"> <li class="astro-3ii7xxms"> <a href="/reference/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Reference Library</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/architecture/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Arsitektur Sistem</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/blueprint/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Blueprint:</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/blueprint-bintang-marwah/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Blueprint: BINTANG MARWAH</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/blueprint-tirta-marwah/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Blueprint: TIRTA MARWAH</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/core/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Referensi Modul Inti</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/database-mode-switching/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Mode Database dan Runtime</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/developer-guide/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Panduan Developer</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/ecommerce-implementation/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Implementasi E-Commerce</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/ecommerce-next-steps/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Rencana Lanjutan E-Commerce</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/modules/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Peta Modul dan Route</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/penawaran-bintang-marwah-enterprise/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Penawaran: BINTANG MARWAH ENTERPRISE</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/penawaran-tirta-marwah-canvasser/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Penawaran: TIRTA MARWAH CANVASSER</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/readme/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Ringkasan Dokumentasi</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/roadmap-8-10/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Roadmap: 8 10</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/roadmap-modul-addon-global-v3-2026/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Roadmap: MODUL ADDON GLOBAL V3 2026</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/roadmap-module-addon-global/" aria-current="page" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Roadmap: MODULE ADDON GLOBAL</span>  </a> </li><li class="astro-3ii7xxms"> <a href="/reference/syirkah-accounting/" class="astro-3ii7xxms"> <span class="astro-3ii7xxms">Akuntansi Syirkah</span>  </a> </li> </ul> </details> </li> </ul>  <script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script> </sl-sidebar-state-persist> <div class="md:sl-hidden"> <div class="mobile-preferences sl-flex astro-wu23bvmt"> <div class="social-icons astro-wu23bvmt"> <a href="https://github.com/asriewahyuni/nizam-app" rel="me" class="sl-flex astro-wy4te6ga"><span class="sr-only astro-wy4te6ga">GitHub</span><svg aria-hidden="true" class="astro-wy4te6ga astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a> </div> <starlight-theme-select>  <label style="--sl-select-width: 6.25em" class="astro-4yphtoen"> <span class="sr-only astro-4yphtoen">Select theme</span> <svg aria-hidden="true" class="icon label-icon astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg> <select autocomplete="off" class="astro-4yphtoen"> <option value="dark" class="astro-4yphtoen">Dark</option><option value="light" class="astro-4yphtoen">Light</option><option value="auto" selected class="astro-4yphtoen">Auto</option> </select> <svg aria-hidden="true" class="icon caret astro-4yphtoen astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg> </label> </starlight-theme-select>  <script>
+	StarlightThemeProvider.updatePickers();
+</script>   </div> </div> </div> </div> </nav> <div class="main-frame astro-vrdttmbt">  <script type="module">const a=document.getElementById("starlight__sidebar"),n=a?.querySelector("sl-sidebar-state-persist"),o="sl-sidebar-state",i=()=>{let t=[];const e=n?.dataset.hash||"";try{const s=sessionStorage.getItem(o),r=JSON.parse(s||"{}");Array.isArray(r.open)&&r.hash===e&&(t=r.open)}catch{}return{hash:e,open:t,scroll:a?.scrollTop||0}},c=t=>{try{sessionStorage.setItem(o,JSON.stringify(t))}catch{}},d=()=>c(i()),l=(t,e)=>{const s=i();s.open[e]=t,c(s)};n?.addEventListener("click",t=>{if(!(t.target instanceof Element))return;const e=t.target.closest("summary")?.closest("details");if(!e)return;const s=e.querySelector("sl-sidebar-restore"),r=parseInt(s?.dataset.index||"");isNaN(r)||l(!e.open,r)});addEventListener("visibilitychange",()=>{document.visibilityState==="hidden"&&d()});addEventListener("pageHide",d);</script> <div class="lg:sl-flex astro-67yu43on"> <aside class="right-sidebar-container print:hidden astro-67yu43on"> <div class="right-sidebar astro-67yu43on"> <div class="lg:sl-hidden astro-pb3aqygn"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-doynk5tl"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-doynk5tl"><details id="starlight__mobile-toc" class="astro-doynk5tl"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-doynk5tl"><span class="toggle sl-flex astro-doynk5tl">On this page<svg aria-hidden="true" class="caret astro-doynk5tl astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-doynk5tl"></span></summary><div class="dropdown astro-doynk5tl"><ul class="isMobile astro-gnoq344e" style="--depth: 0;"> <li class="astro-gnoq344e" style="--depth: 0;"> <a href="#_top" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Overview</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#dokumen-perencanaan-produk-menyelesaikan-pain-customer-secara-global" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Dokumen Perencanaan Produk: Menyelesaikan Pain Customer Secara Global</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#1-ringkasan-eksekutif" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">1. Ringkasan Eksekutif</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#2-konteks-pain-point-customer-global" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">2. Konteks Pain Point Customer Global</span> </a> <ul class="isMobile astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#21-pain-point-tier-1-urgensi-tinggi--kehilangan-revenue" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">2.1 Pain Point Tier-1 (Urgensi Tinggi — Kehilangan Revenue)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#22-pain-point-tier-2-growth-blocker" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">2.2 Pain Point Tier-2 (Growth Blocker)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#23-pain-point-tier-3-compliance--governance" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">2.3 Pain Point Tier-3 (Compliance &amp; Governance)</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#3-modul-baru-yang-direkomendasikan" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">3. Modul Baru yang Direkomendasikan</span> </a> <ul class="isMobile astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#31-modul-baru-treasury--multi-currency" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.1 MODUL BARU: Treasury &amp; Multi-Currency</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#32-modul-baru-budget--cost-control" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.2 MODUL BARU: Budget &amp; Cost Control</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#33-modul-baru-fixed-asset-management" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.3 MODUL BARU: Fixed Asset Management</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#34-modul-baru-tax-compliance-engine" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.4 MODUL BARU: Tax Compliance Engine</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#35-modul-baru-subscription--recurring-billing" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.5 MODUL BARU: Subscription &amp; Recurring Billing</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#36-modul-baru-omnichannel-commerce" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.6 MODUL BARU: Omnichannel Commerce</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#37-modul-baru-customer-success--portal" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.7 MODUL BARU: Customer Success &amp; Portal</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#38-modul-baru-supply-chain-planning-scp" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.8 MODUL BARU: Supply Chain Planning (SCP)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#39-modul-baru-field-service-management" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.9 MODUL BARU: Field Service Management</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#310-modul-baru-payables--receivables-intelligence" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.10 MODUL BARU: Payables &amp; Receivables Intelligence</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#311-modul-baru-esg--sustainability-reporting" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.11 MODUL BARU: ESG &amp; Sustainability Reporting</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#312-modul-baru-commission--incentive-management" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.12 MODUL BARU: Commission &amp; Incentive Management</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#4-add-on-baru-yang-direkomendasikan" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">4. Add-on Baru yang Direkomendasikan</span> </a> <ul class="isMobile astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#41-ai-purchase-assistant" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.1 AI Purchase Assistant</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#42-whatsapp-business-integration" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.2 WhatsApp Business Integration</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#43-barcode--qr-inventory-scanner" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.3 Barcode &amp; QR Inventory Scanner</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#44-e-commerce-auto-sync" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.4 E-Commerce Auto-Sync</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#45-smart-invoice-ocr" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.5 Smart Invoice OCR</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#46-payment-gateway-integration" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.6 Payment Gateway Integration</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#47-hr-self-service-mobile-app" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.7 HR Self-Service Mobile App</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#48-advanced-analytics--bi" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.8 Advanced Analytics &amp; BI</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#49-approval-workflow-engine" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.9 Approval Workflow Engine</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#410-franchise--multi-outlet-management" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.10 Franchise &amp; Multi-Outlet Management</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#411-contract-management" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.11 Contract Management</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#412-loyalty--rewards-program" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.12 Loyalty &amp; Rewards Program</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#413-document-management-system-dms" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.13 Document Management System (DMS)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#414-route--delivery-optimization" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.14 Route &amp; Delivery Optimization</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#415-vendor-portal" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.15 Vendor Portal</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#416-predictive-maintenance-iot-ready" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.16 Predictive Maintenance (IoT-Ready)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#417-ai-cashflow-advisor" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.17 AI Cashflow Advisor</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#418-training--certification-marketplace" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.18 Training &amp; Certification Marketplace</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#5-matriks-prioritas--roadmap" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">5. Matriks Prioritas &amp; Roadmap</span> </a> <ul class="isMobile astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#51-phase-1--q3-2026-quick-wins--tier-1-pain" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">5.1 Phase 1 — Q3 2026 (Quick Wins &amp; Tier-1 Pain)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#52-phase-2--q4-2026-growth--vertical" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">5.2 Phase 2 — Q4 2026 (Growth &amp; Vertical)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#53-phase-3--q1-2027-scale--ecosystem" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">5.3 Phase 3 — Q1 2027 (Scale &amp; Ecosystem)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#54-phase-4--q2-q3-2027-enterprise--global" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">5.4 Phase 4 — Q2-Q3 2027 (Enterprise &amp; Global)</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#6-arsitektur-produk-final-post-roadmap" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">6. Arsitektur Produk Final (Post-Roadmap)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#7-segmentasi-customer-dan-rekomendasi-paket" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">7. Segmentasi Customer dan Rekomendasi Paket</span> </a> <ul class="isMobile astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#71-usaha-kecil--retail-revenue--rp-5mbulan" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7.1 Usaha Kecil &amp; Retail (Revenue &lt; Rp 5M/bulan)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#72-ukm-berkembang-revenue-rp-5m500mbulan" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7.2 UKM Berkembang (Revenue Rp 5M–500M/bulan)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#73-perusahaan-menengah-revenue--rp-500mbulan" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7.3 Perusahaan Menengah (Revenue &gt; Rp 500M/bulan)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#74-bisnis-e-commerce--omnichannel" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7.4 Bisnis E-Commerce &amp; Omnichannel</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#75-industri-dengan-regulasi-tinggi-ekspor-tbk-gcg" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7.5 Industri dengan Regulasi Tinggi (Ekspor, TBk, GCG)</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#8-differensiator-kompetitif-global" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">8. Differensiator Kompetitif Global</span> </a> <ul class="isMobile astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#81-versus-sap--oracle-enterprise-erp" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">8.1 Versus SAP / Oracle (Enterprise ERP)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#82-versus-accurate--jurnal-akuntansi-saas-lokal" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">8.2 Versus Accurate / Jurnal (Akuntansi SaaS Lokal)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#83-versus-odoo-open-source-erp" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">8.3 Versus Odoo (Open-Source ERP)</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#9-estimasi-potensi-revenue-per-kategori-modul" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">9. Estimasi Potensi Revenue Per Kategori Modul</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#10-kesimpulan-dan-rekomendasi-tindakan" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">10. Kesimpulan dan Rekomendasi Tindakan</span> </a> <ul class="isMobile astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#101-tiga-modul-paling-kritis-untuk-dikerjakan-pertama" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">10.1 Tiga Modul Paling Kritis untuk Dikerjakan Pertama</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#102-tiga-modul-paling-strategis-untuk-jangka-panjang" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">10.2 Tiga Modul Paling Strategis untuk Jangka Panjang</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#103-differensiator-yang-harus-dijaga" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">10.3 Differensiator yang Harus Dijaga</span> </a>  </li> </ul> </li> </ul></div></details></nav></mobile-starlight-toc><script type="module" src="/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.hwBsy0Mo.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-pb3aqygn"><div class="sl-container astro-pb3aqygn"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-gnoq344e" style="--depth: 0;"> <li class="astro-gnoq344e" style="--depth: 0;"> <a href="#_top" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Overview</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#dokumen-perencanaan-produk-menyelesaikan-pain-customer-secara-global" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">Dokumen Perencanaan Produk: Menyelesaikan Pain Customer Secara Global</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#1-ringkasan-eksekutif" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">1. Ringkasan Eksekutif</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#2-konteks-pain-point-customer-global" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">2. Konteks Pain Point Customer Global</span> </a> <ul class="astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#21-pain-point-tier-1-urgensi-tinggi--kehilangan-revenue" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">2.1 Pain Point Tier-1 (Urgensi Tinggi — Kehilangan Revenue)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#22-pain-point-tier-2-growth-blocker" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">2.2 Pain Point Tier-2 (Growth Blocker)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#23-pain-point-tier-3-compliance--governance" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">2.3 Pain Point Tier-3 (Compliance &amp; Governance)</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#3-modul-baru-yang-direkomendasikan" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">3. Modul Baru yang Direkomendasikan</span> </a> <ul class="astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#31-modul-baru-treasury--multi-currency" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.1 MODUL BARU: Treasury &amp; Multi-Currency</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#32-modul-baru-budget--cost-control" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.2 MODUL BARU: Budget &amp; Cost Control</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#33-modul-baru-fixed-asset-management" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.3 MODUL BARU: Fixed Asset Management</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#34-modul-baru-tax-compliance-engine" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.4 MODUL BARU: Tax Compliance Engine</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#35-modul-baru-subscription--recurring-billing" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.5 MODUL BARU: Subscription &amp; Recurring Billing</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#36-modul-baru-omnichannel-commerce" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.6 MODUL BARU: Omnichannel Commerce</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#37-modul-baru-customer-success--portal" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.7 MODUL BARU: Customer Success &amp; Portal</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#38-modul-baru-supply-chain-planning-scp" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.8 MODUL BARU: Supply Chain Planning (SCP)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#39-modul-baru-field-service-management" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.9 MODUL BARU: Field Service Management</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#310-modul-baru-payables--receivables-intelligence" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.10 MODUL BARU: Payables &amp; Receivables Intelligence</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#311-modul-baru-esg--sustainability-reporting" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.11 MODUL BARU: ESG &amp; Sustainability Reporting</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#312-modul-baru-commission--incentive-management" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">3.12 MODUL BARU: Commission &amp; Incentive Management</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#4-add-on-baru-yang-direkomendasikan" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">4. Add-on Baru yang Direkomendasikan</span> </a> <ul class="astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#41-ai-purchase-assistant" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.1 AI Purchase Assistant</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#42-whatsapp-business-integration" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.2 WhatsApp Business Integration</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#43-barcode--qr-inventory-scanner" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.3 Barcode &amp; QR Inventory Scanner</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#44-e-commerce-auto-sync" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.4 E-Commerce Auto-Sync</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#45-smart-invoice-ocr" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.5 Smart Invoice OCR</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#46-payment-gateway-integration" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.6 Payment Gateway Integration</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#47-hr-self-service-mobile-app" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.7 HR Self-Service Mobile App</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#48-advanced-analytics--bi" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.8 Advanced Analytics &amp; BI</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#49-approval-workflow-engine" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.9 Approval Workflow Engine</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#410-franchise--multi-outlet-management" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.10 Franchise &amp; Multi-Outlet Management</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#411-contract-management" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.11 Contract Management</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#412-loyalty--rewards-program" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.12 Loyalty &amp; Rewards Program</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#413-document-management-system-dms" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.13 Document Management System (DMS)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#414-route--delivery-optimization" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.14 Route &amp; Delivery Optimization</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#415-vendor-portal" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.15 Vendor Portal</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#416-predictive-maintenance-iot-ready" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.16 Predictive Maintenance (IoT-Ready)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#417-ai-cashflow-advisor" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.17 AI Cashflow Advisor</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#418-training--certification-marketplace" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">4.18 Training &amp; Certification Marketplace</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#5-matriks-prioritas--roadmap" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">5. Matriks Prioritas &amp; Roadmap</span> </a> <ul class="astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#51-phase-1--q3-2026-quick-wins--tier-1-pain" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">5.1 Phase 1 — Q3 2026 (Quick Wins &amp; Tier-1 Pain)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#52-phase-2--q4-2026-growth--vertical" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">5.2 Phase 2 — Q4 2026 (Growth &amp; Vertical)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#53-phase-3--q1-2027-scale--ecosystem" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">5.3 Phase 3 — Q1 2027 (Scale &amp; Ecosystem)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#54-phase-4--q2-q3-2027-enterprise--global" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">5.4 Phase 4 — Q2-Q3 2027 (Enterprise &amp; Global)</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#6-arsitektur-produk-final-post-roadmap" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">6. Arsitektur Produk Final (Post-Roadmap)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#7-segmentasi-customer-dan-rekomendasi-paket" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">7. Segmentasi Customer dan Rekomendasi Paket</span> </a> <ul class="astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#71-usaha-kecil--retail-revenue--rp-5mbulan" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7.1 Usaha Kecil &amp; Retail (Revenue &lt; Rp 5M/bulan)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#72-ukm-berkembang-revenue-rp-5m500mbulan" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7.2 UKM Berkembang (Revenue Rp 5M–500M/bulan)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#73-perusahaan-menengah-revenue--rp-500mbulan" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7.3 Perusahaan Menengah (Revenue &gt; Rp 500M/bulan)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#74-bisnis-e-commerce--omnichannel" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7.4 Bisnis E-Commerce &amp; Omnichannel</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#75-industri-dengan-regulasi-tinggi-ekspor-tbk-gcg" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">7.5 Industri dengan Regulasi Tinggi (Ekspor, TBk, GCG)</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#8-differensiator-kompetitif-global" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">8. Differensiator Kompetitif Global</span> </a> <ul class="astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#81-versus-sap--oracle-enterprise-erp" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">8.1 Versus SAP / Oracle (Enterprise ERP)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#82-versus-accurate--jurnal-akuntansi-saas-lokal" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">8.2 Versus Accurate / Jurnal (Akuntansi SaaS Lokal)</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#83-versus-odoo-open-source-erp" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">8.3 Versus Odoo (Open-Source ERP)</span> </a>  </li> </ul> </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#9-estimasi-potensi-revenue-per-kategori-modul" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">9. Estimasi Potensi Revenue Per Kategori Modul</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 0;"> <a href="#10-kesimpulan-dan-rekomendasi-tindakan" class="astro-gnoq344e" style="--depth: 0;"> <span class="astro-gnoq344e" style="--depth: 0;">10. Kesimpulan dan Rekomendasi Tindakan</span> </a> <ul class="astro-gnoq344e" style="--depth: 1;"> <li class="astro-gnoq344e" style="--depth: 1;"> <a href="#101-tiga-modul-paling-kritis-untuk-dikerjakan-pertama" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">10.1 Tiga Modul Paling Kritis untuk Dikerjakan Pertama</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#102-tiga-modul-paling-strategis-untuk-jangka-panjang" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">10.2 Tiga Modul Paling Strategis untuk Jangka Panjang</span> </a>  </li><li class="astro-gnoq344e" style="--depth: 1;"> <a href="#103-differensiator-yang-harus-dijaga" class="astro-gnoq344e" style="--depth: 1;"> <span class="astro-gnoq344e" style="--depth: 1;">10.3 Differensiator yang Harus Dijaga</span> </a>  </li> </ul> </li> </ul></nav></starlight-toc><script type="module" src="/_astro/TableOfContents.astro_astro_type_script_index_0_lang.FuRcXuRY.js"></script></div></div> </div> </aside> <div class="main-pane astro-67yu43on">  <main data-pagefind-body class="astro-bguv2lll" lang="en" dir="ltr">    <div class="content-panel astro-7nkwcw3z"> <div class="sl-container astro-7nkwcw3z"> <h1 id="_top" class="astro-j6tvhyss">Roadmap: MODULE ADDON GLOBAL</h1> </div> </div> <div class="content-panel astro-7nkwcw3z"> <div class="sl-container astro-7nkwcw3z"> <div class="sl-markdown-content"> <blockquote>
+<p>Dokumen ini disinkronkan otomatis dari file sumber <code dir="auto">ROADMAP_MODULE_ADDON_GLOBAL.md</code> di root project docs.</p>
+</blockquote>
+<div class="sl-heading-wrapper level-h2"><h2 id="dokumen-perencanaan-produk-menyelesaikan-pain-customer-secara-global">Dokumen Perencanaan Produk: Menyelesaikan Pain Customer Secara Global</h2><a class="sl-anchor-link" href="#dokumen-perencanaan-produk-menyelesaikan-pain-customer-secara-global"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Dokumen Perencanaan Produk: Menyelesaikan Pain Customer Secara Global”</span></a></div>
+<p><strong>Versi:</strong> 1.0<br>
+<strong>Tanggal:</strong> 16 Mei 2026<br>
+<strong>Branch Sumber Analisis:</strong> <code dir="auto">feat_multi</code><br>
+<strong>Tujuan:</strong> Memetakan modul dan add-on baru yang relevan secara global untuk menyelesaikan pain point customer nyata di berbagai industri dan geografi.</p>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="1-ringkasan-eksekutif">1. Ringkasan Eksekutif</h2><a class="sl-anchor-link" href="#1-ringkasan-eksekutif"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “1. Ringkasan Eksekutif”</span></a></div>
+<p>NIZAM saat ini telah memiliki fondasi arsitektur 5 pilar yang solid:</p>
+<ul>
+<li><strong>Finance Core</strong> — kontrol keuangan</li>
+<li><strong>Revenue Core</strong> — pipeline penjualan</li>
+<li><strong>Purchasing</strong> — pengadaan</li>
+<li><strong>Inventory Core</strong> — stok dan produk</li>
+<li><strong>HRIS Core</strong> — SDM dan penggajian</li>
+</ul>
+<p>Ditambah 5 <strong>Vertical Module</strong> (Manufacturing, Fleet &#x26; Rental, Service Operations, Project &#x26; Construction, Syirkah) dan <strong>Academy/EDU</strong> sebagai modul strategis.</p>
+<p><strong>Gap utama yang ditemukan:</strong> NIZAM belum menjangkau pain point customer di area:</p>
+<ol>
+<li>Compliance &#x26; regulasi lintas negara</li>
+<li>Supply chain visibility end-to-end</li>
+<li>Customer experience post-sales</li>
+<li>AI-native operations</li>
+<li>ESG &#x26; keberlanjutan bisnis</li>
+<li>Treasury &#x26; cash management lanjutan</li>
+<li>Marketplace &#x26; omnichannel commerce</li>
+</ol>
+<p>Dokumen ini memetakan <strong>12 modul baru</strong> dan <strong>18 add-on baru</strong> yang secara strategis menyelesaikan pain nyata customer global, disusun berdasarkan urgensi dan potensi revenue.</p>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="2-konteks-pain-point-customer-global">2. Konteks Pain Point Customer Global</h2><a class="sl-anchor-link" href="#2-konteks-pain-point-customer-global"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “2. Konteks Pain Point Customer Global”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="21-pain-point-tier-1-urgensi-tinggi--kehilangan-revenue">2.1 Pain Point Tier-1 (Urgensi Tinggi — Kehilangan Revenue)</h3><a class="sl-anchor-link" href="#21-pain-point-tier-1-urgensi-tinggi--kehilangan-revenue"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “2.1 Pain Point Tier-1 (Urgensi Tinggi — Kehilangan Revenue)”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Pain Point</th><th>Segmen Customer</th><th>Dampak Bisnis</th></tr></thead><tbody><tr><td>Tidak bisa kelola multi-mata uang</td><td>Eksportir, importer, bisnis dengan supplier/customer asing</td><td>Selisih kurs tidak tercatat, rugi tersembunyi</td></tr><tr><td>Tidak ada visibilitas stok real-time lintas cabang</td><td>Retail chain, distributor, F&#x26;B franchise</td><td>Overstock di satu lokasi, stockout di tempat lain</td></tr><tr><td>Proses approval manual dan lambat</td><td>Perusahaan dengan hierarki purchase, proyek, atau reimbursement</td><td>Bottleneck operasional, human error, fraud</td></tr><tr><td>Tidak ada portal customer mandiri</td><td>B2B, distributor, jasa berlangganan</td><td>CS overload, customer tidak puas, churn</td></tr><tr><td>Tidak bisa track performa sales per wilayah/agen</td><td>Bisnis dengan channel distribusi</td><td>Komisi tidak akurat, performa opaque</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="22-pain-point-tier-2-growth-blocker">2.2 Pain Point Tier-2 (Growth Blocker)</h3><a class="sl-anchor-link" href="#22-pain-point-tier-2-growth-blocker"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “2.2 Pain Point Tier-2 (Growth Blocker)”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Pain Point</th><th>Segmen Customer</th><th>Dampak Bisnis</th></tr></thead><tbody><tr><td>Tidak bisa otomasi tagihan recurring</td><td>SaaS, rental, langganan, leasing</td><td>Revenue leakage, manual billing overhead</td></tr><tr><td>Tidak ada analitik prediktif stok</td><td>Distributor, manufacturer</td><td>Overpurchase atau stockout berkala</td></tr><tr><td>Tidak bisa kelola aset tetap dengan benar</td><td>Perusahaan dengan banyak fixed asset</td><td>Nilai aset salah, depreciation manual</td></tr><tr><td>Tidak ada integrasi e-commerce/marketplace</td><td>Retail dengan channel online</td><td>Data penjualan manual, duplikasi kerja</td></tr><tr><td>Tidak ada kontrol budget departemen</td><td>Perusahaan dengan banyak cost center</td><td>Budget jebol tidak terdeteksi dini</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="23-pain-point-tier-3-compliance--governance">2.3 Pain Point Tier-3 (Compliance &#x26; Governance)</h3><a class="sl-anchor-link" href="#23-pain-point-tier-3-compliance--governance"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “2.3 Pain Point Tier-3 (Compliance &#x26; Governance)”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Pain Point</th><th>Segmen Customer</th><th>Dampak Bisnis</th></tr></thead><tbody><tr><td>Tidak siap laporan pajak otomatis</td><td>Semua segmen</td><td>Risiko denda, audit, dan reputasi</td></tr><tr><td>Tidak ada audit trail yang kuat</td><td>Perusahaan menengah ke atas</td><td>Tidak bisa diaudit eksternal</td></tr><tr><td>Tidak ada kontrol akses berbasis departemen</td><td>Multi-divisi, multi-cabang</td><td>Data sensitif bocor antar departemen</td></tr><tr><td>Tidak siap laporan ESG/sustainability</td><td>Perusahaan yang IPO-ready atau bermitra dengan asing</td><td>Tidak memenuhi syarat tender atau investor</td></tr></tbody></table>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="3-modul-baru-yang-direkomendasikan">3. Modul Baru yang Direkomendasikan</h2><a class="sl-anchor-link" href="#3-modul-baru-yang-direkomendasikan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3. Modul Baru yang Direkomendasikan”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="31-modul-baru-treasury--multi-currency">3.1 MODUL BARU: Treasury &#x26; Multi-Currency</h3><a class="sl-anchor-link" href="#31-modul-baru-treasury--multi-currency"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.1 MODUL BARU: Treasury &#x26; Multi-Currency”</span></a></div>
+<p><strong>Klasifikasi:</strong> Core Family Extension (Finance Core)<br>
+<strong>Prioritas:</strong> 🔴 Tier-1 — Urgensi Tinggi</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Bisnis ekspor/impor tidak bisa mencatat transaksi multi-mata uang dengan benar</li>
+<li>Selisih kurs tidak terhitung dalam laporan keuangan</li>
+<li>Tidak ada cash pooling untuk group usaha</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>Multi-currency ledger (pencatatan transaksi dalam mata uang asing)</li>
+<li>Automatic exchange rate fetching (dari API Bank Indonesia / ECB / Wise)</li>
+<li>Realized &#x26; unrealized forex gain/loss otomatis</li>
+<li>Currency revaluation akhir periode</li>
+<li>Cash pooling antar cabang/entitas</li>
+<li>Treasury dashboard — posisi kas semua rekening dalam satu tampilan</li>
+<li>Bank reconciliation multi-bank</li>
+<li>Hedging record (pencatatan lindung nilai sederhana)</li>
+</ol>
+<p><strong>Target Customer:</strong> Eksportir, importir, bisnis dengan supplier/pelanggan asing, grup usaha multi-entitas</p>
+<p><strong>Dependencies:</strong> Finance Core, Accounting</p>
+<p><strong>Estimasi Impact:</strong> Membuka segmen eksportir/importir — pasar UKM ekspor Indonesia saja >500.000 entitas</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="32-modul-baru-budget--cost-control">3.2 MODUL BARU: Budget &#x26; Cost Control</h3><a class="sl-anchor-link" href="#32-modul-baru-budget--cost-control"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.2 MODUL BARU: Budget &#x26; Cost Control”</span></a></div>
+<p><strong>Klasifikasi:</strong> Core Family Extension (Finance Core)<br>
+<strong>Prioritas:</strong> 🔴 Tier-1 — Urgensi Tinggi</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Tidak ada kontrol budget departemen/divisi/proyek</li>
+<li>Owner tidak tahu mana departemen yang melebihi budget</li>
+<li>Purchase order tidak dicek terhadap budget yang tersedia</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>Budget planning per departemen / cost center / proyek / periode</li>
+<li>Budget vs actuals dashboard real-time</li>
+<li>Purchase order budget checking (warning/block jika melebihi budget)</li>
+<li>Expense budget utilization report</li>
+<li>Rolling forecast (update proyeksi berdasarkan realisasi berjalan)</li>
+<li>Budget approval workflow</li>
+<li>Budget revision dengan audit trail</li>
+<li>Multi-level budget: korporat → divisi → departemen</li>
+</ol>
+<p><strong>Target Customer:</strong> Perusahaan dengan 20+ karyawan, multi-divisi, multi-cabang, atau proyek skala menengah</p>
+<p><strong>Dependencies:</strong> Finance Core, Purchasing, Accounting</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="33-modul-baru-fixed-asset-management">3.3 MODUL BARU: Fixed Asset Management</h3><a class="sl-anchor-link" href="#33-modul-baru-fixed-asset-management"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.3 MODUL BARU: Fixed Asset Management”</span></a></div>
+<p><strong>Klasifikasi:</strong> Core Family Extension (Finance Core)<br>
+<strong>Prioritas:</strong> 🟠 Tier-2 — Growth Blocker</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Aset tetap dicatat manual di spreadsheet</li>
+<li>Penyusutan salah atau tidak konsisten</li>
+<li>Tidak ada tracking lokasi dan kondisi aset</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>Asset register dengan kategori, lokasi, dan penanggung jawab</li>
+<li>Depreciation engine: straight-line, declining balance, sum-of-years</li>
+<li>Automatic depreciation journal posting</li>
+<li>Asset disposal &#x26; write-off workflow</li>
+<li>Asset transfer (pindah lokasi/divisi)</li>
+<li>Asset maintenance log (integrasi Fleet Maintenance Pack)</li>
+<li>Revaluation aset</li>
+<li>Laporan: NBV, depreciation schedule, asset aging</li>
+</ol>
+<p><strong>Target Customer:</strong> Perusahaan dengan banyak kendaraan, mesin, properti, atau peralatan IT</p>
+<p><strong>Dependencies:</strong> Finance Core, Accounting</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="34-modul-baru-tax-compliance-engine">3.4 MODUL BARU: Tax Compliance Engine</h3><a class="sl-anchor-link" href="#34-modul-baru-tax-compliance-engine"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.4 MODUL BARU: Tax Compliance Engine”</span></a></div>
+<p><strong>Klasifikasi:</strong> Vertical Module (Compliance)<br>
+<strong>Prioritas:</strong> 🔴 Tier-1 — Urgensi Tinggi</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Pelaporan PPN manual dan error-prone</li>
+<li>Tidak ada rekap faktur pajak otomatis</li>
+<li>Tidak siap e-Faktur atau integrasi DJP</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>PPN input/output tracking otomatis dari setiap transaksi</li>
+<li>e-Faktur generation (format XML DJP Indonesia)</li>
+<li>Rekap SPT Masa PPN otomatis</li>
+<li>PPh 21 calculation (terintegrasi HRIS/Payroll)</li>
+<li>PPh 23 withholding tracking</li>
+<li>Tax calendar &#x26; deadline reminder</li>
+<li>Tax audit trail report</li>
+<li>Multi-tax jurisdiction (untuk ekspansi regional: Malaysia GST, Singapore GST, dsb.)</li>
+</ol>
+<p><strong>Target Customer:</strong> Semua PKP (Pengusaha Kena Pajak), perusahaan dengan karyawan tetap</p>
+<p><strong>Dependencies:</strong> Finance Core, Sales, Purchasing, HRIS Core</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="35-modul-baru-subscription--recurring-billing">3.5 MODUL BARU: Subscription &#x26; Recurring Billing</h3><a class="sl-anchor-link" href="#35-modul-baru-subscription--recurring-billing"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.5 MODUL BARU: Subscription &#x26; Recurring Billing”</span></a></div>
+<p><strong>Klasifikasi:</strong> Vertical Module (Revenue)<br>
+<strong>Prioritas:</strong> 🟠 Tier-2 — Growth Blocker</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Bisnis langganan harus buat invoice manual setiap bulan</li>
+<li>Tidak ada tracking trial, renewal, churn</li>
+<li>Revenue recognition tidak akurat untuk bisnis berlangganan</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>Subscription plan management (bulanan, tahunan, custom)</li>
+<li>Automatic invoice generation berdasarkan siklus billing</li>
+<li>Trial management &#x26; conversion tracking</li>
+<li>Dunning management (reminder sebelum/sesudah jatuh tempo)</li>
+<li>Proration billing (charge proporsional saat upgrade/downgrade)</li>
+<li>Deferred revenue recognition</li>
+<li>Churn analysis dan cohort report</li>
+<li>MRR/ARR dashboard</li>
+</ol>
+<p><strong>Target Customer:</strong> SaaS, media digital, rental berlangganan, lembaga pendidikan, layanan membership</p>
+<p><strong>Dependencies:</strong> Revenue Core, Finance Core</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="36-modul-baru-omnichannel-commerce">3.6 MODUL BARU: Omnichannel Commerce</h3><a class="sl-anchor-link" href="#36-modul-baru-omnichannel-commerce"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.6 MODUL BARU: Omnichannel Commerce”</span></a></div>
+<p><strong>Klasifikasi:</strong> Vertical Module (Commerce)<br>
+<strong>Prioritas:</strong> 🟠 Tier-2 — Growth Blocker</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Data penjualan online (Tokopedia, Shopee, Lazada) tidak terintegrasi ke ERP</li>
+<li>Stok tidak sinkron antara online dan offline</li>
+<li>Tidak bisa kelola banyak channel dalam satu dasbor</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>Marketplace connector: Tokopedia, Shopee, Lazada, TikTok Shop</li>
+<li>Centralized order management dari semua channel</li>
+<li>Real-time inventory sync lintas channel</li>
+<li>Unified customer database (customer yang sama di berbagai platform)</li>
+<li>Omnichannel fulfillment: pilih gudang terdekat, cross-docking</li>
+<li>Return &#x26; refund management multi-channel</li>
+<li>Channel performance analytics (margin per channel, sell-through rate)</li>
+<li>Price management terpusat (satu harga bisa di-push ke semua channel)</li>
+</ol>
+<p><strong>Target Customer:</strong> Retail online-offline, brand D2C, distributor yang jualan di marketplace</p>
+<p><strong>Dependencies:</strong> Inventory Core, Revenue Core, Sales</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="37-modul-baru-customer-success--portal">3.7 MODUL BARU: Customer Success &#x26; Portal</h3><a class="sl-anchor-link" href="#37-modul-baru-customer-success--portal"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.7 MODUL BARU: Customer Success &#x26; Portal”</span></a></div>
+<p><strong>Klasifikasi:</strong> Vertical Module (Customer Experience)<br>
+<strong>Prioritas:</strong> 🟠 Tier-2 — Growth Blocker</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Customer harus telepon/WA untuk cek status order atau invoice</li>
+<li>Tim CS overload dengan pertanyaan repetitif</li>
+<li>Tidak ada portal mandiri untuk customer B2B</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>Customer self-service portal (login sendiri, lihat status order, invoice, pembayaran)</li>
+<li>Online payment link dari portal</li>
+<li>Dispute &#x26; claim management</li>
+<li>Customer support ticket (terintegrasi operasional internal)</li>
+<li>Customer statement of account (SOA)</li>
+<li>Delivery tracking integration</li>
+<li>Customer satisfaction survey (CSAT/NPS) post-transaksi</li>
+<li>B2B order portal (customer bisa input order sendiri)</li>
+</ol>
+<p><strong>Target Customer:</strong> Distributor B2B, jasa berlangganan, bisnis dengan volume transaksi tinggi</p>
+<p><strong>Dependencies:</strong> Revenue Core, Finance Core, CRM</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="38-modul-baru-supply-chain-planning-scp">3.8 MODUL BARU: Supply Chain Planning (SCP)</h3><a class="sl-anchor-link" href="#38-modul-baru-supply-chain-planning-scp"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.8 MODUL BARU: Supply Chain Planning (SCP)”</span></a></div>
+<p><strong>Klasifikasi:</strong> Vertical Module (Operations)<br>
+<strong>Prioritas:</strong> 🟠 Tier-2</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Buyer tidak tahu kapan harus reorder</li>
+<li>Tidak ada demand forecasting berbasis data historis</li>
+<li>Lead time supplier tidak diperhitungkan dalam planning</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>Reorder point automation berdasarkan lead time dan safety stock</li>
+<li>Demand forecasting (berbasis moving average, trend, dan seasonal factor)</li>
+<li>Master Production Schedule (MPS) untuk manufacturer</li>
+<li>Material Requirements Planning (MRP) — terintegrasi BoM Manufacturing</li>
+<li>Supplier lead time tracking</li>
+<li>Purchase suggestion otomatis berdasarkan stok dan forecast</li>
+<li>Supply chain risk dashboard (supplier dependency, stockout risk)</li>
+<li>What-if scenario planning</li>
+</ol>
+<p><strong>Target Customer:</strong> Manufacturer, distributor dengan volume besar, bisnis musiman</p>
+<p><strong>Dependencies:</strong> Inventory Core, Purchasing, Manufacturing (untuk MRP)</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="39-modul-baru-field-service-management">3.9 MODUL BARU: Field Service Management</h3><a class="sl-anchor-link" href="#39-modul-baru-field-service-management"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.9 MODUL BARU: Field Service Management”</span></a></div>
+<p><strong>Klasifikasi:</strong> Vertical Module (Operations)<br>
+<strong>Prioritas:</strong> 🟡 Tier-3</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Tidak ada sistem dispatching teknisi/tenaga lapangan</li>
+<li>Laporan pekerjaan lapangan manual</li>
+<li>Tidak bisa track lokasi dan produktivitas tim lapangan</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>Work order dispatching (assign teknisi ke job dari dashboard)</li>
+<li>Mobile check-in/check-out (teknisi konfirmasi via mobile)</li>
+<li>GPS route optimization</li>
+<li>Digital form lapangan (foto, tanda tangan, checklist)</li>
+<li>Spare part consumption dari lapangan (deduct stok otomatis)</li>
+<li>SLA tracking (response time, resolution time)</li>
+<li>Customer sign-off digital</li>
+<li>Field team performance dashboard</li>
+</ol>
+<p><strong>Target Customer:</strong> Bengkel, servis AC/elektronik, kontraktor, utility company, jasa instalasi</p>
+<p><strong>Dependencies:</strong> Service Operations, Inventory Core, HRIS Core</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="310-modul-baru-payables--receivables-intelligence">3.10 MODUL BARU: Payables &#x26; Receivables Intelligence</h3><a class="sl-anchor-link" href="#310-modul-baru-payables--receivables-intelligence"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.10 MODUL BARU: Payables &#x26; Receivables Intelligence”</span></a></div>
+<p><strong>Klasifikasi:</strong> Core Family Extension (Finance Core)<br>
+<strong>Prioritas:</strong> 🔴 Tier-1</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Tidak ada early warning untuk cash crunch</li>
+<li>Tidak tahu kapan harus tagih dan kapan harus bayar</li>
+<li>Tidak ada forecast arus kas</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>Aging AR/AP dengan alert otomatis</li>
+<li>Cash flow forecast 30/60/90 hari ke depan (berbasis AR/AP outstanding)</li>
+<li>Automatic payment reminder ke customer via WhatsApp/Email</li>
+<li>Supplier payment scheduling (prioritaskan berdasarkan diskon atau penalti)</li>
+<li>Early payment discount management</li>
+<li>Factoring / invoice financing readiness report</li>
+<li>DSO (Days Sales Outstanding) dan DPO (Days Payable Outstanding) analytics</li>
+<li>Cashflow scenario: optimistic, base, pessimistic</li>
+</ol>
+<p><strong>Target Customer:</strong> Semua bisnis B2B dengan piutang signifikan, distributor, kontraktor</p>
+<p><strong>Dependencies:</strong> Finance Core, Revenue Core, Purchasing</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="311-modul-baru-esg--sustainability-reporting">3.11 MODUL BARU: ESG &#x26; Sustainability Reporting</h3><a class="sl-anchor-link" href="#311-modul-baru-esg--sustainability-reporting"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.11 MODUL BARU: ESG &#x26; Sustainability Reporting”</span></a></div>
+<p><strong>Klasifikasi:</strong> Vertical Module (Governance &#x26; Compliance)<br>
+<strong>Prioritas:</strong> 🟡 Tier-3 (Tren Global Naik Cepat)</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Perusahaan tidak bisa memenuhi persyaratan ESG dari investor atau mitra asing</li>
+<li>Tidak ada tracking emisi karbon atau konsumsi energi</li>
+<li>Tidak ada laporan keberlanjutan standar global</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>Carbon emission tracking (Scope 1, 2, 3 — terintegrasi operasional)</li>
+<li>Energy consumption tracking per lokasi/divisi</li>
+<li>Waste management log</li>
+<li>Social impact metrics (karyawan, gender diversity, K3)</li>
+<li>ESG report builder (format GRI, SASB, TCFD)</li>
+<li>Supplier ESG scoring</li>
+<li>ESG target setting &#x26; progress tracking</li>
+<li>ESG dashboard untuk direksi dan investor</li>
+</ol>
+<p><strong>Target Customer:</strong> Perusahaan yang IPO-ready, bermitra dengan MNC, eksportir ke Eropa/Jepang, penerima hibah</p>
+<p><strong>Dependencies:</strong> Finance Core, HRIS Core, Purchasing, Fleet &#x26; Rental</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="312-modul-baru-commission--incentive-management">3.12 MODUL BARU: Commission &#x26; Incentive Management</h3><a class="sl-anchor-link" href="#312-modul-baru-commission--incentive-management"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “3.12 MODUL BARU: Commission &#x26; Incentive Management”</span></a></div>
+<p><strong>Klasifikasi:</strong> Core Family Extension (Revenue Core)<br>
+<strong>Prioritas:</strong> 🟠 Tier-2</p>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Perhitungan komisi sales manual dan sering salah</li>
+<li>Tidak ada transparansi komisi untuk tim sales</li>
+<li>Insentif tidak terhubung dengan data transaksi aktual</li>
+</ul>
+<p><strong>Apa yang Ada dalam Modul Ini:</strong></p>
+<ol>
+<li>Commission scheme builder (persentase dari revenue/profit, tiered, target-based)</li>
+<li>Real-time commission tracker untuk setiap sales rep</li>
+<li>Commission approval workflow sebelum dibayar</li>
+<li>Komisi terintegrasi payroll (bayar via slip gaji)</li>
+<li>Multi-level commission (sales rep → supervisor → regional manager)</li>
+<li>Bonus &#x26; incentive campaign management</li>
+<li>Commission statement bulanan untuk sales team</li>
+<li>Sales contest &#x26; leaderboard</li>
+</ol>
+<p><strong>Target Customer:</strong> Perusahaan dengan tim sales, multi-level distributor, agency, broker properti</p>
+<p><strong>Dependencies:</strong> Revenue Core, HRIS Core, Finance Core</p>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="4-add-on-baru-yang-direkomendasikan">4. Add-on Baru yang Direkomendasikan</h2><a class="sl-anchor-link" href="#4-add-on-baru-yang-direkomendasikan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4. Add-on Baru yang Direkomendasikan”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="41-ai-purchase-assistant">4.1 AI Purchase Assistant</h3><a class="sl-anchor-link" href="#41-ai-purchase-assistant"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.1 AI Purchase Assistant”</span></a></div>
+<p><strong>Klasifikasi:</strong> Growth Add-on<br>
+<strong>Prioritas:</strong> 🔴 Tier-1</p>
+<p><strong>Pain:</strong> Buyer tidak tahu harga wajar, tidak ada rekomendasi supplier terbaik.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>AI-powered price benchmarking (bandingkan harga pembelian vs pasar)</li>
+<li>Supplier recommendation berdasarkan harga, lead time, dan histori</li>
+<li>Anomali detection: PO dengan harga di luar range normal (fraud prevention)</li>
+<li>Auto-fill purchase order dari email atau dokumen PDF supplier</li>
+<li>Smart reorder suggestion berbasis pattern historis</li>
+</ul>
+<p><strong>Dependencies:</strong> Purchasing, Inventory Core, AI/LLM backend</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="42-whatsapp-business-integration">4.2 WhatsApp Business Integration</h3><a class="sl-anchor-link" href="#42-whatsapp-business-integration"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.2 WhatsApp Business Integration”</span></a></div>
+<p><strong>Klasifikasi:</strong> Growth Add-on<br>
+<strong>Prioritas:</strong> 🔴 Tier-1 (Southeast Asia-specific)</p>
+<p><strong>Pain:</strong> Customer di Asia Tenggara mengharapkan komunikasi bisnis via WhatsApp, bukan email.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Send invoice, quotation, dan payment reminder via WhatsApp otomatis</li>
+<li>WhatsApp order bot (customer order via WA, masuk ke sistem)</li>
+<li>Real-time delivery status update ke customer via WA</li>
+<li>Collection reminder via WA (dunning)</li>
+<li>Two-way messaging log tersimpan di CRM</li>
+</ul>
+<p><strong>Dependencies:</strong> Revenue Core, CRM, Finance Core</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="43-barcode--qr-inventory-scanner">4.3 Barcode &#x26; QR Inventory Scanner</h3><a class="sl-anchor-link" href="#43-barcode--qr-inventory-scanner"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.3 Barcode &#x26; QR Inventory Scanner”</span></a></div>
+<p><strong>Klasifikasi:</strong> Advanced Ops Add-on<br>
+<strong>Prioritas:</strong> 🟠 Tier-2</p>
+<p><strong>Pain:</strong> Penerimaan barang dan stock opname masih manual, lambat, dan error-prone.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Mobile barcode scanner (kamera HP jadi scanner)</li>
+<li>QR code generation untuk setiap produk/lokasi</li>
+<li>Receiving goods via scan (otomatis update stok)</li>
+<li>Stock opname via scan (bandingkan scan vs sistem)</li>
+<li>Serial number &#x26; batch tracking via barcode</li>
+<li>Label printing integration</li>
+</ul>
+<p><strong>Dependencies:</strong> Inventory Core, Warehouse, Advanced WMS</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="44-e-commerce-auto-sync">4.4 E-Commerce Auto-Sync</h3><a class="sl-anchor-link" href="#44-e-commerce-auto-sync"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.4 E-Commerce Auto-Sync”</span></a></div>
+<p><strong>Klasifikasi:</strong> Integration Add-on<br>
+<strong>Prioritas:</strong> 🟠 Tier-2</p>
+<p><strong>Pain:</strong> Data penjualan marketplace tidak masuk ERP secara otomatis.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Real-time sync order dari Tokopedia, Shopee, Lazada, TikTok Shop</li>
+<li>Inventory level push ke semua marketplace</li>
+<li>Auto-create invoice dari marketplace order</li>
+<li>Return &#x26; refund sync dari marketplace</li>
+<li>Marketplace fee deduction otomatis dalam laporan profit</li>
+</ul>
+<p><strong>Dependencies:</strong> Omnichannel Commerce Module (atau Revenue Core untuk versi lite)</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="45-smart-invoice-ocr">4.5 Smart Invoice OCR</h3><a class="sl-anchor-link" href="#45-smart-invoice-ocr"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.5 Smart Invoice OCR”</span></a></div>
+<p><strong>Klasifikasi:</strong> Productivity Add-on<br>
+<strong>Prioritas:</strong> 🟠 Tier-2</p>
+<p><strong>Pain:</strong> Input faktur pembelian dari supplier masih manual, lambat, dan sering salah ketik.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Upload PDF/foto faktur supplier → otomatis extract data</li>
+<li>AI OCR untuk vendor name, tanggal, nomor, item, qty, harga, total</li>
+<li>Preview dan konfirmasi sebelum create purchase invoice</li>
+<li>Batch upload faktur</li>
+<li>Duplikasi detection (faktur sama diinput dua kali)</li>
+</ul>
+<p><strong>Dependencies:</strong> Purchasing, Finance Core, AI/OCR backend</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="46-payment-gateway-integration">4.6 Payment Gateway Integration</h3><a class="sl-anchor-link" href="#46-payment-gateway-integration"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.6 Payment Gateway Integration”</span></a></div>
+<p><strong>Klasifikasi:</strong> Growth Add-on<br>
+<strong>Prioritas:</strong> 🔴 Tier-1</p>
+<p><strong>Pain:</strong> Invoice dikirim tapi customer tidak punya cara bayar mudah.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Payment link terintegrasi di setiap invoice (Midtrans, Xendit, Doku)</li>
+<li>Auto-reconcile payment yang masuk ke sistem</li>
+<li>Virtual account per transaksi atau per customer</li>
+<li>QRIS payment support</li>
+<li>Installment payment tracking</li>
+<li>Payment success webhook → auto-close invoice</li>
+</ul>
+<p><strong>Dependencies:</strong> Revenue Core, Finance Core</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="47-hr-self-service-mobile-app">4.7 HR Self-Service Mobile App</h3><a class="sl-anchor-link" href="#47-hr-self-service-mobile-app"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.7 HR Self-Service Mobile App”</span></a></div>
+<p><strong>Klasifikasi:</strong> Growth Add-on<br>
+<strong>Prioritas:</strong> 🟠 Tier-2</p>
+<p><strong>Pain:</strong> Karyawan harus ke HRD untuk cuti, reimburse, atau lihat slip gaji.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Mobile app karyawan (iOS/Android) atau PWA</li>
+<li>Request cuti &#x26; approval via mobile</li>
+<li>Submit reimbursement dengan foto struk</li>
+<li>Lihat slip gaji dan histori payroll</li>
+<li>Absensi via GPS + foto selfie</li>
+<li>Pengumuman dan broadcast dari HRD</li>
+<li>Employee directory</li>
+</ul>
+<p><strong>Dependencies:</strong> HRIS Core</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="48-advanced-analytics--bi">4.8 Advanced Analytics &#x26; BI</h3><a class="sl-anchor-link" href="#48-advanced-analytics--bi"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.8 Advanced Analytics &#x26; BI”</span></a></div>
+<p><strong>Klasifikasi:</strong> Growth Add-on<br>
+<strong>Prioritas:</strong> 🟠 Tier-2</p>
+<p><strong>Pain:</strong> Laporan standar tidak cukup untuk keputusan strategis; owner butuh drill-down.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Custom dashboard builder (drag &#x26; drop widget)</li>
+<li>Cross-module analytics (gabung data sales + inventory + finance dalam satu chart)</li>
+<li>Cohort analysis untuk customer</li>
+<li>Trend &#x26; seasonality analysis</li>
+<li>Benchmark antar cabang / salesperson / produk</li>
+<li>Scheduled report (kirim PDF laporan otomatis via email/WA)</li>
+<li>Data export ke Google Sheets / Power BI</li>
+</ul>
+<p><strong>Dependencies:</strong> Reports Module, semua modul aktif</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="49-approval-workflow-engine">4.9 Approval Workflow Engine</h3><a class="sl-anchor-link" href="#49-approval-workflow-engine"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.9 Approval Workflow Engine”</span></a></div>
+<p><strong>Klasifikasi:</strong> Governance Add-on<br>
+<strong>Prioritas:</strong> 🔴 Tier-1</p>
+<p><strong>Pain:</strong> Proses approval PO, reimbursement, cuti, dan lain-lain masih via WhatsApp Group atau manual — tidak terlacak.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Visual workflow builder (define langkah approval, approver, kondisi)</li>
+<li>Approval via email, WhatsApp, atau notifikasi in-app</li>
+<li>Delegation of authority (ketika approver cuti, delegasi otomatis)</li>
+<li>Approval history dan audit trail</li>
+<li>Eskalasi otomatis jika melampaui SLA</li>
+<li>Multi-level approval: sequential atau parallel</li>
+<li>Conditional routing (nilai > X → butuh approval direktur)</li>
+</ul>
+<p><strong>Dependencies:</strong> Semua modul yang punya transaksi (Purchasing, Sales, HRIS, Finance)</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="410-franchise--multi-outlet-management">4.10 Franchise &#x26; Multi-Outlet Management</h3><a class="sl-anchor-link" href="#410-franchise--multi-outlet-management"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.10 Franchise &#x26; Multi-Outlet Management”</span></a></div>
+<p><strong>Klasifikasi:</strong> Capacity Add-on<br>
+<strong>Prioritas:</strong> 🟠 Tier-2</p>
+<p><strong>Pain:</strong> Bisnis franchise atau chain tidak bisa monitor outlet dari satu tempat; standar operasi berbeda-beda.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Franchisor dashboard (monitor semua outlet dalam satu layar)</li>
+<li>Royalty fee calculation dan invoicing otomatis ke franchisee</li>
+<li>Standardized menu/price push ke semua outlet</li>
+<li>Outlet performance comparison (sales, margin, waste)</li>
+<li>Compliance checklist per outlet</li>
+<li>Inter-outlet inventory transfer</li>
+<li>Consolidated financial report (semua outlet dalam satu laporan)</li>
+</ul>
+<p><strong>Dependencies:</strong> Multi-Entity Add-on, Revenue Core, Inventory Core, Finance Core</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="411-contract-management">4.11 Contract Management</h3><a class="sl-anchor-link" href="#411-contract-management"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.11 Contract Management”</span></a></div>
+<p><strong>Klasifikasi:</strong> Governance Add-on<br>
+<strong>Prioritas:</strong> 🟡 Tier-3</p>
+<p><strong>Pain:</strong> Kontrak dengan pelanggan dan supplier disimpan di folder, tidak ada reminder tanggal jatuh tempo atau renewal.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Contract repository (upload &#x26; kelola semua kontrak)</li>
+<li>Key date tracking (start, end, renewal, review date)</li>
+<li>Auto-reminder sebelum kontrak jatuh tempo</li>
+<li>Contract value tracking dan linking ke PO/SO</li>
+<li>E-signature integration</li>
+<li>Vendor/customer contract scorecard</li>
+<li>Contract template library</li>
+</ul>
+<p><strong>Dependencies:</strong> Revenue Core, Purchasing, CRM</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="412-loyalty--rewards-program">4.12 Loyalty &#x26; Rewards Program</h3><a class="sl-anchor-link" href="#412-loyalty--rewards-program"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.12 Loyalty &#x26; Rewards Program”</span></a></div>
+<p><strong>Klasifikasi:</strong> Growth Add-on<br>
+<strong>Prioritas:</strong> 🟡 Tier-3</p>
+<p><strong>Pain:</strong> Tidak ada program loyalitas pelanggan yang terintegrasi dengan transaksi.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Points earning rules (per Rp X transaksi = Y points)</li>
+<li>Points redemption di POS atau sales order</li>
+<li>Tier membership (Silver, Gold, Platinum) dengan benefit berbeda</li>
+<li>Birthday reward automation</li>
+<li>Referral program tracking</li>
+<li>Loyalty program analytics (churn rate, points liability, redemption rate)</li>
+<li>Integration dengan WhatsApp untuk notifikasi points</li>
+</ul>
+<p><strong>Dependencies:</strong> POS Add-on, Revenue Core, CRM</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="413-document-management-system-dms">4.13 Document Management System (DMS)</h3><a class="sl-anchor-link" href="#413-document-management-system-dms"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.13 Document Management System (DMS)”</span></a></div>
+<p><strong>Klasifikasi:</strong> Governance Add-on<br>
+<strong>Prioritas:</strong> 🟡 Tier-3</p>
+<p><strong>Pain:</strong> Dokumen bisnis (PO, invoice, kontrak, laporan) tersebar di email, Google Drive, dan WhatsApp.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Centralized document repository dengan folder structure</li>
+<li>Auto-attach dokumen ke transaksi terkait (PO, invoice, proyek)</li>
+<li>Version control dokumen</li>
+<li>Full-text search di semua dokumen</li>
+<li>Document approval workflow</li>
+<li>Expiry tracking (sertifikat, izin, asuransi)</li>
+<li>Secure sharing dengan link ber-expiry</li>
+</ul>
+<p><strong>Dependencies:</strong> Semua modul (cross-cutting)</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="414-route--delivery-optimization">4.14 Route &#x26; Delivery Optimization</h3><a class="sl-anchor-link" href="#414-route--delivery-optimization"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.14 Route &#x26; Delivery Optimization”</span></a></div>
+<p><strong>Klasifikasi:</strong> Advanced Ops Add-on<br>
+<strong>Prioritas:</strong> 🟡 Tier-3</p>
+<p><strong>Pain:</strong> Pengiriman barang tidak dioptimasi, biaya logistik membengkak.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Daily delivery route planning otomatis</li>
+<li>Vehicle load optimization</li>
+<li>Real-time driver tracking (GPS)</li>
+<li>Proof of delivery (foto + tanda tangan digital)</li>
+<li>Delivery performance analytics (on-time rate, cost per km)</li>
+<li>Customer ETA notification</li>
+<li>Return pickup scheduling</li>
+</ul>
+<p><strong>Dependencies:</strong> Sales, Fleet &#x26; Rental (opsional), Inventory Core</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="415-vendor-portal">4.15 Vendor Portal</h3><a class="sl-anchor-link" href="#415-vendor-portal"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.15 Vendor Portal”</span></a></div>
+<p><strong>Klasifikasi:</strong> Integration Add-on<br>
+<strong>Prioritas:</strong> 🟡 Tier-3</p>
+<p><strong>Pain:</strong> Komunikasi dengan supplier masih manual via email; status PO tidak transparan.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Supplier self-service portal: lihat dan konfirmasi PO</li>
+<li>Supplier invoice submission (upload faktur digital)</li>
+<li>Delivery schedule coordination</li>
+<li>Supplier rating &#x26; scorecard</li>
+<li>RFQ (Request for Quotation) online</li>
+<li>Supplier onboarding form digital</li>
+<li>Communication log terintegrasi</li>
+</ul>
+<p><strong>Dependencies:</strong> Purchasing, Finance Core</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="416-predictive-maintenance-iot-ready">4.16 Predictive Maintenance (IoT-Ready)</h3><a class="sl-anchor-link" href="#416-predictive-maintenance-iot-ready"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.16 Predictive Maintenance (IoT-Ready)”</span></a></div>
+<p><strong>Klasifikasi:</strong> Advanced Ops Add-on<br>
+<strong>Prioritas:</strong> 🟡 Tier-3 (Future-Ready)</p>
+<p><strong>Pain:</strong> Perusahaan dengan mesin atau armada tidak tahu kapan mesin akan rusak — reaktif, bukan preventif.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Maintenance schedule otomatis berdasarkan jam operasional atau kilometer</li>
+<li>IoT sensor integration (temperature, vibration, mileage) — future</li>
+<li>Predictive alert berdasarkan pattern breakdown historis</li>
+<li>Maintenance cost per aset / per periode</li>
+<li>Spare part inventory integration (deduct saat maintenance)</li>
+<li>Vendor maintenance scheduling</li>
+</ul>
+<p><strong>Dependencies:</strong> Fixed Asset Management, Fleet Maintenance Pack, Manufacturing</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="417-ai-cashflow-advisor">4.17 AI Cashflow Advisor</h3><a class="sl-anchor-link" href="#417-ai-cashflow-advisor"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.17 AI Cashflow Advisor”</span></a></div>
+<p><strong>Klasifikasi:</strong> AI Productivity Add-on<br>
+<strong>Prioritas:</strong> 🟠 Tier-2</p>
+<p><strong>Pain:</strong> Owner tidak tahu apakah bisnis akan cukup kas 30-90 hari ke depan.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>AI-generated cashflow forecast berbasis data historis + AR/AP outstanding</li>
+<li>“What-if” scenario modeling (bagaimana jika tagih lebih cepat? jika ada pengeluaran besar?)</li>
+<li>Rekomendasi tindakan (kapan harus tarik pinjaman, kapan bisa invest)</li>
+<li>Alert dini potensi cash crunch</li>
+<li>Natural language summary laporan arus kas (“bulan ini arus kas negatif karena…”)</li>
+<li>Integration dengan perbankan (opsional, open banking)</li>
+</ul>
+<p><strong>Dependencies:</strong> Finance Core, Payables &#x26; Receivables Intelligence, AI backend</p>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="418-training--certification-marketplace">4.18 Training &#x26; Certification Marketplace</h3><a class="sl-anchor-link" href="#418-training--certification-marketplace"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “4.18 Training &#x26; Certification Marketplace”</span></a></div>
+<p><strong>Klasifikasi:</strong> Academy Strategic Add-on<br>
+<strong>Prioritas:</strong> 🟠 Tier-2</p>
+<p><strong>Pain:</strong> NIZAM sudah punya Academy/EDU, tetapi konten pelatihan terbatas pada konten internal.</p>
+<p><strong>Fitur:</strong></p>
+<ul>
+<li>Open marketplace untuk trainer/instruktur eksternal publish konten di NIZAM</li>
+<li>Revenue sharing model untuk instruktur</li>
+<li>Customer bisa beli kursus dari marketplace → belajar langsung di platform</li>
+<li>Sertifikasi resmi NIZAM untuk implementor dan user</li>
+<li>Partner program: reseller, implementor, dan trainer bisa mendapatkan sertifikasi</li>
+<li>Cohort-based learning (belajar bersama seangkatan)</li>
+<li>Live session integration (Zoom/Google Meet in-app)</li>
+</ul>
+<p><strong>Dependencies:</strong> Academy/EDU Module</p>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="5-matriks-prioritas--roadmap">5. Matriks Prioritas &#x26; Roadmap</h2><a class="sl-anchor-link" href="#5-matriks-prioritas--roadmap"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “5. Matriks Prioritas &#x26; Roadmap”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="51-phase-1--q3-2026-quick-wins--tier-1-pain">5.1 Phase 1 — Q3 2026 (Quick Wins &#x26; Tier-1 Pain)</h3><a class="sl-anchor-link" href="#51-phase-1--q3-2026-quick-wins--tier-1-pain"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “5.1 Phase 1 — Q3 2026 (Quick Wins &#x26; Tier-1 Pain)”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Item</th><th>Tipe</th><th>Alasan Prioritas</th></tr></thead><tbody><tr><td>Payment Gateway Integration</td><td>Add-on</td><td>Unblock revenue collection, demand tinggi</td></tr><tr><td>Approval Workflow Engine</td><td>Add-on</td><td>Cross-module impact, pain universal</td></tr><tr><td>WhatsApp Business Integration</td><td>Add-on</td><td>Asia-specific, conversion booster</td></tr><tr><td>Tax Compliance Engine</td><td>Module</td><td>Compliance obligation, semua PKP butuh</td></tr><tr><td>Payables &#x26; Receivables Intelligence</td><td>Module</td><td>Cash flow = lifeline UKM</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="52-phase-2--q4-2026-growth--vertical">5.2 Phase 2 — Q4 2026 (Growth &#x26; Vertical)</h3><a class="sl-anchor-link" href="#52-phase-2--q4-2026-growth--vertical"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “5.2 Phase 2 — Q4 2026 (Growth &#x26; Vertical)”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Item</th><th>Tipe</th><th>Alasan Prioritas</th></tr></thead><tbody><tr><td>Treasury &#x26; Multi-Currency</td><td>Module</td><td>Buka segmen ekspor/impor</td></tr><tr><td>Budget &#x26; Cost Control</td><td>Module</td><td>Upsell ke perusahaan 20+ karyawan</td></tr><tr><td>AI Purchase Assistant</td><td>Add-on</td><td>AI differentiator, cost savings</td></tr><tr><td>Smart Invoice OCR</td><td>Add-on</td><td>Productivity win, reduceable manual error</td></tr><tr><td>Commission &#x26; Incentive Management</td><td>Module</td><td>Sales-driven segment</td></tr><tr><td>Subscription &#x26; Recurring Billing</td><td>Module</td><td>SaaS &#x26; membership vertical</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="53-phase-3--q1-2027-scale--ecosystem">5.3 Phase 3 — Q1 2027 (Scale &#x26; Ecosystem)</h3><a class="sl-anchor-link" href="#53-phase-3--q1-2027-scale--ecosystem"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “5.3 Phase 3 — Q1 2027 (Scale &#x26; Ecosystem)”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Item</th><th>Tipe</th><th>Alasan Prioritas</th></tr></thead><tbody><tr><td>Omnichannel Commerce</td><td>Module</td><td>E-commerce integration demand</td></tr><tr><td>Supply Chain Planning (SCP)</td><td>Module</td><td>Manufacturer &#x26; distributor vertical</td></tr><tr><td>Customer Success &#x26; Portal</td><td>Module</td><td>B2B retention &#x26; self-service</td></tr><tr><td>Fixed Asset Management</td><td>Module</td><td>Compliance &#x26; accounting completeness</td></tr><tr><td>Advanced Analytics &#x26; BI</td><td>Add-on</td><td>Executive &#x26; owner persona</td></tr><tr><td>HR Self-Service Mobile App</td><td>Add-on</td><td>HRIS adoption &#x26; engagement</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="54-phase-4--q2-q3-2027-enterprise--global">5.4 Phase 4 — Q2-Q3 2027 (Enterprise &#x26; Global)</h3><a class="sl-anchor-link" href="#54-phase-4--q2-q3-2027-enterprise--global"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “5.4 Phase 4 — Q2-Q3 2027 (Enterprise &#x26; Global)”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Item</th><th>Tipe</th><th>Alasan Prioritas</th></tr></thead><tbody><tr><td>ESG &#x26; Sustainability Reporting</td><td>Module</td><td>Enterprise &#x26; global compliance</td></tr><tr><td>Field Service Management</td><td>Module</td><td>Service vertical depth</td></tr><tr><td>Franchise &#x26; Multi-Outlet</td><td>Add-on</td><td>F&#x26;B, retail chain segment</td></tr><tr><td>Training &#x26; Certification Marketplace</td><td>Add-on</td><td>Academy ecosystem moat</td></tr><tr><td>Vendor Portal</td><td>Add-on</td><td>Procurement digital ecosystem</td></tr><tr><td>AI Cashflow Advisor</td><td>Add-on</td><td>AI-native finance differentiator</td></tr><tr><td>Predictive Maintenance</td><td>Add-on</td><td>IoT-ready future capability</td></tr></tbody></table>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="6-arsitektur-produk-final-post-roadmap">6. Arsitektur Produk Final (Post-Roadmap)</h2><a class="sl-anchor-link" href="#6-arsitektur-produk-final-post-roadmap"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “6. Arsitektur Produk Final (Post-Roadmap)”</span></a></div>
+<div class="expressive-code"><link rel="stylesheet" href="/_astro/ec.v4551.css"><script type="module" src="/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="plaintext"><code><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">NIZAM Platform</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├── Platform Core (always included)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Auth &#x26; Tenancy</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Organization &#x26; Branch</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Roles &#x26; Permissions</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Dashboard Shell</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   └── Billing &#x26; Support</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├── Core Families (Module Wajib)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Finance Core</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   │   ├── [NEW] Treasury &#x26; Multi-Currency</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   │   ├── [NEW] Budget &#x26; Cost Control</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   │   ├── [NEW] Fixed Asset Management</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   │   └── [NEW] Payables &#x26; Receivables Intelligence</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Revenue Core</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   │   ├── [NEW] Commission &#x26; Incentive Management</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   │   └── [NEW] Subscription &#x26; Recurring Billing</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Purchasing</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Inventory Core</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   └── HRIS Core</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├── Vertical Modules (Pilih 1 atau Lebih)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Manufacturing (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Fleet &#x26; Rental (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Service Operations (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Project &#x26; Construction (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Syirkah (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] Omnichannel Commerce</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] Supply Chain Planning</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] Customer Success &#x26; Portal</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] Field Service Management</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   └── [NEW] ESG &#x26; Sustainability Reporting</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├── Compliance Module</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   └── [NEW] Tax Compliance Engine</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├── Strategic Module</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   └── Academy / EDU (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├── Growth Add-ons</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── POS (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Sales Page (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Quick Bill (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Sales AR Cockpit (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Package Tracking (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] Payment Gateway Integration</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] WhatsApp Business Integration</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] Loyalty &#x26; Rewards Program</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   └── [NEW] AI Cashflow Advisor</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├── Productivity Add-ons</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] Smart Invoice OCR</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] AI Purchase Assistant</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   └── [NEW] Advanced Analytics &#x26; BI</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├── Governance Add-ons</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] Approval Workflow Engine</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] Contract Management</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   └── [NEW] Document Management System</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├── Advanced Ops Add-ons</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Advanced WMS (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Fleet Maintenance Pack (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] Barcode &#x26; QR Inventory Scanner</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] Route &#x26; Delivery Optimization</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   └── [NEW] Predictive Maintenance</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">├── Integration &#x26; Capacity Add-ons</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Open API &#x26; Webhooks (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── Multi-Entity (existing)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   ├── [NEW] E-Commerce Auto-Sync</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│   └── [NEW] Vendor Portal</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">│</span></div></div><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">└── Capacity Add-ons</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#d6deeb;--1:#403f53">    </span></span><span style="--0:#d6deeb;--1:#403f53">├── HR Self-Service Mobile App [NEW]</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#d6deeb;--1:#403f53">    </span></span><span style="--0:#d6deeb;--1:#403f53">├── Franchise &#x26; Multi-Outlet [NEW]</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#d6deeb;--1:#403f53">    </span></span><span style="--0:#d6deeb;--1:#403f53">└── Training &#x26; Certification Marketplace [NEW]</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="NIZAM Platform├── Platform Core (always included)│   ├── Auth &#x26; Tenancy│   ├── Organization &#x26; Branch│   ├── Roles &#x26; Permissions│   ├── Dashboard Shell│   └── Billing &#x26; Support│├── Core Families (Module Wajib)│   ├── Finance Core│   │   ├── [NEW] Treasury &#x26; Multi-Currency│   │   ├── [NEW] Budget &#x26; Cost Control│   │   ├── [NEW] Fixed Asset Management│   │   └── [NEW] Payables &#x26; Receivables Intelligence│   ├── Revenue Core│   │   ├── [NEW] Commission &#x26; Incentive Management│   │   └── [NEW] Subscription &#x26; Recurring Billing│   ├── Purchasing│   ├── Inventory Core│   └── HRIS Core│├── Vertical Modules (Pilih 1 atau Lebih)│   ├── Manufacturing (existing)│   ├── Fleet &#x26; Rental (existing)│   ├── Service Operations (existing)│   ├── Project &#x26; Construction (existing)│   ├── Syirkah (existing)│   ├── [NEW] Omnichannel Commerce│   ├── [NEW] Supply Chain Planning│   ├── [NEW] Customer Success &#x26; Portal│   ├── [NEW] Field Service Management│   └── [NEW] ESG &#x26; Sustainability Reporting│├── Compliance Module│   └── [NEW] Tax Compliance Engine│├── Strategic Module│   └── Academy / EDU (existing)│├── Growth Add-ons│   ├── POS (existing)│   ├── Sales Page (existing)│   ├── Quick Bill (existing)│   ├── Sales AR Cockpit (existing)│   ├── Package Tracking (existing)│   ├── [NEW] Payment Gateway Integration│   ├── [NEW] WhatsApp Business Integration│   ├── [NEW] Loyalty &#x26; Rewards Program│   └── [NEW] AI Cashflow Advisor│├── Productivity Add-ons│   ├── [NEW] Smart Invoice OCR│   ├── [NEW] AI Purchase Assistant│   └── [NEW] Advanced Analytics &#x26; BI│├── Governance Add-ons│   ├── [NEW] Approval Workflow Engine│   ├── [NEW] Contract Management│   └── [NEW] Document Management System│├── Advanced Ops Add-ons│   ├── Advanced WMS (existing)│   ├── Fleet Maintenance Pack (existing)│   ├── [NEW] Barcode &#x26; QR Inventory Scanner│   ├── [NEW] Route &#x26; Delivery Optimization│   └── [NEW] Predictive Maintenance│├── Integration &#x26; Capacity Add-ons│   ├── Open API &#x26; Webhooks (existing)│   ├── Multi-Entity (existing)│   ├── [NEW] E-Commerce Auto-Sync│   └── [NEW] Vendor Portal│└── Capacity Add-ons    ├── HR Self-Service Mobile App [NEW]    ├── Franchise &#x26; Multi-Outlet [NEW]    └── Training &#x26; Certification Marketplace [NEW]"><div></div></button></div></figure></div>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="7-segmentasi-customer-dan-rekomendasi-paket">7. Segmentasi Customer dan Rekomendasi Paket</h2><a class="sl-anchor-link" href="#7-segmentasi-customer-dan-rekomendasi-paket"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “7. Segmentasi Customer dan Rekomendasi Paket”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="71-usaha-kecil--retail-revenue--rp-5mbulan">7.1 Usaha Kecil &#x26; Retail (Revenue &#x3C; Rp 5M/bulan)</h3><a class="sl-anchor-link" href="#71-usaha-kecil--retail-revenue--rp-5mbulan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “7.1 Usaha Kecil &#x26; Retail (Revenue &#x3C; Rp 5M/bulan)”</span></a></div>
+<p><strong>Paket Rekomendasi: NIZAM Starter</strong></p>
+<ul>
+<li>Revenue Core + Inventory Core + Finance Core</li>
+<li>Add-on: POS, Quick Bill, Payment Gateway, WhatsApp Integration</li>
+</ul>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Tidak ada catatan penjualan yang rapi</li>
+<li>Invoice manual</li>
+<li>Tidak bisa terima bayar digital</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="72-ukm-berkembang-revenue-rp-5m500mbulan">7.2 UKM Berkembang (Revenue Rp 5M–500M/bulan)</h3><a class="sl-anchor-link" href="#72-ukm-berkembang-revenue-rp-5m500mbulan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “7.2 UKM Berkembang (Revenue Rp 5M–500M/bulan)”</span></a></div>
+<p><strong>Paket Rekomendasi: NIZAM Business</strong></p>
+<ul>
+<li>Semua Core Families</li>
+<li>Add-on: Approval Workflow, Smart Invoice OCR, Advanced Analytics</li>
+<li>Vertical: sesuai industri (Manufacturing / Workshop / Fleet)</li>
+</ul>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Kontrol pengeluaran tidak ada</li>
+<li>Approval pembelian tidak terlacak</li>
+<li>Laporan untuk pengambilan keputusan tidak ada</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="73-perusahaan-menengah-revenue--rp-500mbulan">7.3 Perusahaan Menengah (Revenue > Rp 500M/bulan)</h3><a class="sl-anchor-link" href="#73-perusahaan-menengah-revenue--rp-500mbulan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “7.3 Perusahaan Menengah (Revenue > Rp 500M/bulan)”</span></a></div>
+<p><strong>Paket Rekomendasi: NIZAM Enterprise</strong></p>
+<ul>
+<li>Semua Core Families + selected Verticals</li>
+<li>Tax Compliance Engine + Budget &#x26; Cost Control + Fixed Asset</li>
+<li>Treasury &#x26; Multi-Currency + Payables &#x26; Receivables Intelligence</li>
+<li>Add-ons: API, Multi-Entity, Franchise Management (jika relevan)</li>
+</ul>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Tidak siap audit eksternal</li>
+<li>Budget tidak terkontrol</li>
+<li>Tidak ada visibilitas cashflow ke depan</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="74-bisnis-e-commerce--omnichannel">7.4 Bisnis E-Commerce &#x26; Omnichannel</h3><a class="sl-anchor-link" href="#74-bisnis-e-commerce--omnichannel"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “7.4 Bisnis E-Commerce &#x26; Omnichannel”</span></a></div>
+<p><strong>Paket Rekomendasi: NIZAM Commerce</strong></p>
+<ul>
+<li>Revenue Core + Inventory Core + Finance Core</li>
+<li>Vertical: Omnichannel Commerce</li>
+<li>Add-ons: E-Commerce Auto-Sync, POS, Payment Gateway, Loyalty Program, WhatsApp Integration</li>
+</ul>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Data dari marketplace tidak terintegrasi</li>
+<li>Stok di online dan offline tidak sinkron</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h3"><h3 id="75-industri-dengan-regulasi-tinggi-ekspor-tbk-gcg">7.5 Industri dengan Regulasi Tinggi (Ekspor, TBk, GCG)</h3><a class="sl-anchor-link" href="#75-industri-dengan-regulasi-tinggi-ekspor-tbk-gcg"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “7.5 Industri dengan Regulasi Tinggi (Ekspor, TBk, GCG)”</span></a></div>
+<p><strong>Paket Rekomendasi: NIZAM Compliance</strong></p>
+<ul>
+<li>Semua Core Families + ESG Reporting + Tax Compliance</li>
+<li>Add-ons: Contract Management, DMS, Approval Workflow, Vendor Portal</li>
+</ul>
+<p><strong>Pain yang Diselesaikan:</strong></p>
+<ul>
+<li>Tidak memenuhi requirement ESG investor</li>
+<li>Tidak siap laporan untuk due diligence</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="8-differensiator-kompetitif-global">8. Differensiator Kompetitif Global</h2><a class="sl-anchor-link" href="#8-differensiator-kompetitif-global"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “8. Differensiator Kompetitif Global”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="81-versus-sap--oracle-enterprise-erp">8.1 Versus SAP / Oracle (Enterprise ERP)</h3><a class="sl-anchor-link" href="#81-versus-sap--oracle-enterprise-erp"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “8.1 Versus SAP / Oracle (Enterprise ERP)”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Dimensi</th><th>SAP/Oracle</th><th>NIZAM</th></tr></thead><tbody><tr><td>Time-to-value</td><td>6–24 bulan</td><td>2–8 minggu</td></tr><tr><td>Total cost</td><td>Ratusan juta–miliar</td><td>Puluhan juta/tahun</td></tr><tr><td>Kemudahan implementasi</td><td>Butuh konsultan mahal</td><td>Self-service + Academy</td></tr><tr><td>Syariah/Syirkah</td><td>Tidak ada native</td><td>Native module</td></tr><tr><td>Lokal compliance (DJP, BI)</td><td>Custom mahal</td><td>Built-in</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="82-versus-accurate--jurnal-akuntansi-saas-lokal">8.2 Versus Accurate / Jurnal (Akuntansi SaaS Lokal)</h3><a class="sl-anchor-link" href="#82-versus-accurate--jurnal-akuntansi-saas-lokal"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “8.2 Versus Accurate / Jurnal (Akuntansi SaaS Lokal)”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Dimensi</th><th>Accurate/Jurnal</th><th>NIZAM</th></tr></thead><tbody><tr><td>Scope</td><td>Akuntansi + Sales dasar</td><td>Full ERP platform</td></tr><tr><td>Vertical operations</td><td>Tidak ada</td><td>Manufacturing, Fleet, Construction, dsb.</td></tr><tr><td>AI capabilities</td><td>Minimal</td><td>AI OCR, AI Advisor, AI Purchasing</td></tr><tr><td>Ecosystem (Academy, Partner)</td><td>Minimal</td><td>Strategis</td></tr><tr><td>Multi-entity</td><td>Terbatas</td><td>Native add-on</td></tr></tbody></table>
+<div class="sl-heading-wrapper level-h3"><h3 id="83-versus-odoo-open-source-erp">8.3 Versus Odoo (Open-Source ERP)</h3><a class="sl-anchor-link" href="#83-versus-odoo-open-source-erp"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “8.3 Versus Odoo (Open-Source ERP)”</span></a></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Dimensi</th><th>Odoo</th><th>NIZAM</th></tr></thead><tbody><tr><td>Kemudahan kustomisasi</td><td>Sangat tinggi (tapi kompleks)</td><td>Modular add-on</td></tr><tr><td>Biaya total (TCO)</td><td>Tinggi karena implementasi</td><td>Lebih terprediksi</td></tr><tr><td>Syariah &#x26; lokal</td><td>Komunitas, bukan native</td><td>Native</td></tr><tr><td>Academy built-in</td><td>Tidak ada</td><td>Modul strategis</td></tr><tr><td>Support bahasa Indonesia</td><td>Tidak native</td><td>Native</td></tr></tbody></table>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="9-estimasi-potensi-revenue-per-kategori-modul">9. Estimasi Potensi Revenue Per Kategori Modul</h2><a class="sl-anchor-link" href="#9-estimasi-potensi-revenue-per-kategori-modul"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “9. Estimasi Potensi Revenue Per Kategori Modul”</span></a></div>
+<p><em>(Estimasi ilustratif berbasis market sizing Indonesia)</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Kategori</th><th>Total Addressable Market (TAM) Indonesia</th><th>NIZAM Share Potential</th></tr></thead><tbody><tr><td>Core ERP UKM</td><td>~2 juta UKM besar yang layak</td><td>50.000 tenant × Rp 2M/bulan = Rp 100B/bulan</td></tr><tr><td>Tax Compliance</td><td>Semua PKP (~900.000 entitas)</td><td>Add-on uplift Rp 300K–1M/bulan</td></tr><tr><td>Omnichannel Commerce</td><td>~500.000 penjual online aktif</td><td>Rp 500K–2M/bulan per tenant</td></tr><tr><td>HRIS + Payroll</td><td>~3 juta perusahaan punya karyawan</td><td>Rp 200K–500K/karyawan/bulan</td></tr><tr><td>Manufacturing Vertical</td><td>~30.000 pabrik skala menengah</td><td>Rp 5M–50M/bulan per pabrik</td></tr><tr><td>ESG Reporting</td><td>~5.000 perusahaan enterprise</td><td>Premium tier Rp 5M+/bulan</td></tr><tr><td>Academy/Certification</td><td>Semua tenant + ekosistem partner</td><td>Per-seat Rp 500K–2M</td></tr></tbody></table>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="10-kesimpulan-dan-rekomendasi-tindakan">10. Kesimpulan dan Rekomendasi Tindakan</h2><a class="sl-anchor-link" href="#10-kesimpulan-dan-rekomendasi-tindakan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “10. Kesimpulan dan Rekomendasi Tindakan”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="101-tiga-modul-paling-kritis-untuk-dikerjakan-pertama">10.1 Tiga Modul Paling Kritis untuk Dikerjakan Pertama</h3><a class="sl-anchor-link" href="#101-tiga-modul-paling-kritis-untuk-dikerjakan-pertama"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “10.1 Tiga Modul Paling Kritis untuk Dikerjakan Pertama”</span></a></div>
+<ol>
+<li><strong>Tax Compliance Engine</strong> — compliance obligation yang wajib, semua PKP butuh, immediate upsell opportunity</li>
+<li><strong>Payment Gateway Integration</strong> — langsung unblock revenue collection; dampak paling cepat terasa customer</li>
+<li><strong>Approval Workflow Engine</strong> — pain yang paling universal lintas semua segmen dan ukuran bisnis</li>
+</ol>
+<div class="sl-heading-wrapper level-h3"><h3 id="102-tiga-modul-paling-strategis-untuk-jangka-panjang">10.2 Tiga Modul Paling Strategis untuk Jangka Panjang</h3><a class="sl-anchor-link" href="#102-tiga-modul-paling-strategis-untuk-jangka-panjang"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “10.2 Tiga Modul Paling Strategis untuk Jangka Panjang”</span></a></div>
+<ol>
+<li><strong>Treasury &#x26; Multi-Currency</strong> — membuka pasar bisnis ekspor/impor yang selama ini tidak bisa dilayani</li>
+<li><strong>Omnichannel Commerce</strong> — memasuki era commerce post-marketplace yang berkembang cepat</li>
+<li><strong>ESG &#x26; Sustainability Reporting</strong> — positioning NIZAM sebagai platform enterprise-ready untuk IPO-ready company dan perusahaan multinasional</li>
+</ol>
+<div class="sl-heading-wrapper level-h3"><h3 id="103-differensiator-yang-harus-dijaga">10.3 Differensiator yang Harus Dijaga</h3><a class="sl-anchor-link" href="#103-differensiator-yang-harus-dijaga"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “10.3 Differensiator yang Harus Dijaga”</span></a></div>
+<ol>
+<li><strong>Syirkah</strong> — tidak ada ERP lain yang punya ini secara native; pertahankan dan perdalam</li>
+<li><strong>Academy/EDU</strong> — jadikan moat utama; bangun Training &#x26; Certification Marketplace</li>
+<li><strong>Local compliance</strong> (DJP, BI regulation) — keunggulan yang tidak mudah ditiru ERP global</li>
+<li><strong>AI-native</strong> (OCR, Advisor, Purchase Assistant) — adopsi AI sejak dini sebelum kompetitor</li>
+</ol>
+<hr>
+<p><em>Dokumen ini dibuat berdasarkan analisis mendalam terhadap branch <code dir="auto">feat_multi</code>, arsitektur produk NIZAM (KLASIFIKASI_MODULE_DAN_ADDON_NIZAM.md, GTM_NIZAM_MODULE_DAN_ADDON.md), dan pemetaan pain point customer global.</em></p>
+<p><em>Untuk implementasi, setiap modul/add-on harus melalui: Product Discovery → Architecture Review → Database Schema → API Design → UI/UX → QA → Release.</em></p> </div> <footer class="sl-flex astro-3yyafb3n"> <div class="meta sl-flex astro-3yyafb3n">   </div> <div class="pagination-links print:hidden astro-u2l5gyhi" dir="ltr"> <a href="/reference/roadmap-modul-addon-global-v3-2026/" rel="prev" class="astro-u2l5gyhi"> <svg aria-hidden="true" class="astro-u2l5gyhi astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg> <span class="astro-u2l5gyhi"> Previous <br class="astro-u2l5gyhi"> <span class="link-title astro-u2l5gyhi">Roadmap: MODUL ADDON GLOBAL V3 2026</span> </span> </a> <a href="/reference/syirkah-accounting/" rel="next" class="astro-u2l5gyhi"> <svg aria-hidden="true" class="astro-u2l5gyhi astro-c6vsoqas" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg> <span class="astro-u2l5gyhi"> Next <br class="astro-u2l5gyhi"> <span class="link-title astro-u2l5gyhi">Akuntansi Syirkah</span> </span> </a> </div>  </footer> </div> </div>  </main> </div> </div> </div> </div> </body></html>

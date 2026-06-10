@@ -1,0 +1,50 @@
+---
+title: Nizam Docs
+description: Dokumentasi resmi untuk produk, operasional, dan developer Nizam ERP.
+template: splash
+hero:
+  title: Dokumentasi Nizam ERP
+  tagline: Panduan produk, operasional, dan developer untuk implementasi Nizam yang rapi dan terhubung lintas modul.
+  actions:
+    - text: Mulai dari Getting Started
+      link: /guides/getting-started/
+      icon: right-arrow
+    - text: Buka Referensi Teknis
+      link: /reference/
+      variant: minimal
+preload:
+  - guides/getting-started
+  - guides/product-map
+  - guides/core-concepts
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Jalur baca yang direkomendasikan
+
+<CardGrid>
+  <Card title="Mulai Cepat" icon="rocket" href="/guides/getting-started/">
+    Masuk ke dokumentasi onboarding, istilah inti, dan urutan belajar yang paling aman untuk tim baru.
+  </Card>
+  <Card title="Peta Produk" icon="seti:markdown" href="/guides/product-map/">
+    Lihat modul utama, relasi antar area ERP, dan bagaimana fitur vertikal menulis ke core modules.
+  </Card>
+  <Card title="Konsep Inti" icon="list" href="/guides/core-concepts/">
+    Pahami organisasi, anak perusahaan, Cabang, approval, dan prinsip anti-silo di Nizam.
+  </Card>
+  <Card title="Referensi Teknis" icon="open-book" href="/reference/">
+    Baca dokumen teknis yang sudah ada di repo, disajikan ulang sebagai portal docs terstruktur.
+  </Card>
+</CardGrid>
+
+## Isi docs ini
+
+- **Product & operations** untuk owner, admin, finance, inventory, sales, dan tim operasional.
+- **Developer & integration** untuk arsitektur, Open API, webhook, dan pola modul.
+- **Reference library** yang mengambil file Markdown sumber dari folder `/docs` lama dan menyajikannya ulang di platform baru.
+
+## Prinsip utama
+
+- Gunakan istilah **Cabang** secara konsisten.
+- Perlakukan Nizam sebagai ERP yang **terhubung lintas modul**, bukan kumpulan fitur silo.
+- Gunakan docs ini sebagai **source of truth yang ramah baca**, sementara file Markdown sumber tetap dipertahankan untuk jejak historis dan drafting internal.
