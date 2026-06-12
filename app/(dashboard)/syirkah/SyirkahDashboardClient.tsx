@@ -118,21 +118,33 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
 
       {/* HERO SECTION */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Net Profit Hero */}
-        <div className="col-span-1 md:col-span-2 relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-900 via-blue-800 to-emerald-900 p-6 flex flex-col justify-between shadow-xl shadow-blue-900/20">
-          <div className="absolute top-0 right-0 p-4 opacity-20">
-            <TrendingUp size={100} />
-          </div>
-          <div className="relative z-10">
-            <h2 className="text-blue-200 text-sm font-semibold tracking-wide uppercase mb-1">Total Net Profit</h2>
-            <div className="text-4xl lg:text-5xl font-semibold text-white tracking-tighter">
-              {formatRupiah(netProfit)}
+        {/* Net Profit / Alokasi Bagi Hasil Hero */}
+        {(() => {
+          const isManual = profitSharingReferenceGroup?.distributionSource === 'MANUAL_ALLOCATION'
+          const heroAmount = isManual
+            ? Number(profitSharingReferenceGroup?.estimatedNetProfit || 0)
+            : netProfit
+          const heroLabel = isManual ? 'Alokasi Bagi Hasil' : 'Total Net Profit'
+          const heroMessage = isManual
+            ? 'Nominal dari alokasi bagi hasil manual yang ditetapkan pada akad syirkah.'
+            : (distributionContext?.message || 'Laba bersih organisasi sebagai basis estimasi bagi hasil syirkah.')
+          return (
+            <div className="col-span-1 md:col-span-2 relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-900 via-blue-800 to-emerald-900 p-6 flex flex-col justify-between shadow-xl shadow-blue-900/20">
+              <div className="absolute top-0 right-0 p-4 opacity-20">
+                <TrendingUp size={100} />
+              </div>
+              <div className="relative z-10">
+                <h2 className="text-blue-200 text-sm font-semibold tracking-wide uppercase mb-1">{heroLabel}</h2>
+                <div className="text-4xl lg:text-5xl font-semibold text-white tracking-tighter">
+                  {formatRupiah(heroAmount)}
+                </div>
+                <p className="text-blue-100 text-sm mt-2 opacity-80 max-w-sm leading-tight">
+                  {heroMessage}
+                </p>
+              </div>
             </div>
-            <p className="text-blue-100 text-sm mt-2 opacity-80 max-w-sm leading-tight">
-              {distributionContext?.message || 'Laba bersih organisasi sebagai basis estimasi bagi hasil syirkah.'}
-            </p>
-          </div>
-        </div>
+          )
+        })()}
 
         {/* Debt Exposure Hero */}
         <div className="col-span-1 md:col-span-2 rounded-xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
