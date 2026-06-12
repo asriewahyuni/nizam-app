@@ -9,12 +9,13 @@ import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/components/ui/NizamUI'
 
 export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: string; initialData: any }) {
-  const { netProfit, totalDebtAllocation, totalCurrentDebt, contracts, allMembers, distributionContext } = initialData
+  const { netProfit, totalAssets, totalModalSyirkah, totalDebtAllocation, totalCurrentDebt, contracts, allMembers, distributionContext } = initialData
   const debtPercentage = totalDebtAllocation > 0 ? Math.min((totalCurrentDebt / totalDebtAllocation) * 100, 100) : 0
   const profitSharingReferenceGroup =
-    allMembers.find((group: any) => group?.distributionSource === 'MANUAL_ALLOCATION')
-    || allMembers.find((group: any) => group?.distributionStatus === 'ESTIMATED')
-    || null
+    allMembers.find((group: any) =>
+      group?.distributionStatus === 'ESTIMATED' &&
+      (group?.distributionSource === 'MANUAL_ALLOCATION' || group?.distributionSource === 'ORG_NET_PROFIT')
+    ) || null
   const profitSharingReferenceContract = profitSharingReferenceGroup
     ? contracts.find((contract: any) => contract?.id === profitSharingReferenceGroup.contractId) || null
     : null
@@ -118,33 +119,21 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
 
       {/* HERO SECTION */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Net Profit / Alokasi Bagi Hasil Hero */}
-        {(() => {
-          const isManual = profitSharingReferenceGroup?.distributionSource === 'MANUAL_ALLOCATION'
-          const heroAmount = isManual
-            ? Number(profitSharingReferenceGroup?.estimatedNetProfit || 0)
-            : netProfit
-          const heroLabel = isManual ? 'Alokasi Bagi Hasil' : 'Total Net Profit'
-          const heroMessage = isManual
-            ? 'Nominal dari alokasi bagi hasil manual yang ditetapkan pada akad syirkah.'
-            : (distributionContext?.message || 'Laba bersih organisasi sebagai basis estimasi bagi hasil syirkah.')
-          return (
-            <div className="col-span-1 md:col-span-2 relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-900 via-blue-800 to-emerald-900 p-6 flex flex-col justify-between shadow-xl shadow-blue-900/20">
-              <div className="absolute top-0 right-0 p-4 opacity-20">
-                <TrendingUp size={100} />
-              </div>
-              <div className="relative z-10">
-                <h2 className="text-blue-200 text-sm font-semibold tracking-wide uppercase mb-1">{heroLabel}</h2>
-                <div className="text-4xl lg:text-5xl font-semibold text-white tracking-tighter">
-                  {formatRupiah(heroAmount)}
-                </div>
-                <p className="text-blue-100 text-sm mt-2 opacity-80 max-w-sm leading-tight">
-                  {heroMessage}
-                </p>
-              </div>
+        {/* Net Profit Hero */}
+        <div className="col-span-1 md:col-span-2 relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-900 via-blue-800 to-emerald-900 p-6 flex flex-col justify-between shadow-xl shadow-blue-900/20">
+          <div className="absolute top-0 right-0 p-4 opacity-20">
+            <TrendingUp size={100} />
+          </div>
+          <div className="relative z-10">
+            <h2 className="text-blue-200 text-sm font-semibold tracking-wide uppercase mb-1">Total Net Profit</h2>
+            <div className="text-4xl lg:text-5xl font-semibold text-white tracking-tighter">
+              {formatRupiah(netProfit)}
             </div>
-          )
-        })()}
+            <p className="text-blue-100 text-sm mt-2 opacity-80 max-w-sm leading-tight">
+              {distributionContext?.message || 'Laba bersih organisasi sebagai basis estimasi bagi hasil syirkah.'}
+            </p>
+          </div>
+        </div>
 
         {/* Debt Exposure Hero */}
         <div className="col-span-1 md:col-span-2 rounded-xl bg-white border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
@@ -174,6 +163,25 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
           </div>
         </div>
       </div>
+
+      {/* Banner: Capital Preservation */}
+      {distributionContext && !distributionContext.isCapitalPreserved && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <AlertCircle size={20} className="mt-0.5 shrink-0 text-amber-500" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">
+              Bagi hasil belum dapat dibagikan — modal syirkah belum terpenuhi
+            </p>
+            <p className="mt-1 text-sm text-amber-700">
+              Total harta organisasi saat ini{' '}
+              <span className="font-semibold">{formatRupiah(totalAssets)}</span>{' '}
+              belum mencapai modal syirkah mudharabah{' '}
+              <span className="font-semibold">{formatRupiah(totalModalSyirkah)}</span>.{' '}
+              Dalam syirkah mudharabah, keuntungan hanya boleh dibagi setelah seluruh modal pemodal kembali.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -382,6 +390,10 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
                       <td className="py-4 text-right">
                         {memberGroup.distributionStatus === 'ESTIMATED' ? (
                           <span className="font-bold text-blue-600">{formatRupiah(totalEst)}</span>
+                        ) : memberGroup.distributionStatus === 'CAPITAL_NOT_PRESERVED' ? (
+                          <span className="inline-flex rounded-lg bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">
+                            Modal belum terpenuhi
+                          </span>
                         ) : memberGroup.distributionStatus === 'MULTIPLE_ACTIVE_UNALLOCATED' ? (
                           <span className="inline-flex rounded-lg bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">
                             Butuh laba per akad

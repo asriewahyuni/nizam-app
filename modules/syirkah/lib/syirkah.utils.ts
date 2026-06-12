@@ -21,12 +21,17 @@ export type SyirkahDistributionContext = {
   netProfit: number
   activeContractIds: string[]
   message: string
+  totalAssets: number
+  totalModalSyirkah: number
+  /** true jika total aset >= modal syirkah mudharabah (syarat capital preservation) */
+  isCapitalPreserved: boolean
 }
 
 export type SyirkahContractDistributionStatus =
   | 'ESTIMATED'
   | 'WAITING_ACTIVE'
   | 'MULTIPLE_ACTIVE_UNALLOCATED'
+  | 'CAPITAL_NOT_PRESERVED'
 
 export type SyirkahContractDistributionSource =
   | 'MANUAL_ALLOCATION'
@@ -59,15 +64,23 @@ function isActiveSyirkahContractStatus(status: unknown) {
 
 export function buildSyirkahDistributionContext(
   contracts: SyirkahDistributionContractLike[],
-  netProfit: number
+  netProfit: number,
+  totalAssets: number = 0,
+  totalModalSyirkah: number = 0
 ): SyirkahDistributionContext {
   const activeContractIds = contracts
     .filter((contract) => isActiveSyirkahContractStatus(contract.status))
     .map((contract) => String(contract.id || '').trim())
     .filter(Boolean)
 
+  // Capital preservation: bagi hasil hanya boleh jika harta >= modal syirkah
+  const isCapitalPreserved = totalModalSyirkah <= 0 || totalAssets >= totalModalSyirkah
+
+  const base = { totalAssets, totalModalSyirkah, isCapitalPreserved }
+
   if (activeContractIds.length === 0) {
     return {
+      ...base,
       mode: 'WAITING_ACTIVE_CONTRACT',
       netProfit,
       activeContractIds: [],
@@ -77,6 +90,7 @@ export function buildSyirkahDistributionContext(
 
   if (activeContractIds.length === 1) {
     return {
+      ...base,
       mode: 'SINGLE_ACTIVE_CONTRACT',
       netProfit,
       activeContractIds,
@@ -85,6 +99,7 @@ export function buildSyirkahDistributionContext(
   }
 
   return {
+    ...base,
     mode: 'MULTIPLE_ACTIVE_CONTRACTS',
     netProfit,
     activeContractIds,
@@ -129,6 +144,16 @@ export function resolveSyirkahContractDistribution(
       source: 'NONE',
       baseAmount: null,
       message: 'Alokasi bagi hasil akan dipakai setelah akad berstatus ACTIVE atau COMPLETED.',
+    }
+  }
+
+  // Syarat mudharabah: harta harus >= modal sebelum bagi hasil boleh dibagikan
+  if (!context.isCapitalPreserved) {
+    return {
+      status: 'CAPITAL_NOT_PRESERVED',
+      source: 'NONE',
+      baseAmount: null,
+      message: 'Bagi hasil belum dapat dibagikan. Total harta organisasi belum mencapai modal syirkah mudharabah.',
     }
   }
 

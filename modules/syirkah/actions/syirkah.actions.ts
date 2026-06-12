@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { queryPostgres } from '@/lib/db/postgres'
 import { revalidatePath } from 'next/cache'
 import { getProfitLoss } from '@/modules/accounting/actions/reports.actions'
 import { createJournalEntry, postJournalEntry } from '@/modules/accounting/actions/journal.actions'
@@ -2094,8 +2095,38 @@ export async function getSyirkahDashboardData(orgId: string) {
     const pnl = await getProfitLoss(orgId, '2000-01-01')
     const netProfit = pnl.netProfit || 0
 
+    // Hitung total aset dan modal syirkah mudharabah (3110) untuk cek capital preservation
+    const capitalRows = await queryPostgres<{ total_assets: string; modal_syirkah: string }>(`
+      SELECT
+        COALESCE(SUM(CASE
+          WHEN a.type = 'ASSET' AND a.normal_balance = 'DEBIT'
+          THEN GREATEST(jl_agg.total_debit - jl_agg.total_credit, 0)
+          WHEN a.type = 'ASSET' AND a.normal_balance = 'CREDIT'
+          THEN GREATEST(jl_agg.total_credit - jl_agg.total_debit, 0)
+          ELSE 0
+        END), 0) AS total_assets,
+        COALESCE(SUM(CASE
+          WHEN a.code = '3110'
+          THEN GREATEST(jl_agg.total_credit - jl_agg.total_debit, 0)
+          ELSE 0
+        END), 0) AS modal_syirkah
+      FROM accounts a
+      LEFT JOIN (
+        SELECT jl.account_id,
+          COALESCE(SUM(CASE WHEN je.status = 'POSTED' THEN jl.debit ELSE 0 END), 0) AS total_debit,
+          COALESCE(SUM(CASE WHEN je.status = 'POSTED' THEN jl.credit ELSE 0 END), 0) AS total_credit
+        FROM journal_lines jl
+        JOIN journal_entries je ON je.id = jl.entry_id AND je.org_id = $1
+        GROUP BY jl.account_id
+      ) jl_agg ON jl_agg.account_id = a.id
+      WHERE a.org_id = $1 AND a.is_active = true
+    `, [orgId])
+
+    const totalAssets = Number(capitalRows[0]?.total_assets || 0)
+    const totalModalSyirkah = Number(capitalRows[0]?.modal_syirkah || 0)
+
     const contracts = await getSyirkahContracts(orgId)
-    const distributionContext = buildSyirkahDistributionContext(contracts, netProfit)
+    const distributionContext = buildSyirkahDistributionContext(contracts, netProfit, totalAssets, totalModalSyirkah)
     const membersByContract = await Promise.all(
       contracts.map((c: any) => getSyirkahMembers(c.id))
     )
@@ -2128,6 +2159,8 @@ export async function getSyirkahDashboardData(orgId: string) {
 
     return {
       netProfit,
+      totalAssets,
+      totalModalSyirkah,
       totalDebtAllocation,
       totalCurrentDebt,
       distributionContext,
@@ -2138,6 +2171,8 @@ export async function getSyirkahDashboardData(orgId: string) {
     console.error('Failed to get syirkah dashboard data', error)
     return {
       netProfit: 0,
+      totalAssets: 0,
+      totalModalSyirkah: 0,
       totalDebtAllocation: 0,
       totalCurrentDebt: 0,
       distributionContext: buildSyirkahDistributionContext([], 0),
