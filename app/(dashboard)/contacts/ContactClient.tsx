@@ -299,7 +299,7 @@ export default function ContactClient({
   ]
 
   return (
-    <div className="max-w-7xl mx-auto pb-24 space-y-12">
+    <div className="space-y-8">
       <PageHeader
         icon={<Users />}
         title="Pelanggan & Pemasok (CRM)"
