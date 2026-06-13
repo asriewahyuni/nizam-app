@@ -12,7 +12,7 @@ export default async function CustomersPage() {
   const activeBranch = await getActiveBranch(orgId)
 
   const [contacts, analytics, assignees] = await Promise.all([
-    getContacts(orgId),
+    getContacts(orgId, 'CUSTOMER'),
     getDashboardAnalytics(orgId, activeBranch?.id),
     getOrgSalesAssignees(orgId)
   ])
@@ -22,7 +22,7 @@ export default async function CustomersPage() {
       orgId={orgId}
       contacts={contacts}
       customerPareto={analytics.customerPareto}
-      initialTypeFilter="CUSTOMER"
+      lockedFilter="CUSTOMER"
       assignees={assignees}
     />
   )

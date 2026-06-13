@@ -196,6 +196,47 @@ export async function deleteContact(orgId: string, contactId: string): Promise<D
   return { success: true }
 }
 
+export type VendorGlobalStats = {
+  totalVendors: number
+  totalApOutstanding: number
+  totalPurchasesThisMonth: number
+  totalActivePo: number
+  topVendors: { name: string; total: number }[]
+}
+
+export async function getVendorGlobalStats(orgId: string): Promise<VendorGlobalStats> {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  const [summary, topVendors] = await Promise.all([
+    queryPostgres<any>(`
+      SELECT
+        (SELECT COUNT(*)::int FROM contacts WHERE org_id = $1 AND type IN ('SUPPLIER','BOTH') AND is_active = true) AS total_vendors,
+        COALESCE((SELECT SUM(grand_total)::float FROM purchases WHERE org_id = $1 AND payment_status IN ('UNPAID','PARTIAL','OVERDUE') AND status != 'VOIDED'), 0) AS total_ap_outstanding,
+        COALESCE((SELECT SUM(grand_total)::float FROM purchases WHERE org_id = $1 AND DATE_TRUNC('month', purchase_date) = DATE_TRUNC('month', CURRENT_DATE) AND status != 'VOIDED'), 0) AS total_purchases_this_month,
+        (SELECT COUNT(*)::int FROM purchases WHERE org_id = $1 AND status IN ('DRAFT','ORDERED') AND status != 'VOIDED') AS total_active_po
+    `, [orgId]),
+
+    queryPostgres<any>(`
+      SELECT c.name, COALESCE(SUM(p.grand_total), 0)::float AS total
+      FROM purchases p
+      JOIN contacts c ON c.id = p.vendor_id
+      WHERE p.org_id = $1 AND p.status != 'VOIDED'
+      GROUP BY c.id, c.name
+      ORDER BY total DESC
+      LIMIT 5
+    `, [orgId]),
+  ])
+
+  const s = summary.rows[0]
+  return {
+    totalVendors: s?.total_vendors ?? 0,
+    totalApOutstanding: s?.total_ap_outstanding ?? 0,
+    totalPurchasesThisMonth: s?.total_purchases_this_month ?? 0,
+    totalActivePo: s?.total_active_po ?? 0,
+    topVendors: topVendors.rows,
+  }
+}
+
 export type ContactCrmAnalytics = {
   monthlyPurchases: { month: string; month_label: string; transaction_count: number; total: number }[]
   topProducts: { description: string; order_count: number; total_qty: number; total_amount: number }[]

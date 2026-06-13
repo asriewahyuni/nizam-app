@@ -27,7 +27,7 @@ import {
   X,
 } from 'lucide-react'
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatCard, useConfirm} from '@/components/ui/NizamUI'
-import { createContact, deleteContact, updateContact, getContactCrmAnalytics, type ContactCrmAnalytics } from '@/modules/contacts/actions/contact.actions'
+import { createContact, deleteContact, updateContact, getContactCrmAnalytics, type ContactCrmAnalytics, type VendorGlobalStats } from '@/modules/contacts/actions/contact.actions'
 import { formatRupiah } from '@/lib/utils'
 
 type ContactType = 'CUSTOMER' | 'SUPPLIER'
@@ -61,7 +61,9 @@ interface ContactClientProps {
   contacts: any[]
   customerPareto: any
   initialTypeFilter?: ContactFilter
+  lockedFilter?: ContactFilter
   assignees?: { user_id: string; user_email: string }[]
+  vendorStats?: VendorGlobalStats
 }
 
 function normalizeContact(contact: any): ContactRecord {
@@ -130,12 +132,14 @@ export default function ContactClient({
   contacts,
   customerPareto,
   initialTypeFilter = 'ALL',
-  assignees = []
+  lockedFilter,
+  assignees = [],
+  vendorStats,
 }: ContactClientProps) {
   const router = useRouter()
   const [contactItems, setContactItems] = useState<ContactRecord[]>(() => sortContacts((contacts || []).map(normalizeContact)))
   const { confirm, ConfirmUI } = useConfirm()
-  const [activeType, setActiveType] = useState<ContactFilter>(initialTypeFilter)
+  const [activeType, setActiveType] = useState<ContactFilter>(lockedFilter ?? initialTypeFilter)
   const [searchQuery, setSearchQuery] = useState('')
   const [showFormModal, setShowFormModal] = useState(false)
   const [editingContact, setEditingContact] = useState<ContactRecord | null>(null)
@@ -152,8 +156,8 @@ export default function ContactClient({
   }, [contacts])
 
   useEffect(() => {
-    setActiveType(initialTypeFilter)
-  }, [initialTypeFilter])
+    setActiveType(lockedFilter ?? initialTypeFilter)
+  }, [initialTypeFilter, lockedFilter])
 
   const customers = contactItems.filter((contact) => contact.type === 'CUSTOMER')
   const suppliers = contactItems.filter((contact) => contact.type === 'SUPPLIER')
@@ -325,12 +329,54 @@ export default function ContactClient({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard label="Total Customer" value={customers.length} icon={UserCircle} color="blue" onClick={() => setActiveType('CUSTOMER')} sub="Klik untuk fokus ke daftar customer" />
-        <StatCard label="Total Supplier" value={suppliers.length} icon={Building2} color="emerald" onClick={() => setActiveType('SUPPLIER')} sub="Klik untuk fokus ke daftar vendor" />
-        <StatCard label="Customer Pareto (Top 20%)" value={customerPareto?.top20Count || 0} icon={Trophy} color="amber" />
-        <StatCard label="Sales / Profit VIP" value={`${formatRupiah(customerPareto?.top20Revenue || 0)} / ${formatRupiah(customerPareto?.top20Profit || 0)}`} icon={TrendingUp} color="indigo" />
-      </div>
+      {lockedFilter === 'SUPPLIER' && vendorStats ? (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <StatCard label="Total Vendor Aktif" value={vendorStats.totalVendors} icon={Building2} color="emerald" />
+          <StatCard label="Hutang Belum Lunas (AP)" value={formatRupiah(vendorStats.totalApOutstanding)} icon={TrendingUp} color="rose" />
+          <StatCard label="Pembelian Bulan Ini" value={formatRupiah(vendorStats.totalPurchasesThisMonth)} icon={ShoppingBag} color="amber" />
+          <StatCard label="PO Aktif" value={`${vendorStats.totalActivePo} PO`} icon={Target} color="blue" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <StatCard label="Total Customer" value={customers.length} icon={UserCircle} color="blue" />
+          <StatCard label="Customer Pareto (Top 20%)" value={customerPareto?.top20Count || 0} icon={Trophy} color="amber" />
+          <StatCard label="Revenue VIP" value={formatRupiah(customerPareto?.top20Revenue || 0)} icon={TrendingUp} color="indigo" />
+          <StatCard label="Profit VIP" value={formatRupiah(customerPareto?.top20Profit || 0)} icon={Star} color="emerald" />
+        </div>
+      )}
+
+      {lockedFilter === 'SUPPLIER' && vendorStats && vendorStats.topVendors.length > 0 && (
+        <div className="bg-emerald-900 rounded-xl p-5 text-white relative overflow-hidden shadow-md shadow-emerald-900/20">
+          <div className="absolute top-0 right-0 p-5 opacity-10 rotate-12">
+            <Building2 size={180} />
+          </div>
+          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-12">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-400 text-emerald-950 rounded-full text-[9px] font-semibold uppercase tracking-wide">
+                <Target size={12} /> Top Vendor
+              </div>
+              <h2 className="text-3xl font-semibold italic tracking-tighter leading-tight">Vendor Terbesar</h2>
+              <p className="text-sm font-medium text-emerald-200 leading-relaxed">
+                Berdasarkan total nilai pembelian keseluruhan.
+              </p>
+            </div>
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {vendorStats.topVendors.map((v, i) => (
+                <div key={`${v.name}-${i}`} className="bg-white/10 backdrop-blur-md border border-white/10 p-5 rounded-[32px] flex items-center justify-between group hover:bg-white/20 transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-400 text-emerald-950 flex items-center justify-center font-semibold">#{i + 1}</div>
+                    <div>
+                      <div className="text-sm font-bold text-white">{v.name}</div>
+                      <div className="text-[10px] font-semibold text-emerald-300 uppercase tracking-wide">{formatRupiah(v.total)}</div>
+                    </div>
+                  </div>
+                  <Building2 size={16} className="text-emerald-400" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {customerPareto && activeType !== 'SUPPLIER' && (
         <div className="bg-indigo-900 rounded-xl p-5 text-white relative overflow-hidden shadow-md shadow-indigo-900/20">
@@ -375,20 +421,22 @@ export default function ContactClient({
           subtitle={sectionSubtitle}
           actions={
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <div className="flex bg-slate-100/70 p-1 rounded-xl border border-slate-100 shadow-inner">
-                {filterButtons.map((button) => (
-                  <button
-                    key={button.key}
-                    type="button"
-                    onClick={() => setActiveType(button.key)}
-                    className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${
-                      activeType === button.key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                  >
-                    {button.label} ({button.count})
-                  </button>
-                ))}
-              </div>
+              {!lockedFilter && (
+                <div className="flex bg-slate-100/70 p-1 rounded-xl border border-slate-100 shadow-inner">
+                  {filterButtons.map((button) => (
+                    <button
+                      key={button.key}
+                      type="button"
+                      onClick={() => setActiveType(button.key)}
+                      className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${
+                        activeType === button.key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      {button.label} ({button.count})
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />

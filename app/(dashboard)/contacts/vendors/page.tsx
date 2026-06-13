@@ -1,29 +1,26 @@
 import { redirect } from 'next/navigation'
-import { getContacts, getOrgSalesAssignees } from '@/modules/contacts/actions/contact.actions'
-import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.actions'
+import { getContacts, getVendorGlobalStats } from '@/modules/contacts/actions/contact.actions'
 import ContactClient from '../ContactClient'
-import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export default async function VendorsPage() {
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 
   const orgId = orgData.org.id
-  const activeBranch = await getActiveBranch(orgId)
 
-  const [contacts, analytics, assignees] = await Promise.all([
-    getContacts(orgId),
-    getDashboardAnalytics(orgId, activeBranch?.id),
-    getOrgSalesAssignees(orgId)
+  const [contacts, vendorStats] = await Promise.all([
+    getContacts(orgId, 'SUPPLIER'),
+    getVendorGlobalStats(orgId),
   ])
 
   return (
     <ContactClient
       orgId={orgId}
       contacts={contacts}
-      customerPareto={analytics.customerPareto}
-      initialTypeFilter="SUPPLIER"
-      assignees={assignees}
+      customerPareto={null}
+      lockedFilter="SUPPLIER"
+      vendorStats={vendorStats}
     />
   )
 }
