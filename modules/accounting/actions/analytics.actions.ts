@@ -221,14 +221,17 @@ export type CogsRevenueTrendRow = {
 }
 
 export async function getCogsRevenueTrend(orgId: string, branchId?: string | null): Promise<CogsRevenueTrendRow[]> {
-  const branchClause = branchId ? 'AND s.branch_id = $2' : ''
-  const params = branchId ? [orgId, branchId] : [orgId]
+  // Revenue dan COGS dipisah agar grand_total tidak terhitung berkali-kali
+  // saat satu sale memiliki banyak items (INNER JOIN menyebabkan double count).
+  const revBranch  = branchId ? 'AND s.branch_id = $2' : ''
+  const cogsBranch = branchId ? 'AND si.branch_id = $2' : ''
+  const params     = branchId ? [orgId, branchId] : [orgId]
 
   const result = await queryPostgres<{
-    month_key: string
+    month_key:   string
     month_label: string
-    revenue: string
-    cogs: string
+    revenue:     string
+    cogs:        string
     gross_profit: string
   }>(
     `WITH months AS (
@@ -238,27 +241,37 @@ export async function getCogsRevenueTrend(orgId: string, branchId?: string | nul
          '1 month'::interval
        ) AS month
      ),
-     monthly AS (
+     monthly_revenue AS (
        SELECT
-         date_trunc('month', s.sale_date)              AS month,
-         SUM(s.grand_total)                             AS revenue,
-         SUM(si.quantity * COALESCE(p.average_cost, 0)) AS cogs
+         date_trunc('month', s.sale_date) AS month,
+         SUM(s.grand_total)               AS revenue
        FROM public.sales s
-       JOIN public.sales_items si ON si.sale_id = s.id
-       LEFT JOIN public.products p ON p.id = si.product_id
        WHERE s.org_id = $1
          AND COALESCE(s.payment_status, '') != 'CANCELLED'
-         ${branchClause}
+         ${revBranch}
+       GROUP BY 1
+     ),
+     monthly_cogs AS (
+       SELECT
+         date_trunc('month', s.sale_date)                       AS month,
+         SUM(si.quantity * COALESCE(p.average_cost, 0))          AS cogs
+       FROM public.sales_items si
+       JOIN public.sales    s ON s.id = si.sale_id
+       LEFT JOIN public.products p ON p.id = si.product_id
+       WHERE si.org_id = $1
+         AND COALESCE(s.payment_status, '') != 'CANCELLED'
+         ${cogsBranch}
        GROUP BY 1
      )
      SELECT
-       TO_CHAR(m.month, 'YYYY-MM')    AS month_key,
-       TO_CHAR(m.month, 'Mon ''YY')   AS month_label,
-       COALESCE(ms.revenue, 0)        AS revenue,
-       COALESCE(ms.cogs, 0)           AS cogs,
-       COALESCE(ms.revenue, 0) - COALESCE(ms.cogs, 0) AS gross_profit
+       TO_CHAR(m.month, 'YYYY-MM') AS month_key,
+       TO_CHAR(m.month, 'Mon YY')  AS month_label,
+       COALESCE(mr.revenue, 0)     AS revenue,
+       COALESCE(mc.cogs, 0)        AS cogs,
+       COALESCE(mr.revenue, 0) - COALESCE(mc.cogs, 0) AS gross_profit
      FROM months m
-     LEFT JOIN monthly ms ON ms.month = m.month
+     LEFT JOIN monthly_revenue mr ON mr.month = m.month
+     LEFT JOIN monthly_cogs    mc ON mc.month = m.month
      ORDER BY m.month`,
     params
   ).catch(() => ({ rows: [] as any[] }))
