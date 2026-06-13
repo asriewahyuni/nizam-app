@@ -126,7 +126,13 @@ function buildBalanceTreeRows(accounts: any[] = [], showEmptyAccounts: boolean):
 }
 
 function CogsRevenueChart({ data }: { data: CogsRevenueTrendRow[] }) {
-  if (data.length === 0) return null
+  if (data.length === 0) return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center py-20 gap-3">
+      <TrendingUp size={32} className="text-slate-200" />
+      <p className="text-sm font-semibold text-slate-400">Belum ada data penjualan</p>
+      <p className="text-[11px] text-slate-300">Data akan muncul setelah ada transaksi penjualan tercatat</p>
+    </div>
+  )
 
   const labels      = data.map(r => r.month_label)
   const hasAnyCogs  = data.some(r => r.cogs > 0)
@@ -252,7 +258,7 @@ export default function ReportsClient({
   const searchParams = useSearchParams()
   const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
   const currentMonthStart = `${todayInJakarta.slice(0, 7)}-01`
-  const [activeTab, setActiveTab] = useState<'PL' | 'BS' | 'CF'>('PL')
+  const [activeTab, setActiveTab] = useState<'PL' | 'BS' | 'CF' | 'COGS'>('PL')
   const [showEmptyAccounts, setShowEmptyAccounts] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
 
@@ -445,33 +451,40 @@ export default function ReportsClient({
           </button>
 
           <div className="flex bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm print:hidden">
-            <button type="button" 
-              onClick={() => setActiveTab('PL')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'PL' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-500 hover:text-slate-800'}`}
-            >
-              Laba Rugi
-            </button>
-            <button type="button" 
-              onClick={() => setActiveTab('BS')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'BS' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-500 hover:text-slate-800'}`}
-            >
-              Neraca
-            </button>
-            <button type="button" 
-              onClick={() => setActiveTab('CF')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'CF' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-500 hover:text-slate-800'}`}
-            >
-              Arus Kas
-            </button>
+            {([
+              { key: 'PL',   label: 'Laba Rugi' },
+              { key: 'BS',   label: 'Neraca'    },
+              { key: 'CF',   label: 'Arus Kas'  },
+              { key: 'COGS', label: 'COGS & Revenue' },
+            ] as const).map(tab => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
+                  activeTab === tab.key
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* ── COGS vs REVENUE TREND ─────────────────────────────────────────── */}
-      <CogsRevenueChart data={cogsTrend} />
-
       <AnimatePresence mode="wait">
-        {activeTab === 'PL' ? (
+        {activeTab === 'COGS' ? (
+          <motion.div
+            key="cogs"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <CogsRevenueChart data={cogsTrend} />
+          </motion.div>
+        ) : activeTab === 'PL' ? (
           <motion.div 
             key="pl" 
             variants={container} 
