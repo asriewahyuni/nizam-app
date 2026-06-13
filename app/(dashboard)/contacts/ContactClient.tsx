@@ -301,10 +301,17 @@ export default function ContactClient({
   return (
     <div className="space-y-8">
       <PageHeader
-        icon={<Users />}
-        title="Pelanggan & Pemasok (CRM)"
-        subtitle="Pusat data relasi bisnis, manajemen pelanggan (Customer), dan pemasok (Supplier)."
-        tag="CRM Core"
+        icon={lockedFilter === 'SUPPLIER' ? <Building2 /> : lockedFilter === 'CUSTOMER' ? <UserCircle /> : <Users />}
+        iconColor={lockedFilter === 'SUPPLIER' ? 'text-emerald-600' : lockedFilter === 'CUSTOMER' ? 'text-blue-600' : 'text-indigo-600'}
+        title={lockedFilter === 'SUPPLIER' ? 'Vendor' : lockedFilter === 'CUSTOMER' ? 'Pelanggan' : 'Pelanggan & Pemasok'}
+        subtitle={
+          lockedFilter === 'SUPPLIER'
+            ? 'Manajemen data pemasok, pembelian, dan analitik ketergantungan vendor.'
+            : lockedFilter === 'CUSTOMER'
+            ? 'Manajemen data pelanggan, analitik pembelian, dan segmentasi CRM.'
+            : 'Pusat data relasi bisnis, manajemen pelanggan (Customer), dan pemasok (Supplier).'
+        }
+        tag={lockedFilter === 'SUPPLIER' ? 'Vendor · Operasional' : lockedFilter === 'CUSTOMER' ? 'Pelanggan · CRM' : 'CRM Core'}
         actions={
           <SafeButton variant="primary" icon={<Plus size={18} />} onClick={openCreateModal}>
             {createLabel}
