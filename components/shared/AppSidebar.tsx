@@ -106,6 +106,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Operasional',
     items: [
+      { label: 'Vendor', href: '/contacts/vendors', icon: Building2, permission_key: 'crm', module_key: 'CRM' },
       { label: 'Pembelian', href: '/purchasing', icon: ShoppingCart, permission_key: 'purchasing', module_key: 'Purchasing' },
       { label: 'Inventori', href: '/inventory', icon: Package, permission_key: 'inventory', module_key: 'Inventory' },
       { label: 'Mutasi Stok', href: '/inventory/movements', icon: ArrowLeftRight, permission_key: 'inventory', module_key: 'Inventory' },
@@ -124,7 +125,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Marketing & Sales',
     items: [
-      { label: 'Pelanggan (CRM)', href: '/contacts', icon: Users, permission_key: 'crm', module_key: 'CRM' },
+      { label: 'Pelanggan', href: '/contacts/customers', icon: Users, permission_key: 'crm', module_key: 'CRM' },
       { label: 'Keluhan & Permintaan', href: '/crm/tickets', icon: MessageSquare, permission_key: 'crm', module_key: 'CRM' },
       { label: 'POS (Kasir)', href: '/pos', icon: Store, permission_key: 'pos', module_key: 'POS' },
       { label: 'Penawaran (Quotation)', href: '/sales/quotations', icon: FileText, permission_key: 'quotation', module_key: 'Sales' },
