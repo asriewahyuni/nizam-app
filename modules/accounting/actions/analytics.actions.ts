@@ -210,3 +210,70 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
     },
   }
 }
+
+export type CogsRevenueTrendRow = {
+  month_key: string
+  month_label: string
+  revenue: number
+  cogs: number
+  gross_profit: number
+  gross_margin: number
+}
+
+export async function getCogsRevenueTrend(orgId: string, branchId?: string | null): Promise<CogsRevenueTrendRow[]> {
+  const branchClause = branchId ? 'AND s.branch_id = $2' : ''
+  const params = branchId ? [orgId, branchId] : [orgId]
+
+  const result = await queryPostgres<{
+    month_key: string
+    month_label: string
+    revenue: string
+    cogs: string
+    gross_profit: string
+  }>(
+    `WITH months AS (
+       SELECT generate_series(
+         date_trunc('month', CURRENT_DATE - INTERVAL '11 months'),
+         date_trunc('month', CURRENT_DATE),
+         '1 month'::interval
+       ) AS month
+     ),
+     monthly AS (
+       SELECT
+         date_trunc('month', s.sale_date)              AS month,
+         SUM(s.grand_total)                             AS revenue,
+         SUM(si.quantity * COALESCE(p.average_cost, 0)) AS cogs
+       FROM public.sales s
+       JOIN public.sales_items si ON si.sale_id = s.id
+       LEFT JOIN public.products p ON p.id = si.product_id
+       WHERE s.org_id = $1
+         AND COALESCE(s.payment_status, '') != 'CANCELLED'
+         ${branchClause}
+       GROUP BY 1
+     )
+     SELECT
+       TO_CHAR(m.month, 'YYYY-MM')    AS month_key,
+       TO_CHAR(m.month, 'Mon ''YY')   AS month_label,
+       COALESCE(ms.revenue, 0)        AS revenue,
+       COALESCE(ms.cogs, 0)           AS cogs,
+       COALESCE(ms.revenue, 0) - COALESCE(ms.cogs, 0) AS gross_profit
+     FROM months m
+     LEFT JOIN monthly ms ON ms.month = m.month
+     ORDER BY m.month`,
+    params
+  ).catch(() => ({ rows: [] as any[] }))
+
+  return result.rows.map(r => {
+    const revenue = Number(r.revenue)
+    const cogs    = Number(r.cogs)
+    const gp      = Number(r.gross_profit)
+    return {
+      month_key:    r.month_key,
+      month_label:  r.month_label,
+      revenue,
+      cogs,
+      gross_profit: gp,
+      gross_margin: revenue > 0 ? Math.round((gp / revenue) * 100) : 0,
+    }
+  })
+}

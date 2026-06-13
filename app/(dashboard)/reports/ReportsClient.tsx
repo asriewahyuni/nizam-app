@@ -2,21 +2,25 @@
 
 import React, { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  FileText, 
-  BarChart, 
-  PieChart, 
+import {
+  FileText,
+  BarChart,
+  PieChart,
   ArrowRight,
   ChevronDown,
   Printer,
   Download,
-  Filter,
   TrendingUp,
   Triangle,
-  Layers
+  Layers,
+  TrendingDown,
+  Percent,
+  Filter,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
+import LineChart from '../contacts/_components/LineChart'
+import type { CogsRevenueTrendRow } from '@/modules/accounting/actions/analytics.actions'
 
 interface ReportsClientProps {
   orgId: string
@@ -26,6 +30,7 @@ interface ReportsClientProps {
   isParentOrg?: boolean
   balanceSheet: any
   profitLoss: any
+  cogsTrend?: CogsRevenueTrendRow[]
   cashFlow: {
     ocf: number
     icf: number
@@ -127,6 +132,7 @@ export default function ReportsClient({
   balanceSheet,
   profitLoss,
   cashFlow,
+  cogsTrend = [],
   isConsolidated,
   isParentOrg,
 }: ReportsClientProps) {
@@ -348,6 +354,117 @@ export default function ReportsClient({
           </div>
         </div>
       </div>
+
+      {/* ── COGS vs REVENUE TREND ─────────────────────────────────────────── */}
+      {cogsTrend.length > 0 && (() => {
+        const labels     = cogsTrend.map(r => r.month_label)
+        const hasAnyCogs = cogsTrend.some(r => r.cogs > 0)
+        const lastMonth  = cogsTrend[cogsTrend.length - 1]
+        const prevMonth  = cogsTrend[cogsTrend.length - 2]
+
+        const totalRevenue    = cogsTrend.reduce((s, r) => s + r.revenue, 0)
+        const totalCogs       = cogsTrend.reduce((s, r) => s + r.cogs, 0)
+        const totalGp         = totalRevenue - totalCogs
+        const avgMargin       = totalRevenue > 0 ? Math.round((totalGp / totalRevenue) * 100) : 0
+        const revenueGrowth   = prevMonth && prevMonth.revenue > 0
+          ? Math.round(((lastMonth.revenue - prevMonth.revenue) / prevMonth.revenue) * 100) : null
+
+        return (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            {/* Card header */}
+            <div className="px-6 pt-6 pb-4 border-b border-slate-50 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <TrendingUp size={15} className="text-blue-600" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-800">COGS vs Revenue — 12 Bulan Terakhir</h3>
+                </div>
+                <p className="text-[11px] text-slate-400 pl-10">Tren pendapatan kotor vs harga pokok penjualan bulan per bulan</p>
+              </div>
+
+              {/* Summary chips */}
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                  <TrendingUp size={12} className="text-emerald-600" />
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Revenue</span>
+                  <span className="text-[11px] font-bold text-emerald-700">{formatRupiah(totalRevenue)}</span>
+                </div>
+                {hasAnyCogs && (
+                  <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
+                    <TrendingDown size={12} className="text-rose-500" />
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">COGS</span>
+                    <span className="text-[11px] font-bold text-rose-700">{formatRupiah(totalCogs)}</span>
+                  </div>
+                )}
+                <div className={`flex items-center gap-1.5 border rounded-xl px-3 py-2 ${totalGp >= 0 ? 'bg-blue-50 border-blue-100' : 'bg-amber-50 border-amber-100'}`}>
+                  <Percent size={12} className={totalGp >= 0 ? 'text-blue-600' : 'text-amber-600'} />
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Gross Margin</span>
+                  <span className={`text-[11px] font-bold ${totalGp >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>{avgMargin}%</span>
+                </div>
+                {revenueGrowth !== null && (
+                  <div className={`flex items-center gap-1.5 border rounded-xl px-3 py-2 ${revenueGrowth >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
+                    {revenueGrowth >= 0
+                      ? <Triangle size={10} className="text-emerald-600 fill-emerald-600" />
+                      : <Triangle size={10} className="text-rose-500 fill-rose-500 rotate-180" />}
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">MoM</span>
+                    <span className={`text-[11px] font-bold ${revenueGrowth >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {revenueGrowth >= 0 ? '+' : ''}{revenueGrowth}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Chart */}
+            <div className="px-6 pt-4 pb-6">
+              <LineChart
+                labels={labels}
+                series={[
+                  { key: 'revenue', label: 'Revenue',      color: '#10b981', values: cogsTrend.map(r => r.revenue) },
+                  ...(hasAnyCogs ? [{ key: 'cogs', label: 'COGS', color: '#f43f5e', values: cogsTrend.map(r => r.cogs) }] : []),
+                  { key: 'gp',     label: 'Gross Profit',  color: '#3b82f6', values: cogsTrend.map(r => r.gross_profit) },
+                ]}
+                height={200}
+                formatValue={formatRupiah}
+              />
+
+              {/* Legend */}
+              <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-slate-50">
+                {[
+                  { color: '#10b981', label: 'Revenue' },
+                  ...(hasAnyCogs ? [{ color: '#f43f5e', label: 'COGS (HPP)' }] : []),
+                  { color: '#3b82f6', label: 'Gross Profit' },
+                ].map(s => (
+                  <div key={s.label} className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+                    <div className="w-3 h-0.5 rounded-full" style={{ background: s.color }} />
+                    <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+                    {s.label}
+                  </div>
+                ))}
+                {!hasAnyCogs && (
+                  <span className="text-[10px] text-slate-300 italic">COGS tidak tampil — belum ada produk dengan average cost</span>
+                )}
+              </div>
+
+              {/* Monthly gross margin badges */}
+              <div className="mt-4 flex flex-wrap gap-2">
+                {cogsTrend.filter(r => r.revenue > 0).map(r => (
+                  <div key={r.month_key} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold ${
+                    r.gross_margin >= 40 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                    : r.gross_margin >= 20 ? 'bg-blue-50 text-blue-700 border-blue-100'
+                    : r.gross_margin > 0  ? 'bg-amber-50 text-amber-700 border-amber-100'
+                    : 'bg-rose-50 text-rose-700 border-rose-100'
+                  }`}>
+                    <span className="text-slate-400 font-medium">{r.month_label}</span>
+                    <span>{r.gross_margin}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       <AnimatePresence mode="wait">
         {activeTab === 'PL' ? (
