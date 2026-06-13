@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import type { VendorDashboardData } from '@/modules/contacts/actions/contact.analytics'
+import LineChart from '../_components/LineChart'
 
 const CONC_COLORS = [
   { bar: 'bg-emerald-500', dot: 'bg-emerald-500', text: 'text-emerald-700' },
@@ -52,11 +53,11 @@ function Bar({ value, max, className = 'bg-emerald-500' }: { value: number; max:
 export default function VendorDashboard({ data }: { data: VendorDashboardData }) {
   const { hero, monthlyGrowth, concentration, apAging, spendCategories, topVendors, dpoStats } = data
 
-  const maxSpend   = Math.max(...monthlyGrowth.map(m => m.total_spend), 1)
-  const maxNewV    = Math.max(...monthlyGrowth.map(m => m.new_vendors), 1)
-  const maxTopV    = Math.max(...topVendors.map(v => v.total), 1)
+  const maxTopV     = Math.max(...topVendors.map(v => v.total), 1)
   const maxCatSpend = Math.max(...spendCategories.map(s => s.total_spend), 1)
-  const totalConc  = concentration.reduce((s, v) => s + v.spend, 0) || 1
+  const totalConc   = concentration.reduce((s, v) => s + v.spend, 0) || 1
+
+  const growthLabels = monthlyGrowth.map(m => m.month_label)
 
   return (
     <div className="space-y-5">
@@ -109,18 +110,12 @@ export default function VendorDashboard({ data }: { data: VendorDashboardData })
               <TrendingUp size={16} className="text-emerald-600" />
             </div>
           </div>
-          <div className="space-y-2.5">
-            {monthlyGrowth.map(m => (
-              <div key={m.month} className="flex items-center gap-3">
-                <span className="text-[10px] font-semibold text-slate-400 w-12 shrink-0">{m.month_label}</span>
-                <Bar value={m.total_spend} max={maxSpend} className="bg-gradient-to-r from-emerald-400 to-teal-500" />
-                <div className="flex items-center gap-2 shrink-0 min-w-[140px] justify-end">
-                  <span className="text-[11px] font-bold text-slate-700">{formatRupiah(m.total_spend)}</span>
-                  {m.prev_spend !== null && <Delta current={m.total_spend} previous={m.prev_spend} />}
-                </div>
-              </div>
-            ))}
-          </div>
+          <LineChart
+            labels={growthLabels}
+            series={[{ key: 'spend', label: 'Total Pembelian', color: '#10b981', values: monthlyGrowth.map(m => m.total_spend) }]}
+            height={160}
+            formatValue={formatRupiah}
+          />
         </div>
 
         {/* Vendor baru + PO count */}
@@ -130,22 +125,20 @@ export default function VendorDashboard({ data }: { data: VendorDashboardData })
               <h3 className="text-sm font-bold text-slate-800">Vendor Baru &amp; Volume PO</h3>
               <p className="text-[11px] text-slate-400 mt-0.5">12 bulan terakhir</p>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center">
-              <Building2 size={16} className="text-teal-600" />
+            <div className="flex gap-3 text-[10px] font-semibold shrink-0">
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block"/>Vendor Baru</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block"/>Volume PO</span>
             </div>
           </div>
-          <div className="space-y-2.5">
-            {monthlyGrowth.map(m => (
-              <div key={m.month} className="flex items-center gap-3">
-                <span className="text-[10px] font-semibold text-slate-400 w-12 shrink-0">{m.month_label}</span>
-                <Bar value={m.new_vendors} max={maxNewV} className="bg-gradient-to-r from-teal-400 to-cyan-500" />
-                <div className="flex items-center gap-2 shrink-0 min-w-[110px] justify-end">
-                  <span className="text-[11px] font-bold text-slate-700">{m.new_vendors} vendor</span>
-                  <span className="text-[10px] text-slate-400">{m.po_count} PO</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          <LineChart
+            labels={growthLabels}
+            series={[
+              { key: 'vendors', label: 'Vendor Baru', color: '#14b8a6', values: monthlyGrowth.map(m => m.new_vendors) },
+              { key: 'po',      label: 'Volume PO',   color: '#06b6d4', values: monthlyGrowth.map(m => m.po_count) },
+            ]}
+            height={160}
+            formatValue={(v) => `${v}`}
+          />
         </div>
       </div>
 

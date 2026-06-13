@@ -7,7 +7,6 @@ import {
   BarChart2,
   Clock,
   CreditCard,
-  Minus,
   RefreshCw,
   ShieldCheck,
   Star,
@@ -19,6 +18,7 @@ import {
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import type { CustomerDashboardData } from '@/modules/contacts/actions/contact.analytics'
+import LineChart from '../_components/LineChart'
 
 const RFM_META: Record<string, { badge: string; dot: string; desc: string }> = {
   Champions: { badge: 'bg-amber-100 text-amber-800 border-amber-200',   dot: 'bg-amber-500',   desc: 'Beli sering, baru, nilai tinggi' },
@@ -43,34 +43,26 @@ function Delta({ current, previous, invert = false }: { current: number; previou
     : <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-rose-500"><ArrowDown size={10}/>{Math.abs(p)}%</span>
 }
 
-function Bar({ value, max, className = 'bg-blue-500' }: { value: number; max: number; className?: string }) {
-  const w = max > 0 ? Math.max((value / max) * 100, 2) : 2
-  return (
-    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-      <div className={`h-full rounded-full ${className} transition-all duration-500`} style={{ width: `${w}%` }} />
-    </div>
-  )
-}
-
 export default function CustomerDashboard({ data }: { data: CustomerDashboardData }) {
   const { hero, monthlyGrowth, retention, rfm, ar } = data
 
-  const maxRev  = Math.max(...monthlyGrowth.map(m => m.revenue), 1)
-  const maxNewC = Math.max(...monthlyGrowth.map(m => m.new_customers), 1)
-  const maxAov  = Math.max(...retention.aovByMonth.map(m => m.aov), 1)
-  const maxAr   = Math.max(...ar.buckets.map(b => b.total), 1)
+  const maxAr = Math.max(...ar.buckets.map(b => b.total), 1)
 
   const rfmGroups = rfm.reduce<Record<string, number>>((acc, c) => {
     acc[c.segment] = (acc[c.segment] ?? 0) + 1
     return acc
   }, {})
 
+  const growthLabels  = monthlyGrowth.map(m => m.month_label)
+  const recentLabels  = monthlyGrowth.slice(-6).map(m => m.month_label)
+  const aovLabels     = retention.aovByMonth.map(m => m.month_label)
+  const rvmLabels     = retention.repeatBuyersByMonth.map(m => m.month_label)
+
   return (
     <div className="space-y-5">
 
       {/* ── HERO BANNER ───────────────────────────────────────────────── */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0f172a] via-[#1e3a8a] to-[#1d4ed8] p-6 md:p-8 text-white shadow-lg shadow-blue-900/20">
-        {/* decorative blobs */}
         <div className="pointer-events-none absolute -top-16 -right-16 w-64 h-64 rounded-full bg-blue-500/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-indigo-400/20 blur-3xl" />
 
@@ -117,18 +109,12 @@ export default function CustomerDashboard({ data }: { data: CustomerDashboardDat
               <TrendingUp size={16} className="text-emerald-600" />
             </div>
           </div>
-          <div className="space-y-2.5">
-            {monthlyGrowth.map(m => (
-              <div key={m.month} className="group flex items-center gap-3">
-                <span className="text-[10px] font-semibold text-slate-400 w-12 shrink-0">{m.month_label}</span>
-                <Bar value={m.revenue} max={maxRev} className="bg-gradient-to-r from-emerald-400 to-teal-500" />
-                <div className="flex items-center gap-2 shrink-0 min-w-[130px] justify-end">
-                  <span className="text-[11px] font-bold text-slate-700">{formatRupiah(m.revenue)}</span>
-                  {m.prev_revenue !== null && <Delta current={m.revenue} previous={m.prev_revenue} />}
-                </div>
-              </div>
-            ))}
-          </div>
+          <LineChart
+            labels={growthLabels}
+            series={[{ key: 'revenue', label: 'Revenue', color: '#10b981', values: monthlyGrowth.map(m => m.revenue) }]}
+            height={160}
+            formatValue={formatRupiah}
+          />
         </div>
 
         {/* Customer baru + AOV */}
@@ -139,21 +125,18 @@ export default function CustomerDashboard({ data }: { data: CustomerDashboardDat
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-800">Customer Baru</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Akuisisi 12 bulan terakhir</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Akuisisi 6 bulan terakhir</p>
               </div>
               <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
                 <UserCheck size={16} className="text-blue-600" />
               </div>
             </div>
-            <div className="space-y-2">
-              {monthlyGrowth.slice(-6).map(m => (
-                <div key={m.month} className="flex items-center gap-3">
-                  <span className="text-[10px] font-semibold text-slate-400 w-12 shrink-0">{m.month_label}</span>
-                  <Bar value={m.new_customers} max={maxNewC} className="bg-gradient-to-r from-blue-400 to-indigo-500" />
-                  <span className="text-[11px] font-bold text-slate-700 shrink-0 w-16 text-right">{m.new_customers} baru</span>
-                </div>
-              ))}
-            </div>
+            <LineChart
+              labels={recentLabels}
+              series={[{ key: 'new', label: 'Customer Baru', color: '#3b82f6', values: monthlyGrowth.slice(-6).map(m => m.new_customers) }]}
+              height={100}
+              formatValue={(v) => `${v} baru`}
+            />
           </div>
 
           {/* AOV */}
@@ -167,15 +150,12 @@ export default function CustomerDashboard({ data }: { data: CustomerDashboardDat
                 <BarChart2 size={16} className="text-amber-600" />
               </div>
             </div>
-            <div className="space-y-2">
-              {retention.aovByMonth.map(m => (
-                <div key={m.month} className="flex items-center gap-3">
-                  <span className="text-[10px] font-semibold text-slate-400 w-12 shrink-0">{m.month_label}</span>
-                  <Bar value={m.aov} max={maxAov} className="bg-gradient-to-r from-amber-400 to-orange-400" />
-                  <span className="text-[11px] font-bold text-slate-700 shrink-0 w-28 text-right">{formatRupiah(m.aov)}</span>
-                </div>
-              ))}
-            </div>
+            <LineChart
+              labels={aovLabels}
+              series={[{ key: 'aov', label: 'AOV', color: '#f59e0b', values: retention.aovByMonth.map(m => m.aov) }]}
+              height={100}
+              formatValue={formatRupiah}
+            />
           </div>
         </div>
       </div>
@@ -188,7 +168,7 @@ export default function CustomerDashboard({ data }: { data: CustomerDashboardDat
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="text-sm font-bold text-slate-800">New vs Repeat Buyer</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">Komposisi pembeli 6 bulan terakhir</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Tren pembeli baru vs kembali — 6 bulan terakhir</p>
             </div>
             <div className="flex gap-3 text-[10px] font-semibold">
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 inline-block"/>Baru</span>
@@ -198,28 +178,15 @@ export default function CustomerDashboard({ data }: { data: CustomerDashboardDat
           {retention.repeatBuyersByMonth.length === 0 ? (
             <p className="text-xs text-slate-400 italic">Belum ada data.</p>
           ) : (
-            <div className="space-y-4">
-              {retention.repeatBuyersByMonth.map(m => {
-                const total = m.new_buyers + m.repeat_buyers || 1
-                const newPct = (m.new_buyers / total) * 100
-                const repPct = (m.repeat_buyers / total) * 100
-                return (
-                  <div key={m.month}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[11px] font-semibold text-slate-600">{m.month_label}</span>
-                      <div className="flex gap-4 text-[11px] font-bold">
-                        <span className="text-blue-600">{m.new_buyers} baru</span>
-                        <span className="text-indigo-600">{m.repeat_buyers} repeat</span>
-                      </div>
-                    </div>
-                    <div className="flex h-3 rounded-full overflow-hidden bg-slate-100 gap-px">
-                      <div className="bg-blue-400 rounded-l-full transition-all duration-500" style={{ width: `${newPct}%` }} />
-                      <div className="bg-indigo-600 rounded-r-full transition-all duration-500" style={{ width: `${repPct}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <LineChart
+              labels={rvmLabels}
+              series={[
+                { key: 'new',    label: 'Baru',   color: '#60a5fa', values: retention.repeatBuyersByMonth.map(m => m.new_buyers) },
+                { key: 'repeat', label: 'Repeat', color: '#4f46e5', values: retention.repeatBuyersByMonth.map(m => m.repeat_buyers) },
+              ]}
+              height={160}
+              formatValue={(v) => `${v} pembeli`}
+            />
           )}
         </div>
 
