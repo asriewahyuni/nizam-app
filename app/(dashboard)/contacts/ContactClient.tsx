@@ -4,14 +4,19 @@ import React, { startTransition, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertCircle,
+  BarChart2,
   Building2,
+  Calendar,
   CheckCircle2,
+  CreditCard,
+  Loader2,
   Mail,
   MapPin,
   Pencil,
   Phone,
   Plus,
   Search,
+  ShoppingBag,
   Star,
   Target,
   Trash2,
@@ -19,9 +24,10 @@ import {
   TrendingUp,
   UserCircle,
   Users,
+  X,
 } from 'lucide-react'
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatCard, useConfirm} from '@/components/ui/NizamUI'
-import { createContact, deleteContact, updateContact } from '@/modules/contacts/actions/contact.actions'
+import { createContact, deleteContact, updateContact, getContactCrmAnalytics, type ContactCrmAnalytics } from '@/modules/contacts/actions/contact.actions'
 import { formatRupiah } from '@/lib/utils'
 
 type ContactType = 'CUSTOMER' | 'SUPPLIER'
@@ -137,6 +143,9 @@ export default function ContactClient({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [analyticsContact, setAnalyticsContact] = useState<ContactRecord | null>(null)
+  const [analyticsData, setAnalyticsData] = useState<ContactCrmAnalytics | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
 
   useEffect(() => {
     setContactItems(sortContacts((contacts || []).map(normalizeContact)))
@@ -206,6 +215,20 @@ export default function ContactClient({
     setEditingContact(contact)
     setFormState(toFormState(contact))
     setShowFormModal(true)
+  }
+
+  const openAnalyticsModal = async (contact: ContactRecord) => {
+    setAnalyticsContact(contact)
+    setAnalyticsData(null)
+    setAnalyticsLoading(true)
+    const result = await getContactCrmAnalytics(orgId, contact.id)
+    setAnalyticsData('data' in result ? result.data : null)
+    setAnalyticsLoading(false)
+  }
+
+  const closeAnalyticsModal = () => {
+    setAnalyticsContact(null)
+    setAnalyticsData(null)
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -424,6 +447,16 @@ export default function ContactClient({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
+                        {!isSupplier && (
+                          <button
+                            type="button"
+                            onClick={() => openAnalyticsModal(contact)}
+                            className="w-10 h-10 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center"
+                            title="Lihat analitik pelanggan"
+                          >
+                            <BarChart2 size={15} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => openEditModal(contact)}
@@ -609,7 +642,229 @@ export default function ContactClient({
           </div>
         </div>
       )}
+      {analyticsContact && (
+        <CustomerAnalyticsModal
+          contact={analyticsContact}
+          data={analyticsData}
+          loading={analyticsLoading}
+          onClose={closeAnalyticsModal}
+        />
+      )}
+
       {ConfirmUI}
+    </div>
+  )
+}
+
+const DAY_LABELS = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
+
+function CustomerAnalyticsModal({
+  contact,
+  data,
+  loading,
+  onClose,
+}: {
+  contact: ContactRecord
+  data: ContactCrmAnalytics | null
+  loading: boolean
+  onClose: () => void
+}) {
+  const maxMonthly = Math.max(...(data?.monthlyPurchases.map(m => m.total) ?? [1]), 1)
+  const maxProduct = Math.max(...(data?.topProducts.map(p => p.order_count) ?? [1]), 1)
+  const totalDays = data?.shoppingDays.reduce((sum, d) => sum + d.count, 0) ?? 1
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl">
+
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-8 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg shrink-0">
+              {contact.name.slice(0, 1)}
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 tracking-tight">{contact.name}</h3>
+              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide">Analitik CRM Pelanggan</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-all cursor-pointer"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="px-8 py-6 space-y-8">
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <Loader2 size={32} className="text-indigo-500 animate-spin" />
+              <p className="text-sm font-semibold text-slate-400">Memuat analitik...</p>
+            </div>
+          )}
+
+          {!loading && data && (
+            <>
+              {/* Summary row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Total Transaksi', value: `${data.summary.total_orders}x`, color: 'bg-blue-50 text-blue-700' },
+                  { label: 'Total Belanja', value: formatRupiah(data.summary.total_spent), color: 'bg-indigo-50 text-indigo-700' },
+                  { label: 'Rata-rata / Order', value: formatRupiah(data.summary.avg_order), color: 'bg-violet-50 text-violet-700' },
+                  {
+                    label: 'Transaksi Terakhir',
+                    value: data.summary.last_purchase
+                      ? new Date(data.summary.last_purchase).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : '-',
+                    color: 'bg-slate-50 text-slate-600',
+                  },
+                ].map(stat => (
+                  <div key={stat.label} className={`rounded-xl p-4 ${stat.color}`}>
+                    <p className="text-[9px] font-bold uppercase tracking-wider opacity-60">{stat.label}</p>
+                    <p className="text-sm font-bold mt-1 truncate">{stat.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* 1. Pembelian per bulan */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp size={15} className="text-indigo-500" />
+                  <h4 className="text-sm font-bold text-slate-700">Total Pembelian per Bulan</h4>
+                </div>
+                {data.monthlyPurchases.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Belum ada transaksi 12 bulan terakhir.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.monthlyPurchases.map(m => (
+                      <div key={m.month} className="flex items-center gap-3">
+                        <span className="text-[10px] font-semibold text-slate-500 w-20 shrink-0">{m.month_label}</span>
+                        <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-500 rounded-full flex items-center justify-end pr-2 transition-all duration-500"
+                            style={{ width: `${Math.max((m.total / maxMonthly) * 100, 3)}%` }}
+                          >
+                            <span className="text-[8px] font-bold text-white hidden">{m.transaction_count}x</span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 min-w-[100px]">
+                          <span className="text-[11px] font-bold text-slate-700">{formatRupiah(m.total)}</span>
+                          <span className="text-[9px] text-slate-400 ml-1">({m.transaction_count}x)</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Produk yang sering dibeli */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <ShoppingBag size={15} className="text-emerald-500" />
+                  <h4 className="text-sm font-bold text-slate-700">Produk yang Sering Dibeli</h4>
+                </div>
+                {data.topProducts.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Tidak ada data item transaksi.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.topProducts.map((p, i) => (
+                      <div key={`${p.description}-${i}`} className="flex items-center gap-3">
+                        <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold flex items-center justify-center shrink-0">
+                          {i + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] font-semibold text-slate-700 truncate pr-2">{p.description}</span>
+                            <span className="text-[10px] font-bold text-emerald-600 shrink-0">{p.order_count}x pesan</span>
+                          </div>
+                          <div className="bg-slate-100 rounded-full h-2">
+                            <div
+                              className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+                              style={{ width: `${(p.order_count / maxProduct) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-semibold text-slate-500 shrink-0 w-24 text-right">{formatRupiah(p.total_amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Hari belanja */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Calendar size={15} className="text-amber-500" />
+                  <h4 className="text-sm font-bold text-slate-700">Hari Belanja Favorit</h4>
+                </div>
+                {data.shoppingDays.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Belum ada data transaksi.</p>
+                ) : (
+                  <div className="flex gap-2 flex-wrap">
+                    {[0, 1, 2, 3, 4, 5, 6].map(dayIdx => {
+                      const dayData = data.shoppingDays.find(d => d.day_of_week === dayIdx)
+                      const count = dayData?.count ?? 0
+                      const pct = Math.round((count / totalDays) * 100)
+                      const isTop = data.shoppingDays[0]?.day_of_week === dayIdx
+                      return (
+                        <div
+                          key={dayIdx}
+                          className={`flex-1 min-w-[56px] rounded-xl p-3 text-center border transition-all ${
+                            isTop
+                              ? 'bg-amber-500 border-amber-400 text-white'
+                              : count > 0
+                                ? 'bg-amber-50 border-amber-100 text-amber-700'
+                                : 'bg-slate-50 border-slate-100 text-slate-300'
+                          }`}
+                        >
+                          <p className="text-[10px] font-bold uppercase">{DAY_LABELS[dayIdx]}</p>
+                          <p className="text-lg font-bold mt-1">{count}</p>
+                          <p className="text-[9px] font-semibold opacity-70">{pct}%</p>
+                          {isTop && <p className="text-[8px] font-bold mt-1 opacity-80">FAVORIT</p>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Metode pembayaran */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <CreditCard size={15} className="text-blue-500" />
+                  <h4 className="text-sm font-bold text-slate-700">Metode Pembayaran</h4>
+                </div>
+                {data.paymentChannels.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Belum ada data pembayaran tercatat.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {data.paymentChannels.map((ch, i) => (
+                      <div
+                        key={`${ch.channel}-${i}`}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-100 bg-blue-50 text-blue-700"
+                      >
+                        <CreditCard size={12} />
+                        <span className="text-[11px] font-bold">{ch.channel}</span>
+                        <span className="text-[10px] font-semibold opacity-60">{ch.count}x</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {!loading && !data && (
+            <div className="text-center py-16 text-slate-400">
+              <BarChart2 size={40} className="mx-auto mb-3 opacity-30" />
+              <p className="text-sm font-semibold">Gagal memuat data analitik.</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
