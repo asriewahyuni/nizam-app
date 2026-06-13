@@ -3,7 +3,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { queryPostgres } from '@/lib/db/postgres'
 import { revalidatePath } from 'next/cache'
-import { queryPostgres } from '@/lib/db/postgres'
 import { Product } from '@/types/database.types'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
