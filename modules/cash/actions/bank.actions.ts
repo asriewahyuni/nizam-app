@@ -7,6 +7,7 @@ import { checkCanManageCoA } from '@/modules/accounting/actions/coa.actions'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 import { createInterBranchBankTransfer } from './interbranch-transfer.server'
+import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
 import type { Account, BankAccount } from '@/types/database.types'
 import type { CashBankAccount, RecentTransactionOption } from '@/modules/cash/types'
 
@@ -506,6 +507,11 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
     return { error: 'Akun lawan tidak boleh sama dengan akun kas/bank sumber karena jurnal akan bernilai nol.' }
   }
 
+  const closedPeriodForBankTx = await checkClosedFiscalPeriod(orgId, transDate)
+  if (closedPeriodForBankTx) {
+    return { error: buildClosedPeriodError('Transaksi Kas/Bank', transDate, closedPeriodForBankTx) }
+  }
+
   const { error } = await (supabase as any).from('bank_transactions').insert({
     org_id: orgId,
     branch_id: activeBranchResult.branchId,
@@ -595,6 +601,11 @@ export async function createInterOrgCapitalTransfer(orgId: string, formData: For
       error:
         'Akun lawan entitas tujuan harus akun pendanaan/modal (kelompok 25xx, 26xx, atau 3xxx), misalnya 3001 Modal Disetor.',
     }
+  }
+
+  const closedPeriodForCapitalTransfer = await checkClosedFiscalPeriod(orgId, transactionDate)
+  if (closedPeriodForCapitalTransfer) {
+    return { error: buildClosedPeriodError('Transfer Modal Antar Entitas', transactionDate, closedPeriodForCapitalTransfer) }
   }
 
   const { data, error } = await (supabase as any).rpc('create_interorg_capital_transfer', {

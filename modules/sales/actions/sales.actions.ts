@@ -15,6 +15,8 @@ import {
   getSellableBranchStockShortages,
 } from '@/modules/sales/lib/stock-guard.server'
 import { listActiveSalesWarehouses } from '@/modules/sales/lib/warehouse-branch-compat.server'
+import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
+import { getDateInTimeZone } from '@/lib/utils'
 
 type ActiveBranchResult =
   | { branchId: string }
@@ -1247,6 +1249,12 @@ export async function createSaleEntry(orgId: string, payload: any) {
     return { error: 'Customer dan minimal satu baris item wajib diisi.' }
   }
 
+  const saleDateNormalized = String(payload.sale_date || '').trim().split('T')[0]
+  const closedPeriodForCreate = await checkClosedFiscalPeriod(orgId, saleDateNormalized)
+  if (closedPeriodForCreate) {
+    return { error: buildClosedPeriodError('Penjualan', saleDateNormalized, closedPeriodForCreate) }
+  }
+
   let shariahMode = normalizeShariahMode(payload.shariah_mode)
 
   if (createMode === 'PUBLISH' && shariahMode === 'CASH') {
@@ -1745,6 +1753,12 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
     return { error: 'Akad SALAM wajib lunas terlebih dahulu sebelum pengiriman barang.' }
   }
 
+  const deliverDate = getDateInTimeZone('Asia/Jakarta')
+  const closedPeriodForDeliver = await checkClosedFiscalPeriod(orgId, deliverDate)
+  if (closedPeriodForDeliver) {
+    return { error: buildClosedPeriodError('Pengiriman Penjualan', deliverDate, closedPeriodForDeliver) }
+  }
+
   let resolvedWarehouseId: string | null = null
   if (warehouseId || sale.warehouse_id) {
     const resolvedWarehouse = await resolveDeliveryWarehouseId(
@@ -1897,7 +1911,7 @@ export async function voidSale(orgId: string, saleId: string) {
   // 1. Check current status — only existing documents can be voided
   const { data: sale } = await (supabase as any)
     .from('sales')
-    .select('status, warehouse_id')
+    .select('status, warehouse_id, sale_date')
     .eq('id', saleId)
     .eq('org_id', orgId)
     .eq('branch_id', activeBranchId)
@@ -1905,6 +1919,12 @@ export async function voidSale(orgId: string, saleId: string) {
 
   if (!sale) return { error: 'Order tidak ditemukan.' }
   if (sale.status === 'VOIDED') return { success: true }
+
+  const voidSaleDate = normalizeDateOnlyValue((sale as any).sale_date) || getDateInTimeZone('Asia/Jakarta')
+  const closedPeriodForVoid = await checkClosedFiscalPeriod(orgId, voidSaleDate)
+  if (closedPeriodForVoid) {
+    return { error: buildClosedPeriodError('Pembatalan Penjualan', voidSaleDate, closedPeriodForVoid) }
+  }
 
   // 2. Atomic void to keep journal, stock_movements, and inventory_stocks in sync.
   const { data: rpcRes, error: rpcErr } = await (supabase as any).rpc('void_sale_atomic', {
@@ -1997,6 +2017,12 @@ export async function processSalesReturn(orgId: string, payload: {
 
   if (!sale) return { error: 'Transaksi penjualan tidak tersedia pada unit aktif.' }
 
+  const returnDate = getDateInTimeZone('Asia/Jakarta')
+  const closedPeriodForReturn = await checkClosedFiscalPeriod(orgId, returnDate)
+  if (closedPeriodForReturn) {
+    return { error: buildClosedPeriodError('Retur Penjualan', returnDate, closedPeriodForReturn) }
+  }
+
   const { data, error } = await (supabase as any).rpc('process_sales_return_atomic', {
     p_org_id: orgId, p_sale_id: payload.sale_id, p_return_number: payload.return_number,
     p_nota_retur: payload.nota_retur, p_items: payload.items, p_user_id: user.id,
@@ -2033,6 +2059,11 @@ export async function processSalesPayment(orgId: string, payload: {
     .maybeSingle()
 
   if (!sale) return { error: 'Transaksi penjualan tidak tersedia pada unit aktif.' }
+
+  const closedPeriodForPayment = await checkClosedFiscalPeriod(orgId, payload.payment_date)
+  if (closedPeriodForPayment) {
+    return { error: buildClosedPeriodError('Pembayaran Penjualan', payload.payment_date, closedPeriodForPayment) }
+  }
 
   const { data, error } = await (supabase as any).rpc('process_sales_payment_atomic', {
     p_org_id: orgId, p_sale_id: payload.sale_id, p_account_id: payload.account_id,

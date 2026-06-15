@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { getProducts } from '@/modules/inventory/actions/inventory.actions';
 import { createSaleEntry, deliverSale } from '@/modules/sales/actions/sales.actions';
+import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period';
+import { getDateInTimeZone } from '@/lib/utils';
 
 export async function getPosMobileProducts(orgId: string, warehouseId: string | null) {
   const supabase = await createClient();
@@ -41,6 +43,12 @@ export async function getPosMobileProducts(orgId: string, warehouseId: string | 
 }
 
 export async function checkoutPosMobile(orgId: string, payload: any) {
+  const posMobileDate = getDateInTimeZone('Asia/Jakarta');
+  const closedPeriodForPosMobile = await checkClosedFiscalPeriod(orgId, posMobileDate);
+  if (closedPeriodForPosMobile) {
+    return { error: buildClosedPeriodError('Transaksi POS Mobile', posMobileDate, closedPeriodForPosMobile) };
+  }
+
   const result = await createSaleEntry(orgId, payload);
   
   if (result.error || !result.saleId) {

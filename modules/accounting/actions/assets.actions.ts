@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { getDateInTimeZone } from '@/lib/utils'
+import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
 
 import { createJournalEntry } from './journal.actions'
 
@@ -113,8 +115,14 @@ export async function createFixedAsset(orgId: string, assetData: any) {
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
+  // Guard: cek periode fiskal tertutup untuk tanggal pembelian aset
+  const closedPeriodAsset = await checkClosedFiscalPeriod(orgId, assetData.purchase_date)
+  if (closedPeriodAsset) {
+    return { error: buildClosedPeriodError('Pendaftaran Aset Tetap', assetData.purchase_date, closedPeriodAsset) }
+  }
+
   // 1. Persiapan Data (Split Payment Support)
-  const { 
+  const {
     source_account_id, 
     source_lines, 
     payment_method: acquisition_method, // Mapping UI to DB
@@ -296,6 +304,13 @@ export async function runOrganizationDepreciation(orgId: string, branchId?: stri
   if (assetError) {
     (console as any).error('Depreciation Error:', assetError)
     return { error: 'Gagal memproses data aset.' }
+  }
+
+  // Guard: cek periode fiskal tertutup untuk tanggal penyusutan hari ini
+  const depreciationDate = getDateInTimeZone('Asia/Jakarta')
+  const closedPeriodDep = await checkClosedFiscalPeriod(orgId, depreciationDate)
+  if (closedPeriodDep) {
+    return { error: buildClosedPeriodError('Jalankan Penyusutan Aset', depreciationDate, closedPeriodDep) }
   }
 
   const today = new Date()
@@ -525,6 +540,13 @@ export async function disposeFixedAsset(orgId: string, payload: {
   )
   if (!accessibleAsset) {
     return { error: 'Aset tetap tidak ditemukan pada unit aktif.' }
+  }
+
+  // Guard: cek periode fiskal tertutup untuk tanggal pelepasan aset
+  const disposalDate = payload.saleDate || getDateInTimeZone('Asia/Jakarta')
+  const closedPeriodDisposal = await checkClosedFiscalPeriod(orgId, disposalDate)
+  if (closedPeriodDisposal) {
+    return { error: buildClosedPeriodError('Pelepasan Aset Tetap', disposalDate, closedPeriodDisposal) }
   }
 
   const { data, error } = await (supabase as any).rpc('process_asset_disposal', {

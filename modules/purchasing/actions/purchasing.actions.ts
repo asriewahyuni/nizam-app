@@ -11,6 +11,7 @@ import { getBranchAccessScope, resolveAccessibleBranchSelection } from '@/module
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 import { getDocumentHeaderDiscountAmount, getDocumentLineDiscountTotal, roundMoney } from '@/lib/commerce/discounts'
 import { getDateInTimeZone } from '@/lib/utils'
+import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
@@ -177,6 +178,7 @@ function isPurchaseWarehouseColumnSchemaCacheMiss(
       message.includes('schema cache'))
   )
 }
+
 
 async function insertPurchaseRecord(
   supabase: any,
@@ -696,6 +698,12 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
     return { error: 'Vendor dan baris produk wajib diisi.' }
   }
 
+  const purchaseDate = normalizeJournalEntryDate(payload.purchase_date)
+  const closedPeriodName = await checkClosedFiscalPeriod(orgId, purchaseDate)
+  if (closedPeriodName) {
+    return { error: `Pembelian tanggal ${purchaseDate} berada pada periode fiskal "${closedPeriodName}" yang sudah ditutup. Pembelian tidak dapat dibuat.` }
+  }
+
   const branchSelection = await resolvePurchasingBranchId(orgId, payload.branch_id)
   if ('error' in branchSelection) {
     return { error: 'Unit aktif tidak valid untuk organisasi ini.' }
@@ -1053,6 +1061,13 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
   const purchaseAccess = await ensurePurchaseDocumentAccess(orgId, purchase.branch_id)
   if ('error' in purchaseAccess) return { error: purchaseAccess.error }
+
+  const receiveDate = getDateInTimeZone('Asia/Jakarta')
+  const closedPeriodOnReceive = await checkClosedFiscalPeriod(orgId, receiveDate)
+  if (closedPeriodOnReceive) {
+    return { error: `Tanggal penerimaan barang (${receiveDate}) berada pada periode fiskal "${closedPeriodOnReceive}" yang sudah ditutup. Penerimaan tidak dapat diproses.` }
+  }
+
   const wasAlreadyReceived = purchase.status === 'RECEIVED'
   if (String(purchase.shariah_mode || '').toUpperCase() === 'SALAM' && purchase.payment_status !== 'PAID') {
     return { error: 'Akad SALAM pembelian wajib lunas terlebih dahulu sebelum penerimaan barang.' }
@@ -1549,6 +1564,12 @@ export async function createPurchasePayment(orgId: string, payload: {
   const purchaseAccess = await ensurePurchaseDocumentAccess(orgId, purchase.branch_id)
   if ('error' in purchaseAccess) return { error: purchaseAccess.error }
 
+  const paymentDate = normalizeJournalEntryDate(payload.payment_date)
+  const closedPeriodOnPayment = await checkClosedFiscalPeriod(orgId, paymentDate)
+  if (closedPeriodOnPayment) {
+    return { error: `Tanggal pembayaran (${paymentDate}) berada pada periode fiskal "${closedPeriodOnPayment}" yang sudah ditutup. Pembayaran tidak dapat diproses.` }
+  }
+
   const { data, error } = await (supabase as any).rpc('process_purchase_payment_atomic', {
     p_org_id: orgId,
     p_purchase_id: payload.purchase_id,
@@ -1588,6 +1609,12 @@ export async function createPurchaseReturn(orgId: string, payload: {
   if (!purchase) return { error: 'PO tidak ditemukan.' }
   const purchaseAccess = await ensurePurchaseDocumentAccess(orgId, purchase.branch_id)
   if ('error' in purchaseAccess) return { error: purchaseAccess.error }
+
+  const returnDate = normalizeJournalEntryDate(payload.return_date)
+  const closedPeriodOnReturn = await checkClosedFiscalPeriod(orgId, returnDate)
+  if (closedPeriodOnReturn) {
+    return { error: `Tanggal retur (${returnDate}) berada pada periode fiskal "${closedPeriodOnReturn}" yang sudah ditutup. Retur tidak dapat diproses.` }
+  }
 
   const { data, error } = await (supabase as any).rpc('process_purchase_return_atomic', {
     p_org_id: orgId,

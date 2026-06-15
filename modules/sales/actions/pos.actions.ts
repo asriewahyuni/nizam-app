@@ -11,6 +11,7 @@ import {
 } from '@/modules/sales/actions/promo.actions'
 import { getPosShiftConfig, isPosShiftSchemaMissing } from '@/modules/sales/lib/pos-shift'
 import { listActiveSalesWarehouses } from '@/modules/sales/lib/warehouse-branch-compat.server'
+import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
 
 type PosStockRequirement = {
   productId: string
@@ -261,6 +262,12 @@ export async function processPosTransaction(orgId: string, payload: any) {
   const activeBranch = await getActiveBranch(orgId)
   if (!activeBranch) {
     return { error: 'Pilih unit aktif terlebih dahulu untuk memproses transaksi POS.' }
+  }
+
+  const posTransactionDate = getDateInTimeZone('Asia/Jakarta')
+  const closedPeriodForPos = await checkClosedFiscalPeriod(orgId, posTransactionDate)
+  if (closedPeriodForPos) {
+    return { error: buildClosedPeriodError('Transaksi POS', posTransactionDate, closedPeriodForPos) }
   }
 
   const posShiftValidation = await validatePosShiftSession(

@@ -2,6 +2,7 @@
 
 import { getDateInTimeZone } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
+import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
 import { revalidatePath } from 'next/cache'
 import { createJournalEntry } from './journal.actions'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
@@ -143,6 +144,14 @@ export async function submitReimbursement(orgId: string, input: {
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
+
+  // Guard: cek periode fiskal tertutup untuk setiap tanggal pengeluaran
+  for (const item of input.items) {
+    const closedPeriod = await checkClosedFiscalPeriod(orgId, item.expense_date)
+    if (closedPeriod) {
+      return { error: buildClosedPeriodError('Pengajuan Reimbursement', item.expense_date, closedPeriod) }
+    }
+  }
 
   const totalAmount = input.items.reduce((sum: any, item: any) => sum + item.amount, 0)
   
@@ -294,6 +303,13 @@ export async function payReimbursement(id: string, orgId: string, bankAccountId:
   if (rErr || !reim) return { error: 'Data reimbursement tidak ditemukan.' }
   if (reim.status !== 'APPROVED') return { error: 'Hanya reimbursement status APPROVED yang bisa dibayar.' }
 
+  // Guard: cek periode fiskal tertutup untuk tanggal pembayaran hari ini
+  const paymentDate = getDateInTimeZone('Asia/Jakarta')
+  const closedPeriod = await checkClosedFiscalPeriod(orgId, paymentDate)
+  if (closedPeriod) {
+    return { error: buildClosedPeriodError('Pembayaran Reimbursement', paymentDate, closedPeriod) }
+  }
+
   // 2. Fetch Bank Account to get CoA Linked Account
   const { data: bank, error: bErr } = await (supabase as any)
     .from('bank_accounts')
@@ -334,7 +350,7 @@ export async function payReimbursement(id: string, orgId: string, bankAccountId:
   const journalResult = await createJournalEntry({
     org_id: orgId,
     branch_id: activeBranchId,
-    entry_date: getDateInTimeZone('Asia/Jakarta'),
+    entry_date: paymentDate,
     description: `Pembayaran Reimburse ${reim.claim_number} - ${reim.description}`,
     reference_type: 'CASH_OUT',
     reference_id: reim.id,

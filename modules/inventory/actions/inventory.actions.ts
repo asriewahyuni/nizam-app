@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { Product } from '@/types/database.types'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
+import { getDateInTimeZone } from '@/lib/utils'
+import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
 
 type ProductInventoryFields = Pick<
   Product,
@@ -420,6 +422,12 @@ export async function createInventoryAdjustment(
     return { error: 'Gudang opname tidak tersedia pada unit aktif.' }
   }
 
+  // Guard: cek periode fiskal tertutup untuk tanggal penyesuaian inventori
+  const closedPeriodAdj = await checkClosedFiscalPeriod(orgId, payload.adj_date)
+  if (closedPeriodAdj) {
+    return { error: buildClosedPeriodError('Penyesuaian Inventori', payload.adj_date, closedPeriodAdj) }
+  }
+
   const { data: adj, error: adjErr } = await insertAdjustmentWithRetry(supabase, {
     org_id: orgId,
     adj_date: payload.adj_date,
@@ -515,6 +523,12 @@ export async function createInventoryTransfer(
     return { error: 'Gudang transfer tidak tersedia pada unit aktif.' }
   }
 
+  // Guard: cek periode fiskal tertutup untuk tanggal transfer stok
+  const closedPeriodTransfer = await checkClosedFiscalPeriod(orgId, payload.transfer_date)
+  if (closedPeriodTransfer) {
+    return { error: buildClosedPeriodError('Transfer Stok', payload.transfer_date, closedPeriodTransfer) }
+  }
+
   // 🔴 RESILIENCY FIX: Use existing 'inventory_adjustments' table (MIGRATION 031 compatible)
   // Modeling Transfer as a 2-line adjustment: -Qty (Source) and +Qty (Target)
   const { data: adj, error: adjErr } = await insertAdjustmentWithRetry(supabase, {
@@ -588,6 +602,13 @@ export async function createInventoryTransfer(
 
 // Keep backward compatibility for Write-off
 export async function createInventoryWriteOff(orgId: string, payload: any) {
+  // Guard: cek periode fiskal tertutup untuk tanggal write-off hari ini
+  const writeOffDate = getDateInTimeZone('Asia/Jakarta')
+  const closedPeriodWriteOff = await checkClosedFiscalPeriod(orgId, writeOffDate)
+  if (closedPeriodWriteOff) {
+    return { error: buildClosedPeriodError('Write-off Inventori', writeOffDate, closedPeriodWriteOff) }
+  }
+
   return createInventoryAdjustment(orgId, {
     ...payload,
     type: 'WRITE_OFF',

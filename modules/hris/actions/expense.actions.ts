@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
 
 type BranchSelectionResult =
   | { branchId: string | null }
@@ -87,6 +88,12 @@ export async function createExpenseClaim(orgId: string, formData: FormData) {
   const category = formData.get('category') as string
   const description = formData.get('description') as string
   const claimDate = formData.get('claim_date') as string || new Date().toISOString().split('T')[0]
+
+  // Guard: cek periode fiskal tertutup untuk tanggal klaim biaya
+  const closedPeriodExpense = await checkClosedFiscalPeriod(orgId, claimDate)
+  if (closedPeriodExpense) {
+    return { error: buildClosedPeriodError('Pengajuan Klaim Biaya', claimDate, closedPeriodExpense) }
+  }
 
   const { error } = await db.from('expense_claims').insert({
     org_id: orgId,

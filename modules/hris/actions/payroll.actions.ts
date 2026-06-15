@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { getDateInTimeZone } from '@/lib/utils'
+import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
 
 type BranchSelectionResult =
   | { branchId: string | null }
@@ -119,6 +120,12 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
   const periodEnd = formData.get('period_end') as string
   const paymentDate = formData.get('payment_date') as string
 
+  // Guard: cek periode fiskal tertutup untuk tanggal mulai periode payroll
+  const closedPeriodPayroll = await checkClosedFiscalPeriod(orgId, periodStart)
+  if (closedPeriodPayroll) {
+    return { error: buildClosedPeriodError('Buat Payroll Run', periodStart, closedPeriodPayroll) }
+  }
+
   // 1. Create the Run Header
   const { data: run, error: runErr } = await (supabase as any)
     .from('payroll_runs')
@@ -170,6 +177,12 @@ export async function payPayrollRun(runId: string, orgId: string, accountId: str
     'Payroll run tidak ditemukan.'
   )
   if ('error' in accessibleRun) return { error: accessibleRun.error }
+
+  // Guard: cek periode fiskal tertutup untuk tanggal pencairan payroll hari ini
+  const closedPeriodDisbursement = await checkClosedFiscalPeriod(orgId, disbursementDate)
+  if (closedPeriodDisbursement) {
+    return { error: buildClosedPeriodError('Pembayaran Payroll', disbursementDate, closedPeriodDisbursement) }
+  }
 
   // 1. Update the run with selected bank account before processing
   const { error: accountUpdateError } = await db

@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getActiveBranch } from '@/modules/organization/actions/org.actions';
 import { revalidatePath } from 'next/cache';
 import { queryPostgres } from '@/lib/db/postgres';
+import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period';
+import { getDateInTimeZone } from '@/lib/utils';
 
 /**
  * Mendapatkan daftar pelanggan yang murni dibuat oleh/ditugaskan ke Canvaser ini.
@@ -87,6 +89,12 @@ export async function processArCollection(orgId: string, payload: {
 
   const activeBranch = await getActiveBranch(orgId);
   if (!activeBranch) return { error: 'Unit aktif tidak ditemukan.' };
+
+  const arCollectionDate = getDateInTimeZone('Asia/Jakarta');
+  const closedPeriodForAr = await checkClosedFiscalPeriod(orgId, arCollectionDate);
+  if (closedPeriodForAr) {
+    return { error: buildClosedPeriodError('Pembayaran Piutang', arCollectionDate, closedPeriodForAr) };
+  }
 
   // 1. Dapatkan data tagihan saat ini
   const { data: sale, error: saleError } = await (supabase as any)
