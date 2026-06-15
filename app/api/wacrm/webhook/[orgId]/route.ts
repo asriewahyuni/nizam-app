@@ -1,15 +1,22 @@
 // app/api/wacrm/webhook/[orgId]/route.ts
 // Terima pesan masuk dari Fonnte dan simpan ke wacrm_messages.
 // URL ini di-paste ke field "URL Webhook" di dashboard Fonnte.
-// Fonnte POST payload: { device, sender, message, name, member? }
+// Payload Fonnte: { device, sender, message, name, url?, type?, filename? }
 
 import { NextRequest, NextResponse } from 'next/server'
 import { queryPostgres } from '@/lib/db/postgres'
 
 export const runtime = 'nodejs'
 
-// Fonnte tidak mendukung HMAC signature — kita verifikasi via `device` phone
-// yang harus cocok dengan connected_phone di wacrm_connections milik org ini.
+// Mapping tipe Fonnte → media_type kita
+const MEDIA_TYPES: Record<string, string> = {
+  image:    'image',
+  video:    'video',
+  audio:    'audio',
+  document: 'document',
+  sticker:  'sticker',
+  ptt:      'audio', // push-to-talk voice note
+}
 
 export async function POST(
   req: NextRequest,
@@ -26,13 +33,17 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const { device, sender, message, name } = payload
-  if (!device || !sender || !message) {
-    return NextResponse.json({ ok: true }) // abaikan event non-pesan (status, dll)
-  }
+  const { device, sender, message, name, url, type } = payload
+
+  // Abaikan jika tidak ada pengirim/device (event status/system)
+  if (!device || !sender) return NextResponse.json({ ok: true })
+
+  // Harus ada konten: teks atau media URL
+  const hasText  = !!message?.trim()
+  const hasMedia = !!url?.trim()
+  if (!hasText && !hasMedia) return NextResponse.json({ ok: true })
 
   try {
-    // Ambil koneksi aktif untuk org ini
     const connResult = await queryPostgres<{
       id: string
       bridge_token: string
@@ -46,7 +57,7 @@ export async function POST(
     )
     const conn = connResult.rows[0]
 
-    // Log webhook terlepas dari validasi
+    // Log webhook
     await queryPostgres(
       `INSERT INTO wacrm_webhook_logs (org_id, event_type, payload, processed)
        VALUES ($1, 'message_in', $2::jsonb, false)`,
@@ -55,11 +66,9 @@ export async function POST(
 
     if (!conn) return NextResponse.json({ ok: true })
 
-    // Normalisasi nomor pengirim (hapus @s.whatsapp.net dll)
+    // Normalisasi nomor pengirim
     const senderPhone = sender.replace(/@.*/, '').replace(/\D/g, '')
-
-    // Jangan proses pesan dari nomor sendiri (echo dari outbound)
-    const ownPhone = (conn.connected_phone ?? '').replace(/\D/g, '')
+    const ownPhone    = (conn.connected_phone ?? '').replace(/\D/g, '')
     if (senderPhone === ownPhone) return NextResponse.json({ ok: true })
 
     // Upsert kontak
@@ -75,11 +84,15 @@ export async function POST(
     const contactId = contactResult.rows[0]?.id
     if (!contactId) return NextResponse.json({ ok: true })
 
-    // Simpan pesan
+    // Tentukan media_type
+    const mediaType = type ? (MEDIA_TYPES[type.toLowerCase()] ?? null) : null
+
+    // Simpan pesan (body boleh kosong untuk pesan gambar tanpa caption)
     await queryPostgres(
-      `INSERT INTO wacrm_messages (org_id, contact_id, direction, body, sent_at, delivered)
-       VALUES ($1, $2, 'in', $3, NOW(), true)`,
-      [orgId, contactId, message]
+      `INSERT INTO wacrm_messages
+         (org_id, contact_id, direction, body, media_url, media_type, sent_at, delivered)
+       VALUES ($1, $2, 'in', $3, $4, $5, NOW(), true)`,
+      [orgId, contactId, message?.trim() || '', url?.trim() || null, mediaType]
     )
 
     // Update last_message_at kontak
@@ -88,7 +101,7 @@ export async function POST(
       [contactId]
     )
 
-    // Tandai webhook terakhir sebagai processed
+    // Tandai webhook sebagai processed
     await queryPostgres(
       `UPDATE wacrm_webhook_logs SET processed = true
        WHERE id = (
@@ -102,6 +115,6 @@ export async function POST(
     return NextResponse.json({ ok: true })
   } catch (err: any) {
     console.error('[wacrm/webhook]', err.message)
-    return NextResponse.json({ ok: true }) // selalu 200 agar Fonnte tidak retry terus
+    return NextResponse.json({ ok: true })
   }
 }

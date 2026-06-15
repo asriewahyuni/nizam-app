@@ -14,7 +14,7 @@ export async function GET() {
     const orgId = orgData.org.id
 
     const result = await queryPostgres(
-      `SELECT id, contact_id, direction, body, sent_at, delivered, read_at
+      `SELECT id, contact_id, direction, body, media_url, media_type, sent_at, delivered, read_at
        FROM wacrm_messages
        WHERE org_id = $1
        ORDER BY sent_at DESC

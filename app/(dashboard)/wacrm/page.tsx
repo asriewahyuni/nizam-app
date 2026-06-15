@@ -28,6 +28,8 @@ export type WaCrmMessage = {
   contact_id: string
   direction: 'in' | 'out'
   body: string
+  media_url: string | null
+  media_type: 'image' | 'video' | 'audio' | 'document' | 'sticker' | null
   sent_at: string
   delivered: boolean
   read_at: string | null
@@ -60,7 +62,7 @@ export default async function WaCrmPage() {
     ),
     // Ambil 100 pesan terbaru untuk semua kontak (inbox preview)
     queryPostgres<WaCrmMessage>(
-      `SELECT id, contact_id, direction, body, sent_at, delivered, read_at
+      `SELECT id, contact_id, direction, body, media_url, media_type, sent_at, delivered, read_at
        FROM wacrm_messages
        WHERE org_id = $1
        ORDER BY sent_at DESC
