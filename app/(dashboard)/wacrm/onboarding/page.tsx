@@ -24,7 +24,7 @@ export default async function WaCrmOnboardingPage() {
   const instance = await getModuleInstanceStatus(orgId, MODULE_KEY)
   if (instance?.status === 'READY') redirect('/wacrm')
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.kliknizam.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://brain.kliknizam.app'
   const webhookUrl = `${appUrl}/api/wacrm/webhook/${orgId}`
   const savedSettings = (instance?.settings ?? {}) as Record<string, string>
 
