@@ -538,6 +538,10 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
     aliases: ['multi-entity (pt/cv)', 'multi-entity', 'multi entity', 'multi entity (pt/cv)'],
   },
   {
+    canonical: 'WA_CRM',
+    aliases: ['wa_crm', 'whatsapp crm', 'wacrm', 'wa crm'],
+  },
+  {
     canonical: 'Quick Bill',
     aliases: ['quick bill', 'billing cepat', 'tagihan cepat'],
   },
