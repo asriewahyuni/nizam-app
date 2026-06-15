@@ -319,45 +319,50 @@ export function WaCrmDashboardClient({
 
   const aiEnabled = settings.ai_enabled === 'true'
 
-  // Poll pesan & kontak baru setiap 10 detik
-  const refresh = useCallback(async () => {
+  // Refresh kontak (dipanggil saat ada pesan dari kontak baru)
+  const refreshContacts = useCallback(async () => {
     try {
-      const [cRes, mRes] = await Promise.all([
-        fetch('/api/wacrm/contacts'),
-        fetch('/api/wacrm/messages'),
-      ])
-      if (cRes.ok) {
-        const { data } = await cRes.json()
+      const res = await fetch('/api/wacrm/contacts')
+      if (res.ok) {
+        const { data } = await res.json()
         if (data) setLocalContacts(data)
-      }
-      if (mRes.ok) {
-        const { data } = await mRes.json()
-        if (data) setLocalMessages(data)
       }
     } catch { /* silent */ }
   }, [])
 
+  // SSE — subscribe ke /api/wacrm/stream, reconnect otomatis jika putus
   useEffect(() => {
-    let id: ReturnType<typeof setInterval> | null = null
+    let es: EventSource | null = null
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
-    function start() {
-      if (!id) id = setInterval(refresh, 3_000)
-    }
-    function stop() {
-      if (id) { clearInterval(id); id = null }
+    function connect() {
+      es = new EventSource('/api/wacrm/stream')
+
+      es.onmessage = (e) => {
+        try {
+          const msg: WaCrmMessage = JSON.parse(e.data)
+          // Tambah pesan ke state (deduplicate by id)
+          setLocalMessages(prev =>
+            prev.some(m => m.id === msg.id) ? prev : [...prev, msg]
+          )
+          // Refresh kontak agar last_message_at & nama kontak baru muncul
+          refreshContacts()
+        } catch { /* malformed event */ }
+      }
+
+      es.onerror = () => {
+        es?.close()
+        // Reconnect setelah 3 detik
+        reconnectTimer = setTimeout(connect, 3_000)
+      }
     }
 
-    function onVisibility() {
-      document.visibilityState === 'visible' ? start() : stop()
-    }
-
-    start()
-    document.addEventListener('visibilitychange', onVisibility)
+    connect()
     return () => {
-      stop()
-      document.removeEventListener('visibilitychange', onVisibility)
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      es?.close()
     }
-  }, [refresh])
+  }, [refreshContacts])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
