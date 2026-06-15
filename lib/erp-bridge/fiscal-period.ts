@@ -1,5 +1,3 @@
-'use server'
-
 import { queryPostgres } from '@/lib/db/postgres'
 
 /**

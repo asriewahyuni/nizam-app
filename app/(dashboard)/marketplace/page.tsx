@@ -9,6 +9,7 @@ import {
   CORE_MODULES,
   OPERATIONAL_MODULES,
   ADDON_MODULES,
+  isModuleAvailableForOrg,
   type ModuleDefinition,
 } from '@/modules/marketplace/lib/module-registry'
 import { CheckCircle2, Lock, ArrowRight, Sparkles, ShieldCheck, Zap, Circle } from 'lucide-react'
@@ -35,8 +36,10 @@ export default async function MarketplacePage() {
   if (!orgData) return redirect('/onboarding')
   if (!['owner', 'admin'].includes(orgData.role)) return redirect('/dashboard?error=akses-ditolak')
 
+  const orgId = orgData.org.id
+
   const [instances, pricing] = await Promise.all([
-    getOrgModuleInstances(orgData.org.id),
+    getOrgModuleInstances(orgId),
     getOperationalModulePricing(),
   ])
 
@@ -194,7 +197,7 @@ export default async function MarketplacePage() {
         </p>
 
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {ADDON_MODULES.map(mod => {
+          {ADDON_MODULES.filter(mod => isModuleAvailableForOrg(mod, orgId)).map(mod => {
             const state = getModuleState(mod)
             const price = pricing[mod.key]
             const instance = instanceMap.get(mod.key) as any

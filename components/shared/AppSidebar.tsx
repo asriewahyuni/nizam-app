@@ -51,6 +51,7 @@ import {
   Fingerprint,
   ClipboardCheck,
   Rocket,
+  MessageCircle,
   MessageSquare,
   Bus,
   HandHeart,
@@ -127,6 +128,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Pelanggan', href: '/contacts/customers', icon: Users, permission_key: 'crm', module_key: 'CRM' },
       { label: 'Keluhan & Permintaan', href: '/crm/tickets', icon: MessageSquare, permission_key: 'crm', module_key: 'CRM' },
+      { label: 'WhatsApp CRM', href: '/wacrm', icon: MessageCircle, permission_key: 'crm', module_key: 'WA_CRM' },
       { label: 'POS (Kasir)', href: '/pos', icon: Store, permission_key: 'pos', module_key: 'POS' },
       { label: 'Penawaran (Quotation)', href: '/sales/quotations', icon: FileText, permission_key: 'quotation', module_key: 'Sales' },
       { label: 'Penjualan', href: '/sales', icon: TrendingUp, permission_key: 'sales', module_key: 'Sales' },

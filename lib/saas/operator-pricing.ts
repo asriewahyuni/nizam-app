@@ -22,6 +22,7 @@ export type OperatorAddonOption = {
   dependsOnCapabilities?: string[]
 }
 
+const WA_CRM_MODULE_NAME = 'WhatsApp CRM'
 const FLEET_MODULE_NAME = 'Fleet & Rental'
 const JOB_ORDER_MODULE_NAME = 'Job Order (Jasa)'
 const WORKSHOP_MODULE_NAME = 'Workshop'
@@ -39,6 +40,41 @@ export type OperatorMarketplaceCompatibility = {
 }
 
 export const OPERATOR_ADDON_OPTIONS: OperatorAddonOption[] = [
+  // ── WA CRM ──────────────────────────────────────────────────────────────
+  {
+    id: 'addon_wa_crm_starter',
+    name: WA_CRM_MODULE_NAME,
+    price: 99000,
+    anchorPrice: 149000,
+    billing: 'Bulan',
+    description: 'Starter: 1 nomor WA, hingga 500 kontak. Pipeline kanban, inbox percakapan, dan AI auto-reply.',
+    capacityNote: '1 nomor WA, maks 500 kontak',
+    selfServiceEnabled: true,
+    minCoreFamily: 'lite',
+  },
+  {
+    id: 'addon_wa_crm_pro',
+    name: WA_CRM_MODULE_NAME,
+    price: 249000,
+    anchorPrice: 349000,
+    billing: 'Bulan',
+    description: 'Pro: 3 nomor WA, kontak tidak terbatas. Semua fitur Starter + import grup WA massal.',
+    capacityNote: '3 nomor WA, kontak unlimited',
+    selfServiceEnabled: true,
+    minCoreFamily: 'lite',
+  },
+  {
+    id: 'addon_wa_crm_enterprise',
+    name: WA_CRM_MODULE_NAME,
+    price: 599000,
+    anchorPrice: 799000,
+    billing: 'Bulan',
+    description: 'Enterprise: nomor WA tidak terbatas, kontak tidak terbatas, dan dukungan prioritas.',
+    capacityNote: 'Nomor & kontak unlimited, prioritas support',
+    selfServiceEnabled: false,
+    minCoreFamily: 'starter',
+  },
+  // ── Fleet ────────────────────────────────────────────────────────────────
   {
     id: 'addon_fleet',
     name: FLEET_MODULE_NAME,

@@ -40,6 +40,7 @@ export type ModuleDefinition = {
   onboardingSteps: OnboardingStep[]
   tags?: string[]
   requires?: string[]
+  betaOrgs?: string[]  // jika diset, modul hanya muncul & bisa diaktifkan oleh org dalam daftar ini
 }
 
 // ── FINANCE PILLAR ─────────────────────────────────────────────────────────
@@ -342,6 +343,27 @@ export const SPECIAL_MODULES: ModuleDefinition[] = []
 // ── ADD-ON (multi-aktif, tidak ngaruh operasional) ────────────────────────
 export const ADDON_MODULES: ModuleDefinition[] = [
   {
+    key: 'WA_CRM',
+    name: 'WhatsApp CRM',
+    tagline: 'Pipeline prospek, inbox percakapan, dan AI auto-reply via WhatsApp',
+    description: 'Kelola prospek, percakapan, dan pipeline penjualan langsung dari WhatsApp. Dilengkapi AI auto-reply, import kontak dari grup WA, dan dashboard pipeline kanban.',
+    icon: '💬',
+    color: 'bg-green-500',
+    href: '/wacrm',
+    isCore: false,
+    isAddon: true,
+    category: 'addon',
+    coaInjectionFn: 'inject_wacrm_coa',
+    onboardingSteps: [
+      { id: 'connection',  title: 'Hubungkan WhatsApp',  description: 'Sambungkan nomor WA bisnis Anda lewat WA Web bridge atau WABA.' },
+      { id: 'pipeline',    title: 'Setup Pipeline',       description: 'Kustomisasi nama stage dan pilih produk/layanan yang dijual.' },
+      { id: 'ai_config',   title: 'Konfigurasi AI',       description: 'Aktifkan AI auto-reply dan tulis instruksi default untuk asisten.' },
+    ],
+    tags: ['whatsapp', 'crm', 'pipeline', 'chat', 'prospek', 'ai', 'sales'],
+    requires: [],
+    betaOrgs: ['f4455b6f-c7fc-4164-9732-a906bcce5e65'], // NIZAM APP only — coming soon untuk org lain
+  },
+  {
     key: 'POS',
     name: 'POS (Kasir)',
     tagline: 'Point of Sale untuk transaksi ritel cepat',
@@ -454,6 +476,12 @@ export function getPillarModules(): ModuleDefinition[] {
 
 export function getBusinessTypeModules(): ModuleDefinition[] {
   return BUSINESS_TYPE_MODULES
+}
+
+/** Cek apakah org boleh melihat/mengaktifkan modul (betaOrgs = undefined → semua org boleh) */
+export function isModuleAvailableForOrg(mod: ModuleDefinition, orgId: string): boolean {
+  if (!mod.betaOrgs || mod.betaOrgs.length === 0) return true
+  return mod.betaOrgs.includes(orgId)
 }
 
 export function getActiveBusinessType(enabledModules: string[]): ModuleDefinition | undefined {
