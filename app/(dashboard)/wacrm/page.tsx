@@ -29,7 +29,7 @@ export type WaCrmMessage = {
   direction: 'in' | 'out'
   body: string
   media_url: string | null
-  media_type: 'image' | 'video' | 'audio' | 'document' | 'sticker' | null
+  media_type: 'image' | 'video' | 'audio' | 'document' | 'sticker' | 'unknown' | null
   sent_at: string
   delivered: boolean
   read_at: string | null

@@ -125,12 +125,14 @@ export async function POST(
     }
 
     const bodyText = hasText ? message.trim() : ''
+    // Jika masih tidak tahu tipe media, tandai sebagai 'unknown' agar UI bisa tampilkan placeholder
+    const finalMediaType = mediaType || (isNonText ? 'unknown' : null)
 
     await queryPostgres(
       `INSERT INTO wacrm_messages
          (org_id, contact_id, direction, body, media_url, media_type, sent_at, delivered)
        VALUES ($1, $2, 'in', $3, $4, $5, NOW(), true)`,
-      [orgId, contactId, bodyText, mediaUrl, mediaType]
+      [orgId, contactId, bodyText, mediaUrl, finalMediaType]
     )
 
     await queryPostgres(

@@ -267,44 +267,38 @@ function ChatPanel({
                 : 'mr-auto bg-white border border-slate-200 text-slate-800 rounded-bl-none',
             )}
           >
-            {/* Gambar */}
-            {msg.media_type === 'image' && (
-              msg.media_url
-                ? <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
-                    <img src={msg.media_url} alt="Gambar" className="max-w-full max-h-60 object-cover block" loading="lazy" />
-                  </a>
-                : <div className="px-3 pt-2 text-xs opacity-70">📷 Gambar</div>
+            {/* Media content */}
+            {msg.media_type === 'image' && msg.media_url && (
+              <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
+                <img src={msg.media_url} alt="Gambar" className="max-w-full max-h-60 object-cover block" loading="lazy" />
+              </a>
             )}
-            {/* Video */}
-            {msg.media_type === 'video' && (
-              msg.media_url
-                ? <video src={msg.media_url} controls className="max-w-full max-h-60 block" />
-                : <div className="px-3 pt-2 text-xs opacity-70">🎥 Video</div>
+            {msg.media_type === 'video' && msg.media_url && (
+              <video src={msg.media_url} controls className="max-w-full max-h-60 block" />
             )}
-            {/* Audio / Voice note */}
-            {msg.media_type === 'audio' && (
-              msg.media_url
-                ? <div className="px-3 pt-2"><audio src={msg.media_url} controls className="w-full h-8" /></div>
-                : <div className="px-3 pt-2 text-xs opacity-70">🎵 Pesan suara</div>
+            {msg.media_type === 'audio' && msg.media_url && (
+              <div className="px-3 pt-2">
+                <audio src={msg.media_url} controls className="w-full h-8" />
+              </div>
             )}
-            {/* Dokumen */}
-            {msg.media_type === 'document' && (
-              msg.media_url
-                ? <a href={msg.media_url} target="_blank" rel="noopener noreferrer"
-                     className={cn('flex items-center gap-2 px-3 py-2 text-xs underline', msg.direction === 'out' ? 'text-green-100' : 'text-blue-600')}>
-                    📄 {msg.media_url.split('/').pop() ?? 'Dokumen'}
-                  </a>
-                : <div className="px-3 pt-2 text-xs opacity-70">📄 Dokumen</div>
+            {msg.media_type === 'sticker' && msg.media_url && (
+              <img src={msg.media_url} alt="Sticker" className="w-24 h-24 object-contain block p-1" />
             )}
-            {/* Sticker */}
-            {msg.media_type === 'sticker' && (
-              msg.media_url
-                ? <img src={msg.media_url} alt="Sticker" className="w-24 h-24 object-contain block p-1" />
-                : <div className="px-3 pt-2 text-xs opacity-70">🎭 Sticker</div>
+            {msg.media_type === 'document' && msg.media_url && (
+              <a href={msg.media_url} target="_blank" rel="noopener noreferrer"
+                 className={cn('flex items-center gap-2 px-3 py-2 text-xs underline', msg.direction === 'out' ? 'text-green-100' : 'text-blue-600')}>
+                📄 {msg.media_url.split('/').pop() ?? 'Dokumen'}
+              </a>
             )}
-            {/* Caption / teks */}
+            {/* Placeholder jika media ada tapi URL tidak tersedia */}
+            {(msg.media_type && !msg.media_url) && (
+              <div className={cn('px-3 pt-2 pb-1 text-xs opacity-60 italic', msg.direction === 'out' ? 'text-green-100' : 'text-slate-500')}>
+                {{ image: '📷 Gambar', video: '🎥 Video', audio: '🎵 Pesan suara', document: '📄 Dokumen', sticker: '🎭 Sticker', unknown: '📎 Media' }[msg.media_type] ?? '📎 Media'}
+              </div>
+            )}
+            {/* Teks / caption — sembunyikan jika isinya placeholder Fonnte */}
             <div className="px-3 py-2">
-              {msg.body && <div>{msg.body}</div>}
+              {msg.body && msg.body !== 'non-text message' && <div>{msg.body}</div>}
               <div className={cn('text-[10px] mt-0.5', msg.direction === 'out' ? 'text-green-200' : 'text-slate-400')}>
                 {new Date(msg.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                 {msg.direction === 'out' && (msg.delivered ? ' ✓✓' : ' ✓')}
