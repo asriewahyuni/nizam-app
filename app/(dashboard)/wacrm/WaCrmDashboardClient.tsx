@@ -268,39 +268,39 @@ function ChatPanel({
             )}
           >
             {/* Gambar */}
-            {msg.media_type === 'image' && msg.media_url && (
-              <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
-                <img
-                  src={msg.media_url}
-                  alt="Gambar"
-                  className="max-w-full max-h-60 object-cover block"
-                  loading="lazy"
-                />
-              </a>
+            {msg.media_type === 'image' && (
+              msg.media_url
+                ? <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
+                    <img src={msg.media_url} alt="Gambar" className="max-w-full max-h-60 object-cover block" loading="lazy" />
+                  </a>
+                : <div className="px-3 pt-2 text-xs opacity-70">📷 Gambar</div>
             )}
             {/* Video */}
-            {msg.media_type === 'video' && msg.media_url && (
-              <video src={msg.media_url} controls className="max-w-full max-h-60 block" />
+            {msg.media_type === 'video' && (
+              msg.media_url
+                ? <video src={msg.media_url} controls className="max-w-full max-h-60 block" />
+                : <div className="px-3 pt-2 text-xs opacity-70">🎥 Video</div>
             )}
             {/* Audio / Voice note */}
-            {msg.media_type === 'audio' && msg.media_url && (
-              <div className="px-3 pt-2">
-                <audio src={msg.media_url} controls className="w-full h-8" />
-              </div>
+            {msg.media_type === 'audio' && (
+              msg.media_url
+                ? <div className="px-3 pt-2"><audio src={msg.media_url} controls className="w-full h-8" /></div>
+                : <div className="px-3 pt-2 text-xs opacity-70">🎵 Pesan suara</div>
             )}
             {/* Dokumen */}
-            {msg.media_type === 'document' && msg.media_url && (
-              <a
-                href={msg.media_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  'flex items-center gap-2 px-3 py-2 text-xs underline',
-                  msg.direction === 'out' ? 'text-green-100' : 'text-blue-600',
-                )}
-              >
-                📄 {msg.media_url.split('/').pop() ?? 'Dokumen'}
-              </a>
+            {msg.media_type === 'document' && (
+              msg.media_url
+                ? <a href={msg.media_url} target="_blank" rel="noopener noreferrer"
+                     className={cn('flex items-center gap-2 px-3 py-2 text-xs underline', msg.direction === 'out' ? 'text-green-100' : 'text-blue-600')}>
+                    📄 {msg.media_url.split('/').pop() ?? 'Dokumen'}
+                  </a>
+                : <div className="px-3 pt-2 text-xs opacity-70">📄 Dokumen</div>
+            )}
+            {/* Sticker */}
+            {msg.media_type === 'sticker' && (
+              msg.media_url
+                ? <img src={msg.media_url} alt="Sticker" className="w-24 h-24 object-contain block p-1" />
+                : <div className="px-3 pt-2 text-xs opacity-70">🎭 Sticker</div>
             )}
             {/* Caption / teks */}
             <div className="px-3 py-2">
