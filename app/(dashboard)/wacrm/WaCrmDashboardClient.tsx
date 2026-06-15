@@ -2,7 +2,7 @@
 // app/(dashboard)/wacrm/WaCrmDashboardClient.tsx
 // Kanban pipeline + inbox dua-panel untuk WA CRM
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useTransition, useEffect, useCallback } from 'react'
 import {
   MessageCircle,
   Plus,
@@ -191,6 +191,7 @@ function ChatPanel({
   onStageChange,
   stageLabels,
   aiEnabled,
+  onMessageSent,
 }: {
   contact: WaCrmContact
   messages: WaCrmMessage[]
@@ -198,6 +199,7 @@ function ChatPanel({
   onStageChange: (contactId: string, newStage: WaCrmContact['stage']) => void
   stageLabels: string[]
   aiEnabled: boolean
+  onMessageSent: (msg: WaCrmMessage) => void
 }) {
   const [body, setBody]             = useState('')
   const [isSending, startTransition] = useTransition()
@@ -205,12 +207,15 @@ function ChatPanel({
   function handleSend() {
     if (!body.trim()) return
     startTransition(async () => {
-      // Placeholder: panggil API route /api/wacrm/send
-      await fetch('/api/wacrm/send', {
+      const res = await fetch('/api/wacrm/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contactId: contact.id, body: body.trim() }),
       })
+      if (res.ok) {
+        const { data } = await res.json()
+        if (data) onMessageSent(data)
+      }
       setBody('')
     })
   }
@@ -309,9 +314,33 @@ export function WaCrmDashboardClient({
   const [search, setSearch]           = useState('')
   const [selectedContact, setSelected] = useState<WaCrmContact | null>(null)
   const [localContacts, setLocalContacts] = useState(contacts)
+  const [localMessages, setLocalMessages] = useState(messages)
   const [showTambahModal, setShowTambahModal] = useState(false)
 
   const aiEnabled = settings.ai_enabled === 'true'
+
+  // Poll pesan & kontak baru setiap 10 detik
+  const refresh = useCallback(async () => {
+    try {
+      const [cRes, mRes] = await Promise.all([
+        fetch('/api/wacrm/contacts'),
+        fetch('/api/wacrm/messages'),
+      ])
+      if (cRes.ok) {
+        const { data } = await cRes.json()
+        if (data) setLocalContacts(data)
+      }
+      if (mRes.ok) {
+        const { data } = await mRes.json()
+        if (data) setLocalMessages(data)
+      }
+    } catch { /* silent */ }
+  }, [])
+
+  useEffect(() => {
+    const id = setInterval(refresh, 10_000)
+    return () => clearInterval(id)
+  }, [refresh])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -322,7 +351,7 @@ export function WaCrmDashboardClient({
   }, [localContacts, search])
 
   function getLastMessage(contactId: string): WaCrmMessage | undefined {
-    return messages
+    return localMessages
       .filter(m => m.contact_id === contactId)
       .sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())[0]
   }
@@ -455,11 +484,12 @@ export function WaCrmDashboardClient({
             {selectedContact ? (
               <ChatPanel
                 contact={selectedContact}
-                messages={messages}
+                messages={localMessages}
                 stageLabel={getStageLabel(selectedContact.stage)}
                 onStageChange={handleStageChange}
                 stageLabels={pipelineStages}
                 aiEnabled={aiEnabled}
+                onMessageSent={(msg) => setLocalMessages(prev => [...prev, msg])}
               />
             ) : (
               <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-400">

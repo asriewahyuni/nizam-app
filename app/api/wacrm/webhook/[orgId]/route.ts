@@ -88,11 +88,14 @@ export async function POST(
       [contactId]
     )
 
-    // Tandai webhook sebagai processed
+    // Tandai webhook terakhir sebagai processed
     await queryPostgres(
       `UPDATE wacrm_webhook_logs SET processed = true
-       WHERE org_id = $1 AND processed = false
-       ORDER BY received_at DESC LIMIT 1`,
+       WHERE id = (
+         SELECT id FROM wacrm_webhook_logs
+         WHERE org_id = $1 AND processed = false
+         ORDER BY received_at DESC LIMIT 1
+       )`,
       [orgId]
     )
 
