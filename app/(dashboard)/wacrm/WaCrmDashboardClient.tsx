@@ -338,8 +338,25 @@ export function WaCrmDashboardClient({
   }, [])
 
   useEffect(() => {
-    const id = setInterval(refresh, 10_000)
-    return () => clearInterval(id)
+    let id: ReturnType<typeof setInterval> | null = null
+
+    function start() {
+      if (!id) id = setInterval(refresh, 3_000)
+    }
+    function stop() {
+      if (id) { clearInterval(id); id = null }
+    }
+
+    function onVisibility() {
+      document.visibilityState === 'visible' ? start() : stop()
+    }
+
+    start()
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [refresh])
 
   const filtered = useMemo(() => {
