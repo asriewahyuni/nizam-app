@@ -1,29 +1,41 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { cn } from '@/lib/utils'
 import {
   Users, Briefcase, Wallet, GraduationCap, LayoutDashboard,
   Plus, Search, ChevronRight, CheckCircle, XCircle,
   ArrowUpCircle, Shield, Send, RefreshCw,
   TrendingUp, Banknote, Star, Clock, FileText,
-  AlertTriangle, ClipboardList, Eye, Link2, ExternalLink
+  AlertTriangle, ClipboardList, Eye, Link2, ExternalLink,
+  BookOpen, ArrowDownCircle, X, Copy, Check, Pencil, Trash2, Upload, FolderOpen,
+  TrendingDown, Scale,
 } from 'lucide-react'
 import {
   createAnggota, updateAnggota,
   catatSimpananMutasi,
-  createProyek, updateProyekStatus, submitProyekKeDPS,
+  getSimpananByAnggota, getMutasiByAnggota,
+  createProyek, updateProyek, deleteProyek, updateProyekStatus, submitProyekKeDPS,
   submitDpsReview, kirimPenawaranProyek,
-  createPelatihan, daftarPesertaPelatihan,
+  createPelatihan, daftarPesertaPelatihan, getPesertaPelatihan, luluskanPeserta,
   type KojasmatAnggota, type KojasmatProyek, type KojasmatPelatihan, type KojasmatStats,
+  type KojasmatSimpanan, type KojasmatSimpananMutasi,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
   setujuiPendaftaran, tolakPendaftaran, mintaRevisiPendaftaran,
-  getDokumenByRef, beriTindakan, selesaikanTindakan, ulasLaporan,
+  getDokumenByRef, simpanDokumen, hapusDokumen, beriTindakan, selesaikanTindakan, ulasLaporan,
   type KojasmatPendaftaran, type KojasmatDokumen,
   type KojasmatLaporanProyek, type KojasmatTindakan,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
 import { seedKojasmatDummyData, resetAndReseedKojasmat } from '@/modules/kojasmat/actions/kojasmat-seeder.actions'
+import {
+  catatTransaksiProyek, getTransaksiByProyek, getLaporanKeuanganProyek,
+  getPemodalDenganPotensi, distribusikanBagiHasil,
+  type KojasmatProyekTransaksi, type KojasmatLaporanKeuanganProyek, type KojasmatPemodalDenganPotensi,
+} from '@/modules/kojasmat/actions/kojasmat-keuangan.actions'
+
+const KATEGORI_PENDAPATAN = ['Penjualan', 'Jasa', 'Pendapatan Lain'] as const
+const KATEGORI_BEBAN = ['Bahan Baku', 'Operasional', 'Gaji/Upah', 'Sewa', 'Transportasi', 'Beban Lain'] as const
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -97,6 +109,398 @@ function Modal({ open, onClose, title, children }: {
         <h2 className="mb-4 text-lg font-semibold text-gray-900">{title}</h2>
         {children}
       </div>
+    </div>
+  )
+}
+
+// ─── DRAWER ───────────────────────────────────────────────────────────────────
+
+function Drawer({ open, onClose, title, children }: {
+  open: boolean; onClose: () => void; title: string; children: React.ReactNode
+}) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── BUKU TABUNGAN PANEL ──────────────────────────────────────────────────────
+
+function BukuTabunganPanel({
+  anggota, orgId, onTransaksi,
+}: {
+  anggota: KojasmatAnggota
+  orgId: string
+  onTransaksi: () => void
+}) {
+  const [loading, setLoading] = useState(true)
+  const [simpanan, setSimpanan] = useState<KojasmatSimpanan[]>([])
+  const [mutasi, setMutasi] = useState<KojasmatSimpananMutasi[]>([])
+  const [filterJenis, setFilterJenis] = useState<'SEMUA' | 'POKOK' | 'WAJIB' | 'SUKARELA'>('SEMUA')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    Promise.all([
+      getSimpananByAnggota(anggota.id),
+      getMutasiByAnggota(anggota.id),
+    ]).then(([s, m]) => {
+      if (cancelled) return
+      setSimpanan(s)
+      setMutasi(m)
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [anggota.id])
+
+  const saldo = (jenis: 'POKOK' | 'WAJIB' | 'SUKARELA') =>
+    Number(simpanan.find(s => s.jenis === jenis)?.saldo ?? 0)
+
+  const totalSaldo = saldo('POKOK') + saldo('WAJIB') + saldo('SUKARELA')
+
+  const mutasiFilt = filterJenis === 'SEMUA'
+    ? mutasi
+    : mutasi.filter(m => {
+        const s = simpanan.find(x => x.id === m.simpanan_id)
+        return s?.jenis === filterJenis
+      })
+
+  const JENIS_LABEL: Record<string, string> = {
+    POKOK: 'Pokok', WAJIB: 'Wajib', SUKARELA: 'Sukarela',
+  }
+  const MUTASI_COLOR: Record<string, string> = {
+    SETOR: 'text-emerald-600', BAGI_HASIL: 'text-blue-600',
+    TARIK: 'text-red-600', KOREKSI: 'text-amber-600',
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Info anggota */}
+      <div className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm">
+          {anggota.nama.charAt(0).toUpperCase()}
+        </div>
+        <div>
+          <p className="font-semibold text-gray-900">{anggota.nama}</p>
+          <p className="text-xs text-gray-400 font-mono">{anggota.kode_anggota}</p>
+        </div>
+        <div className="ml-auto text-right">
+          <p className="text-xs text-gray-400">Total Saldo</p>
+          <p className="font-bold text-gray-900">{fmt(totalSaldo)}</p>
+        </div>
+      </div>
+
+      {/* 3 saldo cards */}
+      {loading ? (
+        <div className="grid grid-cols-3 gap-3">
+          {['POKOK','WAJIB','SUKARELA'].map(j => (
+            <div key={j} className="h-20 animate-pulse rounded-2xl bg-gray-100" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-3">
+          {(['POKOK','WAJIB','SUKARELA'] as const).map(jenis => (
+            <button
+              key={jenis}
+              onClick={() => setFilterJenis(f => f === jenis ? 'SEMUA' : jenis)}
+              className={cn(
+                'rounded-2xl border px-4 py-3 text-left transition-all cursor-pointer',
+                filterJenis === jenis
+                  ? 'border-emerald-300 bg-emerald-50 shadow-sm'
+                  : 'border-gray-100 bg-white hover:border-emerald-200 hover:bg-emerald-50/40'
+              )}
+            >
+              <p className="text-xs font-medium text-gray-500">Simpanan {JENIS_LABEL[jenis]}</p>
+              <p className={cn('mt-1 text-sm font-bold', filterJenis === jenis ? 'text-emerald-700' : 'text-gray-900')}>
+                {fmt(saldo(jenis))}
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Riwayat mutasi */}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Riwayat Transaksi
+            {filterJenis !== 'SEMUA' && (
+              <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+                {JENIS_LABEL[filterJenis]}
+              </span>
+            )}
+          </h3>
+          <button
+            onClick={onTransaksi}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition-colors cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" /> Transaksi
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="space-y-2">
+            {[1,2,3,4].map(i => <div key={i} className="h-12 animate-pulse rounded-xl bg-gray-100" />)}
+          </div>
+        ) : mutasiFilt.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+            Belum ada transaksi
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-gray-100">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-xs text-gray-500">
+                  <tr>
+                    <th className="px-4 py-2.5 text-left font-medium">Tanggal</th>
+                    <th className="px-4 py-2.5 text-left font-medium">Jenis</th>
+                    <th className="px-4 py-2.5 text-left font-medium">Keterangan</th>
+                    <th className="px-4 py-2.5 text-right font-medium text-emerald-700">Kredit</th>
+                    <th className="px-4 py-2.5 text-right font-medium text-red-600">Debit</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {mutasiFilt.map(m => {
+                    const isKredit = m.jenis_mutasi === 'SETOR' || m.jenis_mutasi === 'BAGI_HASIL'
+                    const jenisLabel = simpanan.find(s => s.id === m.simpanan_id)?.jenis
+                    return (
+                      <tr key={m.id} className="hover:bg-gray-50/60 transition-colors">
+                        <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">
+                          {new Date(m.tanggal).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            {isKredit
+                              ? <ArrowDownCircle className="h-3.5 w-3.5 text-emerald-500" />
+                              : <ArrowUpCircle className="h-3.5 w-3.5 text-red-500" />
+                            }
+                            <span className={cn('text-xs font-medium', MUTASI_COLOR[m.jenis_mutasi])}>
+                              {m.jenis_mutasi === 'BAGI_HASIL' ? 'Bagi Hasil'
+                                : m.jenis_mutasi === 'SETOR' ? 'Setor'
+                                : m.jenis_mutasi === 'TARIK' ? 'Tarik'
+                                : 'Koreksi'}
+                            </span>
+                            {jenisLabel && (
+                              <span className="text-xs text-gray-400">({JENIS_LABEL[jenisLabel]})</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px] truncate">
+                          {m.keterangan || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-xs">
+                          {isKredit ? (
+                            <span className="font-medium text-emerald-600">{fmt(Number(m.jumlah))}</span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-xs">
+                          {!isKredit ? (
+                            <span className="font-medium text-red-600">{fmt(Number(m.jumlah))}</span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-xs font-semibold text-gray-900 whitespace-nowrap">
+                          {fmt(Number(m.saldo_sesudah))}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── DOKUMEN PROYEK PANEL ─────────────────────────────────────────────────────
+
+const JENIS_DOKUMEN_PROYEK = [
+  { value: 'KELAYAKAN_USAHA',  label: 'Kelayakan Usaha'  },
+  { value: 'PROPOSAL',         label: 'Proposal'          },
+  { value: 'PENAWARAN_HARGA',  label: 'Penawaran Harga'   },
+  { value: 'PROYEKSI_KEUANGAN',label: 'Proyeksi Keuangan' },
+  { value: 'ANALISA_BISNIS',   label: 'Analisa Bisnis'    },
+  { value: 'PENAWARAN_SYIRKAH',label: 'Penawaran Syirkah' },
+  { value: 'AKAD',             label: 'Akad'              },
+  { value: 'LAINNYA',          label: 'Dokumen Lain'      },
+] as const
+
+type JenisDokProyek = typeof JENIS_DOKUMEN_PROYEK[number]['value']
+
+async function uploadFileDokumen(file: File, orgId: string): Promise<{ key: string; name: string; size: number; mime: string } | { error: string }> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('org_id', orgId)
+  fd.append('ref_type', 'PROYEK')
+  try {
+    const res = await fetch('/api/kojasmat/upload', { method: 'POST', body: fd })
+    const data = await res.json()
+    if (!res.ok) return { error: data.error ?? 'Upload gagal' }
+    return data
+  } catch {
+    return { error: 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.' }
+  }
+}
+
+async function getFileUrl(key: string): Promise<string | null> {
+  const res = await fetch(`/api/kojasmat/file?key=${encodeURIComponent(key)}`)
+  if (!res.ok) return null
+  const data = await res.json()
+  return data.url ?? null
+}
+
+function DokumenProyekPanel({ proyek, orgId }: { proyek: KojasmatProyek; orgId: string }) {
+  const [docs, setDocs] = useState<KojasmatDokumen[]>([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [, startTransition] = useTransition()
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getDokumenByRef('PROYEK', proyek.id).then(d => {
+      if (!cancelled) { setDocs(d); setLoading(false) }
+    })
+    return () => { cancelled = true }
+  }, [proyek.id])
+
+  async function handleUpload(jenis: JenisDokProyek, file: File) {
+    setUploading(jenis)
+    setUploadError(null)
+    const res = await uploadFileDokumen(file, orgId)
+    if ('error' in res) { setUploadError(res.error); setUploading(null); return }
+    startTransition(async () => {
+      const saved = await simpanDokumen({
+        org_id: orgId,
+        referensi_type: 'PROYEK',
+        referensi_id: proyek.id,
+        jenis_dokumen: jenis as KojasmatDokumen['jenis_dokumen'],
+        nama_file: res.name,
+        file_key: res.key,
+        file_size: res.size,
+        mime_type: res.mime,
+      })
+      if (saved.data) {
+        setDocs(prev => [...prev.filter(d => d.jenis_dokumen !== jenis), saved.data!])
+      } else {
+        setUploadError(saved.error ?? 'Gagal menyimpan dokumen')
+      }
+      setUploading(null)
+    })
+  }
+
+  async function handleDelete(dok: KojasmatDokumen) {
+    setDeleting(dok.id)
+    startTransition(async () => {
+      await hapusDokumen(dok.id)
+      setDocs(prev => prev.filter(d => d.id !== dok.id))
+      setDeleting(null)
+    })
+  }
+
+  async function handleView(key: string) {
+    const url = await getFileUrl(key)
+    if (url) window.open(url, '_blank')
+  }
+
+  const docByJenis = (jenis: string) => docs.find(d => d.jenis_dokumen === jenis)
+
+  return (
+    <div className="space-y-5">
+      {/* Info proyek */}
+      <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs text-gray-400">{proyek.kode_proyek}</span>
+          <Badge text={proyek.jenis_akad} cls={AKAD_COLOR[proyek.jenis_akad] ?? 'bg-gray-100 text-gray-600'} />
+        </div>
+        <p className="font-semibold text-gray-900 mt-0.5">{proyek.nama_proyek}</p>
+      </div>
+
+      {/* Daftar dokumen */}
+      {loading ? (
+        <div className="space-y-2">
+          {[1,2,3].map(i => <div key={i} className="h-14 animate-pulse rounded-2xl bg-gray-100" />)}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {JENIS_DOKUMEN_PROYEK.map(({ value, label }) => {
+            const dok = docByJenis(value)
+            const isUploading = uploading === value
+            const isDeleting = dok ? deleting === dok.id : false
+            return (
+              <div key={value} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-700">{label}</p>
+                  {dok && (
+                    <p className="text-xs text-gray-400 truncate mt-0.5">{dok.nama_file}</p>
+                  )}
+                </div>
+
+                {dok ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <CheckCircle className="h-4 w-4 text-emerald-500" />
+                    <button
+                      onClick={() => handleView(dok.file_key)}
+                      className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors cursor-pointer"
+                    >
+                      Lihat
+                    </button>
+                    <button
+                      onClick={() => handleDelete(dok)}
+                      disabled={isDeleting}
+                      className="rounded-lg border border-red-100 px-2.5 py-1 text-xs text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {isDeleting ? '...' : 'Hapus'}
+                    </button>
+                  </div>
+                ) : (
+                  <label className={cn(
+                    'flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs transition-colors shrink-0',
+                    isUploading
+                      ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                      : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:border-gray-300 cursor-pointer'
+                  )}>
+                    {isUploading
+                      ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Mengunggah...</>
+                      : <><Upload className="h-3.5 w-3.5" /> Upload</>
+                    }
+                    {!isUploading && (
+                      <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={e => { if (e.target.files?.[0]) handleUpload(value, e.target.files[0]); e.target.value = '' }} />
+                    )}
+                  </label>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {uploadError && (
+        <p className="flex items-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs text-rose-600">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {uploadError}
+        </p>
+      )}
+
+      <p className="text-xs text-gray-400">Format: PDF, JPG, PNG · Maks 10 MB per file</p>
     </div>
   )
 }
@@ -534,12 +938,376 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
   )
 }
 
+// ─── KEUANGAN PROYEK ──────────────────────────────────────────────────────────
+
+function LaporanKeuanganView({ laporan }: { laporan: KojasmatLaporanKeuanganProyek }) {
+  const { labaRugi, neraca, cashflow, bagiHasil, analisis } = laporan
+  return (
+    <div className="space-y-4">
+      {/* Laba/Rugi */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-4">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-3">
+          <Scale className="h-4 w-4 text-blue-500" /> Laba / Rugi
+        </p>
+        <div className="space-y-1.5 text-sm">
+          {labaRugi.rincianPendapatan.map(r => (
+            <div key={r.kategori} className="flex justify-between text-gray-600">
+              <span>{r.kategori}</span><span>{fmt(r.jumlah)}</span>
+            </div>
+          ))}
+          <div className="flex justify-between font-medium text-gray-800 pt-1 border-t border-gray-100">
+            <span>Total Pendapatan</span><span>{fmt(labaRugi.totalPendapatan)}</span>
+          </div>
+          {labaRugi.rincianBeban.map(r => (
+            <div key={r.kategori} className="flex justify-between text-gray-600 pt-1">
+              <span>{r.kategori}</span><span>({fmt(r.jumlah)})</span>
+            </div>
+          ))}
+          <div className="flex justify-between font-medium text-gray-800 pt-1 border-t border-gray-100">
+            <span>Total Beban</span><span>({fmt(labaRugi.totalBeban)})</span>
+          </div>
+          <div className={cn('flex justify-between font-bold pt-2 border-t border-gray-200',
+            labaRugi.labaBersih >= 0 ? 'text-emerald-700' : 'text-red-600')}>
+            <span>Laba Bersih</span><span>{fmt(labaRugi.labaBersih)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Neraca */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-4">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-3">
+          <Wallet className="h-4 w-4 text-emerald-500" /> Neraca Sederhana
+        </p>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-xs text-gray-400 mb-1">Aset</p>
+            <div className="flex justify-between text-gray-600"><span>Kas Proyek</span><span>{fmt(neraca.kas)}</span></div>
+            <div className="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-100 mt-1"><span>Total Aset</span><span>{fmt(neraca.totalAset)}</span></div>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 mb-1">Kewajiban &amp; Ekuitas</p>
+            <div className="flex justify-between text-gray-600"><span>Modal Pemodal</span><span>{fmt(neraca.modalPemodal)}</span></div>
+            <div className="flex justify-between text-gray-600"><span>Laba Ditahan</span><span>{fmt(neraca.labaDitahan)}</span></div>
+            <div className="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-100 mt-1"><span>Total</span><span>{fmt(neraca.totalKewajibanEkuitas)}</span></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Cashflow */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-4">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-3">
+          <TrendingDown className="h-4 w-4 text-purple-500 rotate-180" /> Laporan Cashflow
+        </p>
+        <div className="space-y-1.5 text-sm text-gray-600">
+          <div className="flex justify-between"><span>Kas Masuk Operasional</span><span>{fmt(cashflow.kasMasukOperasional)}</span></div>
+          <div className="flex justify-between"><span>Kas Keluar Operasional</span><span>({fmt(cashflow.kasKeluarOperasional)})</span></div>
+          <div className="flex justify-between"><span>Kas Masuk Pendanaan (Modal)</span><span>{fmt(cashflow.kasMasukPendanaan)}</span></div>
+          <div className="flex justify-between font-bold text-gray-900 pt-2 border-t border-gray-200">
+            <span>Saldo Kas Akhir</span><span>{fmt(cashflow.saldoKasAkhir)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Sharing Profit */}
+      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-900 mb-3">
+          <Banknote className="h-4 w-4" /> Sharing Profit &amp; Potensi Bagi Hasil
+        </p>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-xl bg-white p-3">
+            <p className="text-xs text-gray-400">Nisbah Pemodal</p>
+            <p className="font-bold text-emerald-700">{bagiHasil.nisbahPemodal}%</p>
+            <p className="text-xs text-gray-500 mt-1">Potensi: {fmt(bagiHasil.potensiBagiHasilPemodal)}</p>
+          </div>
+          <div className="rounded-xl bg-white p-3">
+            <p className="text-xs text-gray-400">Nisbah Pengaju</p>
+            <p className="font-bold text-blue-700">{bagiHasil.nisbahPengaju}%</p>
+            <p className="text-xs text-gray-500 mt-1">Potensi: {fmt(bagiHasil.potensiBagiHasilPengaju)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Analisis */}
+      {analisis.length > 0 && (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+          <p className="text-sm font-semibold text-blue-900 mb-2">Analisis</p>
+          <ul className="space-y-1.5 list-disc list-inside text-sm text-blue-800">
+            {analisis.map((a, i) => <li key={i}>{a}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DaftarPemodalPanel({ proyekId }: { proyekId: string }) {
+  const [list, setList] = useState<KojasmatPemodalDenganPotensi[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getPemodalDenganPotensi(proyekId).then(l => { if (!cancelled) setList(l) })
+    return () => { cancelled = true }
+  }, [proyekId])
+
+  if (list === null) return <div className="py-4 text-center text-sm text-gray-400">Memuat daftar pemodal...</div>
+
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-4">
+      <p className="text-sm font-semibold text-gray-800 mb-3">Daftar Pemodal</p>
+      {list.length === 0 ? (
+        <p className="text-sm text-gray-400">Belum ada pemodal yang mendanai proyek ini.</p>
+      ) : (
+        <div className="space-y-2">
+          {list.map(pm => (
+            <div key={pm.id} className="flex items-center justify-between rounded-xl border border-gray-100 p-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900">{pm.pemodal_nama}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Porsi {pm.porsi_pct.toFixed(1)}% · {pm.kehadiran_akad === 'DIWAKILKAN' ? 'Diwakilkan koperasi' : 'Hadir sendiri'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold text-gray-900">{fmt(pm.jumlah)}</p>
+                <p className="text-xs font-medium text-emerald-600">Potensi {fmt(pm.potensiBagiHasil)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DetailProyekPanel({ proyek }: { proyek: KojasmatProyek }) {
+  const st = STATUS_PROYEK[proyek.status] ?? { label: proyek.status, color: 'bg-gray-100 text-gray-600' }
+  const pct = Number(proyek.kebutuhan_modal) > 0
+    ? Math.min(100, (Number(proyek.modal_terkumpul) / Number(proyek.kebutuhan_modal)) * 100)
+    : 0
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-gray-100 bg-white p-4">
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <Badge text={st.label} cls={st.color} />
+          <Badge text={proyek.jenis_akad} cls={AKAD_COLOR[proyek.jenis_akad] ?? 'bg-gray-100 text-gray-600'} />
+        </div>
+        <h3 className="text-base font-semibold text-gray-900">{proyek.nama_proyek}</h3>
+        <p className="text-sm text-gray-500 mt-0.5">
+          {proyek.kode_proyek} · Pengaju: {proyek.pengaju_nama ?? '—'} · {proyek.durasi_bulan} bulan
+        </p>
+        {proyek.deskripsi && <p className="text-sm text-gray-600 mt-2 leading-relaxed">{proyek.deskripsi}</p>}
+        {proyek.agunan && <p className="text-xs text-gray-500 mt-2">Agunan: {proyek.agunan}</p>}
+
+        <div className="mt-4">
+          <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Terkumpul: {fmt(Number(proyek.modal_terkumpul))}</span>
+            <span>{pct.toFixed(0)}%</span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-gray-100">
+            <div className="h-2 rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>Kebutuhan Modal</span>
+            <span className="font-medium text-gray-700">{fmt(Number(proyek.kebutuhan_modal))}</span>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-xl bg-gray-50 p-3">
+            <p className="text-xs text-gray-400 mb-0.5">Nisbah Pengaju</p>
+            <p className="font-bold text-gray-800">{proyek.nisbah_pengaju ?? 30}%</p>
+          </div>
+          <div className="rounded-xl bg-gray-50 p-3">
+            <p className="text-xs text-gray-400 mb-0.5">Nisbah Pemodal</p>
+            <p className="font-bold text-gray-800">{proyek.nisbah_pemodal ?? 70}%</p>
+          </div>
+          <div className="rounded-xl bg-gray-50 p-3">
+            <p className="text-xs text-gray-400 mb-0.5">Ujrah Wakalah</p>
+            <p className="font-bold text-gray-800">{fmt(Number(proyek.ujrah_nominal))}</p>
+          </div>
+          <div className="rounded-xl bg-gray-50 p-3">
+            <p className="text-xs text-gray-400 mb-0.5">Ujrah Diwakilkan Akad</p>
+            <p className="font-bold text-gray-800">{fmt(Number(proyek.ujrah_wakalah_akad ?? 0))}</p>
+          </div>
+        </div>
+
+        {(proyek.tanggal_mulai || proyek.tanggal_selesai) && (
+          <div className="mt-3 flex gap-4 text-xs text-gray-500">
+            {proyek.tanggal_mulai && <span>Mulai: {String(proyek.tanggal_mulai).split('T')[0]}</span>}
+            {proyek.tanggal_selesai && <span>Selesai: {String(proyek.tanggal_selesai).split('T')[0]}</span>}
+          </div>
+        )}
+        {proyek.notes && <p className="mt-3 text-xs text-gray-400">Catatan: {proyek.notes}</p>}
+      </div>
+
+      <DaftarPemodalPanel proyekId={proyek.id} />
+    </div>
+  )
+}
+
+function KeuanganProyekPanel({ proyek, orgId }: { proyek: KojasmatProyek; orgId: string }) {
+  const [pending, startTransition] = useTransition()
+  const [transaksi, setTransaksi] = useState<KojasmatProyekTransaksi[]>([])
+  const [laporan, setLaporan] = useState<KojasmatLaporanKeuanganProyek | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [view, setView] = useState<'laporan' | 'riwayat'>('laporan')
+  const [bagiHasilError, setBagiHasilError] = useState<string | null>(null)
+  const [form, setForm] = useState<{
+    tanggal: string; jenis: 'PENDAPATAN' | 'BEBAN'; kategori: string; keterangan: string; jumlah: string
+  }>({
+    tanggal: new Date().toISOString().slice(0, 10),
+    jenis: 'PENDAPATAN',
+    kategori: KATEGORI_PENDAPATAN[0],
+    keterangan: '',
+    jumlah: '',
+  })
+
+  async function reload() {
+    setLoading(true)
+    const [t, l] = await Promise.all([
+      getTransaksiByProyek(proyek.id),
+      getLaporanKeuanganProyek(proyek.id),
+    ])
+    setTransaksi(t)
+    setLaporan(l)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    reload().then(() => { if (cancelled) return })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proyek.id])
+
+  function handleSubmit() {
+    if (!form.jumlah || Number(form.jumlah) <= 0) return
+    startTransition(async () => {
+      await catatTransaksiProyek({
+        org_id: orgId,
+        proyek_id: proyek.id,
+        tanggal: form.tanggal,
+        jenis: form.jenis,
+        kategori: form.kategori,
+        keterangan: form.keterangan || undefined,
+        jumlah: Number(form.jumlah),
+      })
+      setForm(f => ({ ...f, keterangan: '', jumlah: '' }))
+      await reload()
+    })
+  }
+
+  function handleBagiHasil() {
+    setBagiHasilError(null)
+    startTransition(async () => {
+      const res = await distribusikanBagiHasil(proyek.id)
+      if (res.error) { setBagiHasilError(res.error); return }
+      await reload()
+    })
+  }
+
+  const kategoriOptions = form.jenis === 'PENDAPATAN' ? KATEGORI_PENDAPATAN : KATEGORI_BEBAN
+
+  return (
+    <div className="space-y-4">
+      {/* Form catat transaksi */}
+      <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+        <p className="text-sm font-semibold text-gray-800">Catat Perkembangan Proyek</p>
+        <div className="flex rounded-xl border border-gray-200 bg-white p-1">
+          {(['PENDAPATAN', 'BEBAN'] as const).map(j => (
+            <button key={j}
+              onClick={() => setForm(f => ({ ...f, jenis: j, kategori: j === 'PENDAPATAN' ? KATEGORI_PENDAPATAN[0] : KATEGORI_BEBAN[0] }))}
+              className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors cursor-pointer',
+                form.jenis === j
+                  ? (j === 'PENDAPATAN' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700')
+                  : 'text-gray-500 hover:text-gray-700')}>
+              {j === 'PENDAPATAN' ? 'Pendapatan' : 'Beban'}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <input type="date" value={form.tanggal} onChange={e => setForm(f => ({ ...f, tanggal: e.target.value }))}
+            className="rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+          <select value={form.kategori} onChange={e => setForm(f => ({ ...f, kategori: e.target.value }))}
+            className="rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500">
+            {kategoriOptions.map(k => <option key={k} value={k}>{k}</option>)}
+          </select>
+        </div>
+        <input type="number" placeholder="Jumlah (Rp)" value={form.jumlah}
+          onChange={e => setForm(f => ({ ...f, jumlah: e.target.value }))}
+          className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+        <input type="text" placeholder="Keterangan (opsional)" value={form.keterangan}
+          onChange={e => setForm(f => ({ ...f, keterangan: e.target.value }))}
+          className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+        <button onClick={handleSubmit} disabled={pending || !form.jumlah}
+          className="w-full rounded-xl bg-emerald-600 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+          {pending ? 'Menyimpan...' : 'Simpan Transaksi'}
+        </button>
+      </div>
+
+      <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+        {([['laporan', 'Laporan Keuangan'], ['riwayat', 'Riwayat Transaksi']] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setView(key)}
+            className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors cursor-pointer',
+              view === key ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700')}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="py-8 text-center text-sm text-gray-400">Memuat data keuangan...</div>
+      ) : view === 'laporan' ? (
+        laporan && (
+          <div className="space-y-4">
+            <DaftarPemodalPanel proyekId={proyek.id} />
+            <LaporanKeuanganView laporan={laporan} />
+            {laporan.labaRugi.labaBersih > 0 && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 space-y-2">
+                <p className="text-sm font-semibold text-emerald-900">
+                  Harta proyek sudah melebihi modal — laba bersih {fmt(laporan.labaRugi.labaBersih)} siap dibagikan.
+                </p>
+                {bagiHasilError && <p className="text-xs text-rose-600">{bagiHasilError}</p>}
+                <button onClick={handleBagiHasil} disabled={pending}
+                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+                  <Banknote className="h-4 w-4" /> {pending ? 'Memproses...' : 'Bagi Hasil Sekarang'}
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      ) : (
+        <div className="space-y-2">
+          {transaksi.length === 0 && (
+            <div className="rounded-2xl border border-gray-100 bg-white py-10 text-center text-gray-400 text-sm">
+              Belum ada transaksi tercatat
+            </div>
+          )}
+          {transaksi.map(t => (
+            <div key={t.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-3">
+              <div>
+                <p className="text-sm font-medium text-gray-800">{t.kategori}</p>
+                <p className="text-xs text-gray-400">{String(t.tanggal).split('T')[0]}{t.keterangan ? ` · ${t.keterangan}` : ''}</p>
+              </div>
+              <p className={cn('text-sm font-semibold', t.jenis === 'PENDAPATAN' ? 'text-emerald-600' : 'text-red-600')}>
+                {t.jenis === 'PENDAPATAN' ? '+' : '−'}{fmt(t.jumlah)}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── TAB: PROYEK ──────────────────────────────────────────────────────────────
 
 type ProyekForm = {
   pengaju_id: string; nama_proyek: string; deskripsi: string
   jenis_akad: string; kebutuhan_modal: string
   ujrah_nominal: string
+  ujrah_wakalah_akad: string
+  nisbah_pengaju: number
   durasi_bulan: string; agunan: string; notes: string
 }
 
@@ -547,6 +1315,8 @@ const emptyProyekForm: ProyekForm = {
   pengaju_id: '', nama_proyek: '', deskripsi: '',
   jenis_akad: 'MUDHARABAH', kebutuhan_modal: '',
   ujrah_nominal: '150000',
+  ujrah_wakalah_akad: '50000',
+  nisbah_pengaju: 30,
   durasi_bulan: '6', agunan: '', notes: ''
 }
 
@@ -556,10 +1326,17 @@ function TabProyek({ orgId, proyek, anggota }: {
   const [pending, startTransition] = useTransition()
   const [subTab, setSubTab] = useState<'semua' | 'dps'>('semua')
   const [modalNew, setModalNew] = useState(false)
+  const [modalEdit, setModalEdit] = useState<KojasmatProyek | null>(null)
+  const [modalDelete, setModalDelete] = useState<KojasmatProyek | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [dokProyek, setDokProyek] = useState<KojasmatProyek | null>(null)
+  const [keuanganProyek, setKeuanganProyek] = useState<KojasmatProyek | null>(null)
+  const [detailProyek, setDetailProyek] = useState<KojasmatProyek | null>(null)
   const [modalDps, setModalDps] = useState<KojasmatProyek | null>(null)
   const [modalPenawaran, setModalPenawaran] = useState<KojasmatProyek | null>(null)
   const [dpsForm, setDpsForm] = useState<{ keputusan: 'DISETUJUI' | 'DITOLAK' | 'REVISI'; catatan: string }>({ keputusan: 'DISETUJUI', catatan: '' })
   const [form, setForm] = useState<ProyekForm>(emptyProyekForm)
+  const [editForm, setEditForm] = useState<ProyekForm>(emptyProyekForm)
   const [penawaranIds, setPenawaranIds] = useState<string[]>([])
 
   const antrianDps = proyek.filter(p => p.status === 'REVIEW_DPS')
@@ -575,6 +1352,9 @@ function TabProyek({ orgId, proyek, anggota }: {
         jenis_akad: form.jenis_akad as 'MURABAHAH' | 'MUDHARABAH' | 'INAN',
         kebutuhan_modal: Number(form.kebutuhan_modal),
         ujrah_nominal: Number(form.ujrah_nominal),
+        ujrah_wakalah_akad: Number(form.ujrah_wakalah_akad),
+        nisbah_pengaju: form.nisbah_pengaju,
+        nisbah_pemodal: 100 - form.nisbah_pengaju,
         durasi_bulan: Number(form.durasi_bulan),
         agunan: form.agunan || undefined,
         notes: form.notes || undefined,
@@ -608,6 +1388,56 @@ function TabProyek({ orgId, proyek, anggota }: {
 
   function handleStatus(id: string, status: string) {
     startTransition(async () => { await updateProyekStatus(id, status) })
+  }
+
+  function openEdit(p: KojasmatProyek) {
+    setEditForm({
+      pengaju_id: p.pengaju_id,
+      nama_proyek: p.nama_proyek,
+      deskripsi: p.deskripsi ?? '',
+      jenis_akad: p.jenis_akad,
+      kebutuhan_modal: String(p.kebutuhan_modal),
+      ujrah_nominal: String(p.ujrah_nominal),
+      ujrah_wakalah_akad: String(p.ujrah_wakalah_akad ?? 0),
+      nisbah_pengaju: p.nisbah_pengaju ?? 30,
+      durasi_bulan: String(p.durasi_bulan),
+      agunan: p.agunan ?? '',
+      notes: p.notes ?? '',
+    })
+    setModalEdit(p)
+  }
+
+  function handleEdit() {
+    if (!modalEdit) return
+    startTransition(async () => {
+      await updateProyek(modalEdit.id, {
+        nama_proyek: editForm.nama_proyek,
+        deskripsi: editForm.deskripsi || undefined,
+        jenis_akad: editForm.jenis_akad as 'MURABAHAH' | 'MUDHARABAH' | 'INAN',
+        kebutuhan_modal: Number(editForm.kebutuhan_modal),
+        ujrah_nominal: Number(editForm.ujrah_nominal),
+        ujrah_wakalah_akad: Number(editForm.ujrah_wakalah_akad),
+        nisbah_pengaju: editForm.nisbah_pengaju,
+        nisbah_pemodal: 100 - editForm.nisbah_pengaju,
+        durasi_bulan: Number(editForm.durasi_bulan),
+        agunan: editForm.agunan || undefined,
+        notes: editForm.notes || undefined,
+      })
+      setModalEdit(null)
+    })
+  }
+
+  function handleDelete() {
+    if (!modalDelete) return
+    setDeleteError(null)
+    startTransition(async () => {
+      const res = await deleteProyek(modalDelete.id)
+      if (res.error) {
+        setDeleteError(res.error)
+        return
+      }
+      setModalDelete(null)
+    })
   }
 
   return (
@@ -655,10 +1485,49 @@ function TabProyek({ orgId, proyek, anggota }: {
                   <p className="text-sm text-gray-500 mt-0.5">
                     Pengaju: {p.pengaju_nama ?? '—'} · {p.durasi_bulan} bulan
                   </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Nisbah Pengaju {p.nisbah_pengaju ?? 30}% · Pemodal {p.nisbah_pemodal ?? 70}%
+                  </p>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-lg font-bold text-gray-900">{fmt(Number(p.kebutuhan_modal))}</p>
-                  <p className="text-xs text-gray-400">Kebutuhan modal</p>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-gray-900">{fmt(Number(p.kebutuhan_modal))}</p>
+                    <p className="text-xs text-gray-400">Kebutuhan modal</p>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => setDetailProyek(p)}
+                      className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 transition-colors cursor-pointer"
+                    >
+                      <Users className="h-3 w-3" /> Detail
+                    </button>
+                    <button
+                      onClick={() => setDokProyek(p)}
+                      className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-pointer"
+                    >
+                      <FolderOpen className="h-3 w-3" /> Dokumen
+                    </button>
+                    <button
+                      onClick={() => setKeuanganProyek(p)}
+                      className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 transition-colors cursor-pointer"
+                    >
+                      <Wallet className="h-3 w-3" /> Keuangan
+                    </button>
+                    <button
+                      onClick={() => openEdit(p)}
+                      className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors cursor-pointer"
+                    >
+                      <Pencil className="h-3 w-3" /> Edit
+                    </button>
+                    {p.status === 'DRAFT' && (
+                      <button
+                        onClick={() => { setModalDelete(p); setDeleteError(null) }}
+                        className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="h-3 w-3" /> Hapus
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -715,6 +1584,165 @@ function TabProyek({ orgId, proyek, anggota }: {
         })}
       </div>
 
+      {/* Drawer Detail Proyek */}
+      <Drawer
+        open={!!detailProyek}
+        onClose={() => setDetailProyek(null)}
+        title={`Detail Proyek — ${detailProyek?.kode_proyek ?? ''}`}
+      >
+        {detailProyek && <DetailProyekPanel key={detailProyek.id} proyek={detailProyek} />}
+      </Drawer>
+
+      {/* Drawer Dokumen Proyek */}
+      <Drawer
+        open={!!dokProyek}
+        onClose={() => setDokProyek(null)}
+        title={`Dokumen Proyek — ${dokProyek?.kode_proyek ?? ''}`}
+      >
+        {dokProyek && <DokumenProyekPanel key={dokProyek.id} proyek={dokProyek} orgId={orgId} />}
+      </Drawer>
+
+      {/* Drawer Keuangan Proyek */}
+      <Drawer
+        open={!!keuanganProyek}
+        onClose={() => setKeuanganProyek(null)}
+        title={`Keuangan Proyek — ${keuanganProyek?.kode_proyek ?? ''}`}
+      >
+        {keuanganProyek && <KeuanganProyekPanel key={keuanganProyek.id} proyek={keuanganProyek} orgId={orgId} />}
+      </Drawer>
+
+      {/* Modal Edit Proyek */}
+      <Modal open={!!modalEdit} onClose={() => setModalEdit(null)} title={`Edit Proyek — ${modalEdit?.kode_proyek ?? ''}`}>
+        {modalEdit && (
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Nama Proyek *</label>
+              <input
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={editForm.nama_proyek} onChange={e => setEditForm(f => ({ ...f, nama_proyek: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Jenis Akad *</label>
+              <select
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={editForm.jenis_akad} onChange={e => setEditForm(f => ({ ...f, jenis_akad: e.target.value }))}>
+                <option value="MUDHARABAH">Mudharabah</option>
+                <option value="MURABAHAH">Murabahah — Jual Beli Cicil</option>
+                <option value="INAN">Musyarakah Inan — Modal Bersama</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Kebutuhan Modal (Rp) *</label>
+                <input type="number"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  value={editForm.kebutuhan_modal} onChange={e => setEditForm(f => ({ ...f, kebutuhan_modal: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Durasi (bulan)</label>
+                <input type="number"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  value={editForm.durasi_bulan} onChange={e => setEditForm(f => ({ ...f, durasi_bulan: e.target.value }))} />
+              </div>
+            </div>
+
+            {/* Nisbah Bagi Hasil */}
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+              <p className="text-sm font-semibold text-blue-900 mb-3">Pembagian Keuntungan (Nisbah)</p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="text-gray-600">Pengaju</span>
+                  <span className="text-emerald-700 font-bold text-sm">{editForm.nisbah_pengaju}%</span>
+                </div>
+                <input type="range" min={10} max={90} step={5}
+                  className="w-full accent-slate-800 cursor-pointer"
+                  value={editForm.nisbah_pengaju}
+                  onChange={e => setEditForm(f => ({ ...f, nisbah_pengaju: Number(e.target.value) }))} />
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="text-gray-600">Pemodal</span>
+                  <span className="text-blue-700 font-bold text-sm">{100 - editForm.nisbah_pengaju}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-blue-200 overflow-hidden">
+                  <div className="h-2 bg-gradient-to-r from-slate-700 to-slate-900 rounded-full transition-all"
+                    style={{ width: `${editForm.nisbah_pengaju}%` }} />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Ujrah Wakalah (Rp)
+                <span className="ml-1 font-normal text-gray-400 text-xs">— fee nominal koperasi untuk pendampingan syirkah</span>
+              </label>
+              <input type="number" min="0" step="1000"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={editForm.ujrah_nominal} onChange={e => setEditForm(f => ({ ...f, ujrah_nominal: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Ujrah Diwakilkan Akad (Rp)
+                <span className="ml-1 font-normal text-gray-400 text-xs">— jika pemodal pilih diwakilkan koperasi saat akad</span>
+              </label>
+              <input type="number" min="0" step="1000"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={editForm.ujrah_wakalah_akad} onChange={e => setEditForm(f => ({ ...f, ujrah_wakalah_akad: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Agunan / Jaminan</label>
+              <input
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={editForm.agunan} onChange={e => setEditForm(f => ({ ...f, agunan: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Deskripsi Usaha</label>
+              <textarea rows={3}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
+                value={editForm.deskripsi} onChange={e => setEditForm(f => ({ ...f, deskripsi: e.target.value }))} />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setModalEdit(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Batal
+              </button>
+              <button onClick={handleEdit} disabled={!editForm.nama_proyek || !editForm.kebutuhan_modal || pending}
+                className="flex-1 rounded-xl bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer">
+                {pending ? 'Menyimpan...' : 'Simpan Perubahan'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal Konfirmasi Hapus */}
+      <Modal open={!!modalDelete} onClose={() => setModalDelete(null)} title="Hapus Proyek">
+        {modalDelete && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+              <p className="font-medium text-red-800">{modalDelete.nama_proyek}</p>
+              <p className="text-sm text-red-600 mt-1">{modalDelete.kode_proyek} · {modalDelete.jenis_akad}</p>
+            </div>
+            <p className="text-sm text-gray-600">
+              Proyek ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.
+            </p>
+            {deleteError && (
+              <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {deleteError}
+              </p>
+            )}
+            <div className="flex gap-3">
+              <button onClick={() => setModalDelete(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Batal
+              </button>
+              <button onClick={handleDelete} disabled={pending}
+                className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer">
+                {pending ? 'Menghapus...' : 'Ya, Hapus'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* Modal Proyek Baru */}
       <Modal open={modalNew} onClose={() => setModalNew(false)} title="Buat Proyek Baru">
         <div className="space-y-3">
@@ -727,6 +1755,41 @@ function TabProyek({ orgId, proyek, anggota }: {
               {anggota.map(a => <option key={a.id} value={a.id}>{a.kode_anggota} · {a.nama}</option>)}
             </select>
           </div>
+
+          {/* Nisbah Bagi Hasil */}
+          {(() => {
+            const nisbahTerkunci = modalEdit?.status === 'BERJALAN' || modalEdit?.status === 'SELESAI'
+            return (
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                <p className="text-sm font-semibold text-blue-900 mb-3">Pembagian Keuntungan (Nisbah)</p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs font-medium">
+                    <span className="text-gray-600">Pengaju</span>
+                    <span className="text-emerald-700 font-bold text-sm">{editForm.nisbah_pengaju}%</span>
+                  </div>
+                  <input type="range" min={10} max={90} step={5}
+                    disabled={nisbahTerkunci}
+                    className="w-full accent-slate-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    value={editForm.nisbah_pengaju}
+                    onChange={e => setEditForm(f => ({ ...f, nisbah_pengaju: Number(e.target.value) }))} />
+                  <div className="flex items-center justify-between text-xs font-medium">
+                    <span className="text-gray-600">Pemodal</span>
+                    <span className="text-blue-700 font-bold text-sm">{100 - editForm.nisbah_pengaju}%</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-blue-200 overflow-hidden">
+                    <div className="h-2 bg-gradient-to-r from-slate-700 to-slate-900 rounded-full transition-all"
+                      style={{ width: `${editForm.nisbah_pengaju}%` }} />
+                  </div>
+                  {nisbahTerkunci ? (
+                    <p className="text-xs text-rose-600">Proyek sudah berjalan — nisbah tidak dapat diubah lagi.</p>
+                  ) : (
+                    <p className="text-xs text-blue-600">Koperasi menerima ujrah nominal tetap — tidak masuk nisbah.</p>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Nama Proyek *</label>
             <input
@@ -739,7 +1802,7 @@ function TabProyek({ orgId, proyek, anggota }: {
             <select
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
               value={form.jenis_akad} onChange={e => setForm(f => ({ ...f, jenis_akad: e.target.value }))}>
-              <option value="MUDHARABAH">Mudharabah — Modal Penuh Koperasi</option>
+              <option value="MUDHARABAH">Mudharabah</option>
               <option value="MURABAHAH">Murabahah — Jual Beli Cicil</option>
               <option value="INAN">Musyarakah Inan — Modal Bersama</option>
             </select>
@@ -762,7 +1825,7 @@ function TabProyek({ orgId, proyek, anggota }: {
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Ujrah Wakalah (Rp, nominal tetap)
-              <span className="ml-1 font-normal text-gray-400 text-xs">— fee agen koperasi, bukan nisbah bagi hasil</span>
+              <span className="ml-1 font-normal text-gray-400 text-xs">— fee nominal koperasi untuk pendampingan syirkah, bukan nisbah bagi hasil</span>
             </label>
             <input type="number" min="0" step="1000"
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
@@ -771,6 +1834,20 @@ function TabProyek({ orgId, proyek, anggota }: {
               onChange={e => setForm(f => ({ ...f, ujrah_nominal: e.target.value }))} />
             <p className="mt-1 text-xs text-gray-400">
               Seluruh keuntungan proyek menjadi hak pemodal. Koperasi hanya menerima ujrah nominal ini sebagai biaya layanan wakalah.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Ujrah Diwakilkan Akad (Rp)
+              <span className="ml-1 font-normal text-gray-400 text-xs">— jika pemodal pilih diwakilkan koperasi saat akad</span>
+            </label>
+            <input type="number" min="0" step="1000"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              placeholder="Contoh: 50000"
+              value={form.ujrah_wakalah_akad}
+              onChange={e => setForm(f => ({ ...f, ujrah_wakalah_akad: e.target.value }))} />
+            <p className="mt-1 text-xs text-gray-400">
+              Ditentukan koperasi sebagai biaya jasa menghadiri presentasi & menandatangani akad atas nama pemodal yang memilih diwakilkan.
             </p>
           </div>
           <div>
@@ -808,6 +1885,9 @@ function TabProyek({ orgId, proyek, anggota }: {
               <p className="font-medium text-amber-800">{modalDps.nama_proyek}</p>
               <p className="text-sm text-amber-600 mt-1">
                 {modalDps.jenis_akad} · {fmt(Number(modalDps.kebutuhan_modal))} · {modalDps.durasi_bulan} bulan
+              </p>
+              <p className="text-sm text-amber-600 mt-1">
+                Nisbah Pengaju {modalDps.nisbah_pengaju ?? 30}% · Nisbah Pemodal {modalDps.nisbah_pemodal ?? 70}%
               </p>
               {modalDps.deskripsi && <p className="text-sm text-amber-700 mt-2">{modalDps.deskripsi}</p>}
               {modalDps.agunan && <p className="text-xs text-amber-600 mt-1">Agunan: {modalDps.agunan}</p>}
@@ -895,6 +1975,8 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
   const [pending, startTransition] = useTransition()
   const [selectedAnggota, setSelectedAnggota] = useState<KojasmatAnggota | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [bukuAnggota, setBukuAnggota] = useState<KojasmatAnggota | null>(null)
+  const [bukuOpen, setBukuOpen] = useState(false)
   const [mutasiError, setMutasiError] = useState<string | null>(null)
   const [mutasiSuccess, setMutasiSuccess] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -907,6 +1989,17 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
     a.nama.toLowerCase().includes(search.toLowerCase()) ||
     a.kode_anggota.includes(search)
   )
+
+  function openBukuTabungan(a: KojasmatAnggota) {
+    setBukuAnggota(a)
+    setBukuOpen(true)
+  }
+
+  function openTransaksi(a: KojasmatAnggota) {
+    setSelectedAnggota(a)
+    setBukuOpen(false)
+    setModalOpen(true)
+  }
 
   function handleMutasi() {
     if (!selectedAnggota) return
@@ -977,10 +2070,16 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
                       cls={a.status === 'AKTIF' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'} />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => { setSelectedAnggota(a); setModalOpen(true) }}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer">
-                      <Banknote className="h-3.5 w-3.5" /> Transaksi
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => openBukuTabungan(a)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer">
+                        <BookOpen className="h-3.5 w-3.5" /> Buku Tabungan
+                      </button>
+                      <button onClick={() => openTransaksi(a)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer">
+                        <Banknote className="h-3.5 w-3.5" /> Transaksi
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -989,6 +2088,23 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
         </div>
       </div>
 
+      {/* Buku Tabungan Drawer */}
+      <Drawer
+        open={bukuOpen}
+        onClose={() => setBukuOpen(false)}
+        title={`Buku Tabungan — ${bukuAnggota?.nama ?? ''}`}
+      >
+        {bukuAnggota && (
+          <BukuTabunganPanel
+            key={bukuAnggota.id}
+            anggota={bukuAnggota}
+            orgId={orgId}
+            onTransaksi={() => openTransaksi(bukuAnggota)}
+          />
+        )}
+      </Drawer>
+
+      {/* Modal Transaksi */}
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setMutasiError(null) }}
         title={`Transaksi Simpanan — ${selectedAnggota?.nama ?? ''}`}>
         <div className="space-y-3">
@@ -1063,12 +2179,112 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
 
 // ─── TAB: PELATIHAN ───────────────────────────────────────────────────────────
 
+function CopyLinkButton({ pelatihanId }: { pelatihanId: string }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    const url = `${window.location.origin}/kojasmat/daftar/${pelatihanId}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={cn(
+        'flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer shrink-0',
+        copied
+          ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+      )}
+    >
+      {copied ? <><Check className="h-3.5 w-3.5" /> Tersalin!</> : <><Copy className="h-3.5 w-3.5" /> Salin Link Daftar</>}
+    </button>
+  )
+}
+
+type PesertaPelatihan = {
+  id: string
+  pelatihan_id: string
+  anggota_id: string
+  status: string
+  nama: string
+  kode_anggota: string
+  phone: string | null
+}
+
+function PesertaPelatihanPanel({ pelatihan }: { pelatihan: KojasmatPelatihan }) {
+  const [pending, startTransition] = useTransition()
+  const [peserta, setPeserta] = useState<PesertaPelatihan[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getPesertaPelatihan(pelatihan.id).then(rows => {
+      if (!cancelled) {
+        setPeserta(rows as PesertaPelatihan[])
+        setLoading(false)
+      }
+    })
+    return () => { cancelled = true }
+  }, [pelatihan.id])
+
+  function handleLuluskan(pesertaId: string, anggotaId: string) {
+    startTransition(async () => {
+      await luluskanPeserta(pesertaId, anggotaId)
+      setPeserta(prev => prev.map(p => p.id === pesertaId ? { ...p, status: 'LULUS' } : p))
+    })
+  }
+
+  const statusColor: Record<string, string> = {
+    TERDAFTAR: 'bg-blue-100 text-blue-700',
+    LULUS:     'bg-emerald-100 text-emerald-700',
+  }
+
+  if (loading) return <div className="py-8 text-center text-sm text-gray-400">Memuat peserta...</div>
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-gray-500">{peserta.length} peserta terdaftar di <strong>{pelatihan.judul}</strong></p>
+      {peserta.length === 0 && (
+        <div className="rounded-2xl border border-gray-100 bg-white py-10 text-center text-gray-400 text-sm">
+          Belum ada anggota yang mendaftar
+        </div>
+      )}
+      {peserta.map(p => (
+        <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white p-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">{p.nama}</p>
+            <p className="text-xs text-gray-400">{p.kode_anggota}{p.phone ? ` · ${p.phone}` : ''}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge text={p.status === 'LULUS' ? 'Lulus' : 'Terdaftar'} cls={statusColor[p.status] ?? 'bg-gray-100 text-gray-600'} />
+            {p.status !== 'LULUS' && (
+              <button
+                onClick={() => handleLuluskan(p.id, p.anggota_id)}
+                disabled={pending}
+                className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                Luluskan
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function TabPelatihan({ orgId, pelatihan, anggota }: {
   orgId: string; pelatihan: KojasmatPelatihan[]; anggota: KojasmatAnggota[]
 }) {
   const [pending, startTransition] = useTransition()
   const [modalNew, setModalNew] = useState(false)
   const [modalDaftar, setModalDaftar] = useState<KojasmatPelatihan | null>(null)
+  const [modalPeserta, setModalPeserta] = useState<KojasmatPelatihan | null>(null)
   const [selectedAnggotaId, setSelectedAnggotaId] = useState('')
   const [form, setForm] = useState({
     judul: '', deskripsi: '', instruktur: '', tanggal: '', lokasi: '', kuota: '30'
@@ -1125,12 +2341,19 @@ function TabPelatihan({ orgId, pelatihan, anggota }: {
                   <span>{p.peserta_count ?? 0}/{p.kuota} peserta</span>
                 </div>
               </div>
-              {p.status === 'TERJADWAL' && (
-                <button onClick={() => { setModalDaftar(p); setSelectedAnggotaId('') }}
-                  className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer shrink-0">
-                  <Plus className="h-3.5 w-3.5" /> Daftarkan
+              <div className="flex items-center gap-2 shrink-0">
+                <CopyLinkButton pelatihanId={p.id} />
+                <button onClick={() => setModalPeserta(p)}
+                  className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                  <Users className="h-3.5 w-3.5" /> Lihat Peserta
                 </button>
-              )}
+                {p.status === 'TERJADWAL' && (
+                  <button onClick={() => { setModalDaftar(p); setSelectedAnggotaId('') }}
+                    className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer">
+                    <Plus className="h-3.5 w-3.5" /> Daftarkan
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -1205,6 +2428,10 @@ function TabPelatihan({ orgId, pelatihan, anggota }: {
           </div>
         )}
       </Modal>
+
+      <Drawer open={!!modalPeserta} onClose={() => setModalPeserta(null)} title="Daftar Pendaftar">
+        {modalPeserta && <PesertaPelatihanPanel pelatihan={modalPeserta} />}
+      </Drawer>
     </div>
   )
 }

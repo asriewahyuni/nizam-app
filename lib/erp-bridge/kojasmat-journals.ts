@@ -129,6 +129,45 @@ export async function jurnalPenerimaanDanaPemodal(
 }
 
 /**
+ * Pembatalan pendanaan oleh pemodal sebelum proyek berjalan — reversal dari
+ * jurnalPenerimaanDanaPemodal:
+ *   Dr Dana Syirkah Temporer → Cr Kas (1101)
+ */
+export async function jurnalPembatalanPembiayaan(
+  orgId: string,
+  jenisAkad: 'MUDHARABAH' | 'MURABAHAH' | 'INAN',
+  jumlah: number,
+  pembiayaanId: string,
+  kodeProyek: string,
+) {
+  const debitCode = DST_COA[jenisAkad] ?? '21-5002'
+  await postJurnal(
+    orgId, debitCode, '1101', jumlah,
+    `Pembatalan pendanaan proyek ${kodeProyek} (${jenisAkad})`,
+    'KOJASMAT_PEMBIAYAAN_BATAL', pembiayaanId,
+  )
+}
+
+/**
+ * Pembatalan ujrah diwakilkan akad — reversal dari jurnalUjrahMudharabah/Murabahah:
+ *   Dr Ujrah Wakalah → Cr Kas (1101)
+ */
+export async function jurnalPembatalanUjrah(
+  orgId: string,
+  jenisAkad: string,
+  jumlah: number,
+  refId: string,
+  kodeProyek: string,
+) {
+  const debitCode = jenisAkad === 'MURABAHAH' ? '41-6001' : '41-6002'
+  await postJurnal(
+    orgId, debitCode, '1101', jumlah,
+    `Pembatalan ujrah wakalah diwakilkan akad proyek ${kodeProyek}`,
+    'KOJASMAT_UJRAH_BATAL', refId,
+  )
+}
+
+/**
  * Penyaluran modal ke mudharib (koperasi bayar ke pengaju proyek):
  *   Dr Piutang Mudharabah (11-4001) → Cr Kas (1101)
  */
@@ -197,5 +236,43 @@ export async function jurnalDistribusiBagiHasil(
     orgId, '21-5002', '1101', jumlah,
     `Distribusi bagi hasil proyek ${kodeProyek}`,
     'KOJASMAT_BAGI_HASIL', bagiHasilId,
+  )
+}
+
+// ─── PERKEMBANGAN USAHA PROYEK (PENDAPATAN/BEBAN) ──────────────────────────────
+
+/**
+ * Pendapatan usaha dari proyek pembiayaan (dicatat mudharib di laporan perkembangan):
+ *   Dr Kas (1101) → Cr Pendapatan Usaha Proyek (41-7000)
+ */
+export async function jurnalPendapatanProyek(
+  orgId: string,
+  jumlah: number,
+  transaksiId: string,
+  kodeProyek: string,
+  kategori: string,
+) {
+  await postJurnal(
+    orgId, '1101', '41-7000', jumlah,
+    `Pendapatan proyek ${kodeProyek} — ${kategori}`,
+    'KOJASMAT_PROYEK_PENDAPATAN', transaksiId,
+  )
+}
+
+/**
+ * Beban usaha dari proyek pembiayaan (dicatat mudharib di laporan perkembangan):
+ *   Dr Beban Usaha Proyek (51-7000) → Cr Kas (1101)
+ */
+export async function jurnalBebanProyek(
+  orgId: string,
+  jumlah: number,
+  transaksiId: string,
+  kodeProyek: string,
+  kategori: string,
+) {
+  await postJurnal(
+    orgId, '51-7000', '1101', jumlah,
+    `Beban proyek ${kodeProyek} — ${kategori}`,
+    'KOJASMAT_PROYEK_BEBAN', transaksiId,
   )
 }

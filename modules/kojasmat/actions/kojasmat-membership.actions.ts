@@ -46,7 +46,8 @@ export type KojasmatDokumen = {
   referensi_id: string
   jenis_dokumen: 'KTP' | 'PASSPORT' | 'SURAT_USAHA' | 'FOTO_USAHA' |
     'PROYEKSI_KEUANGAN' | 'ANALISA_BISNIS' | 'PENAWARAN_SYIRKAH' |
-    'LAPORAN_MINGGUAN' | 'AKAD' | 'LAINNYA'
+    'LAPORAN_MINGGUAN' | 'AKAD' | 'LAINNYA' |
+    'KELAYAKAN_USAHA' | 'PROPOSAL' | 'PENAWARAN_HARGA'
   nama_file: string
   file_key: string
   file_size?: number

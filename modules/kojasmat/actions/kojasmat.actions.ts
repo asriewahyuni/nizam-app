@@ -9,6 +9,10 @@ import {
   jurnalSetorSimpanan,
   jurnalTarikSimpanan,
   jurnalPenerimaanDanaPemodal,
+  jurnalUjrahMudharabah,
+  jurnalUjrahMurabahah,
+  jurnalPembatalanPembiayaan,
+  jurnalPembatalanUjrah,
 } from '@/lib/erp-bridge/kojasmat-journals'
 
 // session.user.id bisa berisi legacy_user_id (Supabase UUID), bukan internal_auth_users.id.
@@ -69,8 +73,10 @@ export type KojasmatProyek = {
   kebutuhan_modal: number
   modal_terkumpul: number
   ujrah_nominal: number
+  ujrah_wakalah_akad: number
   nisbah_pengaju: number
   nisbah_pemodal: number
+  min_investasi: number
   durasi_bulan: number
   tanggal_mulai?: string
   tanggal_selesai?: string
@@ -78,6 +84,10 @@ export type KojasmatProyek = {
   agunan?: string
   notes?: string
   created_at: string
+  // joined fields untuk tampilan portal
+  is_berminat?: boolean
+  sudah_dibiayai?: boolean
+  jumlah_minat?: number
 }
 
 export type KojasmatPembiayaan = {
@@ -88,6 +98,8 @@ export type KojasmatPembiayaan = {
   jumlah: number
   porsi_pct: number
   status: 'AKTIF' | 'SELESAI' | 'GAGAL'
+  kehadiran_akad?: 'SENDIRI' | 'DIWAKILKAN'
+  ujrah_diwakilkan?: number
   created_at: string
   // joined from proyek
   nama_proyek?: string
@@ -131,6 +143,7 @@ export type KojasmatPenawaran = {
   kebutuhan_modal?: number
   modal_terkumpul?: number
   ujrah_nominal?: number
+  ujrah_wakalah_akad?: number
   durasi_bulan?: number
   proyek_status?: string
 }
@@ -371,6 +384,7 @@ export async function createProyek(payload: {
   jenis_akad: 'MURABAHAH' | 'MUDHARABAH' | 'INAN'
   kebutuhan_modal: number
   ujrah_nominal?: number
+  ujrah_wakalah_akad?: number
   nisbah_pengaju?: number
   nisbah_pemodal?: number
   durasi_bulan?: number
@@ -394,15 +408,16 @@ export async function createProyek(payload: {
   const { rows } = await queryPostgres(
     `INSERT INTO kojasmat_proyek
        (org_id, pengaju_id, kode_proyek, nama_proyek, deskripsi, jenis_akad,
-        kebutuhan_modal, ujrah_nominal, nisbah_pengaju, nisbah_pemodal,
+        kebutuhan_modal, ujrah_nominal, ujrah_wakalah_akad, nisbah_pengaju, nisbah_pemodal,
         durasi_bulan, agunan, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      RETURNING *`,
     [
       payload.org_id, payload.pengaju_id, kode, payload.nama_proyek,
       payload.deskripsi ?? null, payload.jenis_akad,
       payload.kebutuhan_modal,
       payload.ujrah_nominal ?? 0,
+      payload.ujrah_wakalah_akad ?? 0,
       payload.nisbah_pengaju ?? 30,
       payload.nisbah_pemodal ?? 70,
       payload.durasi_bulan ?? 6,
@@ -433,6 +448,63 @@ export async function updateProyekStatus(id: string, status: string, notes?: str
       [id]
     )
   }
+  revalidatePath('/kojasmat')
+  return { data: { ok: true } }
+}
+
+export async function updateProyek(id: string, payload: {
+  nama_proyek: string
+  deskripsi?: string
+  jenis_akad: 'MURABAHAH' | 'MUDHARABAH' | 'INAN'
+  kebutuhan_modal: number
+  ujrah_nominal: number
+  ujrah_wakalah_akad?: number
+  nisbah_pengaju?: number
+  nisbah_pemodal?: number
+  durasi_bulan: number
+  agunan?: string
+  notes?: string
+}) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const { rows: [existing] } = await queryPostgres(`SELECT status, nisbah_pengaju, nisbah_pemodal FROM kojasmat_proyek WHERE id=$1`, [id])
+  if (!existing) return { error: 'Proyek tidak ditemukan' }
+
+  const nisbahTerkunci = existing.status === 'BERJALAN' || existing.status === 'SELESAI'
+  const nisbahPengaju = nisbahTerkunci ? Number(existing.nisbah_pengaju) : (payload.nisbah_pengaju ?? 30)
+  const nisbahPemodal = nisbahTerkunci ? Number(existing.nisbah_pemodal) : (payload.nisbah_pemodal ?? 70)
+
+  await queryPostgres(
+    `UPDATE kojasmat_proyek
+     SET nama_proyek=$2, deskripsi=$3, jenis_akad=$4,
+         kebutuhan_modal=$5, ujrah_nominal=$6, ujrah_wakalah_akad=$10,
+         nisbah_pengaju=$11, nisbah_pemodal=$12,
+         durasi_bulan=$7, agunan=$8, notes=$9, updated_at=NOW()
+     WHERE id=$1`,
+    [
+      id, payload.nama_proyek, payload.deskripsi ?? null,
+      payload.jenis_akad, payload.kebutuhan_modal, payload.ujrah_nominal,
+      payload.durasi_bulan, payload.agunan ?? null, payload.notes ?? null,
+      payload.ujrah_wakalah_akad ?? 0,
+      nisbahPengaju, nisbahPemodal,
+    ]
+  )
+  revalidatePath('/kojasmat')
+  return { data: { ok: true } }
+}
+
+export async function deleteProyek(id: string) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const { rows: [p] } = await queryPostgres(
+    `SELECT status FROM kojasmat_proyek WHERE id=$1`, [id]
+  )
+  if (!p) return { error: 'Proyek tidak ditemukan' }
+  if (p.status !== 'DRAFT') return { error: 'Hanya proyek berstatus DRAFT yang dapat dihapus' }
+
+  await queryPostgres(`DELETE FROM kojasmat_proyek WHERE id=$1`, [id])
   revalidatePath('/kojasmat')
   return { data: { ok: true } }
 }
@@ -531,6 +603,7 @@ export async function createPembiayaan(payload: {
   proyek_id: string
   pemodal_id: string
   jumlah: number
+  kehadiran_akad?: 'SENDIRI' | 'DIWAKILKAN'
 }) {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
@@ -548,11 +621,13 @@ export async function createPembiayaan(payload: {
   }
 
   const porsiPct = (payload.jumlah / Number(proyek.kebutuhan_modal)) * 100
+  const kehadiranAkad = payload.kehadiran_akad ?? 'SENDIRI'
+  const ujrahDiwakilkan = kehadiranAkad === 'DIWAKILKAN' ? Number(proyek.ujrah_wakalah_akad ?? 0) : 0
 
   const { rows } = await queryPostgres(
-    `INSERT INTO kojasmat_pembiayaan (org_id, proyek_id, pemodal_id, jumlah, porsi_pct)
-     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [payload.org_id, payload.proyek_id, payload.pemodal_id, payload.jumlah, porsiPct]
+    `INSERT INTO kojasmat_pembiayaan (org_id, proyek_id, pemodal_id, jumlah, porsi_pct, kehadiran_akad, ujrah_diwakilkan)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [payload.org_id, payload.proyek_id, payload.pemodal_id, payload.jumlah, porsiPct, kehadiranAkad, ujrahDiwakilkan]
   )
 
   const newModal = Number(proyek.modal_terkumpul) + payload.jumlah
@@ -568,10 +643,55 @@ export async function createPembiayaan(payload: {
       payload.org_id, proyek.jenis_akad as 'MUDHARABAH' | 'MURABAHAH' | 'INAN',
       payload.jumlah, String(rows[0].id), String(proyek.kode_proyek),
     )
+    if (ujrahDiwakilkan > 0) {
+      if (proyek.jenis_akad === 'MURABAHAH') {
+        await jurnalUjrahMurabahah(payload.org_id, ujrahDiwakilkan, String(rows[0].id), String(proyek.kode_proyek))
+      } else {
+        await jurnalUjrahMudharabah(payload.org_id, ujrahDiwakilkan, String(rows[0].id), String(proyek.kode_proyek))
+      }
+    }
   } catch (_) { /* jurnal non-fatal */ }
 
   revalidatePath('/kojasmat')
   return { data: rows[0] as KojasmatPembiayaan }
+}
+
+export async function batalkanPembiayaan(pembiayaanId: string) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const { rows: [pb] } = await queryPostgres(`SELECT * FROM kojasmat_pembiayaan WHERE id=$1`, [pembiayaanId])
+  if (!pb) return { error: 'Data pembiayaan tidak ditemukan' }
+  if (pb.status !== 'AKTIF') return { error: 'Pembiayaan ini sudah tidak aktif' }
+
+  const { rows: [proyek] } = await queryPostgres(`SELECT * FROM kojasmat_proyek WHERE id=$1`, [pb.proyek_id])
+  if (!proyek) return { error: 'Proyek tidak ditemukan' }
+  if (!['OPEN', 'TERPENUHI'].includes(proyek.status)) {
+    return { error: 'Pembiayaan hanya dapat dibatalkan sebelum proyek berjalan' }
+  }
+
+  await queryPostgres(`UPDATE kojasmat_pembiayaan SET status='GAGAL' WHERE id=$1`, [pembiayaanId])
+
+  const newModal = Number(proyek.modal_terkumpul) - Number(pb.jumlah)
+  const newStatus = proyek.status === 'TERPENUHI' && newModal < Number(proyek.kebutuhan_modal) ? 'OPEN' : proyek.status
+
+  await queryPostgres(
+    `UPDATE kojasmat_proyek SET modal_terkumpul=$2, status=$3, updated_at=NOW() WHERE id=$1`,
+    [pb.proyek_id, newModal, newStatus]
+  )
+
+  try {
+    await jurnalPembatalanPembiayaan(
+      proyek.org_id, proyek.jenis_akad as 'MUDHARABAH' | 'MURABAHAH' | 'INAN',
+      Number(pb.jumlah), pembiayaanId, String(proyek.kode_proyek),
+    )
+    if (Number(pb.ujrah_diwakilkan) > 0) {
+      await jurnalPembatalanUjrah(proyek.org_id, proyek.jenis_akad, Number(pb.ujrah_diwakilkan), pembiayaanId, String(proyek.kode_proyek))
+    }
+  } catch (_) { /* jurnal non-fatal */ }
+
+  revalidatePath('/kojasmat')
+  return { data: { ok: true } }
 }
 
 // ─── PELATIHAN ─────────────────────────────────────────────────────────────────
@@ -587,6 +707,25 @@ export async function getAllPelatihan(orgId: string): Promise<KojasmatPelatihan[
     [orgId]
   )
   return rows as KojasmatPelatihan[]
+}
+
+export type KojasmatPelatihanTerjadwal = KojasmatPelatihan & { is_terdaftar: boolean }
+
+export async function getPelatihanTerjadwal(orgId: string, anggotaId: string): Promise<KojasmatPelatihanTerjadwal[]> {
+  const { rows } = await queryPostgres(
+    `SELECT p.*, COUNT(pp.id)::int AS peserta_count,
+            EXISTS(
+              SELECT 1 FROM kojasmat_pelatihan_peserta x
+              WHERE x.pelatihan_id = p.id AND x.anggota_id = $2
+            ) AS is_terdaftar
+     FROM kojasmat_pelatihan p
+     LEFT JOIN kojasmat_pelatihan_peserta pp ON pp.pelatihan_id = p.id
+     WHERE p.org_id = $1 AND p.status = 'TERJADWAL'
+     GROUP BY p.id
+     ORDER BY p.tanggal ASC`,
+    [orgId, anggotaId]
+  )
+  return rows as KojasmatPelatihanTerjadwal[]
 }
 
 export async function createPelatihan(payload: {
@@ -683,7 +822,7 @@ export async function kirimPenawaranProyek(payload: {
 export async function getPenawaranByAnggota(anggotaId: string): Promise<KojasmatPenawaran[]> {
   const { rows } = await queryPostgres(
     `SELECT pn.*, p.nama_proyek, p.jenis_akad, p.kebutuhan_modal,
-            p.modal_terkumpul, p.ujrah_nominal, p.durasi_bulan, p.status AS proyek_status
+            p.modal_terkumpul, p.ujrah_nominal, p.ujrah_wakalah_akad, p.durasi_bulan, p.status AS proyek_status
      FROM kojasmat_penawaran pn
      LEFT JOIN kojasmat_proyek p ON p.id = pn.proyek_id
      WHERE pn.anggota_id=$1 ORDER BY pn.sent_at DESC`,
@@ -712,6 +851,141 @@ export type KojasmatStats = {
   total_simpanan: number
   total_pembiayaan: number
 }
+
+// ─── PROYEK TERSEDIA & KETERTARIKAN ──────────────────────────────────────────
+
+export async function getProyekTersedia(
+  orgId: string,
+  anggotaId: string,
+  totalSimpanan: number
+): Promise<KojasmatProyek[]> {
+  const { rows } = await queryPostgres(
+    `SELECT
+       p.*,
+       a.nama AS pengaju_nama,
+       COUNT(DISTINCT pb.id)::int           AS jumlah_pemodal,
+       COUNT(DISTINCT km.id)::int           AS jumlah_minat,
+       EXISTS(
+         SELECT 1 FROM kojasmat_minat km2
+         WHERE km2.proyek_id=p.id AND km2.anggota_id=$2
+       )                                    AS is_berminat,
+       EXISTS(
+         SELECT 1 FROM kojasmat_pembiayaan pb2
+         WHERE pb2.proyek_id=p.id AND pb2.pemodal_id=$2 AND pb2.status='AKTIF'
+       )                                    AS sudah_dibiayai
+     FROM kojasmat_proyek p
+     LEFT JOIN kojasmat_anggota a  ON a.id  = p.pengaju_id
+     LEFT JOIN kojasmat_pembiayaan pb ON pb.proyek_id = p.id AND pb.status='AKTIF'
+     LEFT JOIN kojasmat_minat km   ON km.proyek_id = p.id
+     WHERE p.org_id = $1
+       AND p.status = 'OPEN'
+       AND p.pengaju_id != $2
+     GROUP BY p.id, a.nama
+     ORDER BY
+       -- Proyek yang diminati anggota ini duluan
+       EXISTS(SELECT 1 FROM kojasmat_minat WHERE proyek_id=p.id AND anggota_id=$2) DESC,
+       -- Lalu proyek yang sesuai kapasitas simpanan (sisa kebutuhan ≤ total simpanan)
+       (p.kebutuhan_modal - p.modal_terkumpul) <= $3 DESC,
+       -- Proyek dengan progress paling mendekati penuh (butuh dorongan akhir)
+       (p.modal_terkumpul::float / NULLIF(p.kebutuhan_modal,0)) DESC`,
+    [orgId, anggotaId, totalSimpanan]
+  )
+  return rows as KojasmatProyek[]
+}
+
+export async function toggleMinatProyek(payload: {
+  org_id: string
+  proyek_id: string
+  anggota_id: string
+}): Promise<{ is_berminat: boolean }> {
+  const { rows: [existing] } = await queryPostgres(
+    `SELECT id FROM kojasmat_minat WHERE proyek_id=$1 AND anggota_id=$2`,
+    [payload.proyek_id, payload.anggota_id]
+  )
+  if (existing) {
+    await queryPostgres(
+      `DELETE FROM kojasmat_minat WHERE proyek_id=$1 AND anggota_id=$2`,
+      [payload.proyek_id, payload.anggota_id]
+    )
+    return { is_berminat: false }
+  }
+  await queryPostgres(
+    `INSERT INTO kojasmat_minat (org_id, proyek_id, anggota_id) VALUES ($1,$2,$3)`,
+    [payload.org_id, payload.proyek_id, payload.anggota_id]
+  )
+  return { is_berminat: true }
+}
+
+// ─── PENDAFTARAN MANDIRI PELATIHAN (PUBLIK) ───────────────────────────────────
+
+export type PelatihanPublik = {
+  id: string
+  org_id: string
+  judul: string
+  deskripsi: string | null
+  instruktur: string | null
+  tanggal: string
+  lokasi: string | null
+  kuota: number
+  status: string
+  peserta_count: number
+}
+
+export async function getPelatihanPublik(pelatihanId: string): Promise<PelatihanPublik | null> {
+  const { rows } = await queryPostgres(
+    `SELECT p.*, COUNT(pp.id)::int AS peserta_count
+     FROM kojasmat_pelatihan p
+     LEFT JOIN kojasmat_pelatihan_peserta pp ON pp.pelatihan_id = p.id
+     WHERE p.id = $1
+     GROUP BY p.id`,
+    [pelatihanId]
+  )
+  return (rows[0] as PelatihanPublik) ?? null
+}
+
+export async function daftarMandiriPelatihan(payload: {
+  pelatihan_id: string
+  kode_anggota: string
+}): Promise<{ success?: boolean; sudah_terdaftar?: boolean; error?: string }> {
+  const { rows: [pelatihan] } = await queryPostgres(
+    `SELECT p.*, COUNT(pp.id)::int AS peserta_count
+     FROM kojasmat_pelatihan p
+     LEFT JOIN kojasmat_pelatihan_peserta pp ON pp.pelatihan_id = p.id
+     WHERE p.id = $1
+     GROUP BY p.id`,
+    [payload.pelatihan_id]
+  )
+  if (!pelatihan) return { error: 'Pelatihan tidak ditemukan' }
+  if (pelatihan.status !== 'TERJADWAL') return { error: 'Pendaftaran pelatihan ini sudah ditutup' }
+  if (Number(pelatihan.peserta_count) >= Number(pelatihan.kuota)) {
+    return { error: 'Kuota pelatihan sudah penuh' }
+  }
+
+  const { rows: [anggota] } = await queryPostgres(
+    `SELECT * FROM kojasmat_anggota
+     WHERE org_id = $1 AND UPPER(kode_anggota) = UPPER($2)
+     LIMIT 1`,
+    [pelatihan.org_id, payload.kode_anggota]
+  )
+  if (!anggota) return { error: 'Kode anggota tidak ditemukan. Pastikan kode anggota benar.' }
+  if (anggota.status !== 'AKTIF') return { error: 'Hanya anggota aktif yang dapat mendaftar pelatihan' }
+
+  const { rows: [existing] } = await queryPostgres(
+    `SELECT id FROM kojasmat_pelatihan_peserta WHERE pelatihan_id=$1 AND anggota_id=$2`,
+    [payload.pelatihan_id, anggota.id]
+  )
+  if (existing) return { sudah_terdaftar: true }
+
+  await queryPostgres(
+    `INSERT INTO kojasmat_pelatihan_peserta (org_id, pelatihan_id, anggota_id)
+     VALUES ($1,$2,$3)`,
+    [pelatihan.org_id, payload.pelatihan_id, anggota.id]
+  )
+
+  return { success: true }
+}
+
+// ─── STATS ────────────────────────────────────────────────────────────────────
 
 export async function getKojasmatStats(orgId: string): Promise<KojasmatStats> {
   const { rows } = await queryPostgres(

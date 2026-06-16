@@ -18,7 +18,6 @@ import {
   FileText,
   Trash,
   Trash2,
-  PiggyBank,
   Wallet,
   MoreHorizontal,
   TrendingUp,
@@ -587,7 +586,7 @@ export function CashClient({
               {visibleBankAccounts.length === 0 ? (
                 <div className="col-span-full py-24 bg-white rounded-xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center space-y-6 shadow-inner">
                   <div className="w-20 h-20 rounded-[32px] bg-slate-50 flex items-center justify-center text-slate-200 border border-slate-100 shadow-sm">
-                    <PiggyBank size={36} strokeWidth={1.5} />
+                    <Wallet size={36} strokeWidth={1.5} />
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-semibold text-slate-900 text-xl tracking-tight">Belum ada Rekening</h3>
