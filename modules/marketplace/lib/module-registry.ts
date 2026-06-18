@@ -344,7 +344,7 @@ export const SPECIAL_MODULES: ModuleDefinition[] = []
 export const ADDON_MODULES: ModuleDefinition[] = [
   {
     key: 'WA_CRM',
-    name: 'WhatsApp CRM',
+    name: 'Whatslab CRM',
     tagline: 'Pipeline prospek, inbox percakapan, dan AI auto-reply via WhatsApp',
     description: 'Kelola prospek, percakapan, dan pipeline penjualan langsung dari WhatsApp. Dilengkapi AI auto-reply, import kontak dari grup WA, dan dashboard pipeline kanban.',
     icon: '💬',

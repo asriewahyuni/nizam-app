@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     if (!result.rows[0]) {
       return NextResponse.json(
-        { error: `Nomor ${normalizedPhone} sudah ada di WA CRM` },
+        { error: `Nomor ${normalizedPhone} sudah ada di Whatslab CRM` },
         { status: 409 }
       )
     }

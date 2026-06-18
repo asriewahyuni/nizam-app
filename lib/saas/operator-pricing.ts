@@ -22,7 +22,7 @@ export type OperatorAddonOption = {
   dependsOnCapabilities?: string[]
 }
 
-const WA_CRM_MODULE_NAME = 'WhatsApp CRM'
+const WA_CRM_MODULE_NAME = 'Whatslab CRM'
 const FLEET_MODULE_NAME = 'Fleet & Rental'
 const JOB_ORDER_MODULE_NAME = 'Job Order (Jasa)'
 const WORKSHOP_MODULE_NAME = 'Workshop'

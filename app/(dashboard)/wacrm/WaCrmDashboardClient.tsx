@@ -14,6 +14,9 @@ import {
   Users,
   Bot,
   Loader2,
+  Copy,
+  Trash2,
+  Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WaCrmContact, WaCrmMessage, WaCrmConnectionStatus } from './page'
@@ -192,6 +195,7 @@ function ChatPanel({
   stageLabels,
   aiEnabled,
   onMessageSent,
+  onMessageDeleted,
 }: {
   contact: WaCrmContact
   messages: WaCrmMessage[]
@@ -200,9 +204,33 @@ function ChatPanel({
   stageLabels: string[]
   aiEnabled: boolean
   onMessageSent: (msg: WaCrmMessage) => void
+  onMessageDeleted: (msgId: string) => void
 }) {
   const [body, setBody]             = useState('')
   const [isSending, startTransition] = useTransition()
+  const [copiedId, setCopiedId]     = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  function handleCopy(msgId: string, text: string | null) {
+    if (!text || text === 'non-text message') return
+    navigator.clipboard.writeText(text).catch(() => {})
+    setCopiedId(msgId)
+    setTimeout(() => setCopiedId(null), 1500)
+  }
+
+  async function handleDelete(msgId: string) {
+    setDeletingId(msgId)
+    try {
+      await fetch('/api/wacrm/messages', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: msgId }),
+      })
+      onMessageDeleted(msgId)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   function handleSend() {
     if (!body.trim()) return
@@ -260,48 +288,84 @@ function ChatPanel({
         {contactMessages.map(msg => (
           <div
             key={msg.id}
-            className={cn(
-              'max-w-[75%] rounded-xl text-sm overflow-hidden',
-              msg.direction === 'out'
-                ? 'ml-auto bg-green-600 text-white rounded-br-none'
-                : 'mr-auto bg-white border border-slate-200 text-slate-800 rounded-bl-none',
-            )}
+            className={cn('group flex', msg.direction === 'out' ? 'justify-end' : 'justify-start')}
           >
-            {/* Media content */}
-            {msg.media_type === 'image' && msg.media_url && (
-              <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
-                <img src={msg.media_url} alt="Gambar" className="max-w-full max-h-60 object-cover block" loading="lazy" />
-              </a>
-            )}
-            {msg.media_type === 'video' && msg.media_url && (
-              <video src={msg.media_url} controls className="max-w-full max-h-60 block" />
-            )}
-            {msg.media_type === 'audio' && msg.media_url && (
-              <div className="px-3 pt-2">
-                <audio src={msg.media_url} controls className="w-full h-8" />
+            <div className="relative max-w-[75%]">
+
+              {/* ── Action toolbar — muncul saat hover ── */}
+              <div className={cn(
+                'absolute -top-8 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10',
+                msg.direction === 'out' ? 'right-0' : 'left-0',
+              )}>
+                {msg.body && msg.body !== 'non-text message' && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(msg.id, msg.body)}
+                    title="Salin teks"
+                    className="flex items-center gap-1 px-1.5 py-1 rounded-md bg-slate-700 text-white hover:bg-slate-600 transition-colors cursor-pointer text-[10px] font-medium"
+                  >
+                    {copiedId === msg.id
+                      ? <Check className="h-3 w-3 text-emerald-400" />
+                      : <Copy className="h-3 w-3" />}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleDelete(msg.id)}
+                  disabled={deletingId === msg.id}
+                  title="Hapus pesan"
+                  className="flex items-center gap-1 px-1.5 py-1 rounded-md bg-slate-700 text-white hover:bg-red-600 disabled:opacity-50 transition-colors cursor-pointer text-[10px] font-medium"
+                >
+                  {deletingId === msg.id
+                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                    : <Trash2 className="h-3 w-3" />}
+                </button>
               </div>
-            )}
-            {msg.media_type === 'sticker' && msg.media_url && (
-              <img src={msg.media_url} alt="Sticker" className="w-24 h-24 object-contain block p-1" />
-            )}
-            {msg.media_type === 'document' && msg.media_url && (
-              <a href={msg.media_url} target="_blank" rel="noopener noreferrer"
-                 className={cn('flex items-center gap-2 px-3 py-2 text-xs underline', msg.direction === 'out' ? 'text-green-100' : 'text-blue-600')}>
-                📄 {msg.media_url.split('/').pop() ?? 'Dokumen'}
-              </a>
-            )}
-            {/* Placeholder jika media ada tapi URL tidak tersedia */}
-            {(msg.media_type && !msg.media_url) && (
-              <div className={cn('px-3 pt-2 pb-1 text-xs opacity-60 italic', msg.direction === 'out' ? 'text-green-100' : 'text-slate-500')}>
-                {{ image: '📷 Gambar', video: '🎥 Video', audio: '🎵 Pesan suara', document: '📄 Dokumen', sticker: '🎭 Sticker', unknown: '📎 Media' }[msg.media_type] ?? '📎 Media'}
-              </div>
-            )}
-            {/* Teks / caption — sembunyikan jika isinya placeholder Fonnte */}
-            <div className="px-3 py-2">
-              {msg.body && msg.body !== 'non-text message' && <div>{msg.body}</div>}
-              <div className={cn('text-[10px] mt-0.5', msg.direction === 'out' ? 'text-green-200' : 'text-slate-400')}>
-                {new Date(msg.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                {msg.direction === 'out' && (msg.delivered ? ' ✓✓' : ' ✓')}
+
+              {/* ── Bubble ── */}
+              <div className={cn(
+                'rounded-xl text-sm overflow-hidden',
+                msg.direction === 'out'
+                  ? 'bg-green-600 text-white rounded-br-none'
+                  : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none',
+              )}>
+                {/* Media content */}
+                {msg.media_type === 'image' && msg.media_url && (
+                  <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
+                    <img src={msg.media_url} alt="Gambar" className="max-w-full max-h-60 object-cover block" loading="lazy" />
+                  </a>
+                )}
+                {msg.media_type === 'video' && msg.media_url && (
+                  <video src={msg.media_url} controls className="max-w-full max-h-60 block" />
+                )}
+                {msg.media_type === 'audio' && msg.media_url && (
+                  <div className="px-3 pt-2">
+                    <audio src={msg.media_url} controls className="w-full h-8" />
+                  </div>
+                )}
+                {msg.media_type === 'sticker' && msg.media_url && (
+                  <img src={msg.media_url} alt="Sticker" className="w-24 h-24 object-contain block p-1" />
+                )}
+                {msg.media_type === 'document' && msg.media_url && (
+                  <a href={msg.media_url} target="_blank" rel="noopener noreferrer"
+                     className={cn('flex items-center gap-2 px-3 py-2 text-xs underline', msg.direction === 'out' ? 'text-green-100' : 'text-blue-600')}>
+                    📄 {msg.media_url.split('/').pop() ?? 'Dokumen'}
+                  </a>
+                )}
+                {/* Placeholder jika media ada tapi URL tidak tersedia */}
+                {(msg.media_type && !msg.media_url) && (
+                  <div className={cn('px-3 pt-2 pb-1 text-xs opacity-60 italic', msg.direction === 'out' ? 'text-green-100' : 'text-slate-500')}>
+                    {{ image: '📷 Gambar', video: '🎥 Video', audio: '🎵 Pesan suara', document: '📄 Dokumen', sticker: '🎭 Sticker', unknown: '📎 Media' }[msg.media_type] ?? '📎 Media'}
+                  </div>
+                )}
+                {/* Teks / caption — sembunyikan jika isinya placeholder Fonnte */}
+                <div className="px-3 py-2">
+                  {msg.body && msg.body !== 'non-text message' && <div>{msg.body}</div>}
+                  <div className={cn('text-[10px] mt-0.5', msg.direction === 'out' ? 'text-green-200' : 'text-slate-400')}>
+                    {new Date(msg.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                    {msg.direction === 'out' && (msg.delivered ? ' ✓✓' : ' ✓')}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -426,6 +490,10 @@ export function WaCrmDashboardClient({
     })
   }
 
+  function handleDeleteMessage(msgId: string) {
+    setLocalMessages(prev => prev.filter(m => m.id !== msgId))
+  }
+
   const totalByStage = useMemo(() => {
     const map = {} as Record<WaCrmContact['stage'], number>
     STAGE_KEYS.forEach(k => (map[k] = 0))
@@ -440,7 +508,7 @@ export function WaCrmDashboardClient({
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200 bg-white sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <MessageCircle className="h-5 w-5 text-green-600" />
-          <h1 className="text-base font-bold text-slate-900">WhatsApp CRM</h1>
+          <h1 className="text-base font-bold text-slate-900">Whatslab CRM</h1>
         </div>
         <div className="flex items-center gap-2">
           <ConnectionBadge status={connectionStatus} phone={connectedPhone} />
@@ -544,6 +612,7 @@ export function WaCrmDashboardClient({
                 stageLabels={pipelineStages}
                 aiEnabled={aiEnabled}
                 onMessageSent={(msg) => setLocalMessages(prev => [...prev, msg])}
+                onMessageDeleted={handleDeleteMessage}
               />
             ) : (
               <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-400">

@@ -431,7 +431,7 @@ function StepAiConfig({
           className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition-colors cursor-pointer"
         >
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-          Mulai WA CRM
+          Mulai Whatslab CRM
         </button>
       </div>
     </div>
@@ -488,7 +488,7 @@ export function WaCrmOnboardingClient({ orgId, webhookUrl, savedSettings }: Prop
             <MessageCircle className="h-8 w-8 text-white" />
           </div>
           <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-200 mb-2">Add-On Baru</div>
-          <h1 className="text-2xl font-semibold tracking-tight">Selamat datang di WhatsApp CRM</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Selamat datang di Whatslab CRM</h1>
           <p className="mt-2 text-sm text-emerald-100 leading-relaxed">
             Pipeline prospek, inbox percakapan, dan AI auto-reply — semua dari WhatsApp bisnis Anda.
           </p>

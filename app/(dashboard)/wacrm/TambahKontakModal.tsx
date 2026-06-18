@@ -310,7 +310,7 @@ function TabImportPelanggan({
           <span className="text-xs font-semibold text-slate-500">
             {loadingSearch
               ? 'Mencari...'
-              : `${customers.length} pelanggan belum di WA CRM`}
+              : `${customers.length} pelanggan belum di Whatslab CRM`}
           </span>
           {selected.size > 0 && (
             <span className="ml-auto text-xs font-semibold text-green-600">
@@ -329,7 +329,7 @@ function TabImportPelanggan({
           )}
           {!loadingSearch && customers.length === 0 && (
             <div className="py-8 text-center text-sm text-slate-400">
-              {query ? 'Tidak ada pelanggan yang cocok' : 'Semua pelanggan sudah ada di WA CRM'}
+              {query ? 'Tidak ada pelanggan yang cocok' : 'Semua pelanggan sudah ada di Whatslab CRM'}
             </div>
           )}
           {!loadingSearch && customers.map(cust => (
@@ -364,7 +364,7 @@ function TabImportPelanggan({
       {importedCount > 0 && (
         <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg">
           <CheckCircle2 className="h-4 w-4" />
-          {importedCount} kontak berhasil ditambahkan ke WA CRM
+          {importedCount} kontak berhasil ditambahkan ke Whatslab CRM
         </div>
       )}
       {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
@@ -415,7 +415,7 @@ export function TambahKontakModal({ open, onClose, pipelineStages, onCreated }: 
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-base font-bold text-slate-900">Tambah Kontak WA CRM</h2>
+          <h2 className="text-base font-bold text-slate-900">Tambah Kontak Whatslab CRM</h2>
           <button
             type="button"
             onClick={onClose}
