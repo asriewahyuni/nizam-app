@@ -14,9 +14,9 @@ import {
   Users,
   Bot,
   Loader2,
-  Copy,
+  Pencil,
   Trash2,
-  Check,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WaCrmContact, WaCrmMessage, WaCrmConnectionStatus } from './page'
@@ -88,11 +88,15 @@ function KanbanBoard({
   contacts,
   stageLabels,
   onSelectContact,
+  onEditContact,
+  onDeleteContact,
   selectedId,
 }: {
   contacts: WaCrmContact[]
   stageLabels: string[]
   onSelectContact: (c: WaCrmContact) => void
+  onEditContact: (c: WaCrmContact) => void
+  onDeleteContact: (id: string) => void
   selectedId: string | null
 }) {
   const byStage = useMemo(() => {
@@ -111,24 +115,51 @@ function KanbanBoard({
             <span className="text-xs font-semibold text-slate-400">{byStage[key].length}</span>
           </div>
           {byStage[key].map(contact => (
-            <button
+            <div
               key={contact.id}
-              type="button"
-              onClick={() => onSelectContact(contact)}
               className={cn(
-                'w-full text-left rounded-lg border bg-white p-3 shadow-sm hover:shadow-md transition-all cursor-pointer',
+                'group relative rounded-lg border bg-white p-3 shadow-sm hover:shadow-md transition-all',
                 selectedId === contact.id ? 'border-green-400 ring-1 ring-green-300' : 'border-slate-200',
               )}
             >
-              <div className="font-semibold text-sm text-slate-800 truncate">{contact.name}</div>
-              <div className="text-xs text-slate-500 mt-0.5 truncate">{contact.phone}</div>
-              {contact.product_interest && (
-                <div className="text-[11px] text-slate-400 mt-1 truncate">{contact.product_interest}</div>
-              )}
-              {contact.last_message_at && (
-                <div className="text-[11px] text-slate-400 mt-1">{relativeTime(contact.last_message_at)}</div>
-              )}
-            </button>
+              {/* Area klik utama — buka inbox */}
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectContact(contact)}
+                onKeyDown={e => e.key === 'Enter' && onSelectContact(contact)}
+                className="cursor-pointer pr-14"
+              >
+                <div className="font-semibold text-sm text-slate-800 truncate">{contact.name}</div>
+                <div className="text-xs text-slate-500 mt-0.5 truncate">{contact.phone}</div>
+                {contact.product_interest && (
+                  <div className="text-[11px] text-slate-400 mt-1 truncate">{contact.product_interest}</div>
+                )}
+                {contact.last_message_at && (
+                  <div className="text-[11px] text-slate-400 mt-1">{relativeTime(contact.last_message_at)}</div>
+                )}
+              </div>
+
+              {/* Tombol CRUD — muncul saat hover */}
+              <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                <button
+                  type="button"
+                  title="Edit kontak"
+                  onClick={e => { e.stopPropagation(); onEditContact(contact) }}
+                  className="p-1.5 rounded-md bg-slate-100 hover:bg-blue-100 text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  title="Hapus kontak"
+                  onClick={e => { e.stopPropagation(); onDeleteContact(contact.id) }}
+                  className="p-1.5 rounded-md bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-600 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       ))}
@@ -195,7 +226,6 @@ function ChatPanel({
   stageLabels,
   aiEnabled,
   onMessageSent,
-  onMessageDeleted,
 }: {
   contact: WaCrmContact
   messages: WaCrmMessage[]
@@ -204,33 +234,9 @@ function ChatPanel({
   stageLabels: string[]
   aiEnabled: boolean
   onMessageSent: (msg: WaCrmMessage) => void
-  onMessageDeleted: (msgId: string) => void
 }) {
   const [body, setBody]             = useState('')
   const [isSending, startTransition] = useTransition()
-  const [copiedId, setCopiedId]     = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-
-  function handleCopy(msgId: string, text: string | null) {
-    if (!text || text === 'non-text message') return
-    navigator.clipboard.writeText(text).catch(() => {})
-    setCopiedId(msgId)
-    setTimeout(() => setCopiedId(null), 1500)
-  }
-
-  async function handleDelete(msgId: string) {
-    setDeletingId(msgId)
-    try {
-      await fetch('/api/wacrm/messages', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId: msgId }),
-      })
-      onMessageDeleted(msgId)
-    } finally {
-      setDeletingId(null)
-    }
-  }
 
   function handleSend() {
     if (!body.trim()) return
@@ -288,84 +294,45 @@ function ChatPanel({
         {contactMessages.map(msg => (
           <div
             key={msg.id}
-            className={cn('group flex', msg.direction === 'out' ? 'justify-end' : 'justify-start')}
+            className={cn(
+              'max-w-[75%] rounded-xl text-sm overflow-hidden',
+              msg.direction === 'out'
+                ? 'ml-auto bg-green-600 text-white rounded-br-none'
+                : 'mr-auto bg-white border border-slate-200 text-slate-800 rounded-bl-none',
+            )}
           >
-            <div className="relative max-w-[75%]">
-
-              {/* ── Action toolbar — muncul saat hover ── */}
-              <div className={cn(
-                'absolute -top-8 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10',
-                msg.direction === 'out' ? 'right-0' : 'left-0',
-              )}>
-                {msg.body && msg.body !== 'non-text message' && (
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(msg.id, msg.body)}
-                    title="Salin teks"
-                    className="flex items-center gap-1 px-1.5 py-1 rounded-md bg-slate-700 text-white hover:bg-slate-600 transition-colors cursor-pointer text-[10px] font-medium"
-                  >
-                    {copiedId === msg.id
-                      ? <Check className="h-3 w-3 text-emerald-400" />
-                      : <Copy className="h-3 w-3" />}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleDelete(msg.id)}
-                  disabled={deletingId === msg.id}
-                  title="Hapus pesan"
-                  className="flex items-center gap-1 px-1.5 py-1 rounded-md bg-slate-700 text-white hover:bg-red-600 disabled:opacity-50 transition-colors cursor-pointer text-[10px] font-medium"
-                >
-                  {deletingId === msg.id
-                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                    : <Trash2 className="h-3 w-3" />}
-                </button>
+            {msg.media_type === 'image' && msg.media_url && (
+              <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
+                <img src={msg.media_url} alt="Gambar" className="max-w-full max-h-60 object-cover block" loading="lazy" />
+              </a>
+            )}
+            {msg.media_type === 'video' && msg.media_url && (
+              <video src={msg.media_url} controls className="max-w-full max-h-60 block" />
+            )}
+            {msg.media_type === 'audio' && msg.media_url && (
+              <div className="px-3 pt-2">
+                <audio src={msg.media_url} controls className="w-full h-8" />
               </div>
-
-              {/* ── Bubble ── */}
-              <div className={cn(
-                'rounded-xl text-sm overflow-hidden',
-                msg.direction === 'out'
-                  ? 'bg-green-600 text-white rounded-br-none'
-                  : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none',
-              )}>
-                {/* Media content */}
-                {msg.media_type === 'image' && msg.media_url && (
-                  <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
-                    <img src={msg.media_url} alt="Gambar" className="max-w-full max-h-60 object-cover block" loading="lazy" />
-                  </a>
-                )}
-                {msg.media_type === 'video' && msg.media_url && (
-                  <video src={msg.media_url} controls className="max-w-full max-h-60 block" />
-                )}
-                {msg.media_type === 'audio' && msg.media_url && (
-                  <div className="px-3 pt-2">
-                    <audio src={msg.media_url} controls className="w-full h-8" />
-                  </div>
-                )}
-                {msg.media_type === 'sticker' && msg.media_url && (
-                  <img src={msg.media_url} alt="Sticker" className="w-24 h-24 object-contain block p-1" />
-                )}
-                {msg.media_type === 'document' && msg.media_url && (
-                  <a href={msg.media_url} target="_blank" rel="noopener noreferrer"
-                     className={cn('flex items-center gap-2 px-3 py-2 text-xs underline', msg.direction === 'out' ? 'text-green-100' : 'text-blue-600')}>
-                    📄 {msg.media_url.split('/').pop() ?? 'Dokumen'}
-                  </a>
-                )}
-                {/* Placeholder jika media ada tapi URL tidak tersedia */}
-                {(msg.media_type && !msg.media_url) && (
-                  <div className={cn('px-3 pt-2 pb-1 text-xs opacity-60 italic', msg.direction === 'out' ? 'text-green-100' : 'text-slate-500')}>
-                    {{ image: '📷 Gambar', video: '🎥 Video', audio: '🎵 Pesan suara', document: '📄 Dokumen', sticker: '🎭 Sticker', unknown: '📎 Media' }[msg.media_type] ?? '📎 Media'}
-                  </div>
-                )}
-                {/* Teks / caption — sembunyikan jika isinya placeholder Fonnte */}
-                <div className="px-3 py-2">
-                  {msg.body && msg.body !== 'non-text message' && <div>{msg.body}</div>}
-                  <div className={cn('text-[10px] mt-0.5', msg.direction === 'out' ? 'text-green-200' : 'text-slate-400')}>
-                    {new Date(msg.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                    {msg.direction === 'out' && (msg.delivered ? ' ✓✓' : ' ✓')}
-                  </div>
-                </div>
+            )}
+            {msg.media_type === 'sticker' && msg.media_url && (
+              <img src={msg.media_url} alt="Sticker" className="w-24 h-24 object-contain block p-1" />
+            )}
+            {msg.media_type === 'document' && msg.media_url && (
+              <a href={msg.media_url} target="_blank" rel="noopener noreferrer"
+                 className={cn('flex items-center gap-2 px-3 py-2 text-xs underline', msg.direction === 'out' ? 'text-green-100' : 'text-blue-600')}>
+                📄 {msg.media_url.split('/').pop() ?? 'Dokumen'}
+              </a>
+            )}
+            {(msg.media_type && !msg.media_url) && (
+              <div className={cn('px-3 pt-2 pb-1 text-xs opacity-60 italic', msg.direction === 'out' ? 'text-green-100' : 'text-slate-500')}>
+                {{ image: '📷 Gambar', video: '🎥 Video', audio: '🎵 Pesan suara', document: '📄 Dokumen', sticker: '🎭 Sticker', unknown: '📎 Media' }[msg.media_type] ?? '📎 Media'}
+              </div>
+            )}
+            <div className="px-3 py-2">
+              {msg.body && msg.body !== 'non-text message' && <div>{msg.body}</div>}
+              <div className={cn('text-[10px] mt-0.5', msg.direction === 'out' ? 'text-green-200' : 'text-slate-400')}>
+                {new Date(msg.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                {msg.direction === 'out' && (msg.delivered ? ' ✓✓' : ' ✓')}
               </div>
             </div>
           </div>
@@ -412,6 +379,12 @@ export function WaCrmDashboardClient({
   const [localContacts, setLocalContacts] = useState(contacts)
   const [localMessages, setLocalMessages] = useState(messages)
   const [showTambahModal, setShowTambahModal] = useState(false)
+  const [editContact, setEditContact]   = useState<WaCrmContact | null>(null)
+  const [editName, setEditName]         = useState('')
+  const [editInterest, setEditInterest] = useState('')
+  const [editNotes, setEditNotes]       = useState('')
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [editError, setEditError]       = useState('')
 
   const aiEnabled = settings.ai_enabled === 'true'
 
@@ -490,8 +463,61 @@ export function WaCrmDashboardClient({
     })
   }
 
-  function handleDeleteMessage(msgId: string) {
-    setLocalMessages(prev => prev.filter(m => m.id !== msgId))
+  function openEdit(contact: WaCrmContact) {
+    setEditContact(contact)
+    setEditName(contact.name)
+    setEditInterest(contact.product_interest ?? '')
+    setEditNotes((contact as any).notes ?? '')
+    setEditError('')
+  }
+
+  async function handleSaveEdit() {
+    if (!editContact) return
+    if (!editName.trim()) { setEditError('Nama tidak boleh kosong.'); return }
+    setIsSavingEdit(true)
+    setEditError('')
+    try {
+      const res = await fetch('/api/wacrm/contacts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: editContact.id,
+          name: editName.trim(),
+          product_interest: editInterest.trim() || null,
+          notes: editNotes.trim() || null,
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        setEditError(d.error ?? 'Gagal menyimpan.')
+        return
+      }
+      setLocalContacts(prev =>
+        prev.map(c => c.id === editContact.id
+          ? { ...c, name: editName.trim(), product_interest: editInterest.trim() || null }
+          : c
+        )
+      )
+      if (selectedContact?.id === editContact.id) {
+        setSelected(prev => prev ? { ...prev, name: editName.trim(), product_interest: editInterest.trim() || null } : prev)
+      }
+      setEditContact(null)
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  async function handleDeleteContact(contactId: string) {
+    if (!confirm('Hapus kontak ini dari Whatslab CRM?')) return
+    const res = await fetch('/api/wacrm/contacts', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contactId }),
+    })
+    if (res.ok) {
+      setLocalContacts(prev => prev.filter(c => c.id !== contactId))
+      if (selectedContact?.id === contactId) setSelected(null)
+    }
   }
 
   const totalByStage = useMemo(() => {
@@ -579,6 +605,8 @@ export function WaCrmDashboardClient({
             contacts={filtered}
             stageLabels={pipelineStages}
             onSelectContact={c => { setSelected(c); setView('inbox') }}
+            onEditContact={openEdit}
+            onDeleteContact={handleDeleteContact}
             selectedId={selectedContact?.id ?? null}
           />
         </div>
@@ -612,7 +640,6 @@ export function WaCrmDashboardClient({
                 stageLabels={pipelineStages}
                 aiEnabled={aiEnabled}
                 onMessageSent={(msg) => setLocalMessages(prev => [...prev, msg])}
-                onMessageDeleted={handleDeleteMessage}
               />
             ) : (
               <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-400">
@@ -635,6 +662,81 @@ export function WaCrmDashboardClient({
           setView('inbox')
         }}
       />
+
+      {/* ── Modal Edit Kontak ── */}
+      {editContact && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditContact(null)} aria-hidden="true" />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-900">Edit Kontak</h2>
+              <button
+                type="button"
+                onClick={() => setEditContact(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Fields */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Nama *</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Nama kontak"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Minat Produk</label>
+                <input
+                  type="text"
+                  value={editInterest}
+                  onChange={e => setEditInterest(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Produk yang diminati"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Catatan</label>
+                <textarea
+                  value={editNotes}
+                  onChange={e => setEditNotes(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                  placeholder="Catatan tentang kontak ini"
+                />
+              </div>
+            </div>
+
+            {editError && <p className="text-xs text-red-500">{editError}</p>}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setEditContact(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-60 transition-colors cursor-pointer"
+              >
+                {isSavingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

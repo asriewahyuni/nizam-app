@@ -1,6 +1,8 @@
 // app/api/wacrm/contacts/route.ts
-// GET  — daftar wacrm_contacts + daftar pelanggan dari tabel contacts (untuk import)
-// POST — buat wacrm_contact baru (manual atau dari contacts yang ada)
+// GET    — daftar wacrm_contacts + pelanggan untuk import
+// POST   — buat wacrm_contact baru
+// PATCH  — edit nama / minat produk / catatan kontak
+// DELETE — hapus kontak dari Whatslab CRM
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
@@ -90,6 +92,57 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ data: result.rows[0] }, { status: 201 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+// PATCH /api/wacrm/contacts
+// Body: { contactId, name?, product_interest?, notes? }
+export async function PATCH(req: NextRequest) {
+  try {
+    const orgData = await getActiveOrg()
+    if (!orgData) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const orgId = orgData.org.id
+
+    const { contactId, name, product_interest, notes } = await req.json()
+    if (!contactId) return NextResponse.json({ error: 'contactId wajib diisi' }, { status: 400 })
+    if (name !== undefined && !name?.trim()) return NextResponse.json({ error: 'Nama tidak boleh kosong' }, { status: 400 })
+
+    const result = await queryPostgres(
+      `UPDATE wacrm_contacts
+       SET name             = COALESCE($3, name),
+           product_interest = $4,
+           notes            = $5
+       WHERE id = $1 AND org_id = $2
+       RETURNING id, name, phone, stage, product_interest, notes, last_message_at`,
+      [contactId, orgId, name?.trim() ?? null, product_interest ?? null, notes ?? null]
+    )
+
+    if (!result.rows[0]) return NextResponse.json({ error: 'Kontak tidak ditemukan' }, { status: 404 })
+    return NextResponse.json({ data: result.rows[0] })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+// DELETE /api/wacrm/contacts
+// Body: { contactId }
+export async function DELETE(req: NextRequest) {
+  try {
+    const orgData = await getActiveOrg()
+    if (!orgData) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const orgId = orgData.org.id
+
+    const { contactId } = await req.json()
+    if (!contactId) return NextResponse.json({ error: 'contactId wajib diisi' }, { status: 400 })
+
+    await queryPostgres(
+      'DELETE FROM wacrm_contacts WHERE id = $1 AND org_id = $2',
+      [contactId, orgId]
+    )
+
+    return NextResponse.json({ success: true })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
