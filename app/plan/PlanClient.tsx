@@ -35,14 +35,6 @@ const PLAN_META: Record<string, {
   badgeBg: string
   activeBg: string
 }> = {
-  Lite: {
-    tagline: 'Untuk bisnis yang baru mulai',
-    textColor: 'text-emerald-600',
-    badgeBg: 'bg-emerald-500',
-    activeBg: 'bg-emerald-50 border-emerald-400',
-    cta: 'Mulai dengan Lite →',
-    planParam: 'lite',
-  },
   Mini: {
     tagline: 'Untuk bisnis yang sudah berkembang',
     textColor: 'text-blue-600',
@@ -63,17 +55,17 @@ const PLAN_META: Record<string, {
 }
 
 const FEATURE_ROWS: { label: string; plans: Record<string, boolean>; note?: string }[] = [
-  { label: 'Jualan & Kasir',        plans: { Lite: true,  Mini: true,  Enterprise: true  } },
-  { label: 'Data Pelanggan',        plans: { Lite: true,  Mini: true,  Enterprise: true  } },
-  { label: 'Laporan Bisnis',        plans: { Lite: true,  Mini: true,  Enterprise: true  } },
-  { label: 'Akuntansi & Keuangan',  plans: { Lite: true,  Mini: true,  Enterprise: true  } },
-  { label: 'Stok & Pembelian',      plans: { Lite: true,  Mini: true,  Enterprise: true  } },
-  { label: 'Syirkah',               plans: { Lite: true,  Mini: true,  Enterprise: true  } },
-  { label: 'Karyawan & Penggajian', plans: { Lite: false, Mini: true,  Enterprise: true  } },
-  { label: 'Produksi & Manufaktur', plans: { Lite: false, Mini: true,  Enterprise: true  } },
-  { label: 'Audit & Kepatuhan',     plans: { Lite: false, Mini: true,  Enterprise: true  } },
-  { label: 'Modul Operasional',     plans: { Lite: true,  Mini: true,  Enterprise: true  }, note: 'beli terpisah' },
-  { label: 'Add-on',                plans: { Lite: true,  Mini: true,  Enterprise: true  }, note: 'beli terpisah' },
+  { label: 'Jualan & Kasir',        plans: { Mini: true,  Enterprise: true  } },
+  { label: 'Data Pelanggan',        plans: { Mini: true,  Enterprise: true  } },
+  { label: 'Laporan Bisnis',        plans: { Mini: true,  Enterprise: true  } },
+  { label: 'Akuntansi & Keuangan',  plans: { Mini: true,  Enterprise: true  } },
+  { label: 'Stok & Pembelian',      plans: { Mini: true,  Enterprise: true  } },
+  { label: 'Syirkah',               plans: { Mini: true,  Enterprise: true  } },
+  { label: 'Karyawan & Penggajian', plans: { Mini: true,  Enterprise: true  } },
+  { label: 'Produksi & Manufaktur', plans: { Mini: true,  Enterprise: true  } },
+  { label: 'Audit & Kepatuhan',     plans: { Mini: true,  Enterprise: true  } },
+  { label: 'Modul Operasional',     plans: { Mini: true,  Enterprise: true  }, note: 'beli terpisah' },
+  { label: 'Add-on',                plans: { Mini: true,  Enterprise: true  }, note: 'beli terpisah' },
 ]
 
 const LIMIT_ROWS = [
@@ -164,7 +156,7 @@ export default function PlanClient({ packages }: { packages: Package[] }) {
           className="md:hidden space-y-4"
         >
           {/* Plan Switcher */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {packages.map((pkg) => {
               const n = normalize(pkg.name)
               const meta = PLAN_META[n]
@@ -316,7 +308,7 @@ export default function PlanClient({ packages }: { packages: Package[] }) {
             <tbody>
               {/* Fitur */}
               <tr className="bg-slate-50 border-t border-slate-100">
-                <td colSpan={4} className="px-8 py-2.5">
+                <td colSpan={3} className="px-8 py-2.5">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Fitur</span>
                 </td>
               </tr>
@@ -343,7 +335,7 @@ export default function PlanClient({ packages }: { packages: Package[] }) {
 
               {/* Batas */}
               <tr className="bg-slate-50 border-t border-slate-200">
-                <td colSpan={4} className="px-8 py-2.5">
+                <td colSpan={3} className="px-8 py-2.5">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Batas</span>
                 </td>
               </tr>
@@ -374,7 +366,7 @@ export default function PlanClient({ packages }: { packages: Package[] }) {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="hidden md:grid grid-cols-3 gap-4"
+          className="hidden md:grid grid-cols-2 gap-4"
         >
           {packages.map((pkg) => {
             const n = normalize(pkg.name)

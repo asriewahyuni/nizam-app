@@ -20,7 +20,6 @@ type PlanPackage = {
 
 // Fallback data apabila DB tidak bisa diakses atau belum ada data.
 const FALLBACK_PACKAGES: PlanPackage[] = [
-  { id: 'lite',       name: 'Lite',       price: 299000,  billing: 'Bulan', max_users: 3,  max_child_orgs: 0,    max_branches: 1  },
   { id: 'mini',       name: 'Mini',       price: 599000,  billing: 'Bulan', max_users: 15, max_child_orgs: 1,    max_branches: 3  },
   { id: 'enterprise', name: 'Enterprise', price: 1299000, billing: 'Bulan', max_users: null, max_child_orgs: null, max_branches: null },
 ]
@@ -34,7 +33,7 @@ export default async function PlanPage() {
        FROM saas_packages
        WHERE is_active = true AND LOWER(name) = ANY($1)
        ORDER BY price ASC`,
-      [['lite', 'mini', 'enterprise']]
+      [['mini', 'enterprise']]
     )
     if (rows.length > 0) packages = rows
   } catch (err) {
