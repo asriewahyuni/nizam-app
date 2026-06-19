@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Search, Users, CheckCircle2, AlertCircle, AlertTriangle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil, ArrowUp, ArrowDown } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { createSaleEntry, createSaleFulfillmentDrafts, deliverSale, voidSale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
@@ -358,6 +358,7 @@ export default function SalesClient({
 
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
   
   // State for Down Payment
   const [hasDp, setHasDp] = useState(false)
@@ -800,6 +801,9 @@ export default function SalesClient({
         router.refresh()
         setTimeout(() => setSuccess(null), 4500)
       }
+    } else if ('warning' in (res ?? {}) && (res as any)?.warning) {
+      setWarning((res as any).warning)
+      setTimeout(() => setWarning(null), 6000)
     } else if (res?.error) {
       setError(res.error)
     } else {
@@ -2327,6 +2331,11 @@ export default function SalesClient({
           {error && (
             <motion.div key="sales-error-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
               <AlertCircle size={18} /> {error}
+            </motion.div>
+          )}
+          {warning && (
+            <motion.div key="sales-warning-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-amber-50 border border-amber-200 px-6 py-4 rounded-xl shadow-xl flex items-start gap-3 text-amber-700 text-sm font-medium max-w-sm">
+              <AlertTriangle size={18} className="shrink-0 mt-0.5" /> {warning}
             </motion.div>
           )}
           {success && (

@@ -61,7 +61,7 @@ const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
  * Normalize low-level delivery RPC failures into user-facing sales messages.
  * This prevents duplicate delivery journals from surfacing as raw SQL errors.
  */
-function getSalesDeliveryRpcErrorMessage(error: { message?: string | null; code?: string | null } | null | undefined) {
+function getSalesDeliveryRpcResult(error: { message?: string | null; code?: string | null } | null | undefined): { error: string } | { warning: string } {
   const code = String(error?.code || '').trim()
   const rawMessage = String(error?.message || '').trim()
   const normalizedMessage = rawMessage.toLowerCase()
@@ -73,14 +73,18 @@ function getSalesDeliveryRpcErrorMessage(error: { message?: string | null; code?
       || (normalizedMessage.includes('duplicate key') && normalizedMessage.includes('journal'))
     )
   ) {
-    return 'Sales ini sudah memiliki jurnal delivery. Sistem menolak membuat jurnal SALE ganda. Muat ulang data; jika status sales masih belum selesai, rekonsiliasi jurnal delivery lama terlebih dahulu.'
+    return { error: 'Sales ini sudah memiliki jurnal delivery. Sistem menolak membuat jurnal SALE ganda. Muat ulang data; jika status sales masih belum selesai, rekonsiliasi jurnal delivery lama terlebih dahulu.' }
+  }
+
+  if (normalizedMessage.includes('insufficient permission') && normalizedMessage.includes('deliver sales')) {
+    return { warning: 'Akun Anda tidak memiliki izin sales:write atau pos:write untuk mengirim sales order ini. Minta admin untuk mengaktifkan permission tersebut di pengaturan role.' }
   }
 
   if (!rawMessage) {
-    return 'Gagal memproses delivery sales.'
+    return { error: 'Gagal memproses delivery sales.' }
   }
 
-  return `Gagal memproses delivery sales: ${rawMessage}`
+  return { error: `Gagal memproses delivery sales: ${rawMessage}` }
 }
 
 function formatQuantity(value: number): string {
@@ -1826,7 +1830,7 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
 
   if (error) {
     (console as any).error('Failed to deliver sale via atomic engine:', error)
-    return { error: getSalesDeliveryRpcErrorMessage(error) }
+    return getSalesDeliveryRpcResult(error)
   }
 
   const { error: markDeliveredError } = await (supabase as any)
