@@ -118,7 +118,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Kojasmat', href: '/kojasmat', icon: HandHeart, permission_key: 'kojasmat', module_key: 'Kojasmat' },
       { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase, permission_key: 'services', module_key: 'Job Order (Jasa)' },
       { label: 'Bengkel Motor', href: '/workshop', icon: Wrench, permission_key: 'workshop', module_key: 'Workshop' },
-      { label: 'Project Konstruksi', href: '/construction', icon: Building2, permission_key: 'construction,project,services', module_key: 'Project & Construction' },
+
       { label: 'LMS (Pelatihan Komersial)', href: '/lms', icon: GraduationCap, permission_key: 'learning', module_key: 'LMS' },
       { label: 'Panel Penilai', href: '/lms/assessment-center', icon: ShieldCheck, permission_key: 'learning:write', module_key: 'LMS', saas_assessor_only: true },
     ]

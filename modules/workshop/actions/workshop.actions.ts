@@ -468,6 +468,14 @@ export async function deductWorkshopPartInventory(orgId: string, workOrderId: st
   const errors: string[] = []
   for (const item of items.rows) {
     try {
+      // 1. Catat ke stock_movements
+      await queryPostgres(`
+        INSERT INTO public.stock_movements
+        (org_id, product_id, warehouse_id, movement_type, quantity, reference_type, reference_id, date)
+        VALUES ($1, $2, $3, 'OUT', $4, 'WORKSHOP_SPK', $5, CURRENT_TIMESTAMP)
+      `, [orgId, item.product_id, warehouseId, item.quantity, workOrderId])
+
+      // 2. Update inventory_stocks
       await queryPostgres(`
         UPDATE public.inventory_stocks
         SET quantity = GREATEST(0, quantity - $1)

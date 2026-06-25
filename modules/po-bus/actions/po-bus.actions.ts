@@ -259,6 +259,7 @@ export async function getBusCrew(orgId: string, branchId?: string | null): Promi
 export async function createBusCrew(orgId: string, payload: {
   name: string
   role: string
+  employee_id?: string
   phone?: string
   nik?: string
   license_number?: string
@@ -279,6 +280,7 @@ export async function createBusCrew(orgId: string, payload: {
       branch_id: resolvedBranchId,
       name: payload.name.trim(),
       role: payload.role || 'DRIVER',
+      employee_id: payload.employee_id || null,
       phone: payload.phone?.trim() || null,
       nik: payload.nik?.trim() || null,
       license_number: payload.license_number?.trim() || null,
@@ -297,7 +299,7 @@ export async function createBusCrew(orgId: string, payload: {
 }
 
 export async function updateBusCrew(orgId: string, crewId: string, payload: Partial<{
-  name: string; role: string; phone: string; nik: string
+  name: string; role: string; employee_id: string; phone: string; nik: string
   license_number: string; license_expiry: string; blood_type: string; is_active: boolean; notes: string
 }>) {
   const supabase = await createClient()

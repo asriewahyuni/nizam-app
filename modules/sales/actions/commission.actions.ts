@@ -269,3 +269,49 @@ export async function getResellerCommissionSnapshot(orgId: string, resellerId?: 
         : Number(reseller.commission_value),
   }
 }
+
+export async function settleCommission(orgId: string, commissionId: string, payoutAmount: number, paymentMethod: string) {
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // Record expense directly to ERP Bridge
+  const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+  const debitAccount = await ERPBridge.getDefaultAccount(orgId, '6-60001') // Beban Operasional / Komisi
+  const creditAccount = await ERPBridge.getDefaultAccount(orgId, '1-10001') // Kas Default
+
+  if (debitAccount && creditAccount) {
+    try {
+      await ERPBridge.recordExpense({
+        orgId: orgId,
+        amount: payoutAmount,
+        date: new Date().toISOString().split('T')[0],
+        description: `Pembayaran Komisi untuk ID: ${commissionId}`,
+        referenceType: 'SALES_COMMISSION',
+        referenceId: commissionId,
+        debitAccountId: debitAccount,
+        creditAccountId: creditAccount,
+      })
+
+      // Insert into bank_transactions
+      await db.from('bank_transactions').insert({
+        org_id: orgId,
+        account_id: creditAccount,
+        transaction_date: new Date().toISOString().split('T')[0],
+        type: 'OUT',
+        amount: payoutAmount,
+        reference_type: 'SALES_COMMISSION',
+        reference_id: commissionId,
+        description: `Pembayaran Komisi untuk ID: ${commissionId}`,
+        notes: `Metode: ${paymentMethod}`,
+        created_by: user.id
+      })
+    } catch (e: any) {
+      return { error: 'Gagal memproses pembayaran komisi: ' + e.message }
+    }
+  }
+
+  revalidateSalesCommissionPages()
+  return { success: true }
+}

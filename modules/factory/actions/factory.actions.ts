@@ -564,6 +564,40 @@ export async function updateWorkOrderStatus(orgId: string, woId: string, status:
       return { error: data?.error || 'Failed to complete Work Order' }
     }
 
+    // NEW: Post COGM Journal
+    try {
+      const { data: woData } = await (supabase as any)
+        .from('production_work_orders')
+        .select('id, work_order_number, actual_cost, product_id, products(name)')
+        .eq('id', woId)
+        .single();
+      
+      if (woData && woData.actual_cost && Number(woData.actual_cost) > 0) {
+        const { createJournalEntry } = await import('@/modules/accounting/actions/journal.actions')
+        const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+        
+        const debitAccount = await ERPBridge.getDefaultAccount(orgId, '1-14000') || await ERPBridge.getDefaultAccount(orgId, '1-10001') // Persediaan Barang Jadi
+        const creditAccount = await ERPBridge.getDefaultAccount(orgId, '1-15000') || await ERPBridge.getDefaultAccount(orgId, '1-10001') // Persediaan BDP
+        
+        if (debitAccount && creditAccount) {
+          await createJournalEntry({
+            orgId,
+            actorUserId: userData.user?.id || '',
+            entryDate: new Date().toISOString().split('T')[0],
+            description: `HPP Produksi - ${woData.work_order_number} (${woData.products?.name})`,
+            referenceType: 'FACTORY_WO_COMPLETION',
+            referenceId: woId,
+            lines: [
+              { account_id: debitAccount, debit: Number(woData.actual_cost), credit: 0, memo: 'Barang Jadi Masuk Gudang' },
+              { account_id: creditAccount, debit: 0, credit: Number(woData.actual_cost), memo: 'Pemakaian Barang Dalam Proses' }
+            ]
+          }).catch(err => console.error('Error posting COGM journal:', err))
+        }
+      }
+    } catch(err) {
+      console.error('Failed to post COGM journal:', err)
+    }
+
     revalidatePath('/factory')
     return { success: true, data }
   }

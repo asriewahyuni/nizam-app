@@ -103,7 +103,7 @@ export async function updateServiceStatus(orgId: string, orderId: string, status
   const db = supabase as unknown as LooseDb
   const { data: order, error: orderError } = await db
     .from('service_orders')
-    .select('id, branch_id')
+    .select('id, branch_id, contact_id, job_number, estimated_cost, description')
     .eq('id', orderId)
     .eq('org_id', orgId)
     .maybeSingle()
@@ -122,6 +122,38 @@ export async function updateServiceStatus(orgId: string, orderId: string, status
     .eq('branch_id', order.branch_id)
 
   if (error) return { error: error.message }
+
+  // Buat Invoice via Operational Bridge jika selesai
+  if (status === 'COMPLETED' && order.estimated_cost && Number(order.estimated_cost) > 0) {
+    const { createInvoiceFromOperational } = await import('@/modules/operational-bridge/actions/bridge.actions')
+    
+    // Ambil info kontak jika ada
+    let contactName = undefined
+    if (order.contact_id) {
+      const { data: contact } = await db.from('contacts').select('name').eq('id', order.contact_id).maybeSingle()
+      if (contact) contactName = String(contact.name)
+    }
+
+    try {
+      await createInvoiceFromOperational({
+        context: { type: 'JOB_ORDER', referenceId: orderId, orderNumber: String(order.job_number) },
+        customerId: String(order.contact_id || ''),
+        customerName: contactName,
+        items: [{
+          product_name: `Jasa Service: ${order.description || order.job_number}`,
+          quantity: 1,
+          unit_price: Number(order.estimated_cost),
+          unit: 'Pcs'
+        }],
+        notes: `Penyelesaian Job Order ${order.job_number}`,
+        paymentTerm: 'LUNAS',
+        saleDate: new Date().toISOString().split('T')[0],
+      })
+    } catch (e) {
+      console.error('[updateServiceStatus] Error creating invoice from bridge:', e)
+      // Non-blocking error for status update
+    }
+  }
 
   revalidatePath('/services')
   return { success: true }

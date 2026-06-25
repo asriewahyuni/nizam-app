@@ -206,6 +206,16 @@ export async function updateRegistrationPayment(registrationId: string, amountPa
   const orgData = await assertOrgAdmin()
   const supabase = await createClient()
 
+  // Ambil info registrasi dan batch
+  const { data: regData, error: fetchError } = await supabase
+    .from('lms_registrations')
+    .select('*, lms_course_batches(name, org_id)')
+    .eq('id', registrationId)
+    .eq('org_id', orgData.org.id)
+    .single()
+
+  if (fetchError || !regData) throw new Error(getErrorMessage(fetchError) || 'Registrasi tidak ditemukan')
+
   const { error } = await supabase
     .from('lms_registrations')
     .update({
@@ -218,6 +228,39 @@ export async function updateRegistrationPayment(registrationId: string, amountPa
     .eq('org_id', orgData.org.id)
 
   if (error) throw new Error(getErrorMessage(error))
+
+  // Catat ke ERP (Buku Besar & Kas)
+  if (amountPaid > 0) {
+    const { ERPBridge } = await import('@/lib/erp-bridge/finances')
+    const debitAccount = await ERPBridge.getDefaultAccount(orgData.org.id, '1-10001') // Kas Kecil
+    const creditAccount = await ERPBridge.getDefaultAccount(orgData.org.id, '4-40001') // Pendapatan
+    
+    if (debitAccount && creditAccount) {
+      await ERPBridge.recordRevenue({
+        orgId: orgData.org.id,
+        amount: amountPaid,
+        date: new Date().toISOString().split('T')[0],
+        description: `Pembayaran Pelatihan: ${(regData.lms_course_batches as any)?.name} - ${regData.full_name}`,
+        referenceType: 'LMS_REGISTRATION',
+        referenceId: registrationId,
+        debitAccountId: debitAccount,
+        creditAccountId: creditAccount,
+      })
+      
+      // Catat ke bank_transactions
+      await supabase.from('bank_transactions').insert({
+        org_id: orgData.org.id,
+        account_id: debitAccount,
+        transaction_date: new Date().toISOString().split('T')[0],
+        type: 'IN',
+        amount: amountPaid,
+        reference_type: 'LMS_REGISTRATION',
+        reference_id: registrationId,
+        description: `Pembayaran Pelatihan: ${(regData.lms_course_batches as any)?.name} - ${regData.full_name}`,
+        notes: `Metode: ${paymentMethod}`,
+      })
+    }
+  }
 
   revalidatePath('/lms/registrasi')
   revalidatePath('/lms/admin')

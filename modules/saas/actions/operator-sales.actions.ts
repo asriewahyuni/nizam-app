@@ -564,7 +564,7 @@ async function ensureOperatorReceiptJournal(
     return { error: `Akun Kas/Bank default untuk penerimaan belum tersedia${operatorOrgId ? ' di organisasi operator' : ' di organisasi ini'}.` }
   }
 
-  return createAutoPostedJournal(admin, {
+  const journalResult = await createAutoPostedJournal(admin, {
     orgId: journalOrgId,
     actorUserId,
     entryDate: toEntryDate(invoice.updated_at),
@@ -587,6 +587,29 @@ async function ensureOperatorReceiptJournal(
       },
     ],
   })
+
+  // Insert bank_transactions if journal created successfully and didn't exist
+  if (journalResult.entryId && !journalResult.existed) {
+    const { error: bankError } = await (admin.from('bank_transactions') as any)
+      .insert({
+        org_id: journalOrgId,
+        account_id: settlementAccount.id,
+        transaction_date: toEntryDate(invoice.updated_at),
+        type: 'IN',
+        amount: totalAmount,
+        reference_type: 'SAAS_CASH_IN',
+        reference_id: invoice.id,
+        description: `Penerimaan SaaS ${invoice.invoice_number}`,
+        notes: `Pelunasan SaaS via ${paymentMethod || invoice.payment_method || 'MANUAL_TRANSFER'} dari tenant ${invoice.org_id}`,
+        created_by: actorUserId,
+      })
+    
+    if (bankError) {
+      console.error('[ensureOperatorReceiptJournal] Error creating bank transaction:', bankError)
+    }
+  }
+
+  return journalResult
 }
 
 function parseNumericRecordJson(raw: string): Record<string, number> {
