@@ -6,20 +6,21 @@ import { createClient } from '@/lib/supabase/server'
 type BranchFilter = string | null | undefined
 
 async function getCashAccountCodes(db: any, orgId: string) {
-  const { data: linkedAccounts } = await db
+  const { data: bankAccounts } = await db
     .from('bank_accounts')
-    .select('account_id, accounts(code)')
+    .select('account_id')
     .eq('org_id', orgId)
     .eq('is_active', true)
 
-  const codes = Array.from(
-    new Set(
-      (linkedAccounts || [])
-        .map((account: any) => account.accounts?.code)
-        .filter(Boolean)
-    )
-  )
+  const accountIds = (bankAccounts || []).map((b: any) => b.account_id).filter(Boolean)
+  if (accountIds.length === 0) return ['1101', '1102', '1103', '1104', '1105']
 
+  const { data: accountRows } = await db
+    .from('accounts')
+    .select('code')
+    .in('id', accountIds)
+
+  const codes = Array.from(new Set((accountRows || []).map((a: any) => a.code).filter(Boolean))) as string[]
   return codes.length > 0 ? codes : ['1101', '1102', '1103', '1104', '1105']
 }
 
@@ -48,11 +49,22 @@ async function getCurrentCashBalance(db: any, orgId: string, branchId?: BranchFi
 
   if (entryIds.length === 0) return 0
 
+  // Resolve account codes → IDs dulu, lalu join di sisi aplikasi
+  // menghindari sintaks !inner join yang tidak di-support postgres-client
+  const { data: accountRows } = await db
+    .from('accounts')
+    .select('id, code')
+    .eq('org_id', orgId)
+    .in('code', cashAccountCodes)
+
+  const cashAccountIds = (accountRows || []).map((a: any) => a.id)
+  if (cashAccountIds.length === 0) return 0
+
   const { data: lines, error } = await db
     .from('journal_lines')
-    .select('debit, credit, accounts!inner(code)')
+    .select('debit, credit')
     .in('entry_id', entryIds)
-    .in('accounts.code', cashAccountCodes) as any
+    .in('account_id', cashAccountIds)
 
   if (error || !Array.isArray(lines)) return 0
 
