@@ -237,16 +237,30 @@ async function getContactAttributedJournalRows(
     netByEntry[line.entry_id] = (netByEntry[line.entry_id] || 0) + net
   }
 
-  // Kumpulkan contact_id yang dibutuhkan
   const entryById: Record<string, any> = {}
   for (const entry of entries) entryById[entry.id] = entry
 
-  const contactIds = [...new Set(
-    Object.keys(netByEntry)
-      .filter(id => (netByEntry[id] || 0) > 0.01)
-      .map(id => entryById[id]?.contact_id)
-      .filter(Boolean)
-  )]
+  // Aggregate net per contact_id agar pembayaran sebagian (partial payment)
+  // yang dicatat di entry terpisah ikut mengurangi saldo AR yang tampil.
+  // Setiap kontak mendapat satu baris dengan outstanding = total debit - total credit.
+  const netByContact: Record<string, number> = {}
+  const firstEntryByContact: Record<string, any> = {}
+
+  for (const [entryId, net] of Object.entries(netByEntry)) {
+    const entry = entryById[entryId]
+    if (!entry?.contact_id) continue
+    const cid = entry.contact_id
+    netByContact[cid] = (netByContact[cid] || 0) + net
+    // Simpan entry dengan due_date paling awal sebagai referensi baris
+    if (
+      !firstEntryByContact[cid] ||
+      (entry.due_date && (!firstEntryByContact[cid].due_date || entry.due_date < firstEntryByContact[cid].due_date))
+    ) {
+      firstEntryByContact[cid] = entry
+    }
+  }
+
+  const contactIds = Object.keys(netByContact).filter(cid => (netByContact[cid] || 0) > 0.01)
 
   let contactMap: Record<string, string> = {}
   if (contactIds.length > 0) {
@@ -260,9 +274,10 @@ async function getContactAttributedJournalRows(
   }
 
   const rows: AgingReportRow[] = []
-  for (const [entryId, net] of Object.entries(netByEntry)) {
+  for (const contactId of contactIds) {
+    const net = netByContact[contactId] || 0
     if (net <= 0.01) continue
-    const entry = entryById[entryId]
+    const entry = firstEntryByContact[contactId]
     if (!entry) continue
 
     const dueDateStr = entry.due_date
@@ -270,11 +285,11 @@ async function getContactAttributedJournalRows(
       : String(entry.entry_date || '').slice(0, 10) || today
 
     rows.push({
-      id: `journal-${accountCode}-${entryId}`,
-      contact_id: entry.contact_id,
-      contact_name: contactMap[entry.contact_id] || 'Unknown',
-      doc_number: entry.entry_number || `JE-${entryId.slice(0, 8).toUpperCase()}`,
-      doc_href: `/accounting/journal?entry=${entryId}`,
+      id: `journal-${accountCode}-${contactId}`,
+      contact_id: contactId,
+      contact_name: contactMap[contactId] || 'Unknown',
+      doc_number: entry.entry_number || `JE-${entry.id.slice(0, 8).toUpperCase()}`,
+      doc_href: `/accounting/journal?entry=${entry.id}`,
       due_date: dueDateStr,
       grand_total: net,
       paid_amount: 0,
