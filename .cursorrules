@@ -17,6 +17,14 @@ Walaupun lu lihat folder `lib/supabase/` dan import `from '@/lib/supabase/server
 2. `lib/supabase/README.md`
 3. `lib/supabase/server.ts` (header comment baris 1-10)
 
+## 🚨🚨🚨 CRITICAL: ANTI-SILO / ERP INTEGRATION 🚨🚨🚨
+
+**HUKUM BESI ERP Nizam App:**
+- ❌ **DILARANG KERAS** melakukan `INSERT INTO journal_entries` atau `UPDATE inventory_stocks` secara manual / raw query.
+- ❌ **DILARANG KERAS** membuat fitur "Silo" yang hanya mencatat pembayaran (PAID) tanpa memotong kas/bank.
+- ✅ **WAJIB** memanggil fungsi dari `lib/erp-bridge/finances.ts` (contoh: `ERPBridge.recordRevenue()`, `ERPBridge.recordExpense()`) untuk setiap transaksi uang.
+- ✅ **WAJIB** menggunakan `Operational Bridge` (`modules/operational-bridge/actions/bridge.actions.ts`) untuk integrasi Dokumen (SO, DO, WO).
+
 ## Stack
 
 - Framework: Next.js 16 (App Router) + TypeScript
