@@ -162,7 +162,8 @@ export async function getCrmTickets(
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
 
-  if (branchId) query = query.eq('branch_id', branchId)
+  // Sertakan ticket tanpa branch (dari form publik) meski filter branch aktif
+  if (branchId) query = query.or(`branch_id.eq.${branchId},branch_id.is.null`)
   if (filters.status && filters.status !== 'ALL') query = query.eq('status', filters.status)
   if (filters.type && filters.type !== 'ALL') query = query.eq('type', filters.type)
   if (filters.priority && filters.priority !== 'ALL') query = query.eq('priority', filters.priority)
@@ -333,7 +334,8 @@ export async function getNewCrmTicketsCount(
     .eq('org_id', orgId)
     .eq('status', 'NEW')
 
-  if (branchId) query = query.eq('branch_id', branchId)
+  // Sertakan ticket tanpa branch (dari form publik) meski filter branch aktif
+  if (branchId) query = query.or(`branch_id.eq.${branchId},branch_id.is.null`)
 
   const { count } = await query
   return count || 0

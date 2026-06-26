@@ -66,9 +66,8 @@ export function TicketListClient({ tickets, orgId, orgSlug, orgName }: Props) {
   const [typeFilter, setTypeFilter] = useState<CrmTicketType | 'ALL'>('ALL')
   const [copied, setCopied] = useState(false)
 
-  const publicUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/submit/${orgSlug}`
-    : `/submit/${orgSlug}`
+  const appOrigin = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+  const publicUrl = `${appOrigin}/submit/${orgSlug}`
 
   const copyLink = () => {
     navigator.clipboard.writeText(publicUrl).then(() => {
@@ -120,10 +119,15 @@ export function TicketListClient({ tickets, orgId, orgSlug, orgName }: Props) {
 
           {/* Link publik */}
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-600 font-mono max-w-xs overflow-hidden">
-              <ExternalLink size={12} className="shrink-0 text-slate-400" />
-              <span className="truncate">/submit/{orgSlug}</span>
-            </div>
+            <a
+              href={publicUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 bg-slate-50 border border-slate-200 hover:border-[#003366]/40 hover:bg-blue-50 rounded-lg px-3 py-2 text-xs text-slate-600 font-mono max-w-xs overflow-hidden transition-colors cursor-pointer group"
+            >
+              <ExternalLink size={12} className="shrink-0 text-slate-400 group-hover:text-[#003366] transition-colors" />
+              <span className="truncate group-hover:text-[#003366] transition-colors">{publicUrl}</span>
+            </a>
             <button type="button"
               onClick={copyLink}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#003366] hover:bg-[#002a55] text-white text-xs font-semibold transition-colors cursor-pointer"

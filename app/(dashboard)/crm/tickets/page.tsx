@@ -1,6 +1,6 @@
 import { unstable_noStore as noStore } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { getActiveOrg, getActiveBranch } from '@/modules/organization/actions/org.actions'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getCrmTickets } from '@/modules/crm/actions/tickets.actions'
 import { TicketListClient } from './TicketListClient'
 
@@ -12,9 +12,9 @@ export default async function CrmTicketsPage() {
   if (!orgData) redirect('/onboarding')
 
   const orgId = orgData.org.id
-  const branch = await getActiveBranch(orgId)
 
-  const tickets = await getCrmTickets(orgId, branch?.id)
+  // Tidak filter by branch — tiket publik tidak memiliki branch, tampilkan semua
+  const tickets = await getCrmTickets(orgId)
 
   const orgSlug = orgData.org.slug || orgId
 
