@@ -3,11 +3,11 @@ import { getStockLedger } from '@/modules/inventory/actions/inventory.actions'
 import { redirect } from 'next/navigation'
 import StockLedgerClient from './StockLedgerClient'
 
-export default async function StockLedgerPage({ params }: { params: { id: string } }) {
+export default async function StockLedgerPage({ params }: { params: Promise<{ id: string }> }) {
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
 
-  const productId = params.id
+  const { id: productId } = await params
   const data = await getStockLedger(orgData.org.id, productId)
 
   if (!data || (data as any).error) {
