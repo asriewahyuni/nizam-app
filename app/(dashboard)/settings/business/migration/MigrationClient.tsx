@@ -1350,7 +1350,7 @@ export default function MigrationClient() {
               Kembali
             </Link>
             <a
-              href="/templates/migrasi/NIZAM_Migration_Template.xlsx"
+              href="/templates/migrasi/NIZAM_Migration_Template_NIZAMNEW.xlsx"
               download
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-black"
             >
@@ -1409,7 +1409,7 @@ export default function MigrationClient() {
                 Upload Workbook
               </SafeButton>
               <a
-                href="/templates/migrasi/NIZAM_Migration_Template.xlsx"
+                href="/templates/migrasi/NIZAM_Migration_Template_NIZAMNEW.xlsx"
                 download
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-7 py-3.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
               >
@@ -1638,7 +1638,7 @@ export default function MigrationClient() {
                           {report ? 'Ganti Workbook' : 'Upload Workbook'}
                         </SafeButton>
                         <a
-                          href="/templates/migrasi/NIZAM_Migration_Template.xlsx"
+                          href="/templates/migrasi/NIZAM_Migration_Template_NIZAMNEW.xlsx"
                           download
                           className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
                         >

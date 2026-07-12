@@ -4,7 +4,7 @@ Folder ini berisi template CSV standar untuk proses migrasi client dari Excel at
 
 Versi workbook Excel yang siap dibagikan ke client:
 
-1. [NIZAM_Migration_Template.xlsx](./NIZAM_Migration_Template.xlsx)
+1. [NIZAM_Migration_Template_NIZAMNEW.xlsx](./NIZAM_Migration_Template_NIZAMNEW.xlsx)
 
 Gunakan template ini bersama:
 
@@ -32,7 +32,7 @@ Gunakan template ini bersama:
 
 Workbook utama:
 
-1. [NIZAM_Migration_Template.xlsx](./NIZAM_Migration_Template.xlsx)
+1. [NIZAM_Migration_Template_NIZAMNEW.xlsx](./NIZAM_Migration_Template_NIZAMNEW.xlsx)
 
 Versi CSV per sheet:
 

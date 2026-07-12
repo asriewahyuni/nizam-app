@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, '..')
-const outputPath = path.join(repoRoot, 'templates', 'migrasi', 'NIZAM_Migration_Template.xlsx')
-const publicOutputPath = path.join(repoRoot, 'public', 'templates', 'migrasi', 'NIZAM_Migration_Template.xlsx')
+const outputPath = path.join(repoRoot, 'templates', 'migrasi', 'NIZAM_Migration_Template_NIZAMNEW.xlsx')
+const publicOutputPath = path.join(repoRoot, 'public', 'templates', 'migrasi', 'NIZAM_Migration_Template_NIZAMNEW.xlsx')
 
 const HEADER_FILL = '0F3B74'
 const HEADER_TEXT = 'FFFFFFFF'
