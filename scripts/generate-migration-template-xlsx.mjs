@@ -43,6 +43,7 @@ const templates = [
       { section: 'Persediaan', content: 'Opening stock sebaiknya diisi per produk per gudang.' },
       { section: 'AR/AP', content: 'Kalau memungkinkan isi per invoice outstanding, bukan total ringkas.' },
       { section: 'Produk inventory', content: 'Category yang disarankan: Bahan, Setengah Jadi, Siap Jual, Pelengkap.' },
+      { section: 'Aset tetap (asset_category)', content: 'Wajib diisi salah satu: TANAH, BANGUNAN, KENDARAAN, atau MESIN (mencakup peralatan & elektronik). Jika dikosongkan, sistem memakai akun aset tetap generik dan akun akumulasi penyusutan generik — bukan akun spesifik per kategori sesuai Chart of Accounts standar.' },
       { section: 'Versi CSV', content: 'Versi CSV mentah tetap tersedia di folder templates/migrasi untuk kebutuhan internal.' }
     ]
   },
@@ -320,6 +321,7 @@ const templates = [
     columns: [
       { header: 'asset_code', key: 'asset_code', width: 18 },
       { header: 'asset_name', key: 'asset_name', width: 32 },
+      { header: 'asset_category', key: 'asset_category', width: 18 },
       { header: 'acquisition_date', key: 'acquisition_date', width: 16 },
       { header: 'acquisition_cost', key: 'acquisition_cost', width: 18 },
       { header: 'accumulated_depreciation', key: 'accumulated_depreciation', width: 24 },
@@ -330,7 +332,13 @@ const templates = [
     ],
     requiredFields: ['asset_name', 'acquisition_cost'],
     numericFields: ['acquisition_cost', 'accumulated_depreciation', 'useful_life_months', 'residual_value'],
-    dateFields: ['acquisition_date']
+    dateFields: ['acquisition_date'],
+    enumFields: {
+      asset_category: ['TANAH', 'BANGUNAN', 'KENDARAAN', 'MESIN']
+    },
+    validations: [
+      { columnKey: 'asset_category', values: ['TANAH', 'BANGUNAN', 'KENDARAAN', 'MESIN'] }
+    ]
   },
   {
     name: 'bom',

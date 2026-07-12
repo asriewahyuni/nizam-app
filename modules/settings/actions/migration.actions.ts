@@ -2746,29 +2746,28 @@ export async function importFixedAssetsMigration(
       .sort((a, b) => a.code.localeCompare(b.code))[0] ||
     [...accounts].filter((account) => account.type === 'EXPENSE').sort((a, b) => a.code.localeCompare(b.code))[0]
 
-  // Pemetaan akun per kategori aset tetap (standar CoA Nizam)
-  // Per-kategori account mapping — lihat docs/syirkah-accounting.md §5 untuk tabel lengkap.
+  // Pemetaan akun per kategori aset tetap — HARUS mengikuti STANDARD_PSAK_COA_TEMPLATE
+  // yang sungguhan di-seed untuk organisasi baru (lihat modules/accounting/actions/coa.actions.ts:179-186).
+  // CoA standar hanya punya 4 kategori aset tetap detail (Tanah, Bangunan, Kendaraan,
+  // Peralatan & Mesin) — tidak ada akun terpisah untuk Interior/Elektronik, sehingga
+  // keduanya di-alias ke MESIN (Peralatan & Mesin) di CATEGORY_ALIASES di bawah.
   // TANAH tidak memiliki akun akumulasi penyusutan karena tanah tidak disusutkan.
   const CATEGORY_ASSET_CODE: Record<string, string> = {
-    TANAH: '1501', KENDARAAN: '1502', BANGUNAN: '1503',
-    INTERIOR: '1504', ELEKTRONIK: '1505', MESIN: '1506',
+    TANAH: '1501', BANGUNAN: '1502', KENDARAAN: '1504', MESIN: '1506',
   }
   const CATEGORY_ACCUM_CODE: Record<string, string> = {
-    KENDARAAN: '1507', BANGUNAN: '1508', INTERIOR: '1509',
-    ELEKTRONIK: '1510', MESIN: '1511',
+    BANGUNAN: '1503', KENDARAAN: '1505', MESIN: '1507',
   }
-  const CATEGORY_DEP_EXP_CODE: Record<string, string> = {
-    MESIN: '6050', KENDARAAN: '6051', ELEKTRONIK: '6052',
-    TANAH: '6053', BANGUNAN: '6054',
-  }
+  // Tidak ada akun beban penyusutan per kategori di CoA standar (hanya satu akun
+  // generik "Biaya Penyusutan", kode 6009) — semua kategori memakai fallbackDepExpenseAccount.
 
   const CATEGORY_ALIASES: Record<string, string> = {
     TANAH: 'TANAH', LAND: 'TANAH',
-    KENDARAAN: 'KENDARAAN', VEHICLE: 'KENDARAAN', MOBIL: 'KENDARAAN', MOTOR: 'KENDARAAN',
+    KENDARAAN: 'KENDARAAN', VEHICLE: 'KENDARAAN', MOBIL: 'KENDARAAN', MOTOR: 'KENDARAAN', BUS: 'KENDARAAN',
     BANGUNAN: 'BANGUNAN', GEDUNG: 'BANGUNAN', BUILDING: 'BANGUNAN',
-    ELEKTRONIK: 'ELEKTRONIK', ELECTRONIC: 'ELEKTRONIK', PERALATAN: 'ELEKTRONIK',
-    MESIN: 'MESIN', MACHINE: 'MESIN',
-    INTERIOR: 'INTERIOR',
+    MESIN: 'MESIN', MACHINE: 'MESIN', PERALATAN: 'MESIN', EQUIPMENT: 'MESIN',
+    ELEKTRONIK: 'MESIN', ELECTRONIC: 'MESIN',
+    INTERIOR: 'MESIN', FURNITURE: 'MESIN',
   }
 
   const accountByCode = new Map(accounts.map((a) => [a.code, a]))
@@ -2776,11 +2775,10 @@ export async function importFixedAssetsMigration(
   function resolveAssetAccounts(category: string | null) {
     const assetCode = category ? CATEGORY_ASSET_CODE[category] : null
     const accumCode = category ? CATEGORY_ACCUM_CODE[category] : null
-    const depExpCode = category ? CATEGORY_DEP_EXP_CODE[category] : null
     return {
       assetAccountId: (assetCode ? accountByCode.get(assetCode)?.id : null) ?? assetAccount?.id ?? null,
       accumDepAccountId: (accumCode ? accountByCode.get(accumCode)?.id : null) ?? fallbackAccumDepAccount?.id ?? null,
-      depExpenseAccountId: (depExpCode ? accountByCode.get(depExpCode)?.id : null) ?? fallbackDepExpenseAccount?.id ?? null,
+      depExpenseAccountId: fallbackDepExpenseAccount?.id ?? null,
     }
   }
 
@@ -2890,7 +2888,7 @@ export async function importFixedAssetsMigration(
     if (!category) {
       warnings.push(
         `Baris ${row.rowNumber}: kolom asset_category kosong untuk "${assetName}". ` +
-        `Sistem memakai akun fallback. Isi kategori (TANAH/BANGUNAN/KENDARAAN/MESIN/ELEKTRONIK/INTERIOR) agar akun aset dan akumulasi terpetakan dengan benar.`
+        `Sistem memakai akun fallback. Isi kategori (TANAH/BANGUNAN/KENDARAAN/MESIN) agar akun aset dan akumulasi terpetakan dengan benar.`
       )
     }
 

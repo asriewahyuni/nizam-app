@@ -191,10 +191,13 @@ const SHEET_SCHEMAS: SheetSchema[] = [
   },
   {
     name: 'fixed_assets',
-    columns: ['asset_code', 'asset_name', 'acquisition_date', 'acquisition_cost', 'accumulated_depreciation', 'useful_life_months', 'residual_value', 'branch_name', 'notes'],
+    columns: ['asset_code', 'asset_name', 'asset_category', 'acquisition_date', 'acquisition_cost', 'accumulated_depreciation', 'useful_life_months', 'residual_value', 'branch_name', 'notes'],
     requiredFields: ['asset_name', 'acquisition_cost'],
     numericFields: ['acquisition_cost', 'accumulated_depreciation', 'useful_life_months', 'residual_value'],
     dateFields: ['acquisition_date'],
+    enumFields: {
+      asset_category: ['TANAH', 'BANGUNAN', 'KENDARAAN', 'MESIN'],
+    },
   },
   {
     name: 'bom',
