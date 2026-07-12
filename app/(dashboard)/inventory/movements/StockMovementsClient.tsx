@@ -173,10 +173,7 @@ export default function StockMovementsClient({
   const totalPages = Math.ceil(result.total / result.limit)
   const hasFilters = search || refType || direction || dateFrom || dateTo
 
-  const totalIn = result.rows.filter((r) => r.quantity > 0).reduce((s, r) => s + r.quantity, 0)
-  const totalOut = result.rows.filter((r) => r.quantity < 0).reduce((s, r) => s + Math.abs(r.quantity), 0)
-  const totalValueIn = result.rows.filter((r) => r.quantity > 0).reduce((s, r) => s + r.quantity * r.unit_price, 0)
-  const totalValueOut = result.rows.filter((r) => r.quantity < 0).reduce((s, r) => s + Math.abs(r.quantity) * r.unit_price, 0)
+  const { totalIn, totalOut, totalValueIn, totalValueOut } = result
 
   return (
     <div className="max-w-7xl mx-auto space-y-10 pb-24">
@@ -198,21 +195,21 @@ export default function StockMovementsClient({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          label="Total Mutasi (Halaman Ini)"
+          label="Total Mutasi"
           value={`${result.total.toLocaleString('id-ID')} transaksi`}
           icon={ArrowLeftRight}
           color="indigo"
           sub="Sesuai filter aktif"
         />
         <StatCard
-          label="Total Masuk (Halaman Ini)"
+          label="Total Masuk"
           value={formatQty(totalIn)}
           icon={TrendingUp}
           color="emerald"
           sub={formatRupiah(totalValueIn)}
         />
         <StatCard
-          label="Total Keluar (Halaman Ini)"
+          label="Total Keluar"
           value={formatQty(-totalOut)}
           icon={TrendingDown}
           color="rose"

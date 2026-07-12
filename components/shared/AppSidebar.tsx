@@ -84,7 +84,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission_key: 'dashboard' },
       { label: 'Panduan Memulai', href: '/quick-start', icon: Rocket, permission_key: 'dashboard' },
       { label: 'Modul Marketplace', href: '/marketplace', icon: Store, permission_key: 'config', admin_only: true },
-      { label: 'Approval Center', href: '/accounting/approvals', icon: ClipboardCheck, permission_key: 'approval', module_key: 'Accounting' },
+      { label: 'Approval Center', href: '/accounting/approvals', icon: ClipboardCheck, permission_key: 'approval' },
       { label: 'Audit Integritas', href: '/accounting/audit', icon: ShieldCheck, permission_key: 'audit', module_key: 'Audit' },
       { label: 'Pengaturan', href: '/settings/business', icon: Settings, permission_key: 'config', admin_only: true },
     ]
@@ -786,12 +786,12 @@ export function AppSidebar({
 
                             {!effectiveIsCollapsed && (
                               <div className="flex items-center gap-2">
-                                {!anyLocked && badgeCount > 0 && (
+                                {badgeCount > 0 && (
                                   <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-semibold tracking-wide leading-none flex items-center justify-center animate-in fade-in zoom-in ${isActive ? 'bg-white text-[#003366] shadow-sm' : 'bg-[#003366] text-white shadow-sm shadow-[#003366]/10'}`}>
                                     {badgeCount}
                                   </div>
                                 )}
-                                {lockedByActivation && (
+                                {lockedByActivation && badgeCount === 0 && (
                                   <div className="px-1.5 py-0.5 rounded-md text-[8px] font-semibold tracking-wide leading-none bg-blue-50 text-blue-600 border border-blue-200/80 opacity-0 group-hover/item:opacity-100 transition-opacity duration-150">
                                     AKTIFKAN
                                   </div>

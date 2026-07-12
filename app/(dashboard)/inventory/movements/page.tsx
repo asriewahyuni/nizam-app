@@ -9,7 +9,7 @@ import StockMovementsClient from './StockMovementsClient'
 export default async function StockMovementsPage({
   searchParams,
 }: {
-  searchParams: Record<string, string | undefined>
+  searchParams: Promise<Record<string, string | undefined>>
 }) {
   noStore()
 
@@ -17,13 +17,14 @@ export default async function StockMovementsPage({
   if (!orgData) redirect('/onboarding')
 
   const activeBranch = await getActiveBranch(orgData.org.id)
+  const resolvedSearchParams = await searchParams
 
-  const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1)
-  const referenceType = searchParams.type ?? null
-  const direction = (searchParams.direction as 'in' | 'out' | null) ?? null
-  const dateFrom = searchParams.date_from ?? null
-  const dateTo = searchParams.date_to ?? null
-  const search = searchParams.search ?? ''
+  const page = Math.max(1, parseInt(resolvedSearchParams.page ?? '1', 10) || 1)
+  const referenceType = resolvedSearchParams.type ?? null
+  const direction = (resolvedSearchParams.direction as 'in' | 'out' | null) ?? null
+  const dateFrom = resolvedSearchParams.date_from ?? null
+  const dateTo = resolvedSearchParams.date_to ?? null
+  const search = resolvedSearchParams.search ?? ''
 
   const [result, products] = await Promise.all([
     getStockMovementsPage(orgData.org.id, {

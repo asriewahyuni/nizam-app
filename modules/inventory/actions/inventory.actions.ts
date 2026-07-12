@@ -1016,6 +1016,10 @@ export type StockMovementsPageResult = {
   total: number
   page: number
   limit: number
+  totalIn: number
+  totalOut: number
+  totalValueIn: number
+  totalValueOut: number
 }
 
 export async function getStockMovementsPage(
@@ -1040,24 +1044,16 @@ export async function getStockMovementsPage(
     direction === 'in' ? 'AND sm.quantity > 0' :
     direction === 'out' ? 'AND sm.quantity < 0' : ''
 
-  const result = await queryPostgres<StockMovementPageRow & { total_count: string }>(
-    `SELECT
-      sm.id::text AS id,
-      sm.product_id::text AS product_id,
-      COALESCE(p.name, 'Produk Dihapus') AS product_name,
-      p.sku AS product_sku,
-      p.unit AS product_unit,
-      p.category AS product_category,
-      sm.movement_date::text AS movement_date,
-      sm.quantity::float AS quantity,
-      COALESCE(sm.unit_price, 0)::float AS unit_price,
-      COALESCE(sm.reference_type, 'MANUAL') AS reference_type,
-      sm.reference_id::text AS reference_id,
-      sm.notes,
-      sm.branch_id::text AS branch_id,
-      COUNT(*) OVER() AS total_count
-    FROM stock_movements sm
-    LEFT JOIN products p ON p.id = sm.product_id AND p.org_id = sm.org_id
+  const filterParams = [
+    orgId,
+    branchId ?? null,
+    referenceType ? referenceType.toUpperCase() : null,
+    dateFrom ?? null,
+    dateTo ?? null,
+    search,
+  ]
+
+  const whereClause = `
     WHERE sm.org_id = $1
       AND ($2::uuid IS NULL OR sm.branch_id = $2::uuid)
       AND ($3::text IS NULL OR UPPER(COALESCE(sm.reference_type,'')) = $3::text)
@@ -1065,24 +1061,59 @@ export async function getStockMovementsPage(
       AND ($5::date IS NULL OR sm.movement_date::date <= $5::date)
       AND ($6::text = '' OR COALESCE(p.name,'') ILIKE '%'||$6||'%' OR COALESCE(p.sku,'') ILIKE '%'||$6||'%' OR COALESCE(sm.notes,'') ILIKE '%'||$6||'%')
       ${directionClause}
-    ORDER BY sm.movement_date DESC, sm.created_at DESC
-    LIMIT $7 OFFSET $8`,
-    [
-      orgId,
-      branchId ?? null,
-      referenceType ? referenceType.toUpperCase() : null,
-      dateFrom ?? null,
-      dateTo ?? null,
-      search,
-      limit,
-      offset,
-    ]
-  )
+  `
+
+  const [result, totalsResult] = await Promise.all([
+    queryPostgres<StockMovementPageRow & { total_count: string }>(
+      `SELECT
+        sm.id::text AS id,
+        sm.product_id::text AS product_id,
+        COALESCE(p.name, 'Produk Dihapus') AS product_name,
+        p.sku AS product_sku,
+        p.unit AS product_unit,
+        p.category AS product_category,
+        sm.movement_date::text AS movement_date,
+        sm.quantity::float AS quantity,
+        COALESCE(sm.unit_price, 0)::float AS unit_price,
+        COALESCE(sm.reference_type, 'MANUAL') AS reference_type,
+        sm.reference_id::text AS reference_id,
+        sm.notes,
+        sm.branch_id::text AS branch_id,
+        COUNT(*) OVER() AS total_count
+      FROM stock_movements sm
+      LEFT JOIN products p ON p.id = sm.product_id AND p.org_id = sm.org_id
+      ${whereClause}
+      ORDER BY sm.movement_date DESC, sm.created_at DESC
+      LIMIT $7 OFFSET $8`,
+      [...filterParams, limit, offset]
+    ),
+    queryPostgres<{ total_in: string; total_out: string; total_value_in: string; total_value_out: string }>(
+      `SELECT
+        COALESCE(SUM(CASE WHEN sm.quantity > 0 THEN sm.quantity ELSE 0 END), 0)::float AS total_in,
+        COALESCE(SUM(CASE WHEN sm.quantity < 0 THEN ABS(sm.quantity) ELSE 0 END), 0)::float AS total_out,
+        COALESCE(SUM(CASE WHEN sm.quantity > 0 THEN sm.quantity * COALESCE(sm.unit_price, 0) ELSE 0 END), 0)::float AS total_value_in,
+        COALESCE(SUM(CASE WHEN sm.quantity < 0 THEN ABS(sm.quantity) * COALESCE(sm.unit_price, 0) ELSE 0 END), 0)::float AS total_value_out
+      FROM stock_movements sm
+      LEFT JOIN products p ON p.id = sm.product_id AND p.org_id = sm.org_id
+      ${whereClause}`,
+      filterParams
+    ),
+  ])
 
   const rows = result.rows.map(({ total_count: _tc, ...row }) => row as StockMovementPageRow)
   const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count, 10) : 0
+  const totals = totalsResult.rows[0]
 
-  return { rows, total, page, limit }
+  return {
+    rows,
+    total,
+    page,
+    limit,
+    totalIn: totals ? Number(totals.total_in) : 0,
+    totalOut: totals ? Number(totals.total_out) : 0,
+    totalValueIn: totals ? Number(totals.total_value_in) : 0,
+    totalValueOut: totals ? Number(totals.total_value_out) : 0,
+  }
 }
 
 export async function getProductByBarcode(orgId: string, barcode: string) {

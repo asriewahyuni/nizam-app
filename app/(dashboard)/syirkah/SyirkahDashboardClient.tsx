@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
-import { Plus, Briefcase, TrendingUp, AlertCircle, Eye, Handshake, Trash2, PieChart, Edit2, Save, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, Briefcase, TrendingUp, AlertCircle, Eye, Handshake, Trash2, PieChart, Edit2, Save, X, Banknote } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import Link from 'next/link'
-import { deleteSyirkahContract, upsertSyirkahContract } from '@/modules/syirkah/actions/syirkah.actions'
+import { deleteSyirkahContract, upsertSyirkahContract, syncSyirkahProfitSharingToCore } from '@/modules/syirkah/actions/syirkah.actions'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/components/ui/NizamUI'
 
@@ -34,6 +34,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
   )
   const router = useRouter()
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [bagiHasilLoadingId, setBagiHasilLoadingId] = useState<string | null>(null)
   const { confirm, ConfirmUI } = useConfirm()
   const [isEditingProfitSharing, setIsEditingProfitSharing] = useState(false)
   const [isSavingProfitSharing, setIsSavingProfitSharing] = useState(false)
@@ -53,6 +54,27 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
 
     setProfitSharingDraft(Number(profitSharingReferenceGroup.estimatedNetProfit || 0))
   }, [profitSharingReferenceContract, profitSharingReferenceGroup])
+
+  const handleBagiHasil = async (contractId: string, title: string) => {
+    if (!await confirm(`Posting bagi hasil untuk akad "${title}"? Jurnal akan dibuat otomatis:\nDebit 3130 - Bagi Hasil Syirkah\nKredit Bank Operasional (sesuai rekening pembayaran di akad)`)) return
+    setBagiHasilLoadingId(contractId)
+    try {
+      const result = await syncSyirkahProfitSharingToCore(contractId)
+      if ((result as any).error) {
+        alert(`Gagal posting bagi hasil: ${(result as any).error}`)
+      } else if ((result as any).skipped) {
+        alert((result as any).message || 'Bagi hasil belum bisa diposting saat ini.')
+      } else {
+        const entryNumber = String((result as any).entryNumber || '').trim()
+        alert(entryNumber
+          ? `Bagi hasil berhasil diposting ke jurnal Core ${entryNumber}.`
+          : ((result as any).message || 'Posting bagi hasil berhasil.'))
+        router.refresh()
+      }
+    } finally {
+      setBagiHasilLoadingId(null)
+    }
+  }
 
   const handleDelete = async (contractId: string, title: string) => {
     if (!await confirm(`Hapus akad "${title}"? Tindakan ini tidak dapat dibatalkan.`)) return
@@ -408,18 +430,40 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
                         {formatRupiah(c.current_debt || 0)} <br/>
                         <span className="text-xs text-slate-400">Limit: {formatRupiah(c.debt_allocation || 0)}</span>
                       </td>
-	                      <td className="py-4 pr-2 text-center">
-	                        <div className="inline-flex items-center gap-1">
-	                          <Link
-	                            href={c.status === 'ACTIVE' || c.status === 'COMPLETED' ? `/syirkah/${c.id}` : `/syirkah/${c.id}?wizard=1`}
-	                            className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"
-	                          >
+                      <td className="py-4 pr-2 text-center">
+                        <div className="inline-flex items-center gap-1">
+                          <Link
+                            href={c.status === 'ACTIVE' || c.status === 'COMPLETED' ? `/syirkah/${c.id}` : `/syirkah/${c.id}?wizard=1`}
+                            className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition cursor-pointer"
+                            title="Lihat detail akad"
+                          >
                             <Eye size={18} />
                           </Link>
+                          {c.status === 'ACTIVE' && (
+                            <button
+                              type="button"
+                              onClick={() => handleBagiHasil(c.id, c.title)}
+                              disabled={bagiHasilLoadingId === c.id}
+                              title={
+                                memberGroup.distributionStatus === 'ESTIMATED' && Number(memberGroup.estimatedNetProfit) > 0
+                                  ? 'Posting bagi hasil ke jurnal Core'
+                                  : memberGroup.distributionStatus === 'ESTIMATED'
+                                  ? 'Laba bersih Rp 0 — isi kolom Alokasi Bagi Hasil di detail akad'
+                                  : 'Bagi hasil belum tersedia (basis laba belum siap)'
+                              }
+                              className={`inline-flex items-center justify-center p-2 rounded-xl transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                                memberGroup.distributionStatus === 'ESTIMATED' && Number(memberGroup.estimatedNetProfit) > 0
+                                  ? 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'
+                                  : 'text-slate-300 hover:text-slate-400 hover:bg-slate-50'
+                              }`}
+                            >
+                              <Banknote size={18} />
+                            </button>
+                          )}
                           <button type="button"
                             onClick={() => handleDelete(c.id, c.title)}
                             disabled={deletingId === c.id}
-                            className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Hapus akad"
                           >
                             <Trash2 size={18} />

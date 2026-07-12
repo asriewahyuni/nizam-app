@@ -502,7 +502,28 @@ async function resolveSyirkahProfitSharingAccounts(
   }
 
   if (!profitSharingAccount) {
-    return { data: null, error: 'Akun 3130 - Bagi Hasil Syirkah belum tersedia atau belum aktif di CoA Core.' }
+    // Auto-inject akun syirkah (termasuk 3130) jika belum ada, lalu coba lagi
+    try {
+      await queryPostgres('SELECT public.inject_shariah_coa($1)', [contract.org_id])
+      const { data: retryData } = await (supabase as any)
+        .from('accounts')
+        .select('id, code, name, type, normal_balance, is_active')
+        .eq('org_id', contract.org_id)
+        .eq('code', SYIRKAH_PROFIT_SHARING_EQUITY_CODE)
+        .eq('is_active', true)
+        .single()
+      if (!retryData) {
+        return { data: null, error: 'Akun 3130 - Bagi Hasil Syirkah belum tersedia. Hubungi administrator untuk menginisiasi CoA syirkah.' }
+      }
+      return {
+        data: {
+          cashAccount: cashAccount!,
+          equityAccount: retryData as Account,
+        },
+      }
+    } catch {
+      return { data: null, error: 'Akun 3130 - Bagi Hasil Syirkah belum tersedia atau belum aktif di CoA Core.' }
+    }
   }
 
   if (cashAccount.id === profitSharingAccount.id) {
@@ -1651,10 +1672,10 @@ export async function syncSyirkahProfitSharingToCore(
   const distributionAmount = toMoneyNumber(distribution.baseAmount)
 
   if (distribution.baseAmount == null || distributionAmount <= 0) {
-    return clearLinkedJournal(
-      'SYNC_SYIRKAH_PROFIT_SHARING_EMPTY',
-      distribution.message || 'Belum ada nominal bagi hasil positif yang bisa diposting ke Core.'
-    )
+    const skipMsg = distribution.source === 'ORG_NET_PROFIT'
+      ? 'Laba bersih organisasi saat ini Rp 0. Isi kolom "Alokasi Bagi Hasil" di halaman detail akad, lalu posting ulang.'
+      : distribution.message || 'Belum ada nominal bagi hasil positif yang bisa diposting ke Core.'
+    return clearLinkedJournal('SYNC_SYIRKAH_PROFIT_SHARING_EMPTY', skipMsg)
   }
 
   const resolvedAccounts = await resolveSyirkahProfitSharingAccounts(supabase, normalizedContract)
@@ -1664,9 +1685,11 @@ export async function syncSyirkahProfitSharingToCore(
 
   const { cashAccount, equityAccount } = resolvedAccounts.data
   const existingJournal = await getExistingProfitSharingJournal()
+  // Gunakan tanggal hari ini untuk posting baru agar tidak terkena periode fiskal yang sudah ditutup.
+  // Jika journal sudah ada sebelumnya, pakai tanggal yang lama agar konsisten.
   const entryDate = existingJournal?.entry_date
     ? normalizeSyirkahDate(existingJournal.entry_date)
-    : normalizeSyirkahDate(normalizedContract.end_date || new Date())
+    : normalizeSyirkahDate(new Date())
   const description = buildSyirkahProfitSharingDescription(normalizedContract.title)
   const notes = buildSyirkahProfitSharingNotes(normalizedContract, distribution, distributionAmount)
 
@@ -1870,7 +1893,37 @@ export async function syncSyirkahProfitSharingToCore(
     }
   }
 
+  // Anti-silo: catat ke bank_transactions agar Kas & Bank bisa melacak arus keluar ini.
+  // Status RECONCILED agar trigger auto-journal tidak aktif (jurnal sudah dibuat di atas).
+  try {
+    const { data: bankAccountRow } = await (supabase as any)
+      .from('bank_accounts')
+      .select('id')
+      .eq('org_id', normalizedContract.org_id)
+      .eq('account_id', cashAccount.id)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle()
+
+    if (bankAccountRow?.id) {
+      await (supabase as any).from('bank_transactions').insert({
+        org_id: normalizedContract.org_id,
+        bank_account_id: bankAccountRow.id,
+        transaction_date: entryDate,
+        description,
+        amount: distributionAmount,
+        type: 'OUT',
+        category_id: equityAccount.id,
+        journal_entry_id: newEntryId,
+        status: 'RECONCILED',
+      })
+    }
+  } catch {
+    // Bank transactions creation tidak wajib; jurnal sudah dibuat
+  }
+
   if (shouldRevalidate) {
+    revalidatePath('/cash')
     revalidatePath('/accounting/journal')
     revalidatePath('/syirkah')
     revalidatePath(`/syirkah/${contractId}`)
