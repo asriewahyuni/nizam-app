@@ -25,6 +25,7 @@ const LOGO_PREFIX = 'logos/'
 const EXPORT_PREFIX = 'exports/'
 const RECEIPT_PREFIX = 'receipts/'
 const AVATAR_PREFIX = 'avatars/'
+const LMS_MEDIA_PREFIX = 'lms-media/'
 const DEFAULT_SIGNED_URL_TTL_SECONDS = 60 * 60
 
 let cachedClient: S3Client | null = null
@@ -230,6 +231,21 @@ export function isPublicReceiptStorageKey(key: string): boolean {
  */
 export function isPublicAvatarStorageKey(key: string): boolean {
   return key.startsWith(AVATAR_PREFIX)
+}
+
+/**
+ * Menyusun key file media LMS.
+ */
+export function buildLmsMediaStorageKey(orgId: string, originalFileName: string): string {
+  const safeName = sanitizeFileName(originalFileName, 'media')
+  return `${LMS_MEDIA_PREFIX}${orgId}/${Date.now()}-${safeName}`
+}
+
+/**
+ * Mengecek prefix media LMS untuk akses publik.
+ */
+export function isPublicLmsMediaStorageKey(key: string): boolean {
+  return key.startsWith(LMS_MEDIA_PREFIX)
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   isPublicAvatarStorageKey,
   isPublicLogoStorageKey,
   isPublicReceiptStorageKey,
+  isPublicLmsMediaStorageKey,
 } from '@/lib/storage/object-storage.server'
 import { isPublicThemeAssetStorageKey } from '@/modules/ecommerce/lib/ecommerce.server'
 
@@ -29,7 +30,8 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ke
     !isPublicLogoStorageKey(key) &&
     !isPublicThemeAssetStorageKey(key) &&
     !isPublicReceiptStorageKey(key) &&
-    !isPublicAvatarStorageKey(key)
+    !isPublicAvatarStorageKey(key) &&
+    !isPublicLmsMediaStorageKey(key)
   )) {
     return NextResponse.json({ error: 'File tidak ditemukan.' }, { status: 404 })
   }

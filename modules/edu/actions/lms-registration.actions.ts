@@ -45,11 +45,19 @@ export async function getBatchRegisteredCount(batchId: string) {
 
 // ── Public: Daftar ────────────────────────────────────────────────────────────
 
+import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
+
 export async function createLmsRegistration(
   _prevState: { error?: string; success?: boolean } | null,
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
   try {
+    const session = await getInternalAuthSession()
+    if (!session || !session.user) {
+      return { error: 'Anda harus login (miliki akun) untuk mendaftar kelas ini' }
+    }
+    const userId = session.user.id
+
     const batchId = formData.get('batchId') as string
     const fullName = (formData.get('fullName') as string || '').trim()
     const email = (formData.get('email') as string || '').trim().toLowerCase()
@@ -86,17 +94,17 @@ export async function createLmsRegistration(
       }
     }
 
-    // Cek duplikat email
+    // Cek duplikat email / user
     const { data: duplicate } = await supabase
       .from('lms_registrations')
       .select('id')
       .eq('batch_id', batchId)
-      .eq('email', email)
+      .eq('user_id', userId)
       .neq('status', 'CANCELLED')
       .maybeSingle()
 
     if (duplicate) {
-      return { error: 'Email ini sudah terdaftar di batch ini' }
+      return { error: 'Anda sudah terdaftar di batch ini' }
     }
 
     // Simpan registrasi
@@ -105,6 +113,7 @@ export async function createLmsRegistration(
       .insert({
         org_id: batch.org_id,
         batch_id: batchId,
+        user_id: userId,
         full_name: fullName,
         email,
         phone: phone || null,
@@ -174,6 +183,15 @@ export async function confirmLmsRegistration(registrationId: string) {
   const orgData = await assertOrgAdmin()
   const supabase = await createClient()
 
+  const { data: reg, error: fetchError } = await supabase
+    .from('lms_registrations')
+    .select('*, lms_course_batches(course_id)')
+    .eq('id', registrationId)
+    .eq('org_id', orgData.org.id)
+    .single()
+
+  if (fetchError || !reg) throw new Error(getErrorMessage(fetchError) || 'Registrasi tidak ditemukan')
+
   const { error } = await supabase
     .from('lms_registrations')
     .update({ status: 'CONFIRMED', updated_at: new Date().toISOString() })
@@ -181,6 +199,17 @@ export async function confirmLmsRegistration(registrationId: string) {
     .eq('org_id', orgData.org.id)
 
   if (error) throw new Error(getErrorMessage(error))
+
+  // Enrollment (Beri akses kelas)
+  if (reg.user_id && reg.lms_course_batches) {
+    const courseId = (reg.lms_course_batches as any).course_id
+    await supabase.from('learning_enrollments').insert({
+      org_id: orgData.org.id,
+      user_id: reg.user_id,
+      course_id: courseId,
+      status: 'IN_PROGRESS'
+    })
+  }
 
   revalidatePath('/lms/registrasi')
   revalidatePath('/lms/admin')
@@ -209,7 +238,7 @@ export async function updateRegistrationPayment(registrationId: string, amountPa
   // Ambil info registrasi dan batch
   const { data: regData, error: fetchError } = await supabase
     .from('lms_registrations')
-    .select('*, lms_course_batches(name, org_id)')
+    .select('*, lms_course_batches(name, org_id, course_id)')
     .eq('id', registrationId)
     .eq('org_id', orgData.org.id)
     .single()
@@ -229,11 +258,22 @@ export async function updateRegistrationPayment(registrationId: string, amountPa
 
   if (error) throw new Error(getErrorMessage(error))
 
+  // Enrollment (Beri akses kelas secara otomatis setelah bayar)
+  if (regData.user_id && regData.lms_course_batches) {
+    const courseId = (regData.lms_course_batches as any).course_id
+    await supabase.from('learning_enrollments').insert({
+      org_id: orgData.org.id,
+      user_id: regData.user_id,
+      course_id: courseId,
+      status: 'IN_PROGRESS'
+    })
+  }
+
   // Catat ke ERP (Buku Besar & Kas)
   if (amountPaid > 0) {
     const { ERPBridge } = await import('@/lib/erp-bridge/finances')
-    const debitAccount = await ERPBridge.getDefaultAccount(orgData.org.id, '1-10001') // Kas Kecil
-    const creditAccount = await ERPBridge.getDefaultAccount(orgData.org.id, '4-40001') // Pendapatan
+    const debitAccount = await ERPBridge.getDefaultAccount(orgData.org.id, '1101') // Kas/Bank (LMS Injected)
+    const creditAccount = await ERPBridge.getDefaultAccount(orgData.org.id, '4500') // Pendapatan Pelatihan (LMS Injected)
     
     if (debitAccount && creditAccount) {
       await ERPBridge.recordRevenue({

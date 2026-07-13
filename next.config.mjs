@@ -8,6 +8,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '500mb',
+    },
+  },
 }
 
 const canUploadSourceMaps = Boolean(

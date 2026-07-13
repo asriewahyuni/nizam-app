@@ -283,7 +283,7 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
   },
   {
     key: 'LMS',
-    name: 'Lembaga Pelatihan',
+    name: 'Lembaga Pelatihan (LMS)',
     tagline: 'Bisnis pendidikan dan pelatihan',
     description: 'Untuk lembaga pelatihan/kursus: batch, peserta, instruktur, jadwal, sertifikat, dan pembayaran tuition.',
     icon: '🎓',
@@ -291,6 +291,7 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     href: '/lms',
     isCore: false,
     category: 'business_type',
+    coaInjectionFn: 'inject_lms_coa',
     onboardingSteps: [
       { id: 'coa', title: 'Install CoA LMS', description: 'Pasang akun Pendapatan Pelatihan, Piutang Pelatihan, dan Beban Instruktur.' },
       { id: 'settings', title: 'Pengaturan Lembaga', description: 'Tentukan kategori program, durasi, dan metode pembayaran.' },

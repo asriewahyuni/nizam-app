@@ -37,15 +37,19 @@ export default function CreateBatchForm({ courses }: { courses: Course[] }) {
       )}
 
       {/* Course */}
-      <div>
-        <label className={labelCls}>Course <span className="text-red-400">*</span></label>
-        <select name="courseId" required className={inputCls}>
-          <option value="">Pilih course...</option>
-          {courses.filter((c) => c.is_active).map((c) => (
-            <option key={c.id} value={c.id}>{c.title}</option>
-          ))}
-        </select>
-      </div>
+      {courses.length === 1 ? (
+        <input type="hidden" name="courseId" value={courses[0].id} />
+      ) : (
+        <div>
+          <label className={labelCls}>Course <span className="text-red-400">*</span></label>
+          <select name="courseId" required className={inputCls}>
+            <option value="">Pilih course...</option>
+            {courses.filter((c) => c.is_active).map((c) => (
+              <option key={c.id} value={c.id}>{c.title}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Nama Batch */}
       <div>

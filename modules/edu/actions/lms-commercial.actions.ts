@@ -3,7 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { createClient } from '@/lib/supabase/server'
+import { queryPostgres } from '@/lib/db/postgres'
 import { TRAINING_COURSES } from '@/modules/edu/lib/training-center-mvp'
+import {
+  uploadObjectToStorage,
+  buildLmsMediaStorageKey,
+  buildPublicStorageObjectPath,
+} from '@/lib/storage/object-storage.server'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,6 +36,7 @@ export async function getLmsCourses(orgId: string) {
     .from('learning_courses')
     .select('*')
     .eq('org_id', orgId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -142,7 +149,7 @@ export async function deleteLmsCourse(courseId: string) {
 
   const { error } = await supabase
     .from('learning_courses')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('id', courseId)
     .eq('org_id', orgData.org.id)
 
@@ -155,21 +162,108 @@ export async function deleteLmsCourse(courseId: string) {
   revalidatePath('/lms')
 }
 
+export async function getLmsCourseAnalytics(courseId: string) {
+  try {
+    const orgData = await assertOrgAdmin()
+    
+    // Total materi di course ini
+    const lessonRes = await queryPostgres<{ count: string }>(
+      `select count(*) as count from public.learning_lessons where course_id = $1::uuid and org_id = $2::uuid`,
+      [courseId, orgData.org.id]
+    )
+    const totalLessons = Number(lessonRes.rows?.[0]?.count || 0)
+
+    // Daftar peserta dan progress
+    const { rows, error } = await queryPostgres(
+      `
+        select 
+          e.id as enrollment_id,
+          e.status,
+          e.started_at,
+          e.completed_at,
+          e.final_score,
+          u.display_name as user_name,
+          u.login_email as user_email,
+          (
+            select count(*) 
+            from public.learning_lesson_progress p 
+            where p.enrollment_id = e.id and p.status = 'COMPLETED'
+          ) as completed_lessons
+        from public.learning_enrollments e
+        left join public.internal_auth_users u on u.id::text = e.user_id::text or u.legacy_user_id = e.user_id::text
+        where e.course_id = $1::uuid and e.org_id = $2::uuid
+        order by e.started_at desc
+      `,
+      [courseId, orgData.org.id]
+    )
+    
+    if (error) throw error
+
+    return {
+      success: true,
+      data: rows.map(r => ({
+        ...r,
+        total_lessons: totalLessons,
+        progress_percentage: totalLessons > 0 
+          ? Math.round((Number(r.completed_lessons) / totalLessons) * 100) 
+          : 0
+      }))
+    }
+  } catch (err) {
+    return { success: false, error: getErrorMessage(err), data: [] }
+  }
+}
+
 // ── Batches (Angkatan) ────────────────────────────────────────────────────────
 
 export async function getLmsBatches(orgId: string) {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('lms_course_batches')
-    .select('*, learning_courses(id, title, slug)')
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error('[getLmsBatches]', error)
+  try {
+    const { rows, error } = await queryPostgres(
+      `
+        select 
+          b.*,
+          json_build_object('id', c.id, 'title', c.title, 'slug', c.slug) as learning_courses,
+          (select count(*) from public.lms_registrations r where r.batch_id = b.id and r.status = 'CONFIRMED') as enrolled_count
+        from public.lms_course_batches b
+        left join public.learning_courses c on c.id = b.course_id
+        where b.org_id = $1::uuid and b.deleted_at is null
+        order by b.created_at desc
+      `,
+      [orgId]
+    )
+    if (error) {
+      console.error('[getLmsBatches]', error)
+      return []
+    }
+    return rows
+  } catch (err) {
+    console.error('[getLmsBatches]', err)
     return []
   }
-  return data
+}
+
+export async function getLmsBatchesByCourseId(orgId: string, courseId: string) {
+  try {
+    const { rows, error } = await queryPostgres(
+      `
+        select 
+          b.*,
+          (select count(*) from public.lms_registrations r where r.batch_id = b.id and r.status = 'CONFIRMED') as enrolled_count
+        from public.lms_course_batches b
+        where b.org_id = $1::uuid and b.course_id = $2::uuid and b.deleted_at is null
+        order by b.created_at desc
+      `,
+      [orgId, courseId]
+    )
+    if (error) {
+      console.error('[getLmsBatchesByCourseId]', error)
+      return []
+    }
+    return rows
+  } catch (err) {
+    console.error('[getLmsBatchesByCourseId]', err)
+    return []
+  }
 }
 
 export async function createLmsBatch(
@@ -295,7 +389,7 @@ export async function deleteLmsBatch(batchId: string) {
 
   const { error } = await supabase
     .from('lms_course_batches')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('id', batchId)
     .eq('org_id', orgData.org.id)
 
@@ -328,6 +422,19 @@ export async function getLmsBatchSessions(orgId: string, batchId: string) {
     .select('*')
     .eq('org_id', orgId)
     .eq('batch_id', batchId)
+    .order('start_time', { ascending: true })
+
+  if (error) return []
+  return data
+}
+
+export async function getLmsSessionsByCourseId(orgId: string, courseId: string) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('lms_batch_sessions')
+    .select('*, lms_course_batches!inner(id, name, course_id)')
+    .eq('org_id', orgId)
+    .eq('lms_course_batches.course_id', courseId)
     .order('start_time', { ascending: true })
 
   if (error) return []
@@ -446,63 +553,152 @@ export async function getLmsLessonsByCourseId(orgId: string, courseId: string) {
 
 // ── Lesson CRUD ───────────────────────────────────────────────────────────────
 
-export async function createLmsLesson(formData: FormData) {
-  const orgData = await assertOrgAdmin()
-  const supabase = await createClient()
+export async function createLmsLesson(
+  _prevState: unknown,
+  formData: FormData,
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
+    const supabase = await createClient()
 
-  const courseId   = formData.get('courseId') as string
-  const title      = (formData.get('title') as string)?.trim()
-  const contentMd  = (formData.get('contentMd') as string)?.trim() || null
-  const lessonType = (formData.get('lessonType') as string) || 'TEXT'
-  const sortOrder  = Number(formData.get('sortOrder') || 0)
-  const isRequired = formData.get('isRequired') !== 'false'
+    const courseId   = formData.get('courseId') as string
+    const title      = (formData.get('title') as string)?.trim()
+    const contentMd  = (formData.get('contentMd') as string)?.trim() || null
+    const lessonType = (formData.get('lessonType') as string) || 'TEXT'
+    const isRequired = formData.get('isRequired') !== 'false'
+    const videoUrl   = (formData.get('videoUrl') as string)?.trim() || null
 
-  if (!courseId || !title) throw new Error('courseId dan title wajib diisi.')
+    if (!courseId || !title) return { error: 'courseId dan title wajib diisi.' }
 
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now()
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now()
 
-  const { error } = await supabase.from('learning_lessons').insert({
-    org_id:      orgData.org.id,
-    course_id:   courseId,
-    title,
-    slug,
-    content_md:  contentMd,
-    lesson_type: lessonType,
-    sort_order:  sortOrder,
-    is_required: isRequired,
-  })
+    let mediaItems: any[] = []
+    if (lessonType === 'VIDEO' && videoUrl) {
+      mediaItems = [{ type: 'video', url: videoUrl }]
+    }
 
-  if (error) throw new Error(getErrorMessage(error))
-  revalidatePath('/lms')
-}
+    // Dapatkan max sort_order
+    const { data: maxSort } = await supabase
+      .from('learning_lessons')
+      .select('sort_order')
+      .eq('course_id', courseId)
+      .eq('org_id', orgData.org.id)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      
+    const sortOrder = (maxSort && maxSort.length > 0) ? (maxSort[0].sort_order || 0) + 1 : 1
 
-export async function updateLmsLesson(formData: FormData) {
-  const orgData = await assertOrgAdmin()
-  const supabase = await createClient()
-
-  const lessonId   = formData.get('lessonId') as string
-  const title      = (formData.get('title') as string)?.trim()
-  const contentMd  = (formData.get('contentMd') as string)?.trim() || null
-  const lessonType = (formData.get('lessonType') as string) || 'TEXT'
-  const isRequired = formData.get('isRequired') !== 'false'
-
-  if (!lessonId || !title) throw new Error('lessonId dan title wajib diisi.')
-
-  const { error } = await supabase
-    .from('learning_lessons')
-    .update({
+    const { error } = await supabase.from('learning_lessons').insert({
+      org_id:      orgData.org.id,
+      course_id:   courseId,
       title,
+      slug,
       content_md:  contentMd,
       lesson_type: lessonType,
+      sort_order:  sortOrder,
       is_required: isRequired,
-      updated_at:  new Date().toISOString(),
+      media_items: mediaItems,
     })
-    .eq('id', lessonId)
-    .eq('org_id', orgData.org.id)
 
-  if (error) throw new Error(getErrorMessage(error))
-  revalidatePath('/lms')
+    if (error) return { error: getErrorMessage(error) }
+    revalidatePath('/lms')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
 }
+
+export async function updateLmsLesson(
+  _prevState: unknown,
+  formData: FormData,
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
+    const supabase = await createClient()
+
+    const lessonId   = formData.get('lessonId') as string
+    const title      = (formData.get('title') as string)?.trim()
+    const contentMd  = (formData.get('contentMd') as string)?.trim() || null
+    const lessonType = (formData.get('lessonType') as string) || 'TEXT'
+    const isRequired = formData.get('isRequired') !== 'false'
+    const videoUrl   = (formData.get('videoUrl') as string)?.trim() || null
+
+    if (!lessonId || !title) return { error: 'lessonId dan title wajib diisi.' }
+
+    // Dapatkan data lesson sebelumnya untuk memelihara media_items lain jika ada
+    const { data: oldLesson } = await supabase
+      .from('learning_lessons')
+      .select('media_items')
+      .eq('id', lessonId)
+      .eq('org_id', orgData.org.id)
+      .single()
+
+    let mediaItems: any[] = Array.isArray(oldLesson?.media_items) ? oldLesson?.media_items : []
+    // Filter out old video
+    mediaItems = mediaItems.filter((m: any) => m.type !== 'video')
+    
+    if (lessonType === 'VIDEO' && videoUrl) {
+      mediaItems.push({ type: 'video', url: videoUrl })
+    }
+
+    const { error } = await supabase
+      .from('learning_lessons')
+      .update({
+        title,
+        content_md:  contentMd,
+        lesson_type: lessonType,
+        is_required: isRequired,
+        media_items: mediaItems,
+        updated_at:  new Date().toISOString(),
+      })
+      .eq('id', lessonId)
+      .eq('org_id', orgData.org.id)
+
+    if (error) return { error: getErrorMessage(error) }
+    revalidatePath('/lms')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
+}
+
+export async function moveLmsLesson(lessonId: string, courseId: string, direction: 'up' | 'down') {
+  try {
+    const orgData = await assertOrgAdmin()
+    const supabase = await createClient()
+
+    // Ambil semua lesson di course ini dan urutkan
+    const { data: lessons } = await supabase
+      .from('learning_lessons')
+      .select('id, sort_order')
+      .eq('course_id', courseId)
+      .eq('org_id', orgData.org.id)
+      .order('sort_order', { ascending: true })
+
+    if (!lessons) return { error: 'Gagal mengambil data materi' }
+
+    const currentIndex = lessons.findIndex((l: any) => l.id === lessonId)
+    if (currentIndex === -1) return { error: 'Materi tidak ditemukan' }
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (targetIndex < 0 || targetIndex >= lessons.length) {
+      return { success: true } // Sudah di ujung
+    }
+
+    const currentLesson = lessons[currentIndex]
+    const targetLesson = lessons[targetIndex]
+
+    // Swap sort_order
+    await supabase.from('learning_lessons').update({ sort_order: targetLesson.sort_order }).eq('id', currentLesson.id)
+    await supabase.from('learning_lessons').update({ sort_order: currentLesson.sort_order }).eq('id', targetLesson.id)
+
+    revalidatePath('/lms')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
+}
+
 
 export async function deleteLmsLesson(lessonId: string) {
   const orgData = await assertOrgAdmin()
@@ -516,4 +712,75 @@ export async function deleteLmsLesson(lessonId: string) {
 
   if (error) throw new Error(getErrorMessage(error))
   revalidatePath('/lms')
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+export async function updateLmsBranding(
+  _prevState: unknown,
+  formData: FormData
+) {
+  try {
+    const orgData = await assertOrgAdmin()
+    const name = formData.get('name') as string
+    const logoUrl = formData.get('logoUrl') as string
+
+    const supabase = await createClient()
+    
+    const { data: orgRow } = await supabase
+      .from('organizations')
+      .select('settings')
+      .eq('id', orgData.org.id)
+      .single()
+
+    const currentSettings = typeof orgRow?.settings === 'object' && orgRow?.settings !== null ? orgRow.settings : {}
+    
+    const newSettings = {
+      ...currentSettings,
+      lms_branding: {
+        name: name || null,
+        logo_url: logoUrl || null
+      }
+    }
+
+    const { error } = await supabase
+      .from('organizations')
+      .update({ settings: newSettings })
+      .eq('id', orgData.org.id)
+
+    if (error) return { error: getErrorMessage(error) }
+
+    revalidatePath('/lms')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
+}
+
+export async function uploadLmsMediaAction(_prevState: unknown, formData: FormData) {
+  try {
+    const orgData = await assertOrgAdmin()
+    const file = formData.get('file') as File | null
+    if (!file || !(file instanceof File)) {
+      return { error: 'File tidak ditemukan' }
+    }
+
+    if (file.size > 500 * 1024 * 1024) {
+      return { error: 'Ukuran file maksimal 500MB' }
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const storageKey = buildLmsMediaStorageKey(orgData.org.id, file.name)
+
+    await uploadObjectToStorage({
+      body: buffer,
+      key: storageKey,
+      contentType: file.type || 'application/octet-stream',
+    })
+
+    const url = buildPublicStorageObjectPath(storageKey)
+    return { success: true, url }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
 }

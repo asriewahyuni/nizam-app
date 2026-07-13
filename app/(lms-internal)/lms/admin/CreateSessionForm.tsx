@@ -29,17 +29,21 @@ export default function CreateSessionForm({ batches }: { batches: Batch[] }) {
         </div>
       )}
 
-      <div>
-        <label className={labelCls}>Batch <span className="text-red-400">*</span></label>
-        <select name="batchId" required className={inputCls}>
-          <option value="">Pilih batch...</option>
-          {batches.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}{b.learning_courses?.title ? ` · ${b.learning_courses.title}` : ''}
-            </option>
-          ))}
-        </select>
-      </div>
+      {batches.length === 1 ? (
+        <input type="hidden" name="batchId" value={batches[0].id} />
+      ) : (
+        <div>
+          <label className={labelCls}>Batch <span className="text-red-400">*</span></label>
+          <select name="batchId" required className={inputCls}>
+            <option value="">Pilih batch...</option>
+            {batches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}{b.learning_courses?.title ? ` · ${b.learning_courses.title}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div>
         <label className={labelCls}>Judul Sesi <span className="text-red-400">*</span></label>
