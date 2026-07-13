@@ -3076,7 +3076,7 @@ export default function KojasmatClient({ orgId, stats, anggota, proyek, pelatiha
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl px-4 pt-6">
+      <div className="mx-auto px-4 pt-6">
         {activeTab === 'dashboard'  && <TabDashboard stats={stats} orgId={orgId} />}
         {activeTab === 'permohonan' && <TabPermohonan orgId={orgId} pendaftaran={pendaftaran} />}
         {activeTab === 'anggota'    && <TabAnggota orgId={orgId} anggota={anggota} />}
