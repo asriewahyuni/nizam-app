@@ -11,11 +11,14 @@ import {
   Clock,
   GraduationCap,
   ShieldCheck,
+  Trophy
 } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getLmsCourseBySlug, getLmsLessonsByCourseId } from '@/modules/edu/actions/lms-commercial.actions'
+import { createClient } from '@/lib/supabase/server'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.server'
+import { MotionWrapper } from '../../MotionWrapper'
 
 export default async function LearningCoursePage(props: { params: Promise<{ courseSlug: string }> }) {
   noStore()
@@ -42,9 +45,33 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
   const canManageAssessment = learningAccess.canReviewAssessments
   const canAccessParticipantAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning') || canManageAssessment
 
+  let progressPercentage = 0
+  let completedCount = 0
+  if (orgData.user) {
+    const supabase = await createClient()
+    const { data: enrollment } = await supabase
+      .from('learning_enrollments')
+      .select('id')
+      .eq('course_id', course.id)
+      .eq('user_id', orgData.user.id)
+      .single()
+
+    if (enrollment && lessons.length > 0) {
+      const { count } = await supabase
+        .from('learning_lesson_progress')
+        .select('*', { count: 'exact', head: true })
+        .eq('enrollment_id', enrollment.id)
+        .eq('status', 'COMPLETED')
+      
+      completedCount = count || 0
+      progressPercentage = Math.round((completedCount / lessons.length) * 100)
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+    <MotionWrapper>
+      <div className="space-y-6">
+        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
         <Link
           href={track ? `/lms/track/${track.slug}` : '/lms'}
           className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900"
@@ -82,13 +109,30 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
             </div>
 
             {course.is_active && lessons[0] ? (
-              <Link
-                href={`/lms/course/${course.slug}/lesson/${lessons[0].slug}`}
-                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
-              >
-                Mulai Lesson 1
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+              <div className="mt-8 flex flex-col sm:flex-row gap-4 sm:items-center">
+                <Link
+                  href={`/lms/course/${course.slug}/lesson/${lessons[0].slug}`}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
+                >
+                  {progressPercentage > 0 ? 'Lanjutkan Belajar' : 'Mulai Lesson 1'}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+
+                {progressPercentage > 0 && (
+                  <div className="flex-1 max-w-sm ml-0 sm:ml-4">
+                    <div className="flex items-center justify-between mb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                      <span>Progres Anda</span>
+                      <span className={progressPercentage === 100 ? 'text-emerald-600' : ''}>{progressPercentage}%</span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 ${progressPercentage === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                        style={{ width: `${progressPercentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-4 text-sm font-bold text-slate-500">
                 Course ini belum dibuka untuk peserta.
@@ -222,5 +266,6 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
         </div>
       </section>
     </div>
+    </MotionWrapper>
   )
 }

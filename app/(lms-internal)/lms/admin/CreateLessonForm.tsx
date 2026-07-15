@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { createLmsLesson, uploadLmsMediaAction } from '@/modules/edu/actions/lms-commercial.actions'
 import { BookOpen, FileText, Upload, Loader2 } from 'lucide-react'
-import MarkdownEditor from './MarkdownEditor'
+import { WysiwygEditor } from '../WysiwygEditor'
 
 const inputCls = 'w-full rounded-md border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-colors focus:border-indigo-600 focus:ring-0 hover:border-slate-300'
 const labelCls = 'block text-sm font-bold text-slate-900 mb-1.5'
@@ -15,12 +15,14 @@ export default function CreateLessonForm({ courseId }: { courseId: string }) {
   const [videoUrl, setVideoUrl] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [contentHtml, setContentHtml] = useState('')
 
   useEffect(() => {
     if (state?.success) {
       formRef.current?.reset()
       setLessonType('TEXT')
       setVideoUrl('')
+      setContentHtml('')
     }
   }, [state])
 
@@ -126,8 +128,12 @@ export default function CreateLessonForm({ courseId }: { courseId: string }) {
       )}
 
       <div>
-        <label className={labelCls}>Isi Materi (Markdown)</label>
-        <MarkdownEditor name="contentMd" />
+        <label className={labelCls}>Isi Materi</label>
+        <input type="hidden" name="contentMd" value={contentHtml} />
+        <WysiwygEditor 
+          value={contentHtml} 
+          onChange={setContentHtml} 
+        />
       </div>
 
       <button

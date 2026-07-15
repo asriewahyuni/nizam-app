@@ -784,3 +784,76 @@ export async function uploadLmsMediaAction(_prevState: unknown, formData: FormDa
     return { error: getErrorMessage(err) }
   }
 }
+
+export async function swapLmsLessonOrderAction(
+  courseId: string,
+  lessonId1: string,
+  order1: number,
+  lessonId2: string,
+  order2: number
+) {
+  try {
+    const orgData = await assertOrgAdmin()
+    const supabase = await createClient()
+
+    // Lakukan update secara paralel (atau satu per satu)
+    await Promise.all([
+      supabase.from('learning_lessons').update({ sort_order: order2 }).eq('id', lessonId1).eq('course_id', courseId).eq('org_id', orgData.org.id),
+      supabase.from('learning_lessons').update({ sort_order: order1 }).eq('id', lessonId2).eq('course_id', courseId).eq('org_id', orgData.org.id)
+    ])
+
+    revalidatePath('/lms/admin/course/[courseSlug]')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
+}
+
+export async function markLessonCompleteAction(lessonId: string) {
+  try {
+    const orgData = await getActiveOrg()
+    if (!orgData) return { error: 'Unauthorized' }
+    
+    const user = orgData.user
+    if (!user) return { error: 'Not logged in' }
+
+    const supabase = await createClient()
+
+    // 1. Get lesson and course
+    const { data: lesson } = await supabase
+      .from('learning_lessons')
+      .select('course_id')
+      .eq('id', lessonId)
+      .single()
+      
+    if (!lesson) return { error: 'Lesson not found' }
+
+    // 2. Find enrollment
+    const { data: enrollment } = await supabase
+      .from('learning_enrollments')
+      .select('id')
+      .eq('course_id', lesson.course_id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!enrollment) return { error: 'Not enrolled' }
+
+    // 3. Insert or update progress
+    await supabase.from('learning_lesson_progress').upsert({
+      enrollment_id: enrollment.id,
+      lesson_id: lessonId,
+      status: 'COMPLETED',
+      completed_at: new Date().toISOString()
+    }, {
+      onConflict: 'enrollment_id,lesson_id'
+    })
+
+    // Revalidate
+    revalidatePath('/lms/course/[courseSlug]')
+    revalidatePath('/lms/course/[courseSlug]/lesson/[lessonSlug]')
+    
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
+}

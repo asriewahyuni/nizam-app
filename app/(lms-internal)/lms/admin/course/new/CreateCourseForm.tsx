@@ -3,7 +3,8 @@
 import { useActionState, useEffect } from 'react'
 import { createLmsCourse } from '@/modules/edu/actions/lms-commercial.actions'
 import { useRouter } from 'next/navigation'
-import MarkdownEditor from '../../MarkdownEditor'
+import { WysiwygEditor } from '../../../WysiwygEditor'
+import { useState } from 'react'
 
 const inputCls = 'w-full rounded-md border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-colors focus:border-indigo-600 focus:ring-0 hover:border-slate-300'
 const labelCls = 'block text-sm font-bold text-slate-900 mb-1.5'
@@ -11,6 +12,7 @@ const labelCls = 'block text-sm font-bold text-slate-900 mb-1.5'
 export default function CreateCourseForm() {
   const router = useRouter()
   const [state, action, isPending] = useActionState(createLmsCourse, {})
+  const [descriptionHtml, setDescriptionHtml] = useState('')
 
   useEffect(() => {
     if (state?.success) {
@@ -39,7 +41,12 @@ export default function CreateCourseForm() {
 
       <div>
         <label className={labelCls}>Deskripsi</label>
-        <MarkdownEditor name="description" />
+        <input type="hidden" name="description" value={descriptionHtml} />
+        <WysiwygEditor 
+          value={descriptionHtml} 
+          onChange={setDescriptionHtml} 
+          minHeight="150px"
+        />
       </div>
 
       <div>

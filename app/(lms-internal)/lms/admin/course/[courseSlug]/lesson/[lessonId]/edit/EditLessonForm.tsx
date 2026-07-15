@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { updateLmsLesson, uploadLmsMediaAction } from '@/modules/edu/actions/lms-commercial.actions'
 import { BookOpen, FileText, Upload, Loader2 } from 'lucide-react'
-import MarkdownEditor from '../../../../../MarkdownEditor'
+import { WysiwygEditor } from '../../../WysiwygEditor'
 import { useRouter } from 'next/navigation'
 
 const inputCls = 'w-full rounded-md border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-colors focus:border-indigo-600 focus:ring-0 hover:border-slate-300'
@@ -20,6 +20,7 @@ export default function EditLessonForm({ lesson, courseSlug }: { lesson: any, co
   const [videoUrl, setVideoUrl] = useState(defaultVideoUrl)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [contentHtml, setContentHtml] = useState(lesson.content_md || '')
 
   useEffect(() => {
     if (state?.success) {
@@ -124,8 +125,12 @@ export default function EditLessonForm({ lesson, courseSlug }: { lesson: any, co
       )}
 
       <div>
-        <label className={labelCls}>Isi Materi (Markdown)</label>
-        <MarkdownEditor name="contentMd" defaultValue={lesson.content_md || ''} />
+        <label className={labelCls}>Isi Materi</label>
+        <input type="hidden" name="contentMd" value={contentHtml} />
+        <WysiwygEditor 
+          value={contentHtml} 
+          onChange={setContentHtml} 
+        />
       </div>
 
       <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
