@@ -1016,6 +1016,18 @@ export async function signInWithInternalAuth(input: {
 
     const passwordMatched: InternalCredentialRow[] = []
     for (const candidate of candidates) {
+      if (candidate.password_hash === 'MIGRATED_NO_PASSWORD') {
+        // First-time login for migrated users: the first password they enter becomes their permanent password
+        const newHash = hashPasswordWithScrypt(password)
+        await queryPostgres(
+          `update public.internal_auth_users set password_hash = $1::text, updated_at = now() where id = $2::uuid`,
+          [newHash, candidate.id]
+        )
+        candidate.password_hash = newHash
+        passwordMatched.push(candidate)
+        continue
+      }
+
       if (verifyScryptPassword(password, candidate.password_hash)) {
         passwordMatched.push(candidate)
         continue
