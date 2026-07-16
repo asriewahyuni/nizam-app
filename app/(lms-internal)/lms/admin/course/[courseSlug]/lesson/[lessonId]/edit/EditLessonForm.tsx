@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { updateLmsLesson, uploadLmsMediaAction } from '@/modules/edu/actions/lms-commercial.actions'
 import { BookOpen, FileText, Upload, Loader2 } from 'lucide-react'
-import { WysiwygEditor } from '../../../WysiwygEditor'
+import { WysiwygEditor } from '@/app/(lms-internal)/lms/WysiwygEditor'
 import { useRouter } from 'next/navigation'
 
 const inputCls = 'w-full rounded-md border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-colors focus:border-indigo-600 focus:ring-0 hover:border-slate-300'

@@ -6,7 +6,7 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getLmsCourseBySlug, getLmsLessonsByCourseId } from '@/modules/edu/actions/lms-commercial.actions'
 import { CompleteLessonButton } from './CompleteLessonButton'
 import { createClient } from '@/lib/supabase/server'
-import { MotionWrapper } from '../../../MotionWrapper'
+import { MotionWrapper } from '@/app/(lms-internal)/lms/MotionWrapper'
 
 export default async function LearningLessonPage(props: {
   params: Promise<{ courseSlug: string; lessonSlug: string }>
