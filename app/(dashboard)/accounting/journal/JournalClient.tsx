@@ -110,7 +110,7 @@ export default function JournalClient({
     DRAFT: initialLoadedCounts.DRAFT >= JOURNAL_PAGE_SIZE,
   }))
   
-  const isOwner = userRole === 'owner'
+  const isOwner = userRole === 'owner' || userRole === 'admin'
 
   const getPurchaseTransparency = (entry: any): PurchaseTransparencySummary | null => {
     if (!entry || typeof entry !== 'object') return null
