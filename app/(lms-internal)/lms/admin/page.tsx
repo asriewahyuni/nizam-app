@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getLmsCourses, getLmsBatches } from '@/modules/edu/actions/lms-commercial.actions'
+import { queryPostgres } from '@/lib/db/postgres'
 
 export const metadata = {
   title: 'Katalog Kursus — Nizam LMS Admin',
@@ -13,6 +14,16 @@ export default async function CatalogAdminPage() {
 
   const courses = await getLmsCourses(orgData.org.id)
   const allBatches = await getLmsBatches(orgData.org.id)
+  
+  // Get lesson counts
+  const { rows: lessonCounts } = await queryPostgres(`
+    SELECT course_id, COUNT(*) as count 
+    FROM learning_lessons 
+    WHERE org_id = $1 
+    GROUP BY course_id
+  `, [orgData.org.id])
+  
+  const lessonMap = new Map<string, number>(lessonCounts.map((r: any) => [r.course_id, Number(r.count)]))
 
   const activeCoursesCount = courses.filter((c: any) => c.is_active).length
 
@@ -38,98 +49,86 @@ export default async function CatalogAdminPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4">
-        {courses.map((c: any) => {
-          const category = 'Program'
-          const level_code = c.level_code || 'ALL'
-          const duration_hours = 0
-          
-          const courseBatches = allBatches.filter((b: any) => b.course_id === c.id)
-          const nBatches = courseBatches.length
-          const enrolled = courseBatches.reduce((a: number, b: any) => a + (Number(b.enrolled_count) || 0), 0)
-          
-          return (
-            <div
-              key={c.id}
-              className="group flex flex-col md:flex-row overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
-            >
-              {/* Thumbnail Area */}
-              <div
-                className="relative h-48 md:h-auto md:w-64 shrink-0"
-                style={{
-                  background: `linear-gradient(135deg, hsl(231 90% 60%), hsl(240 60% 40%))`,
-                }}
-              >
-                <div className="absolute top-3 right-3 flex gap-1.5 md:hidden">
-                  <span
-                    className={
-                      'rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider ring-1 ring-inset ' +
-                      (c.is_active
-                        ? 'bg-emerald-100 text-emerald-700 ring-emerald-600/20'
-                        : 'bg-white/90 text-slate-800 ring-slate-900/10')
-                    }
-                  >
-                    {c.is_active ? 'Live' : 'Draft'}
-                  </span>
-                </div>
-              </div>
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-x-auto">
+        <table className="w-full text-left text-sm text-slate-600">
+          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+            <tr>
+              <th className="whitespace-nowrap px-6 py-4 font-bold">ID</th>
+              <th className="px-6 py-4 font-bold">Judul</th>
+              <th className="whitespace-nowrap px-6 py-4 font-bold text-center">Chapter</th>
+              <th className="whitespace-nowrap px-6 py-4 font-bold text-center">Lesson</th>
+              <th className="px-6 py-4 font-bold">Produk Terkait</th>
+              <th className="whitespace-nowrap px-6 py-4 font-bold text-center">Partisipan</th>
+              <th className="whitespace-nowrap px-6 py-4 font-bold text-center">Status</th>
+              <th className="whitespace-nowrap px-6 py-4 font-bold text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {courses.map((c: any) => {
+              const courseBatches = allBatches.filter((b: any) => b.course_id === c.id)
+              const enrolled = courseBatches.reduce((a: number, b: any) => a + (Number(b.enrolled_count) || 0), 0)
+              const relatedProducts = courseBatches.map((b: any) => b.name).join(', ') || '-'
+              const lessonCount = lessonMap.get(c.id) || 0
+              
+              // We'll approximate chapter count as 1 if there are lessons, or 0.
+              // If you have a real sections table later, you can map it here.
+              const chapterCount = lessonCount > 0 ? 1 : 0
+              const shortId = c.id.split('-')[0].toUpperCase()
 
-              {/* Content Area */}
-              <div className="flex flex-1 flex-col p-5 md:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600">
-                      <span>{category}</span>
-                      <span className="text-slate-300">&bull;</span>
-                      <span>{level_code}</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">{c.title}</h3>
-                    <p className="mt-1 line-clamp-2 text-sm text-slate-500">
-                      {c.description || 'Tidak ada deskripsi singkat untuk program ini.'}
-                    </p>
-                  </div>
-                  
-                  <div className="hidden md:block">
+              return (
+                <tr key={c.id} className="transition-colors hover:bg-slate-50/80">
+                  <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">
+                    {shortId}
+                  </td>
+                  <td className="px-6 py-4">
+                    <Link href={`/lms/admin/course/${c.slug}`} className="font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
+                      {c.title}
+                    </Link>
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4 text-center font-medium">
+                    {chapterCount}
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4 text-center font-medium">
+                    {lessonCount}
+                  </td>
+                  <td className="px-6 py-4 text-xs">
+                    {relatedProducts}
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4 text-center font-medium text-slate-900">
+                    {enrolled}
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4 text-center">
                     <span
-                      className={
-                        'inline-flex items-center rounded-md px-2.5 py-1 text-xs font-bold uppercase tracking-wider ring-1 ring-inset ' +
-                        (c.is_active
+                      className={`inline-flex items-center rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ring-1 ring-inset ${
+                        c.is_active
                           ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
-                          : 'bg-slate-50 text-slate-600 ring-slate-500/20')
-                      }
+                          : 'bg-slate-50 text-slate-600 ring-slate-500/20'
+                      }`}
                     >
-                      {c.is_active ? 'Live' : 'Draft'}
+                      {c.is_active ? 'Publish' : 'Draft'}
                     </span>
-                  </div>
-                </div>
-
-                <div className="mt-auto pt-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-t border-slate-100">
-                  <div className="flex items-center gap-6 text-sm text-slate-600">
-                    <div>
-                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Batches</div>
-                      <div className="font-bold text-slate-900">{nBatches}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Peserta</div>
-                      <div className="font-bold text-slate-900">{enrolled}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Durasi</div>
-                      <div className="font-bold text-slate-900">{duration_hours} <span className="text-xs font-normal text-slate-500">jam</span></div>
-                    </div>
-                  </div>
-                  
-                  <Link
-                    href={`/lms/admin/course/${c.slug}`}
-                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:border-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                  >
-                    Kelola Program
-                  </Link>
-                </div>
-              </div>
-            </div>
-          )
-        })}
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4 text-right">
+                    <Link
+                      href={`/lms/admin/course/${c.slug}`}
+                      className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-all hover:border-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none"
+                    >
+                      Kelola
+                    </Link>
+                  </td>
+                </tr>
+              )
+            })}
+            
+            {courses.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center text-sm text-slate-500">
+                  Belum ada program pelatihan yang ditambahkan.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </>
   )
