@@ -1311,17 +1311,17 @@ export async function getBalanceSheet(
   }
 
   const assets = accounts
-    .filter((a: any) => a.type === 'ASSET' || String(a.code || '').startsWith('1'))
+    .filter((a: any) => (a.type ? a.type === 'ASSET' : String(a.code || '').startsWith('1')))
     .map((a: any) => mapBalance(a, 'DEBIT'))
     .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
   const liabilities = accounts
-    .filter((a: any) => a.type === 'LIABILITY' || String(a.code || '').startsWith('2'))
+    .filter((a: any) => (a.type ? a.type === 'LIABILITY' : String(a.code || '').startsWith('2')))
     .map((a: any) => mapBalance(a, 'CREDIT'))
     .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
   const equity = accounts
-    .filter((a: any) => a.type === 'EQUITY' || String(a.code || '').startsWith('3'))
+    .filter((a: any) => (a.type ? a.type === 'EQUITY' : String(a.code || '').startsWith('3')))
     .map((a: any) => mapBalance(a, 'CREDIT'))
     .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
