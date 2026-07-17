@@ -888,6 +888,23 @@ async function syncSyirkahProfitSharingJournalInPlace(
     return { error: 'Gagal memperbarui baris kredit jurnal bagi hasil: ' + creditLineError.message }
   }
 
+  // Anti-silo: bank_transactions yang tertaut ke jurnal ini (dibuat saat jurnal pertama kali
+  // dibuat) ikut disinkronkan nominal/tanggalnya, supaya "Mutasi Detail" di Kas & Bank tidak
+  // menampilkan nominal lama saat jurnal periode yang sama diperbarui (mis. alokasi diedit).
+  try {
+    await (supabase as any)
+      .from('bank_transactions')
+      .update({
+        transaction_date: params.entryDate,
+        description: params.description,
+        amount: params.amount,
+      })
+      .eq('journal_entry_id', params.journal.id)
+      .eq('org_id', params.orgId)
+  } catch {
+    // bank_transactions sinkron tidak wajib; jurnal (sumber kebenaran utama) sudah benar
+  }
+
   if (journalStatus === 'DRAFT') {
     const postResult = await postJournalEntry(params.journal.id, params.orgId, { skipRevalidate: true })
     if ((postResult as any).error) {
