@@ -897,7 +897,7 @@ export async function getBankAccountCategoryBreakdown(
      LEFT JOIN accounts cat ON cat.id = bt.category_id
      WHERE bt.org_id = $1
        AND ($2::uuid IS NULL OR bt.branch_id = $2)
-       AND bt.status = 'POSTED'
+       AND bt.status IN ('POSTED', 'RECONCILED')
        AND bt.type IN ('IN', 'OUT')
        AND to_char(bt.transaction_date, 'YYYY-MM') = $3
      GROUP BY bt.bank_account_id, bt.type, cat.id, cat.code, cat.name`,
