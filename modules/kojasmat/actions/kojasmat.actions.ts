@@ -283,6 +283,69 @@ export async function getMutasiByAnggota(anggotaId: string): Promise<KojasmatSim
   return rows as KojasmatSimpananMutasi[]
 }
 
+// Inti logika mutasi simpanan — dipakai oleh aksi staf (catatSimpananMutasi) maupun
+// alur otomatis (aktivasi anggota baru setelah test+bayar), tanpa cek sesi staf.
+export async function postSimpananMutasi(payload: {
+  org_id: string
+  anggota_id: string
+  jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA'
+  jenis_mutasi: 'SETOR' | 'TARIK' | 'KOREKSI'
+  jumlah: number
+  keterangan?: string
+  tanggal?: string
+  created_by?: string | null
+}) {
+  const { rows: [simpanan] } = await queryPostgres(
+    `SELECT * FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis=$2`,
+    [payload.anggota_id, payload.jenis_simpanan]
+  )
+  if (!simpanan) return { error: 'Rekening simpanan tidak ditemukan' }
+
+  if (payload.jenis_mutasi === 'TARIK' && Number(simpanan.saldo) < payload.jumlah) {
+    return { error: 'Saldo tidak mencukupi' }
+  }
+
+  const sebelum = Number(simpanan.saldo)
+  const sesudah = payload.jenis_mutasi === 'TARIK'
+    ? sebelum - payload.jumlah
+    : sebelum + payload.jumlah
+
+  await queryPostgres(
+    `UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`,
+    [simpanan.id, sesudah]
+  )
+  await queryPostgres(
+    `INSERT INTO kojasmat_simpanan_mutasi
+       (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, tanggal, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [
+      payload.org_id, simpanan.id, payload.anggota_id,
+      payload.jenis_mutasi, payload.jumlah,
+      sebelum, sesudah,
+      payload.keterangan ?? null,
+      payload.tanggal ?? new Date().toISOString().split('T')[0],
+      payload.created_by ?? null,
+    ]
+  )
+
+  try {
+    if (payload.jenis_mutasi === 'SETOR') {
+      await jurnalSetorSimpanan(
+        payload.org_id, payload.jenis_simpanan, payload.jumlah,
+        String(simpanan.id), payload.keterangan,
+      )
+    } else if (payload.jenis_mutasi === 'TARIK') {
+      await jurnalTarikSimpanan(
+        payload.org_id, payload.jenis_simpanan, payload.jumlah,
+        String(simpanan.id), payload.keterangan,
+      )
+    }
+  } catch (_) { /* jurnal non-fatal — transaksi simpanan tetap tercatat */ }
+
+  revalidatePath('/kojasmat')
+  return { data: { saldo: sesudah } }
+}
+
 export async function catatSimpananMutasi(payload: {
   org_id: string
   anggota_id: string
@@ -296,55 +359,7 @@ export async function catatSimpananMutasi(payload: {
     const session = await getInternalAuthSession()
     if (!session) return { error: 'Tidak terautentikasi' }
 
-    const { rows: [simpanan] } = await queryPostgres(
-      `SELECT * FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis=$2`,
-      [payload.anggota_id, payload.jenis_simpanan]
-    )
-    if (!simpanan) return { error: 'Rekening simpanan tidak ditemukan' }
-
-    if (payload.jenis_mutasi === 'TARIK' && Number(simpanan.saldo) < payload.jumlah) {
-      return { error: 'Saldo tidak mencukupi' }
-    }
-
-    const sebelum = Number(simpanan.saldo)
-    const sesudah = payload.jenis_mutasi === 'TARIK'
-      ? sebelum - payload.jumlah
-      : sebelum + payload.jumlah
-
-    await queryPostgres(
-      `UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`,
-      [simpanan.id, sesudah]
-    )
-    await queryPostgres(
-      `INSERT INTO kojasmat_simpanan_mutasi
-         (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, tanggal, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [
-        payload.org_id, simpanan.id, payload.anggota_id,
-        payload.jenis_mutasi, payload.jumlah,
-        sebelum, sesudah,
-        payload.keterangan ?? null,
-        payload.tanggal ?? new Date().toISOString().split('T')[0],
-        getInternalUserId(session),
-      ]
-    )
-
-    try {
-      if (payload.jenis_mutasi === 'SETOR') {
-        await jurnalSetorSimpanan(
-          payload.org_id, payload.jenis_simpanan, payload.jumlah,
-          String(simpanan.id), payload.keterangan,
-        )
-      } else if (payload.jenis_mutasi === 'TARIK') {
-        await jurnalTarikSimpanan(
-          payload.org_id, payload.jenis_simpanan, payload.jumlah,
-          String(simpanan.id), payload.keterangan,
-        )
-      }
-    } catch (_) { /* jurnal non-fatal — transaksi simpanan tetap tercatat */ }
-
-    revalidatePath('/kojasmat')
-    return { data: { saldo: sesudah } }
+    return await postSimpananMutasi({ ...payload, created_by: getInternalUserId(session) })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Terjadi kesalahan server'
     return { error: msg }

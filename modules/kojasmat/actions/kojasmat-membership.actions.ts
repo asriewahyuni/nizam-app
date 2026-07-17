@@ -5,6 +5,8 @@
 import { queryPostgres } from '@/lib/db/postgres'
 import { getInternalAuthSession, createInternalAuthUser } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
+import { postSimpananMutasi } from './kojasmat.actions'
+import { jurnalPendapatanBiayaAdmin } from '@/lib/erp-bridge/kojasmat-journals'
 
 function generateTempPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -140,7 +142,7 @@ export async function buatPendaftaran(payload: {
       if ('error' in authResult) {
         return { error: authResult.error }
       }
-      authUserId = (authResult as { id: string }).id ?? null
+      authUserId = authResult.internalUserId ?? null
     }
 
     const { rows } = await queryPostgres(
@@ -162,6 +164,117 @@ export async function buatPendaftaran(payload: {
   }
 }
 
+// Inti pembuatan anggota dari pendaftaran — dipakai baik oleh staf yang approve manual
+// (status awal CALON) maupun alur otomatis test+bayar (status langsung AKTIF).
+async function createAnggotaFromPendaftaran(
+  pend: KojasmatPendaftaran & { simpanan_pokok_dibayar?: number | null; biaya_admin_dibayar?: number | null },
+  opts: { status: 'CALON' | 'AKTIF'; reviewedBy?: string | null }
+) {
+  // Buat nomor anggota baru
+  const { rows: lastRow } = await queryPostgres(
+    `SELECT kode_anggota FROM kojasmat_anggota WHERE org_id=$1 ORDER BY created_at DESC LIMIT 1`,
+    [pend.org_id]
+  )
+  let nextNum = 1
+  if (lastRow[0]) {
+    const m = String(lastRow[0].kode_anggota).match(/\d+$/)
+    if (m) nextNum = parseInt(m[0]) + 1
+  }
+  const kode = `KJM-${String(nextNum).padStart(3, '0')}`
+  const isAktif = opts.status === 'AKTIF'
+
+  // Buat anggota baru
+  const { rows: [anggota] } = await queryPostgres(
+    `INSERT INTO kojasmat_anggota
+       (org_id, kode_anggota, nama, nik, email, phone, alamat, pekerjaan, status, is_verified, user_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     RETURNING id`,
+    [
+      pend.org_id, kode, pend.nama_lengkap,
+      pend.nik, pend.email, pend.phone,
+      pend.alamat, pend.pekerjaan,
+      opts.status, isAktif, pend.user_id ?? null,
+    ]
+  )
+
+  // Buat 3 rekening simpanan
+  await queryPostgres(
+    `INSERT INTO kojasmat_simpanan (org_id, anggota_id, jenis)
+     VALUES ($1,$2,'POKOK'),($1,$2,'WAJIB'),($1,$2,'SUKARELA')`,
+    [pend.org_id, anggota.id]
+  )
+
+  // Pindahkan dokumen pendaftaran ke referensi anggota
+  await queryPostgres(
+    `UPDATE kojasmat_dokumen
+     SET referensi_type='ANGGOTA', referensi_id=$2, status='DITERIMA'
+     WHERE referensi_type='PENDAFTARAN' AND referensi_id=$1`,
+    [pend.id, anggota.id]
+  )
+
+  // Login: pakai akun yang sudah dibuat saat buatPendaftaran (pend.user_id) kalau ada;
+  // hanya generate akun baru untuk pendaftaran lama yang belum sempat membuat akun di step Data.
+  let tempPassword: string | null = null
+  let loginIdentifier: string | null = pend.user_id ? (pend.email ?? pend.nik ?? null) : null
+  if (!pend.user_id && (pend.email || pend.nik)) {
+    tempPassword = generateTempPassword()
+    const userResult = await createInternalAuthUser({
+      email: pend.email ?? null,
+      nik: pend.nik ?? null,
+      password: tempPassword,
+      fullName: pend.nama_lengkap,
+      userType: 'member',
+    })
+    if ('error' in userResult) {
+      // Akun mungkin sudah ada — lanjutkan tanpa error fatal
+      tempPassword = null
+    } else {
+      await queryPostgres(
+        `UPDATE kojasmat_anggota SET user_id=$2 WHERE id=$1`,
+        [anggota.id, userResult.internalUserId]
+      )
+      loginIdentifier = pend.email ?? pend.nik ?? null
+    }
+  }
+
+  // Setoran awal — hanya untuk aktivasi otomatis (test+bayar), supaya tercatat di jurnal
+  if (isAktif) {
+    const nominalPokok = Number(pend.simpanan_pokok_dibayar || 0)
+    const nominalAdmin = Number(pend.biaya_admin_dibayar || 0)
+    if (nominalPokok > 0) {
+      await postSimpananMutasi({
+        org_id: pend.org_id,
+        anggota_id: anggota.id,
+        jenis_simpanan: 'POKOK',
+        jenis_mutasi: 'SETOR',
+        jumlah: nominalPokok,
+        keterangan: 'Setoran simpanan pokok — pendaftaran anggota baru',
+        created_by: pend.user_id ?? null,
+      })
+    }
+    if (nominalAdmin > 0) {
+      await jurnalPendapatanBiayaAdmin(pend.org_id, nominalAdmin, pend.id)
+    }
+  }
+
+  // Update pendaftaran
+  await queryPostgres(
+    `UPDATE kojasmat_pendaftaran
+     SET status='DISETUJUI', anggota_id=$2, ditinjau_oleh=$3, ditinjau_at=NOW(), updated_at=NOW()
+     WHERE id=$1`,
+    [pend.id, anggota.id, opts.reviewedBy ?? null]
+  )
+
+  revalidatePath('/kojasmat')
+  return {
+    anggota_id: anggota.id,
+    kode_anggota: kode,
+    temp_password: tempPassword,
+    login_identifier: loginIdentifier,
+    status: opts.status,
+  }
+}
+
 export async function setujuiPendaftaran(pendaftaranId: string) {
   try {
     const session = await getInternalAuthSession()
@@ -176,90 +289,46 @@ export async function setujuiPendaftaran(pendaftaranId: string) {
       return { error: 'Pendaftaran sudah diproses' }
     }
 
-    // Buat nomor anggota baru
-    const { rows: lastRow } = await queryPostgres(
-      `SELECT kode_anggota FROM kojasmat_anggota WHERE org_id=$1 ORDER BY created_at DESC LIMIT 1`,
-      [pend.org_id]
-    )
-    let nextNum = 1
-    if (lastRow[0]) {
-      const m = String(lastRow[0].kode_anggota).match(/\d+$/)
-      if (m) nextNum = parseInt(m[0]) + 1
-    }
-    const kode = `KJM-${String(nextNum).padStart(3, '0')}`
-
-    // Buat anggota baru
-    const { rows: [anggota] } = await queryPostgres(
-      `INSERT INTO kojasmat_anggota
-         (org_id, kode_anggota, nama, nik, email, phone, alamat, pekerjaan, status, is_verified)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'CALON',FALSE)
-       RETURNING id`,
-      [
-        pend.org_id, kode, pend.nama_lengkap,
-        pend.nik, pend.email, pend.phone,
-        pend.alamat, pend.pekerjaan,
-      ]
-    )
-
-    // Buat 3 rekening simpanan
-    await queryPostgres(
-      `INSERT INTO kojasmat_simpanan (org_id, anggota_id, jenis)
-       VALUES ($1,$2,'POKOK'),($1,$2,'WAJIB'),($1,$2,'SUKARELA')`,
-      [pend.org_id, anggota.id]
-    )
-
-    // Pindahkan dokumen pendaftaran ke referensi anggota
-    await queryPostgres(
-      `UPDATE kojasmat_dokumen
-       SET referensi_type='ANGGOTA', referensi_id=$2, status='DITERIMA'
-       WHERE referensi_type='PENDAFTARAN' AND referensi_id=$1`,
-      [pendaftaranId, anggota.id]
-    )
-
-    // Buat akun login untuk anggota baru
-    let tempPassword: string | null = null
-    let loginIdentifier: string | null = null
-    if (pend.email || pend.nik) {
-      tempPassword = generateTempPassword()
-      const userResult = await createInternalAuthUser({
-        email: pend.email ?? null,
-        nik: pend.nik ?? null,
-        password: tempPassword,
-        fullName: pend.nama_lengkap,
-        userType: 'member',
-      })
-      if ('error' in userResult) {
-        // Akun mungkin sudah ada — lanjutkan tanpa error fatal
-        tempPassword = null
-      } else if ('data' in userResult && userResult.data) {
-        const authUserId = (userResult.data as { id: string }).id
-        await queryPostgres(
-          `UPDATE kojasmat_anggota SET user_id=$2 WHERE id=$1`,
-          [anggota.id, authUserId]
-        )
-        loginIdentifier = pend.email ?? pend.nik ?? null
-      }
-    }
-
-    // Update pendaftaran
-    await queryPostgres(
-      `UPDATE kojasmat_pendaftaran
-       SET status='DISETUJUI', anggota_id=$2, ditinjau_oleh=$3, ditinjau_at=NOW(), updated_at=NOW()
-       WHERE id=$1`,
-      [pendaftaranId, anggota.id, getInternalUserId(session)]
-    )
-
-    revalidatePath('/kojasmat')
-    return {
-      data: {
-        anggota_id: anggota.id,
-        kode_anggota: kode,
-        temp_password: tempPassword,
-        login_identifier: loginIdentifier,
-      }
-    }
+    const data = await createAnggotaFromPendaftaran(pend as KojasmatPendaftaran, {
+      status: 'CALON',
+      reviewedBy: getInternalUserId(session),
+    })
+    return { data }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Gagal menyetujui pendaftaran' }
+  }
+}
+
+// Dipanggil otomatis setelah calon anggota menyelesaikan pembayaran di wizard publik —
+// mengaktifkan langsung (status AKTIF) kalau test masuk terakhir sudah LULUS.
+// Tidak butuh auth staf karena ini bagian dari alur self-service publik.
+export async function cobaAktivasiOtomatis(pendaftaranId: string) {
+  try {
+    const { rows: [pend] } = await queryPostgres(
+      `SELECT * FROM kojasmat_pendaftaran WHERE id = $1`,
+      [pendaftaranId]
+    )
+    if (!pend) return { error: 'Pendaftaran tidak ditemukan' }
+    if (pend.status !== 'MENUNGGU' && pend.status !== 'DIREVISI') {
+      return { error: 'Pendaftaran sudah diproses', already_processed: true }
+    }
+    if (pend.status_bayar !== 'SUDAH') {
+      return { error: 'Pembayaran belum lengkap', activated: false }
+    }
+
+    const { rows: [latestTest] } = await queryPostgres(
+      `SELECT status FROM kojasmat_test_masuk
+       WHERE pendaftaran_id=$1 ORDER BY created_at DESC LIMIT 1`,
+      [pendaftaranId]
+    )
+    if (!latestTest || latestTest.status !== 'LULUS') {
+      return { error: 'Test masuk belum lulus', activated: false }
+    }
+
+    const data = await createAnggotaFromPendaftaran(pend as KojasmatPendaftaran, { status: 'AKTIF', reviewedBy: null })
+    return { data: { ...data, activated: true } }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Gagal mengaktifkan anggota' }
   }
 }
 

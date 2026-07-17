@@ -103,7 +103,9 @@ function Sheet({ open, onClose, title, children }: {
 
 // ─── TAB: BERANDA ─────────────────────────────────────────────────────────────
 
-function TabBeranda({ anggota, simpanan, proyekDiajukan, pembiayaan, penawaran, pelatihan, orgNama }: Props) {
+function TabBeranda({
+  anggota, simpanan, proyekDiajukan, proyekTersedia, pembiayaan, penawaran, pelatihan, orgNama, onLihatSemuaProyek,
+}: Props & { onLihatSemuaProyek: () => void }) {
   const totalSimpanan = simpanan.reduce((s, x) => s + Number(x.saldo), 0)
   const proyekAktif = proyekDiajukan.filter(p => p.status === 'BERJALAN')
   const penawaranBaru = penawaran.filter(p => p.status === 'TERKIRIM').length
@@ -208,6 +210,43 @@ function TabBeranda({ anggota, simpanan, proyekDiajukan, pembiayaan, penawaran, 
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Proyek Tersedia untuk Didanai */}
+      {proyekTersedia.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Proyek Tersedia</p>
+            <button onClick={onLihatSemuaProyek}
+              className="text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer">
+              Lihat Semua
+            </button>
+          </div>
+          {proyekTersedia.slice(0, 3).map(p => {
+            const pct = Math.min(100, Number(p.modal_terkumpul) / Number(p.kebutuhan_modal) * 100)
+            return (
+              <button key={p.id} onClick={onLihatSemuaProyek}
+                className="w-full text-left rounded-2xl border border-gray-100 bg-white p-4 shadow-sm hover:border-emerald-200 hover:bg-emerald-50/40 transition-colors cursor-pointer">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm truncate">{p.nama_proyek}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{p.jenis_akad} · {p.kode_proyek}</p>
+                  </div>
+                  <Badge text="Open" cls="bg-cyan-100 text-cyan-700 shrink-0" />
+                </div>
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>Modal terkumpul</span>
+                    <span>{Math.round(pct)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-gray-100">
+                    <div className="h-1.5 rounded-full bg-cyan-500 transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -1765,7 +1804,7 @@ export default function AnggotaPortalClient(props: Props) {
 
       {/* Content */}
       <div className="mx-auto max-w-lg px-4 py-5 pb-28">
-        {activeTab === 'beranda'   && <TabBeranda {...props} />}
+        {activeTab === 'beranda'   && <TabBeranda {...props} onLihatSemuaProyek={() => setActiveTab('investasi')} />}
         {activeTab === 'simpanan'  && <TabSimpanan simpanan={simpanan} />}
         {activeTab === 'proyek'    && <TabProyek anggota={anggota} proyekDiajukan={proyekDiajukan} />}
         {activeTab === 'investasi' && <TabInvestasi anggota={anggota} simpanan={simpanan} proyekTersedia={proyekTersedia} pembiayaan={pembiayaan} />}

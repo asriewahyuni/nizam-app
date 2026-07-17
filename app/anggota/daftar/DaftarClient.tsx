@@ -1,20 +1,24 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import {
   User, Phone, MapPin, Briefcase, FileText, Upload,
-  CheckCircle, ChevronRight, Loader2, X, Eye, EyeOff
+  CheckCircle, ChevronRight, Loader2, X, Eye, EyeOff, ClipboardList, Wallet, XCircle
 } from 'lucide-react'
 import {
   buatPendaftaran,
   simpanDokumenPendaftaran,
   type KojasmatDokumen,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
+import {
+  mulaiTestMasuk, submitTestMasuk, getInfoPembayaran, submitPembayaranPendaftaran,
+} from '@/modules/kojasmat/actions/kojasmat-test.actions'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-type Step = 'data' | 'dokumen' | 'selesai'
+type Step = 'data' | 'dokumen' | 'tes' | 'bayar' | 'selesai'
+const STEPS: Step[] = ['data', 'dokumen', 'tes', 'bayar', 'selesai']
 
 type FormData = {
   nama_lengkap: string
@@ -42,6 +46,29 @@ const JENIS_DOK: { value: KojasmatDokumen['jenis_dokumen']; label: string; wajib
   { value: 'FOTO_USAHA',    label: 'Foto Usaha',         wajib: false },
   { value: 'LAINNYA',        label: 'Dokumen Lain',       wajib: false },
 ]
+
+// ─── PROGRESS INDICATOR ───────────────────────────────────────────────────────
+
+function StepProgress({ step }: { step: Step }) {
+  const idx = STEPS.indexOf(step)
+  return (
+    <div className="flex items-center gap-2 mb-6">
+      {STEPS.map((s, i) => (
+        <div key={s} className="flex items-center flex-1">
+          <div className={cn(
+            'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold shrink-0',
+            step === s ? 'bg-emerald-600 text-white'
+              : i < idx ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-gray-100 text-gray-400'
+          )}>
+            {i + 1}
+          </div>
+          {i < STEPS.length - 1 && <div className={cn('h-0.5 flex-1 mx-1', i < idx ? 'bg-emerald-300' : 'bg-gray-200')} />}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 // ─── UPLOAD HELPER ────────────────────────────────────────────────────────────
 
@@ -172,6 +199,92 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
     setForm(f => ({ ...f, [k]: v }))
   }
 
+  // ── Test masuk ──
+  const [testMasukId, setTestMasukId] = useState<string | null>(null)
+  const [soal, setSoal] = useState<{ id: string; pertanyaan: string; pilihan_a: string; pilihan_b: string; pilihan_c: string; pilihan_d: string }[]>([])
+  const [jawaban, setJawaban] = useState<Record<string, string>>({})
+  const [testResult, setTestResult] = useState<{ skor: number; jumlah_benar: number; total_soal: number; status: 'LULUS' | 'GAGAL'; passing_threshold: number } | null>(null)
+  const [testLoading, setTestLoading] = useState(false)
+
+  function mulaiTest() {
+    if (!pendaftaranId) return
+    setError(null)
+    setTestResult(null)
+    setJawaban({})
+    setTestLoading(true)
+    startTransition(async () => {
+      const res = await mulaiTestMasuk(orgId, pendaftaranId)
+      setTestLoading(false)
+      if (res.error) { setError(res.error); return }
+      setTestMasukId(res.data!.test_masuk_id)
+      setSoal(res.data!.soal)
+    })
+  }
+
+  function submitTest() {
+    if (!testMasukId) return
+    setError(null)
+    startTransition(async () => {
+      const res = await submitTestMasuk(testMasukId, jawaban)
+      if (res.error) { setError(res.error); return }
+      setTestResult(res.data!)
+      if (res.data!.status === 'LULUS') setStep('bayar')
+    })
+  }
+
+  // ── Pembayaran ──
+  const [infoBayar, setInfoBayar] = useState<{ biaya_admin_pendaftaran: number; nominal_simpanan_pokok: number; bank_account: { bank_name: string; account_number: string; account_holder: string } | null } | null>(null)
+  const [buktiFile, setBuktiFile] = useState<{ key: string; name: string; size: number } | null>(null)
+  const [buktiUploading, setBuktiUploading] = useState(false)
+  const [aktivasiResult, setAktivasiResult] = useState<{ activated: boolean; kode_anggota?: string; login_identifier?: string | null } | null>(null)
+
+  function muatInfoBayar() {
+    setError(null)
+    startTransition(async () => {
+      const res = await getInfoPembayaran(orgId)
+      setInfoBayar(res.data!)
+    })
+  }
+
+  async function handleBuktiUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError(null)
+    setBuktiUploading(true)
+    try {
+      const result = await uploadFile(file, orgId)
+      if ('error' in result) { setError(result.error); return }
+      setBuktiFile(result)
+    } finally {
+      setBuktiUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  function submitBayar() {
+    if (!pendaftaranId || !buktiFile || !infoBayar) return
+    setError(null)
+    startTransition(async () => {
+      const res = await submitPembayaranPendaftaran(pendaftaranId, {
+        org_id: orgId,
+        biaya_admin: infoBayar.biaya_admin_pendaftaran,
+        simpanan_pokok: infoBayar.nominal_simpanan_pokok,
+        file_key: buktiFile.key,
+        nama_file: buktiFile.name,
+        file_size: buktiFile.size,
+      })
+      if (res.error) { setError(res.error); return }
+      setAktivasiResult(res.data as typeof aktivasiResult)
+      setStep('selesai')
+    })
+  }
+
+  useEffect(() => {
+    if (step === 'tes' && !testMasukId && !testLoading) mulaiTest()
+    if (step === 'bayar' && !infoBayar) muatInfoBayar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
+
   function handleSubmitData() {
     if (!form.nama_lengkap.trim()) { setError('Nama lengkap wajib diisi'); return }
     if (form.email && !form.password) { setError('Masukkan kata sandi untuk akun Anda'); return }
@@ -214,21 +327,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
           </div>
 
           {/* Progress */}
-          <div className="flex items-center gap-2 mb-6">
-            {(['data', 'dokumen', 'selesai'] as Step[]).map((s, i) => (
-              <div key={s} className="flex items-center flex-1">
-                <div className={cn(
-                  'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold shrink-0',
-                  step === s ? 'bg-emerald-600 text-white'
-                    : i < ['data', 'dokumen', 'selesai'].indexOf(step) ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-gray-100 text-gray-400'
-                )}>
-                  {i + 1}
-                </div>
-                {i < 2 && <div className={cn('h-0.5 flex-1 mx-1', i < ['data','dokumen','selesai'].indexOf(step) ? 'bg-emerald-300' : 'bg-gray-200')} />}
-              </div>
-            ))}
-          </div>
+          <StepProgress step={step} />
 
           <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
             <div>
@@ -365,21 +464,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
           </div>
 
           {/* Progress */}
-          <div className="flex items-center gap-2 mb-6">
-            {(['data', 'dokumen', 'selesai'] as Step[]).map((s, i) => (
-              <div key={s} className="flex items-center flex-1">
-                <div className={cn(
-                  'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold shrink-0',
-                  step === s ? 'bg-emerald-600 text-white'
-                    : i < ['data', 'dokumen', 'selesai'].indexOf(step) ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-gray-100 text-gray-400'
-                )}>
-                  {i + 1}
-                </div>
-                {i < 2 && <div className={cn('h-0.5 flex-1 mx-1', i < ['data','dokumen','selesai'].indexOf(step) ? 'bg-emerald-300' : 'bg-gray-200')} />}
-              </div>
-            ))}
-          </div>
+          <StepProgress step={step} />
 
           <div className="rounded-2xl bg-white p-6 shadow-sm">
             <p className="text-xs text-gray-500 mb-4">
@@ -407,19 +492,192 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                 </p>
               )}
               <button
-                onClick={() => setStep('selesai')}
+                onClick={() => setStep('tes')}
                 disabled={!ktpUploaded}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
               >
-                Selesaikan Pendaftaran <ChevronRight className="h-4 w-4" />
+                Lanjut ke Test Masuk <ChevronRight className="h-4 w-4" />
               </button>
               <button
-                onClick={() => setStep('selesai')}
+                onClick={() => setStep('tes')}
                 className="w-full text-center text-xs text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
               >
                 Lewati dulu, lengkapi nanti
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Step: Test Masuk ──
+  if (step === 'tes' && pendaftaranId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg">
+          <div className="mb-6 text-center">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 mb-3">
+              <ClipboardList className="h-6 w-6 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Test Masuk Anggota</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Jawab {soal.length || 20} pertanyaan berikut untuk melanjutkan pendaftaran
+            </p>
+          </div>
+
+          <StepProgress step={step} />
+
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            {testLoading && (
+              <div className="py-12 text-center text-gray-400">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Memuat soal...
+              </div>
+            )}
+
+            {!testLoading && testResult && testResult.status === 'GAGAL' && (
+              <div className="text-center py-6 space-y-4">
+                <XCircle className="h-10 w-10 text-red-500 mx-auto" />
+                <p className="text-gray-800 font-semibold">Belum Lulus</p>
+                <p className="text-sm text-gray-500">
+                  Skor Anda {testResult.skor.toFixed(0)}% ({testResult.jumlah_benar}/{testResult.total_soal} benar).
+                  Minimal {testResult.passing_threshold}% untuk lulus.
+                </p>
+                <button onClick={mulaiTest}
+                  className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer">
+                  Coba Lagi
+                </button>
+              </div>
+            )}
+
+            {!testLoading && soal.length > 0 && (!testResult || testResult.status !== 'GAGAL') && (
+              <div className="space-y-5">
+                {soal.map((s, i) => (
+                  <div key={s.id}>
+                    <p className="text-sm font-medium text-gray-800 mb-2">{i + 1}. {s.pertanyaan}</p>
+                    <div className="space-y-1.5">
+                      {(['a', 'b', 'c', 'd'] as const).map(opt => (
+                        <label key={opt} className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 transition-colors">
+                          <input type="radio" name={`soal-${s.id}`} className="h-4 w-4 cursor-pointer accent-emerald-600"
+                            checked={jawaban[s.id] === opt.toUpperCase()}
+                            onChange={() => setJawaban(j => ({ ...j, [s.id]: opt.toUpperCase() }))} />
+                          {s[`pilihan_${opt}` as 'pilihan_a']}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {error && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  onClick={submitTest}
+                  disabled={Object.keys(jawaban).length < soal.length || pending}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Memeriksa...</> : <>Submit Jawaban <ChevronRight className="h-4 w-4" /></>}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Step: Pembayaran ──
+  if (step === 'bayar' && pendaftaranId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg">
+          <div className="mb-6 text-center">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 mb-3">
+              <Wallet className="h-6 w-6 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Pembayaran Pendaftaran</h1>
+            <p className="text-sm text-gray-500 mt-1">Selamat, Anda lulus test masuk! Selesaikan pembayaran berikut.</p>
+          </div>
+
+          <StepProgress step={step} />
+
+          <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
+            {!infoBayar && (
+              <div className="py-12 text-center text-gray-400">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Memuat info pembayaran...
+              </div>
+            )}
+            {infoBayar && (
+              <>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-emerald-700">Biaya Admin Pendaftaran</span>
+                    <span className="font-semibold text-emerald-800">
+                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(infoBayar.biaya_admin_pendaftaran)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-emerald-700">Simpanan Pokok</span>
+                    <span className="font-semibold text-emerald-800">
+                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(infoBayar.nominal_simpanan_pokok)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t border-emerald-200 pt-2 font-bold">
+                    <span className="text-emerald-800">Total Transfer</span>
+                    <span className="text-emerald-900">
+                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(infoBayar.biaya_admin_pendaftaran + infoBayar.nominal_simpanan_pokok)}
+                    </span>
+                  </div>
+                </div>
+
+                {infoBayar.bank_account ? (
+                  <div className="rounded-xl border border-gray-200 p-4 text-sm space-y-1">
+                    <p className="text-gray-500">Transfer ke rekening:</p>
+                    <p className="font-semibold text-gray-900">{infoBayar.bank_account.bank_name} — {infoBayar.bank_account.account_number}</p>
+                    <p className="text-gray-600">a.n. {infoBayar.bank_account.account_holder}</p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                    Rekening tujuan belum diatur oleh pengurus. Hubungi pengurus koperasi untuk info rekening.
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Upload Bukti Transfer *</label>
+                  <label className={cn(
+                    'flex items-center justify-between rounded-xl border p-4 transition-colors cursor-pointer',
+                    buktiFile ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+                  )}>
+                    <span className="flex items-center gap-2 text-sm">
+                      {buktiFile ? <CheckCircle className="h-5 w-5 text-emerald-500" /> : <FileText className="h-5 w-5 text-gray-400" />}
+                      {buktiFile ? buktiFile.name : 'Pilih file bukti transfer (JPG/PNG/PDF)'}
+                    </span>
+                    <span className="shrink-0 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600">
+                      {buktiUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Pilih File'}
+                    </span>
+                    <input type="file" className="sr-only" accept=".jpg,.jpeg,.png,.webp,.pdf"
+                      onChange={handleBuktiUpload} disabled={buktiUploading} />
+                  </label>
+                </div>
+
+                {error && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  onClick={submitBayar}
+                  disabled={!buktiFile || pending}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Memproses...</> : <>Konfirmasi Pembayaran <ChevronRight className="h-4 w-4" /></>}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -434,18 +692,36 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-4">
             <CheckCircle className="h-8 w-8 text-emerald-600" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Pendaftaran Diterima!</h2>
-          <p className="text-sm text-gray-600 mb-6">
-            Permohonan keanggotaan Anda di <strong>{orgNama}</strong> telah kami terima.
-            Pengurus akan meninjau dokumen dan menghubungi Anda.
-          </p>
-          <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-left space-y-2 text-sm">
-            <p className="font-semibold text-emerald-800">Proses selanjutnya:</p>
-            <p className="text-emerald-700">1. Pengurus meninjau dokumen Anda</p>
-            <p className="text-emerald-700">2. Persetujuan dan pemberian akun anggota</p>
-            <p className="text-emerald-700">3. Ikuti pelatihan untuk status Terverifikasi</p>
-            <p className="text-emerald-700">4. Mulai ajukan proyek atau biayai proyek anggota lain</p>
-          </div>
+          {aktivasiResult?.activated ? (
+            <>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Selamat Datang, Anggota Baru!</h2>
+              <p className="text-sm text-gray-600 mb-6">
+                Keanggotaan Anda di <strong>{orgNama}</strong> sudah <strong>aktif</strong>. Anda bisa langsung login ke portal anggota.
+              </p>
+              <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-left space-y-2 text-sm">
+                <p className="font-semibold text-emerald-800">Kode Anggota Anda:</p>
+                <p className="font-mono text-lg text-emerald-900">{aktivasiResult.kode_anggota}</p>
+                <p className="text-emerald-700 pt-2">
+                  Login menggunakan email/NIK dan kata sandi yang Anda buat di langkah pertama.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Pendaftaran Diterima!</h2>
+              <p className="text-sm text-gray-600 mb-6">
+                Permohonan keanggotaan Anda di <strong>{orgNama}</strong> telah kami terima.
+                Pengurus akan meninjau dokumen dan menghubungi Anda.
+              </p>
+              <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-left space-y-2 text-sm">
+                <p className="font-semibold text-emerald-800">Proses selanjutnya:</p>
+                <p className="text-emerald-700">1. Pengurus meninjau dokumen Anda</p>
+                <p className="text-emerald-700">2. Persetujuan dan pemberian akun anggota</p>
+                <p className="text-emerald-700">3. Ikuti pelatihan untuk status Terverifikasi</p>
+                <p className="text-emerald-700">4. Mulai ajukan proyek atau biayai proyek anggota lain</p>
+              </div>
+            </>
+          )}
           <p className="mt-6 text-xs text-gray-400">
             Kode pendaftaran: <span className="font-mono">{pendaftaranId?.slice(0, 8).toUpperCase()}</span>
           </p>

@@ -6,6 +6,8 @@ import {
 import {
   getAllPendaftaran, getAllLaporan, getAllTindakan,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
+import { getBankSoal, getModuleSettings } from '@/modules/kojasmat/actions/kojasmat-test.actions'
+import { getBankAccounts } from '@/modules/cash/actions/bank.actions'
 import KojasmatClient from './KojasmatClient'
 
 export const revalidate = 0
@@ -16,13 +18,16 @@ export default async function KojasmatPage() {
 
   const orgId = orgData.org.id
 
-  const stats       = await getKojasmatStats(orgId)
-  const anggota     = await getAllAnggota(orgId)
-  const proyek      = await getAllProyek(orgId)
-  const pelatihan   = await getAllPelatihan(orgId)
-  const pendaftaran = await getAllPendaftaran(orgId)
-  const laporan     = await getAllLaporan(orgId)
-  const tindakan    = await getAllTindakan(orgId)
+  const stats          = await getKojasmatStats(orgId)
+  const anggota        = await getAllAnggota(orgId)
+  const proyek         = await getAllProyek(orgId)
+  const pelatihan      = await getAllPelatihan(orgId)
+  const pendaftaran    = await getAllPendaftaran(orgId)
+  const laporan        = await getAllLaporan(orgId)
+  const tindakan       = await getAllTindakan(orgId)
+  const bankSoal       = await getBankSoal(orgId)
+  const moduleSettings = await getModuleSettings(orgId)
+  const bankAccounts   = await getBankAccounts(orgId)
 
   return (
     <KojasmatClient
@@ -34,6 +39,9 @@ export default async function KojasmatPage() {
       pendaftaran={pendaftaran}
       laporan={laporan}
       tindakan={tindakan}
+      bankSoal={bankSoal}
+      moduleSettings={moduleSettings}
+      bankAccounts={bankAccounts.map(b => ({ id: b.id, bank_name: b.bank_name, account_number: b.account_number ?? '' }))}
     />
   )
 }

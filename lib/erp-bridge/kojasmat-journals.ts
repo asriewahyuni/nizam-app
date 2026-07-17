@@ -89,6 +89,21 @@ export async function jurnalSetorSimpanan(
 }
 
 /**
+ * Biaya admin pendaftaran anggota baru: Dr Kas (1101) → Cr Pendapatan Administrasi (41-7000)
+ */
+export async function jurnalPendapatanBiayaAdmin(
+  orgId: string,
+  jumlah: number,
+  pendaftaranId: string,
+) {
+  await postJurnal(
+    orgId, '1101', '41-7000', jumlah,
+    'Biaya admin pendaftaran anggota baru',
+    'KOJASMAT_PENDAFTARAN_BAYAR', pendaftaranId,
+  )
+}
+
+/**
  * Penarikan simpanan: Dr Simpanan Anggota → Cr Kas (1101)
  */
 export async function jurnalTarikSimpanan(

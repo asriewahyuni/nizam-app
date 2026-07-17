@@ -33,6 +33,10 @@ import {
   getPemodalDenganPotensi, distribusikanBagiHasil,
   type KojasmatProyekTransaksi, type KojasmatLaporanKeuanganProyek, type KojasmatPemodalDenganPotensi,
 } from '@/modules/kojasmat/actions/kojasmat-keuangan.actions'
+import {
+  simpanBankSoal, hapusBankSoal, updateModuleSettings,
+  type KojasmatBankSoal,
+} from '@/modules/kojasmat/actions/kojasmat-test.actions'
 
 const KATEGORI_PENDAPATAN = ['Penjualan', 'Jasa', 'Pendapatan Lain'] as const
 const KATEGORI_BEBAN = ['Bahan Baku', 'Operasional', 'Gaji/Upah', 'Sewa', 'Transportasi', 'Beban Lain'] as const
@@ -48,6 +52,14 @@ type Props = {
   pendaftaran: KojasmatPendaftaran[]
   laporan: KojasmatLaporanProyek[]
   tindakan: KojasmatTindakan[]
+  bankSoal: KojasmatBankSoal[]
+  moduleSettings: {
+    passing_threshold: number
+    biaya_admin_pendaftaran: number
+    nominal_simpanan_pokok: number
+    bank_account_id: string | null
+  }
+  bankAccounts: { id: string; bank_name: string; account_number: string }[]
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -3019,11 +3031,216 @@ function TabTindakan({ orgId, anggota, proyek, tindakan }: {
   )
 }
 
+function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts }: {
+  orgId: string
+  bankSoal: KojasmatBankSoal[]
+  moduleSettings: Props['moduleSettings']
+  bankAccounts: Props['bankAccounts']
+}) {
+  const [pending, startTransition] = useTransition()
+  const [modalSoal, setModalSoal] = useState<KojasmatBankSoal | 'new' | null>(null)
+  const [form, setForm] = useState({
+    pertanyaan: '', pilihan_a: '', pilihan_b: '', pilihan_c: '', pilihan_d: '',
+    jawaban_benar: 'A' as 'A' | 'B' | 'C' | 'D', is_active: true,
+  })
+  const [settingsForm, setSettingsForm] = useState({
+    passing_threshold: String(moduleSettings.passing_threshold),
+    biaya_admin_pendaftaran: String(moduleSettings.biaya_admin_pendaftaran),
+    nominal_simpanan_pokok: String(moduleSettings.nominal_simpanan_pokok),
+    bank_account_id: moduleSettings.bank_account_id ?? '',
+  })
+
+  const aktifCount = bankSoal.filter(s => s.is_active).length
+
+  function openNew() {
+    setForm({ pertanyaan: '', pilihan_a: '', pilihan_b: '', pilihan_c: '', pilihan_d: '', jawaban_benar: 'A', is_active: true })
+    setModalSoal('new')
+  }
+
+  function openEdit(s: KojasmatBankSoal) {
+    setForm({
+      pertanyaan: s.pertanyaan, pilihan_a: s.pilihan_a, pilihan_b: s.pilihan_b,
+      pilihan_c: s.pilihan_c, pilihan_d: s.pilihan_d, jawaban_benar: s.jawaban_benar, is_active: s.is_active,
+    })
+    setModalSoal(s)
+  }
+
+  function handleSimpan() {
+    startTransition(async () => {
+      await simpanBankSoal({
+        id: modalSoal === 'new' ? undefined : modalSoal?.id,
+        org_id: orgId,
+        ...form,
+      })
+      setModalSoal(null)
+    })
+  }
+
+  function handleHapus(id: string) {
+    startTransition(async () => { await hapusBankSoal(id, orgId) })
+  }
+
+  function handleSimpanSettings() {
+    startTransition(async () => {
+      await updateModuleSettings(orgId, {
+        passing_threshold: Number(settingsForm.passing_threshold) || 70,
+        biaya_admin_pendaftaran: Number(settingsForm.biaya_admin_pendaftaran) || 0,
+        nominal_simpanan_pokok: Number(settingsForm.nominal_simpanan_pokok) || 0,
+        bank_account_id: settingsForm.bank_account_id || null,
+      })
+    })
+  }
+
+  const formValid = form.pertanyaan.trim() && form.pilihan_a.trim() && form.pilihan_b.trim()
+    && form.pilihan_c.trim() && form.pilihan_d.trim()
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <h3 className="font-semibold text-gray-900 mb-1">Pengaturan Test &amp; Pembayaran Pendaftaran</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Dipakai di wizard publik pendaftaran anggota baru (test masuk + pembayaran).
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Ambang Lulus Test (%)</label>
+            <input type="number" min={0} max={100}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              value={settingsForm.passing_threshold}
+              onChange={e => setSettingsForm(f => ({ ...f, passing_threshold: e.target.value }))} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Biaya Admin Pendaftaran (Rp)</label>
+            <input type="number" min={0}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              value={settingsForm.biaya_admin_pendaftaran}
+              onChange={e => setSettingsForm(f => ({ ...f, biaya_admin_pendaftaran: e.target.value }))} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Nominal Simpanan Pokok (Rp)</label>
+            <input type="number" min={0}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              value={settingsForm.nominal_simpanan_pokok}
+              onChange={e => setSettingsForm(f => ({ ...f, nominal_simpanan_pokok: e.target.value }))} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Rekening Tujuan Transfer</label>
+            <select
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              value={settingsForm.bank_account_id}
+              onChange={e => setSettingsForm(f => ({ ...f, bank_account_id: e.target.value }))}>
+              <option value="">— pilih rekening —</option>
+              {bankAccounts.map(b => (
+                <option key={b.id} value={b.id}>{b.bank_name} · {b.account_number}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button onClick={handleSimpanSettings} disabled={pending}
+            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+            {pending ? 'Menyimpan...' : 'Simpan Pengaturan'}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-gray-900">Bank Soal Test Masuk</h3>
+          <p className={cn('text-sm', aktifCount < 20 ? 'text-red-600 font-medium' : 'text-gray-500')}>
+            {aktifCount} soal aktif {aktifCount < 20 && '— minimal 20 soal aktif dibutuhkan agar test bisa dimulai'}
+          </p>
+        </div>
+        <button onClick={openNew}
+          className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors cursor-pointer">
+          <Plus className="h-4 w-4" /> Tambah Soal
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {bankSoal.length === 0 && (
+          <div className="rounded-2xl border border-gray-100 bg-white py-12 text-center text-gray-400">
+            Belum ada soal di bank soal
+          </div>
+        )}
+        {bankSoal.map(s => (
+          <div key={s.id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Badge text={s.is_active ? 'Aktif' : 'Nonaktif'}
+                    cls={s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'} />
+                </div>
+                <h4 className="font-medium text-gray-900 mt-1">{s.pertanyaan}</h4>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-500">
+                  {(['A', 'B', 'C', 'D'] as const).map(opt => (
+                    <div key={opt} className={cn(opt === s.jawaban_benar && 'font-semibold text-emerald-700')}>
+                      {opt}. {s[`pilihan_${opt.toLowerCase()}` as 'pilihan_a']}
+                      {opt === s.jawaban_benar && <CheckCircle className="inline h-3.5 w-3.5 ml-1" />}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={() => openEdit(s)}
+                  className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </button>
+                <button onClick={() => handleHapus(s.id)} disabled={pending}
+                  className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 transition-colors cursor-pointer">
+                  <Trash2 className="h-3.5 w-3.5" /> Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Modal open={!!modalSoal} onClose={() => setModalSoal(null)} title={modalSoal === 'new' ? 'Tambah Soal Baru' : 'Edit Soal'}>
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Pertanyaan *</label>
+            <textarea rows={2}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 resize-none"
+              value={form.pertanyaan} onChange={e => setForm(f => ({ ...f, pertanyaan: e.target.value }))} />
+          </div>
+          {(['a', 'b', 'c', 'd'] as const).map(opt => (
+            <div key={opt} className="flex items-center gap-2">
+              <input type="radio" name="jawaban_benar" className="h-4 w-4 cursor-pointer accent-emerald-600"
+                checked={form.jawaban_benar === opt.toUpperCase()}
+                onChange={() => setForm(f => ({ ...f, jawaban_benar: opt.toUpperCase() as 'A' | 'B' | 'C' | 'D' }))} />
+              <input
+                className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                placeholder={`Pilihan ${opt.toUpperCase()}`}
+                value={form[`pilihan_${opt}` as 'pilihan_a']}
+                onChange={e => setForm(f => ({ ...f, [`pilihan_${opt}`]: e.target.value }))} />
+            </div>
+          ))}
+          <p className="text-xs text-gray-400">Pilih radio di sebelah kiri untuk menandai jawaban yang benar.</p>
+          <div className="flex gap-3 pt-2">
+            <button onClick={() => setModalSoal(null)}
+              className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+              Batal
+            </button>
+            <button onClick={handleSimpan} disabled={!formValid || pending}
+              className="flex-1 rounded-xl bg-emerald-600 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+              {pending ? 'Menyimpan...' : 'Simpan'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+
 // ─── ROOT CLIENT ──────────────────────────────────────────────────────────────
 
-type ActiveTab = 'dashboard' | 'permohonan' | 'anggota' | 'proyek' | 'simpanan' | 'pelatihan' | 'laporan' | 'tindakan'
+type ActiveTab = 'dashboard' | 'permohonan' | 'anggota' | 'proyek' | 'simpanan' | 'pelatihan' | 'laporan' | 'tindakan' | 'soal'
 
-export default function KojasmatClient({ orgId, stats, anggota, proyek, pelatihan, pendaftaran, laporan, tindakan }: Props) {
+export default function KojasmatClient({
+  orgId, stats, anggota, proyek, pelatihan, pendaftaran, laporan, tindakan,
+  bankSoal, moduleSettings, bankAccounts,
+}: Props) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
 
   const pendingPendaftaran = stats.antrian_pendaftaran ?? 0
@@ -3038,6 +3255,7 @@ export default function KojasmatClient({ orgId, stats, anggota, proyek, pelatiha
     { key: 'pelatihan',   label: 'Pelatihan',      icon: GraduationCap },
     { key: 'laporan',     label: 'Laporan',         icon: FileText,      badge: laporan.filter(l => l.status === 'DIKIRIM').length || undefined },
     { key: 'tindakan',    label: 'Tindakan',        icon: AlertTriangle, badge: tindakanAktif || undefined, badgeColor: 'bg-red-100 text-red-700' },
+    { key: 'soal',        label: 'Bank Soal',       icon: BookOpen,      badge: bankSoal.filter(s => s.is_active).length < 20 ? bankSoal.filter(s => s.is_active).length : undefined, badgeColor: 'bg-red-100 text-red-700' },
   ]
 
   return (
@@ -3085,6 +3303,7 @@ export default function KojasmatClient({ orgId, stats, anggota, proyek, pelatiha
         {activeTab === 'pelatihan'  && <TabPelatihan orgId={orgId} pelatihan={pelatihan} anggota={anggota} />}
         {activeTab === 'laporan'    && <TabLaporan laporan={laporan} />}
         {activeTab === 'tindakan'   && <TabTindakan orgId={orgId} anggota={anggota} proyek={proyek} tindakan={tindakan} />}
+        {activeTab === 'soal'       && <TabBankSoal orgId={orgId} bankSoal={bankSoal} moduleSettings={moduleSettings} bankAccounts={bankAccounts} />}
       </div>
     </div>
   )
