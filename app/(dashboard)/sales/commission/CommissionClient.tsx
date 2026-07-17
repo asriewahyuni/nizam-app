@@ -27,10 +27,10 @@ import { formatDate, formatRupiah } from '@/lib/utils'
 import {
   createReseller,
   deleteReseller,
-  getResellerCommissionInvoices,
-  settleResellerCommissionInvoices,
+  getResellerCommissionPayments,
+  settleResellerCommissionPayments,
   updateReseller,
-  type ResellerCommissionInvoiceRow,
+  type ResellerCommissionPaymentRow,
 } from '@/modules/sales/actions/commission.actions'
 import {
   calculateCommissionAmount,
@@ -162,8 +162,8 @@ export default function CommissionClient({
   // Modal pencairan komisi
   const [settlingReseller, setSettlingReseller] = useState<SalesResellerRecord | null>(null)
   const [settlementPeriod, setSettlementPeriod] = useState(currentMonthKey)
-  const [invoiceRows, setInvoiceRows] = useState<ResellerCommissionInvoiceRow[]>([])
-  const [selectedSaleIds, setSelectedSaleIds] = useState<Set<string>>(new Set())
+  const [paymentRows, setPaymentRows] = useState<ResellerCommissionPaymentRow[]>([])
+  const [selectedPaymentIds, setSelectedPaymentIds] = useState<Set<string>>(new Set())
   const [settleDebitAccountId, setSettleDebitAccountId] = useState('')
   const [settleCreditAccountId, setSettleCreditAccountId] = useState('')
   const [settlePaymentMethod, setSettlePaymentMethod] = useState('TRANSFER')
@@ -304,19 +304,19 @@ export default function CommissionClient({
     setLoading(false)
   }
 
-  const fetchInvoicesForPeriod = async (resellerId: string, period: string) => {
+  const fetchPaymentsForPeriod = async (resellerId: string, period: string) => {
     setIsLoadingInvoices(true)
     setSettleError(null)
-    const result = await getResellerCommissionInvoices(orgId, resellerId, period)
+    const result = await getResellerCommissionPayments(orgId, resellerId, period)
     setIsLoadingInvoices(false)
 
     if (Array.isArray(result)) {
-      setInvoiceRows(result)
-      setSelectedSaleIds(new Set())
+      setPaymentRows(result)
+      setSelectedPaymentIds(new Set())
       return
     }
 
-    setInvoiceRows([])
+    setPaymentRows([])
     setSettleError(result.error)
   }
 
@@ -328,13 +328,13 @@ export default function CommissionClient({
     setSettlePaymentMethod('TRANSFER')
     setSettleReferenceNo('')
     setSettleSuccess(null)
-    await fetchInvoicesForPeriod(reseller.id, currentMonthKey)
+    await fetchPaymentsForPeriod(reseller.id, currentMonthKey)
   }
 
   const closeSettleModal = () => {
     setSettlingReseller(null)
-    setInvoiceRows([])
-    setSelectedSaleIds(new Set())
+    setPaymentRows([])
+    setSelectedPaymentIds(new Set())
     setSettleError(null)
     setSettleSuccess(null)
   }
@@ -342,30 +342,30 @@ export default function CommissionClient({
   const handleSettlementPeriodChange = async (period: string) => {
     setSettlementPeriod(period)
     if (settlingReseller) {
-      await fetchInvoicesForPeriod(settlingReseller.id, period)
+      await fetchPaymentsForPeriod(settlingReseller.id, period)
     }
   }
 
-  const toggleSaleSelection = (saleId: string) => {
-    setSelectedSaleIds((current) => {
+  const togglePaymentSelection = (paymentId: string) => {
+    setSelectedPaymentIds((current) => {
       const next = new Set(current)
-      if (next.has(saleId)) {
-        next.delete(saleId)
+      if (next.has(paymentId)) {
+        next.delete(paymentId)
       } else {
-        next.add(saleId)
+        next.add(paymentId)
       }
       return next
     })
   }
 
-  const selectedCommissionTotal = invoiceRows
-    .filter((row) => selectedSaleIds.has(row.saleId))
+  const selectedCommissionTotal = paymentRows
+    .filter((row) => selectedPaymentIds.has(row.paymentId))
     .reduce((sum, row) => sum + row.commissionAmount, 0)
 
   const handleSettleSubmit = async () => {
     if (!settlingReseller) return
-    if (selectedSaleIds.size === 0) {
-      setSettleError('Pilih minimal satu invoice yang mau dicairkan komisinya.')
+    if (selectedPaymentIds.size === 0) {
+      setSettleError('Pilih minimal satu pembayaran yang mau dicairkan komisinya.')
       return
     }
     if (!settleDebitAccountId || !settleCreditAccountId) {
@@ -376,8 +376,8 @@ export default function CommissionClient({
     setIsSettling(true)
     setSettleError(null)
 
-    const response = await settleResellerCommissionInvoices(orgId, settlingReseller.id, {
-      saleIds: Array.from(selectedSaleIds),
+    const response = await settleResellerCommissionPayments(orgId, settlingReseller.id, {
+      paymentIds: Array.from(selectedPaymentIds),
       debitAccountId: settleDebitAccountId,
       creditAccountId: settleCreditAccountId,
       paymentMethod: settlePaymentMethod || undefined,
@@ -394,7 +394,7 @@ export default function CommissionClient({
     setSettleSuccess(
       `Komisi ${formatRupiah(response.totalCommissionAmount)} berhasil dicairkan${response.entryNumber ? ` (jurnal ${response.entryNumber})` : ''}.`
     )
-    await fetchInvoicesForPeriod(settlingReseller.id, settlementPeriod)
+    await fetchPaymentsForPeriod(settlingReseller.id, settlementPeriod)
     startTransition(() => router.refresh())
   }
 
@@ -890,7 +890,8 @@ export default function CommissionClient({
                   Cairkan Komisi — {getResellerDisplayName(settlingReseller)}
                 </h3>
                 <p className="mt-2 text-sm font-bold text-slate-400">
-                  Pilih invoice yang komisinya mau dibayar sekarang. Invoice yang sudah dicairkan tidak bisa dipilih lagi.
+                  Komisi dihitung dari pembayaran/termin yang sudah masuk (cash-basis), bukan dari nilai penuh invoice.
+                  Pembayaran yang sudah dicairkan tidak bisa dipilih lagi.
                 </p>
               </div>
               <button
@@ -933,17 +934,17 @@ export default function CommissionClient({
 
               <div className="space-y-2">
                 {isLoadingInvoices && (
-                  <div className="py-6 text-center text-xs font-bold uppercase italic text-slate-400">Memuat invoice...</div>
+                  <div className="py-6 text-center text-xs font-bold uppercase italic text-slate-400">Memuat pembayaran...</div>
                 )}
-                {!isLoadingInvoices && invoiceRows.length === 0 && (
+                {!isLoadingInvoices && paymentRows.length === 0 && (
                   <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-center text-xs font-bold uppercase italic text-slate-400">
-                    Tidak ada invoice reseller ini pada periode tersebut.
+                    Tidak ada pembayaran invoice reseller ini pada periode tersebut.
                   </div>
                 )}
                 {!isLoadingInvoices &&
-                  invoiceRows.map((row) => (
+                  paymentRows.map((row) => (
                     <label
-                      key={row.saleId}
+                      key={row.paymentId}
                       className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3 text-sm ${
                         row.settled
                           ? 'border-slate-100 bg-slate-50'
@@ -954,14 +955,14 @@ export default function CommissionClient({
                         <input
                           type="checkbox"
                           disabled={row.settled}
-                          checked={selectedSaleIds.has(row.saleId)}
-                          onChange={() => toggleSaleSelection(row.saleId)}
+                          checked={selectedPaymentIds.has(row.paymentId)}
+                          onChange={() => togglePaymentSelection(row.paymentId)}
                           className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
                         />
                         <div>
-                          <div className="font-semibold text-slate-900">{row.saleNumber}</div>
+                          <div className="font-semibold text-slate-900">{row.label || row.paymentNumber}</div>
                           <div className="text-[11px] font-bold text-slate-400">
-                            {formatDate(row.saleDate)} • Omzet bersih {formatRupiah(row.netSalesAmount)}
+                            {row.saleNumber} • {formatDate(row.paymentDate)} • Dibayar {formatRupiah(row.paymentAmount)}
                           </div>
                         </div>
                       </div>
@@ -1032,12 +1033,12 @@ export default function CommissionClient({
                 type="button"
                 variant="primary"
                 className="flex-1 justify-center"
-                disabled={isSettling || selectedSaleIds.size === 0}
+                disabled={isSettling || selectedPaymentIds.size === 0}
                 isLoading={isSettling}
                 loadingText="Memproses..."
                 onClick={handleSettleSubmit}
               >
-                Cairkan Komisi ({selectedSaleIds.size} invoice)
+                Cairkan Komisi ({selectedPaymentIds.size} pembayaran)
               </SafeButton>
             </div>
           </div>

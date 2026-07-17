@@ -12,11 +12,14 @@ import {
   type SalesResellerRecord,
 } from '@/modules/sales/lib/commission'
 
-export type ResellerCommissionInvoiceRow = {
+export type ResellerCommissionPaymentRow = {
+  paymentId: string
+  paymentNumber: string
+  paymentDate: string
+  paymentAmount: number
+  label: string | null
   saleId: string
   saleNumber: string
-  saleDate: string
-  netSalesAmount: number
   commissionAmount: number
   settled: boolean
   settlementDate: string | null
@@ -29,7 +32,7 @@ export type ResellerCommissionSettlementHistoryRow = {
   totalCommissionAmount: number
   paymentMethod: string | null
   referenceNo: string | null
-  invoiceCount: number
+  paymentCount: number
   entryNumber: string | null
 }
 
@@ -304,19 +307,93 @@ function normalizeCommissionPeriod(period: string) {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(normalized) ? normalized : new Date().toISOString().slice(0, 7)
 }
 
-function computeNetSalesAmount(grandTotal: unknown, activeReturnsTotal: unknown) {
-  return Math.max(0, Number(grandTotal || 0) - Number(activeReturnsTotal || 0))
+/**
+ * Komisi cash-basis: PERCENT dihitung dari nominal pembayaran itu sendiri.
+ * FIXED (nominal tetap per invoice) baru cair pada pembayaran yang membuat invoice
+ * lunas penuh (running_paid >= grand_total), supaya tidak dibayar duluan sebelum invoice lunas.
+ */
+function computePaymentCommission(
+  paymentAmount: number,
+  runningPaidAfterThisPayment: number,
+  grandTotal: number,
+  commissionType: string | null,
+  commissionValue: number
+) {
+  const normalizedType = String(commissionType || '').trim().toUpperCase()
+  if (normalizedType === 'FIXED') {
+    return runningPaidAfterThisPayment >= grandTotal - 0.01 ? Math.max(0, commissionValue) : 0
+  }
+  return calculateCommissionAmount(paymentAmount, commissionType, commissionValue)
+}
+
+type CommissionPaymentQueryRow = {
+  payment_id: string
+  payment_number: string
+  payment_date: string
+  payment_amount: string
+  payment_notes: string | null
+  sale_id: string
+  sale_number: string
+  grand_total: string
+  commission_type: string | null
+  commission_value: string | null
+  running_paid: string
+  settlement_id: string | null
+  settlement_date: string | null
+  reference_no: string | null
+}
+
+const COMMISSION_PAYMENT_BASE_QUERY = `
+  SELECT
+    sp.id AS payment_id, sp.payment_number, sp.payment_date, sp.amount AS payment_amount, sp.notes AS payment_notes,
+    s.id AS sale_id, s.sale_number, s.grand_total, s.commission_type, s.commission_value,
+    SUM(sp.amount) OVER (PARTITION BY sp.sale_id ORDER BY sp.payment_date, sp.id) AS running_paid,
+    sci.settlement_id, cs.settlement_date, cs.reference_no
+  FROM sales_payments sp
+  JOIN sales s ON s.id = sp.sale_id
+  LEFT JOIN sales_commission_settlement_items sci ON sci.payment_id = sp.id
+  LEFT JOIN sales_commission_settlements cs ON cs.id = sci.settlement_id
+  WHERE s.org_id = $1 AND s.reseller_id = $2
+`
+
+function mapCommissionPaymentRow(
+  row: CommissionPaymentQueryRow,
+  defaultCommissionType: string | null,
+  defaultCommissionValue: number
+): ResellerCommissionPaymentRow {
+  const paymentAmount = Number(row.payment_amount || 0)
+  const commissionAmount = computePaymentCommission(
+    paymentAmount,
+    Number(row.running_paid || 0),
+    Number(row.grand_total || 0),
+    row.commission_type || defaultCommissionType,
+    Number(row.commission_value ?? defaultCommissionValue)
+  )
+
+  return {
+    paymentId: row.payment_id,
+    paymentNumber: row.payment_number,
+    paymentDate: String(row.payment_date || '').slice(0, 10),
+    paymentAmount,
+    label: row.payment_notes,
+    saleId: row.sale_id,
+    saleNumber: row.sale_number,
+    commissionAmount,
+    settled: Boolean(row.settlement_id),
+    settlementDate: row.settlement_date ? String(row.settlement_date).slice(0, 10) : null,
+    referenceNo: row.reference_no,
+  }
 }
 
 /**
- * Daftar invoice reseller pada suatu periode (YYYY-MM), lengkap dengan status pencairan komisi.
- * Dihitung ulang dari sales + sales_returns langsung di server (bukan dari data yang dikirim client).
+ * Daftar pembayaran/termin reseller pada suatu periode (YYYY-MM), lengkap dengan status pencairan komisi.
+ * Komisi dihitung cash-basis (dari nominal yang sudah dibayar customer), dihitung ulang server-side.
  */
-export async function getResellerCommissionInvoices(
+export async function getResellerCommissionPayments(
   orgId: string,
   resellerId: string,
   period: string
-): Promise<ResellerCommissionInvoiceRow[] | { error: string }> {
+): Promise<ResellerCommissionPaymentRow[] | { error: string }> {
   const normalizedResellerId = String(resellerId || '').trim()
   if (!normalizedResellerId) return { error: 'Reseller tidak valid.' }
 
@@ -333,71 +410,26 @@ export async function getResellerCommissionInvoices(
   const defaultCommissionType = resellerRows[0].commission_type
   const defaultCommissionValue = Number(resellerRows[0].commission_value || 0)
 
-  const { rows } = await queryPostgres<{
-    id: string
-    sale_number: string
-    sale_date: string
-    grand_total: string
-    commission_type: string | null
-    commission_value: string | null
-    returned_amount: string
-    settlement_id: string | null
-    settlement_date: string | null
-    reference_no: string | null
-  }>(
-    `SELECT
-       s.id, s.sale_number, s.sale_date, s.grand_total, s.commission_type, s.commission_value,
-       COALESCE(sr_agg.returned_amount, 0) AS returned_amount,
-       sci.settlement_id,
-       cs.settlement_date,
-       cs.reference_no
-     FROM sales s
-     LEFT JOIN (
-       SELECT sale_id, SUM(grand_total) AS returned_amount
-       FROM sales_returns
-       WHERE status <> 'VOIDED'
-       GROUP BY sale_id
-     ) sr_agg ON sr_agg.sale_id = s.id
-     LEFT JOIN sales_commission_settlement_items sci ON sci.sale_id = s.id
-     LEFT JOIN sales_commission_settlements cs ON cs.id = sci.settlement_id
-     WHERE s.org_id = $1
-       AND s.reseller_id = $2
+  const { rows } = await queryPostgres<CommissionPaymentQueryRow>(
+    `${COMMISSION_PAYMENT_BASE_QUERY}
        AND s.status IN ('ORDERED', 'FINISHED')
-       AND to_char(s.sale_date, 'YYYY-MM') = $3
-     ORDER BY s.sale_date ASC, s.sale_number ASC`,
+       AND to_char(sp.payment_date, 'YYYY-MM') = $3
+     ORDER BY sp.payment_date ASC, sp.payment_number ASC`,
     [orgId, normalizedResellerId, normalizedPeriod]
   )
 
-  return rows.map((row) => {
-    const netSalesAmount = computeNetSalesAmount(row.grand_total, row.returned_amount)
-    const commissionAmount = calculateCommissionAmount(
-      netSalesAmount,
-      row.commission_type || defaultCommissionType,
-      Number(row.commission_value ?? defaultCommissionValue)
-    )
-
-    return {
-      saleId: row.id,
-      saleNumber: row.sale_number,
-      saleDate: String(row.sale_date || '').slice(0, 10),
-      netSalesAmount,
-      commissionAmount,
-      settled: Boolean(row.settlement_id),
-      settlementDate: row.settlement_date ? String(row.settlement_date).slice(0, 10) : null,
-      referenceNo: row.reference_no,
-    }
-  })
+  return rows.map((row) => mapCommissionPaymentRow(row, defaultCommissionType, defaultCommissionValue))
 }
 
 /**
- * Cairkan komisi untuk invoice-invoice yang dipilih milik satu reseller.
- * Satu invoice hanya boleh dicairkan sekali (dijamin UNIQUE(sale_id) di sales_commission_settlement_items).
+ * Cairkan komisi untuk pembayaran/termin yang dipilih milik satu reseller.
+ * Satu pembayaran hanya boleh dicairkan sekali (dijamin UNIQUE(payment_id) di sales_commission_settlement_items).
  */
-export async function settleResellerCommissionInvoices(
+export async function settleResellerCommissionPayments(
   orgId: string,
   resellerId: string,
   payload: {
-    saleIds: string[]
+    paymentIds: string[]
     debitAccountId: string
     creditAccountId: string
     paymentMethod?: string
@@ -412,9 +444,11 @@ export async function settleResellerCommissionInvoices(
   if (!user) return { error: 'Unauthorized' }
 
   const normalizedResellerId = String(resellerId || '').trim()
-  const saleIds = Array.from(new Set((payload.saleIds || []).map((id) => String(id || '').trim()).filter(Boolean)))
+  const paymentIds = Array.from(
+    new Set((payload.paymentIds || []).map((id) => String(id || '').trim()).filter(Boolean))
+  )
   if (!normalizedResellerId) return { error: 'Reseller tidak valid.' }
-  if (saleIds.length === 0) return { error: 'Pilih minimal satu invoice yang mau dicairkan komisinya.' }
+  if (paymentIds.length === 0) return { error: 'Pilih minimal satu pembayaran yang mau dicairkan komisinya.' }
   if (!payload.debitAccountId || !payload.creditAccountId) {
     return { error: 'Akun beban komisi dan akun kas/bank wajib dipilih.' }
   }
@@ -424,63 +458,43 @@ export async function settleResellerCommissionInvoices(
     [normalizedResellerId, orgId]
   )
   if (!resellerRows.length) return { error: 'Reseller tidak ditemukan.' }
+  const defaultCommissionType = null as string | null
+  const defaultCommissionValue = 0
 
-  const { rows: saleRows } = await queryPostgres<{
-    id: string
-    sale_number: string
-    branch_id: string | null
-    grand_total: string
-    commission_type: string | null
-    commission_value: string | null
-    returned_amount: string
-    already_settled: boolean
-  }>(
-    `SELECT
-       s.id, s.sale_number, s.branch_id, s.grand_total, s.commission_type, s.commission_value,
-       COALESCE(sr_agg.returned_amount, 0) AS returned_amount,
-       (sci.id IS NOT NULL) AS already_settled
-     FROM sales s
-     LEFT JOIN (
-       SELECT sale_id, SUM(grand_total) AS returned_amount
-       FROM sales_returns
-       WHERE status <> 'VOIDED'
-       GROUP BY sale_id
-     ) sr_agg ON sr_agg.sale_id = s.id
-     LEFT JOIN sales_commission_settlement_items sci ON sci.sale_id = s.id
-     WHERE s.org_id = $1 AND s.reseller_id = $2 AND s.id = ANY($3::uuid[])`,
-    [orgId, normalizedResellerId, saleIds]
+  // Ambil SEMUA pembayaran reseller ini (bukan cuma yang dipilih) supaya running_paid akurat
+  // untuk perhitungan komisi FIXED (yang baru cair saat invoice lunas penuh).
+  const { rows: allPaymentRows } = await queryPostgres<CommissionPaymentQueryRow>(
+    `${COMMISSION_PAYMENT_BASE_QUERY} AND s.status IN ('ORDERED', 'FINISHED')`,
+    [orgId, normalizedResellerId]
   )
 
-  if (saleRows.length !== saleIds.length) {
-    return { error: 'Sebagian invoice yang dipilih tidak ditemukan atau bukan milik reseller ini.' }
+  const selectedRows = allPaymentRows.filter((row) => paymentIds.includes(row.payment_id))
+  if (selectedRows.length !== paymentIds.length) {
+    return { error: 'Sebagian pembayaran yang dipilih tidak ditemukan atau bukan milik reseller ini.' }
   }
-  const alreadySettled = saleRows.filter((row) => row.already_settled)
+  const alreadySettled = selectedRows.filter((row) => row.settlement_id)
   if (alreadySettled.length > 0) {
     return {
-      error: `Invoice ${alreadySettled.map((row) => row.sale_number).join(', ')} sudah pernah dicairkan komisinya.`,
+      error: `Pembayaran ${alreadySettled.map((row) => row.payment_number).join(', ')} sudah pernah dicairkan komisinya.`,
     }
   }
 
-  const { rows: resellerScheme } = await queryPostgres<{
-    commission_type: string | null
-    commission_value: string | null
-  }>(`SELECT commission_type, commission_value FROM sales_resellers WHERE id = $1`, [normalizedResellerId])
-  const defaultCommissionType = resellerScheme[0]?.commission_type || null
-  const defaultCommissionValue = Number(resellerScheme[0]?.commission_value || 0)
+  const { rows: saleBranchRows } = await queryPostgres<{ branch_id: string | null }>(
+    `SELECT branch_id FROM sales WHERE id = ANY($1::uuid[]) AND branch_id IS NOT NULL LIMIT 1`,
+    [selectedRows.map((row) => row.sale_id)]
+  )
+  const branchId = saleBranchRows[0]?.branch_id || null
 
-  const items = saleRows.map((row) => {
-    const netSalesAmount = computeNetSalesAmount(row.grand_total, row.returned_amount)
-    const commissionAmount = calculateCommissionAmount(
-      netSalesAmount,
-      row.commission_type || defaultCommissionType,
-      Number(row.commission_value ?? defaultCommissionValue)
-    )
-    return { saleId: row.id, netSalesAmount, commissionAmount }
-  })
+  const items = selectedRows.map((row) => ({
+    paymentId: row.payment_id,
+    saleId: row.sale_id,
+    netSalesAmount: Number(row.payment_amount || 0),
+    commissionAmount: mapCommissionPaymentRow(row, defaultCommissionType, defaultCommissionValue).commissionAmount,
+  }))
 
   const totalCommissionAmount = items.reduce((sum, item) => sum + item.commissionAmount, 0)
   if (totalCommissionAmount <= 0) {
-    return { error: 'Tidak ada komisi valid untuk invoice yang dipilih.' }
+    return { error: 'Tidak ada komisi valid untuk pembayaran yang dipilih.' }
   }
 
   const settlementDate = new Date().toISOString().slice(0, 10)
@@ -488,8 +502,6 @@ export async function settleResellerCommissionInvoices(
   if (closedPeriod) {
     return { error: buildClosedPeriodError('Pencairan komisi', settlementDate, closedPeriod) }
   }
-
-  const branchId = saleRows.find((row) => row.branch_id)?.branch_id || null
 
   const { rows: settlementRows } = await queryPostgres<{ id: string }>(
     `INSERT INTO sales_commission_settlements (
@@ -517,21 +529,21 @@ export async function settleResellerCommissionInvoices(
   try {
     for (const item of items) {
       await queryPostgres(
-        `INSERT INTO sales_commission_settlement_items (settlement_id, sale_id, commission_amount, net_sales_amount)
-         VALUES ($1, $2, $3, $4)`,
-        [settlementId, item.saleId, item.commissionAmount, item.netSalesAmount]
+        `INSERT INTO sales_commission_settlement_items (settlement_id, sale_id, payment_id, commission_amount, net_sales_amount)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [settlementId, item.saleId, item.paymentId, item.commissionAmount, item.netSalesAmount]
       )
     }
   } catch (e: any) {
     await queryPostgres(`DELETE FROM sales_commission_settlements WHERE id = $1`, [settlementId])
-    return { error: 'Gagal mencatat invoice yang dicairkan (mungkin sudah dicairkan lebih dulu): ' + e.message }
+    return { error: 'Gagal mencatat pembayaran yang dicairkan (mungkin sudah dicairkan lebih dulu): ' + e.message }
   }
 
   const reseller = await queryPostgres<{ name: string }>(`SELECT name FROM sales_resellers WHERE id = $1`, [
     normalizedResellerId,
   ])
   const resellerName = reseller.rows[0]?.name || 'Reseller'
-  const description = `Pencairan Komisi ${resellerName} (${items.length} invoice)`
+  const description = `Pencairan Komisi ${resellerName} (${items.length} pembayaran)`
 
   const journalResult = await ERPBridge.recordExpense({
     orgId,
@@ -600,12 +612,12 @@ export async function getResellerCommissionSettlementHistory(
     total_commission_amount: string
     payment_method: string | null
     reference_no: string | null
-    invoice_count: string
+    payment_count: string
     entry_number: string | null
   }>(
     `SELECT
        cs.id, cs.settlement_date, cs.total_commission_amount, cs.payment_method, cs.reference_no,
-       COUNT(sci.id) AS invoice_count,
+       COUNT(sci.id) AS payment_count,
        je.entry_number
      FROM sales_commission_settlements cs
      LEFT JOIN sales_commission_settlement_items sci ON sci.settlement_id = cs.id
@@ -622,7 +634,7 @@ export async function getResellerCommissionSettlementHistory(
     totalCommissionAmount: Number(row.total_commission_amount || 0),
     paymentMethod: row.payment_method,
     referenceNo: row.reference_no,
-    invoiceCount: Number(row.invoice_count || 0),
+    paymentCount: Number(row.payment_count || 0),
     entryNumber: row.entry_number,
   }))
 }
