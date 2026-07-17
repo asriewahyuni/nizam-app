@@ -1090,6 +1090,27 @@ async function voidPurchasePaymentReference(
   return voidJournalEntriesByReference(supabase, audit, paymentRefType, paymentId)
 }
 
+async function voidSalesCommissionSettlementReference(
+  supabase: any,
+  audit: VoidAuditParams,
+  refType: string,
+  settlementId: string
+): Promise<JournalActionResult> {
+  const { error: deleteError } = await (supabase as any)
+    .from('sales_commission_settlements')
+    .delete()
+    .eq('id', settlementId)
+    .eq('org_id', audit.orgId)
+
+  if (deleteError) {
+    return { error: 'Gagal membatalkan pencairan komisi reseller: ' + deleteError.message }
+  }
+  // sales_commission_settlement_items ikut terhapus via ON DELETE CASCADE,
+  // sehingga pembayaran yang tadinya tercatat "sudah dicairkan" otomatis bisa dicairkan ulang.
+
+  return voidJournalEntriesByReference(supabase, audit, refType, settlementId)
+}
+
 async function voidCashReference(
   supabase: any,
   audit: VoidAuditParams,
@@ -1436,6 +1457,9 @@ export async function voidJournalEntry(
       case 'CASH_OUT':
       case 'BANK_TRANSFER':
         result = await voidCashReference(supabase, audit, refType, refId)
+        break
+      case 'SALES_COMMISSION_SETTLEMENT':
+        result = await voidSalesCommissionSettlementReference(supabase, audit, refType, refId)
         break
       default:
         result = await voidSingleJournalEntry(supabase, audit, entryId)

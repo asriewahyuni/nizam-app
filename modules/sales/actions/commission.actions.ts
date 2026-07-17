@@ -569,20 +569,29 @@ export async function settleResellerCommissionPayments(
   ])
 
   try {
-    await queryPostgres(
-      `INSERT INTO bank_transactions (org_id, account_id, transaction_date, type, amount, reference_type, reference_id, description, notes, created_by)
-       VALUES ($1, $2, $3, 'OUT', $4, 'SALES_COMMISSION_SETTLEMENT', $5, $6, $7, $8)`,
-      [
-        orgId,
-        payload.creditAccountId,
-        settlementDate,
-        totalCommissionAmount,
-        settlementId,
-        description,
-        payload.paymentMethod ? `Metode: ${payload.paymentMethod}` : null,
-        user.id,
-      ]
+    const { rows: bankAccountRows } = await queryPostgres<{ id: string }>(
+      `SELECT id FROM bank_accounts WHERE org_id = $1 AND account_id = $2 AND is_active = TRUE LIMIT 1`,
+      [orgId, payload.creditAccountId]
     )
+    const bankAccountId = bankAccountRows[0]?.id
+    if (bankAccountId) {
+      // status RECONCILED supaya trigger auto-journal bank_transactions tidak aktif
+      // (jurnal pencairan komisi sudah dibuat manual di atas via ERPBridge.recordExpense).
+      await queryPostgres(
+        `INSERT INTO bank_transactions (org_id, bank_account_id, transaction_date, description, amount, type, category_id, journal_entry_id, status, created_by)
+         VALUES ($1, $2, $3, $4, $5, 'OUT', $6, $7, 'RECONCILED', $8)`,
+        [
+          orgId,
+          bankAccountId,
+          settlementDate,
+          description,
+          totalCommissionAmount,
+          payload.debitAccountId,
+          journalResult.entryId,
+          user.id,
+        ]
+      )
+    }
   } catch {
     // bank_transactions tidak wajib; jurnal sudah tercatat sebagai sumber kebenaran utama
   }
