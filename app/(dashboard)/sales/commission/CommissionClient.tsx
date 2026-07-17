@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import {
   AlertCircle,
   Building2,
+  CheckCircle2,
   Handshake,
   Pencil,
   Plus,
@@ -18,10 +19,19 @@ import {
   Trophy,
   UserCircle,
   Users,
+  Wallet,
 } from 'lucide-react'
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatCard } from '@/components/ui/NizamUI'
-import { formatRupiah } from '@/lib/utils'
-import { createReseller, deleteReseller, updateReseller } from '@/modules/sales/actions/commission.actions'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { formatDate, formatRupiah } from '@/lib/utils'
+import {
+  createReseller,
+  deleteReseller,
+  getResellerCommissionInvoices,
+  settleResellerCommissionInvoices,
+  updateReseller,
+  type ResellerCommissionInvoiceRow,
+} from '@/modules/sales/actions/commission.actions'
 import {
   calculateCommissionAmount,
   type CommissionSaleRecord,
@@ -31,6 +41,17 @@ import {
   normalizeResellerType,
   type SalesResellerRecord,
 } from '@/modules/sales/lib/commission'
+
+const COMMISSION_EXPENSE_DEFAULT_CODES = ['6099']
+const COMMISSION_CASH_DEFAULT_CODES = ['1103', '1101', '1102', '1105']
+
+function pickPreferredAccountByCodes(accounts: any[], preferredCodes: string[]) {
+  for (const code of preferredCodes) {
+    const matched = accounts.find((account) => String(account?.code || '').trim() === code)
+    if (matched) return matched
+  }
+  return null
+}
 
 type ResellerFormState = {
   resellerType: 'PERSONAL' | 'COMPANY'
@@ -109,11 +130,13 @@ export default function CommissionClient({
   orgId,
   sales,
   resellers,
+  accounts,
   activeBranchName,
 }: {
   orgId: string
   sales: CommissionSaleRecord[]
   resellers: SalesResellerRecord[]
+  accounts: any[]
   activeBranchName?: string | null
 }) {
   const router = useRouter()
@@ -126,6 +149,29 @@ export default function CommissionClient({
   const [success, setSuccess] = useState<string | null>(null)
 
   const currentMonthKey = useMemo(() => new Date().toISOString().slice(0, 7), [])
+
+  const activeAccounts = useMemo(() => (Array.isArray(accounts) ? accounts.filter((account: any) => account?.is_active) : []), [accounts])
+  const expenseAccounts = useMemo(() => activeAccounts.filter((account: any) => account?.type === 'EXPENSE'), [activeAccounts])
+  const cashAccounts = useMemo(
+    () => activeAccounts.filter((account: any) => account?.type === 'ASSET' && String(account?.code || '').startsWith('11')),
+    [activeAccounts]
+  )
+  const suggestedExpenseAccount = pickPreferredAccountByCodes(expenseAccounts, COMMISSION_EXPENSE_DEFAULT_CODES) || expenseAccounts[0] || null
+  const suggestedCashAccount = pickPreferredAccountByCodes(cashAccounts, COMMISSION_CASH_DEFAULT_CODES) || cashAccounts[0] || null
+
+  // Modal pencairan komisi
+  const [settlingReseller, setSettlingReseller] = useState<SalesResellerRecord | null>(null)
+  const [settlementPeriod, setSettlementPeriod] = useState(currentMonthKey)
+  const [invoiceRows, setInvoiceRows] = useState<ResellerCommissionInvoiceRow[]>([])
+  const [selectedSaleIds, setSelectedSaleIds] = useState<Set<string>>(new Set())
+  const [settleDebitAccountId, setSettleDebitAccountId] = useState('')
+  const [settleCreditAccountId, setSettleCreditAccountId] = useState('')
+  const [settlePaymentMethod, setSettlePaymentMethod] = useState('TRANSFER')
+  const [settleReferenceNo, setSettleReferenceNo] = useState('')
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false)
+  const [isSettling, setIsSettling] = useState(false)
+  const [settleError, setSettleError] = useState<string | null>(null)
+  const [settleSuccess, setSettleSuccess] = useState<string | null>(null)
   const currentMonthLabel = useMemo(
     () => new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(new Date()),
     []
@@ -258,6 +304,100 @@ export default function CommissionClient({
     setLoading(false)
   }
 
+  const fetchInvoicesForPeriod = async (resellerId: string, period: string) => {
+    setIsLoadingInvoices(true)
+    setSettleError(null)
+    const result = await getResellerCommissionInvoices(orgId, resellerId, period)
+    setIsLoadingInvoices(false)
+
+    if (Array.isArray(result)) {
+      setInvoiceRows(result)
+      setSelectedSaleIds(new Set())
+      return
+    }
+
+    setInvoiceRows([])
+    setSettleError(result.error)
+  }
+
+  const openSettleModal = async (reseller: SalesResellerRecord) => {
+    setSettlingReseller(reseller)
+    setSettlementPeriod(currentMonthKey)
+    setSettleDebitAccountId(suggestedExpenseAccount?.id || '')
+    setSettleCreditAccountId(suggestedCashAccount?.id || '')
+    setSettlePaymentMethod('TRANSFER')
+    setSettleReferenceNo('')
+    setSettleSuccess(null)
+    await fetchInvoicesForPeriod(reseller.id, currentMonthKey)
+  }
+
+  const closeSettleModal = () => {
+    setSettlingReseller(null)
+    setInvoiceRows([])
+    setSelectedSaleIds(new Set())
+    setSettleError(null)
+    setSettleSuccess(null)
+  }
+
+  const handleSettlementPeriodChange = async (period: string) => {
+    setSettlementPeriod(period)
+    if (settlingReseller) {
+      await fetchInvoicesForPeriod(settlingReseller.id, period)
+    }
+  }
+
+  const toggleSaleSelection = (saleId: string) => {
+    setSelectedSaleIds((current) => {
+      const next = new Set(current)
+      if (next.has(saleId)) {
+        next.delete(saleId)
+      } else {
+        next.add(saleId)
+      }
+      return next
+    })
+  }
+
+  const selectedCommissionTotal = invoiceRows
+    .filter((row) => selectedSaleIds.has(row.saleId))
+    .reduce((sum, row) => sum + row.commissionAmount, 0)
+
+  const handleSettleSubmit = async () => {
+    if (!settlingReseller) return
+    if (selectedSaleIds.size === 0) {
+      setSettleError('Pilih minimal satu invoice yang mau dicairkan komisinya.')
+      return
+    }
+    if (!settleDebitAccountId || !settleCreditAccountId) {
+      setSettleError('Pilih akun beban komisi dan akun kas/bank penerima.')
+      return
+    }
+
+    setIsSettling(true)
+    setSettleError(null)
+
+    const response = await settleResellerCommissionInvoices(orgId, settlingReseller.id, {
+      saleIds: Array.from(selectedSaleIds),
+      debitAccountId: settleDebitAccountId,
+      creditAccountId: settleCreditAccountId,
+      paymentMethod: settlePaymentMethod || undefined,
+      referenceNo: settleReferenceNo || undefined,
+    })
+
+    setIsSettling(false)
+
+    if ('error' in response) {
+      setSettleError(response.error || 'Gagal mencairkan komisi.')
+      return
+    }
+
+    setSettleSuccess(
+      `Komisi ${formatRupiah(response.totalCommissionAmount)} berhasil dicairkan${response.entryNumber ? ` (jurnal ${response.entryNumber})` : ''}.`
+    )
+    await fetchInvoicesForPeriod(settlingReseller.id, settlementPeriod)
+    startTransition(() => router.refresh())
+  }
+
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-12">
       <PageHeader
@@ -366,8 +506,17 @@ export default function CommissionClient({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
+                          onClick={() => openSettleModal(reseller)}
+                          className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-xs font-bold text-emerald-700 transition-all hover:bg-emerald-600 hover:text-white"
+                          title="Cairkan komisi"
+                        >
+                          <Wallet size={16} />
+                          Cairkan Komisi
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => openEditModal(reseller)}
-                          className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-indigo-600 transition-all hover:bg-indigo-600 hover:text-white"
+                          className="cursor-pointer rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-indigo-600 transition-all hover:bg-indigo-600 hover:text-white"
                           title="Edit reseller"
                         >
                           <Pencil size={16} />
@@ -375,7 +524,7 @@ export default function CommissionClient({
                         <button
                           type="button"
                           onClick={() => handleDelete(reseller)}
-                          className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-rose-600 transition-all hover:bg-rose-600 hover:text-white"
+                          className="cursor-pointer rounded-xl border border-rose-100 bg-rose-50 p-3 text-rose-600 transition-all hover:bg-rose-600 hover:text-white"
                           title="Nonaktifkan reseller"
                         >
                           <Trash2 size={16} />
@@ -727,6 +876,170 @@ export default function CommissionClient({
                 </SafeButton>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {settlingReseller && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeSettleModal} />
+          <div className="relative w-full max-w-3xl rounded-[32px] bg-white shadow-md flex flex-col max-h-[90dvh]">
+            <div className="px-8 pt-8 pb-4 flex items-start justify-between gap-4 shrink-0">
+              <div>
+                <h3 className="text-2xl font-semibold text-slate-900">
+                  Cairkan Komisi — {getResellerDisplayName(settlingReseller)}
+                </h3>
+                <p className="mt-2 text-sm font-bold text-slate-400">
+                  Pilih invoice yang komisinya mau dibayar sekarang. Invoice yang sudah dicairkan tidak bisa dipilih lagi.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeSettleModal}
+                className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-500 transition-all hover:bg-slate-100 shrink-0"
+              >
+                Tutup
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-8 py-2 space-y-5">
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Periode</label>
+                  <input
+                    type="month"
+                    value={settlementPeriod}
+                    max={currentMonthKey}
+                    onChange={(event) => handleSettlementPeriodChange(event.target.value)}
+                    className="h-12 cursor-pointer rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-900 outline-none transition-all focus:border-blue-500"
+                  />
+                </div>
+                <div className="rounded-[20px] border border-emerald-100 bg-emerald-50 px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600">Komisi Terpilih</div>
+                  <div className="mt-1 text-lg font-semibold text-emerald-700">{formatRupiah(selectedCommissionTotal)}</div>
+                </div>
+              </div>
+
+              {settleError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                  {settleError}
+                </div>
+              )}
+              {settleSuccess && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                  {settleSuccess}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {isLoadingInvoices && (
+                  <div className="py-6 text-center text-xs font-bold uppercase italic text-slate-400">Memuat invoice...</div>
+                )}
+                {!isLoadingInvoices && invoiceRows.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-center text-xs font-bold uppercase italic text-slate-400">
+                    Tidak ada invoice reseller ini pada periode tersebut.
+                  </div>
+                )}
+                {!isLoadingInvoices &&
+                  invoiceRows.map((row) => (
+                    <label
+                      key={row.saleId}
+                      className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3 text-sm ${
+                        row.settled
+                          ? 'border-slate-100 bg-slate-50'
+                          : 'cursor-pointer border-slate-200 bg-white hover:border-emerald-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          disabled={row.settled}
+                          checked={selectedSaleIds.has(row.saleId)}
+                          onChange={() => toggleSaleSelection(row.saleId)}
+                          className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+                        />
+                        <div>
+                          <div className="font-semibold text-slate-900">{row.saleNumber}</div>
+                          <div className="text-[11px] font-bold text-slate-400">
+                            {formatDate(row.saleDate)} • Omzet bersih {formatRupiah(row.netSalesAmount)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-emerald-600">{formatRupiah(row.commissionAmount)}</div>
+                        {row.settled ? (
+                          <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600">
+                            <CheckCircle2 size={12} />
+                            Sudah dicairkan {row.settlementDate ? formatDate(row.settlementDate) : ''}
+                            {row.referenceNo ? ` • ${row.referenceNo}` : ''}
+                          </div>
+                        ) : (
+                          <div className="mt-1 text-[10px] font-bold text-slate-400">Belum dicairkan</div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <SearchableSelect
+                  label="Akun Beban Komisi"
+                  options={expenseAccounts}
+                  value={settleDebitAccountId}
+                  onChange={setSettleDebitAccountId}
+                  placeholder="Pilih akun beban..."
+                />
+                <SearchableSelect
+                  label="Akun Kas/Bank Pembayar"
+                  options={cashAccounts}
+                  value={settleCreditAccountId}
+                  onChange={setSettleCreditAccountId}
+                  placeholder="Pilih akun kas/bank..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Metode Pembayaran</label>
+                  <input
+                    value={settlePaymentMethod}
+                    onChange={(event) => setSettlePaymentMethod(event.target.value)}
+                    className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
+                    placeholder="Contoh: TRANSFER, TUNAI"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">No. Referensi (opsional)</label>
+                  <input
+                    value={settleReferenceNo}
+                    onChange={(event) => setSettleReferenceNo(event.target.value)}
+                    className="h-12 w-full rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
+                    placeholder="Nomor bukti transfer, dsb."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 border-t border-slate-100 px-8 py-5 shrink-0">
+              <button
+                type="button"
+                onClick={closeSettleModal}
+                className="flex-1 cursor-pointer rounded-xl bg-slate-50 py-4 text-xs font-semibold text-slate-500 transition-all hover:bg-slate-100"
+              >
+                Tutup
+              </button>
+              <SafeButton
+                type="button"
+                variant="primary"
+                className="flex-1 justify-center"
+                disabled={isSettling || selectedSaleIds.size === 0}
+                isLoading={isSettling}
+                loadingText="Memproses..."
+                onClick={handleSettleSubmit}
+              >
+                Cairkan Komisi ({selectedSaleIds.size} invoice)
+              </SafeButton>
+            </div>
           </div>
         </div>
       )}
