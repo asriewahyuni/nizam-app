@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { queryPostgres } from '@/lib/db/postgres'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { checkCanManageCoA } from '@/modules/accounting/actions/coa.actions'
@@ -812,4 +813,119 @@ export async function deleteBankTransaction(orgId: string, transactionId: string
   revalidatePath('/reports')
   revalidatePath('/dashboard')
   return { success: true }
+}
+
+export type BankAccountCategoryAmount = {
+  categoryId: string
+  categoryName: string
+  amount: number
+}
+
+export type BankAccountCategoryBreakdownRow = {
+  bankAccountId: string
+  bankName: string
+  accountCode: string
+  accountName: string
+  income: BankAccountCategoryAmount[]
+  expense: BankAccountCategoryAmount[]
+  totalIncome: number
+  totalExpense: number
+}
+
+function normalizeBreakdownPeriod(period?: string | null) {
+  const normalized = String(period || '').trim()
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(normalized) ? normalized : new Date().toISOString().slice(0, 7)
+}
+
+/**
+ * Ringkasan pemasukan & pengeluaran per rekening kas/bank, dipecah per kategori
+ * (akun lawan di CoA) untuk satu periode (bulan). Semua rekening aktif selalu
+ * muncul sebagai baris, walau belum ada transaksi pada periode tsb.
+ */
+export async function getBankAccountCategoryBreakdown(
+  orgId: string,
+  branchId: string | null,
+  period?: string | null
+): Promise<BankAccountCategoryBreakdownRow[]> {
+  const normalizedPeriod = normalizeBreakdownPeriod(period)
+
+  const { rows: accountRows } = await queryPostgres<{
+    id: string
+    bank_name: string
+    account_code: string
+    account_name: string
+  }>(
+    `SELECT ba.id, ba.bank_name, a.code AS account_code, a.name AS account_name
+     FROM bank_accounts ba
+     JOIN accounts a ON a.id = ba.account_id
+     WHERE ba.org_id = $1
+       AND ba.is_active = true
+       AND ($2::uuid IS NULL OR ba.branch_id = $2)
+     ORDER BY a.code`,
+    [orgId, branchId]
+  )
+
+  const breakdownByAccount = new Map<string, BankAccountCategoryBreakdownRow>()
+  for (const row of accountRows) {
+    breakdownByAccount.set(row.id, {
+      bankAccountId: row.id,
+      bankName: row.bank_name,
+      accountCode: row.account_code,
+      accountName: row.account_name,
+      income: [],
+      expense: [],
+      totalIncome: 0,
+      totalExpense: 0,
+    })
+  }
+
+  if (breakdownByAccount.size === 0) return []
+
+  const { rows: aggRows } = await queryPostgres<{
+    bank_account_id: string
+    type: string
+    category_id: string | null
+    category_code: string | null
+    category_name: string | null
+    total_amount: string
+  }>(
+    `SELECT
+       bt.bank_account_id, bt.type,
+       cat.id AS category_id, cat.code AS category_code, cat.name AS category_name,
+       SUM(bt.amount) AS total_amount
+     FROM bank_transactions bt
+     LEFT JOIN accounts cat ON cat.id = bt.category_id
+     WHERE bt.org_id = $1
+       AND ($2::uuid IS NULL OR bt.branch_id = $2)
+       AND bt.status = 'POSTED'
+       AND bt.type IN ('IN', 'OUT')
+       AND to_char(bt.transaction_date, 'YYYY-MM') = $3
+     GROUP BY bt.bank_account_id, bt.type, cat.id, cat.code, cat.name`,
+    [orgId, branchId, normalizedPeriod]
+  )
+
+  for (const row of aggRows) {
+    const entry = breakdownByAccount.get(row.bank_account_id)
+    if (!entry) continue
+
+    const amount = Number(row.total_amount || 0)
+    const categoryLabel = row.category_id
+      ? `${row.category_code || ''} ${row.category_name || ''}`.trim()
+      : 'Tanpa Kategori'
+    const categoryAmount: BankAccountCategoryAmount = {
+      categoryId: row.category_id || 'uncategorized',
+      categoryName: categoryLabel,
+      amount,
+    }
+
+    if (row.type === 'IN') {
+      entry.income.push(categoryAmount)
+      entry.totalIncome += amount
+    } else {
+      entry.expense.push(categoryAmount)
+      entry.totalExpense += amount
+    }
+  }
+
+  return Array.from(breakdownByAccount.values())
 }

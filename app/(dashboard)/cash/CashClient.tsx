@@ -31,7 +31,15 @@ import {
   ExternalLink
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { createBankAccount, createBankTransaction, createInterOrgCapitalTransfer, deleteBankAccount, deleteBankTransaction } from '@/modules/cash/actions/bank.actions'
+import {
+  createBankAccount,
+  createBankTransaction,
+  createInterOrgCapitalTransfer,
+  deleteBankAccount,
+  deleteBankTransaction,
+  getBankAccountCategoryBreakdown,
+  type BankAccountCategoryBreakdownRow,
+} from '@/modules/cash/actions/bank.actions'
 import { processBankCSV } from '@/modules/cash/actions/reconcile.actions'
 import { formatDate, formatRupiah, getDateInTimeZone } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
@@ -164,8 +172,15 @@ export function CashClient({
     : bankAccounts
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'overview' | 'reconcile'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'reconcile' | 'breakdown'>('overview')
   const [selectedBankId, setSelectedBankId] = useState<string | null>(null)
+
+  // Ringkasan pemasukan/pengeluaran per kategori per rekening
+  const [breakdownPeriod, setBreakdownPeriod] = useState(() => getDateInTimeZone('Asia/Jakarta').slice(0, 7))
+  const [breakdownRows, setBreakdownRows] = useState<BankAccountCategoryBreakdownRow[]>([])
+  const [isLoadingBreakdown, setIsLoadingBreakdown] = useState(false)
+  const [breakdownError, setBreakdownError] = useState<string | null>(null)
+  const [breakdownMode, setBreakdownMode] = useState<'income' | 'expense'>('income')
 
   // Form state for account creation GL mapping
   const [glAccountId, setGlAccountId] = useState('')
@@ -299,6 +314,39 @@ export function CashClient({
       })
     }
   }, [searchParams, todayInJakarta])
+
+  useEffect(() => {
+    if (activeTab !== 'breakdown') return
+    let cancelled = false
+    setIsLoadingBreakdown(true)
+    setBreakdownError(null)
+    getBankAccountCategoryBreakdown(orgId, isAllBranchesView ? null : (activeBranchId || null), breakdownPeriod)
+      .then((rows) => {
+        if (cancelled) return
+        setBreakdownRows(rows)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setBreakdownError(err?.message || 'Gagal memuat ringkasan kategori.')
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingBreakdown(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab, breakdownPeriod, orgId, isAllBranchesView, activeBranchId])
+
+  const breakdownCategoryColumns = React.useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const row of breakdownRows) {
+      const list = breakdownMode === 'income' ? row.income : row.expense
+      for (const item of list) {
+        if (!seen.has(item.categoryId)) seen.set(item.categoryId, item.categoryName)
+      }
+    }
+    return Array.from(seen.entries()).map(([categoryId, categoryName]) => ({ categoryId, categoryName }))
+  }, [breakdownRows, breakdownMode])
 
   const handleCreateAccount = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -454,6 +502,12 @@ export function CashClient({
                   className={`px-6 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${activeTab === 'reconcile' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                >
                  Rekonsiliasi
+               </button>
+               <button type="button"
+                  onClick={() => setActiveTab('breakdown')}
+                  className={`px-6 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${activeTab === 'breakdown' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+               >
+                 Ringkasan Kategori
                </button>
             </div>
             {isParentOrg ? (
@@ -940,7 +994,7 @@ export function CashClient({
               </div>
             </div>
           </motion.div>
-        ) : (
+        ) : activeTab === 'reconcile' ? (
           <motion.div
             key="reconcile"
             initial={{ opacity: 0, x: 20 }}
@@ -1033,6 +1087,122 @@ export function CashClient({
                 </div>
               </SectionCard>
             </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="breakdown"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <SectionCard>
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <SectionHeader
+                  title="Ringkasan Pemasukan & Pengeluaran per Rekening"
+                  subtitle="Perbandingan tiap rekening kas/bank, dipecah per kategori (akun lawan)."
+                  icon={Wallet}
+                />
+                <div className="flex items-center gap-3">
+                  <div className="flex bg-slate-100/60 p-1 rounded-xl border border-slate-100 shadow-inner">
+                    <button type="button"
+                      onClick={() => setBreakdownMode('income')}
+                      className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${breakdownMode === 'income' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      Pemasukan
+                    </button>
+                    <button type="button"
+                      onClick={() => setBreakdownMode('expense')}
+                      className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-wide rounded-xl transition-all ${breakdownMode === 'expense' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      Pengeluaran
+                    </button>
+                  </div>
+                  <input
+                    type="month"
+                    value={breakdownPeriod}
+                    onChange={(e) => setBreakdownPeriod(e.target.value)}
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {breakdownError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-semibold text-rose-700 mb-4">
+                  {breakdownError}
+                </div>
+              )}
+
+              {isLoadingBreakdown ? (
+                <div className="py-24 text-center text-xs font-semibold uppercase tracking-wide text-slate-300 animate-pulse">
+                  Memuat ringkasan...
+                </div>
+              ) : breakdownRows.length === 0 ? (
+                <div className="py-24 text-center text-xs font-semibold uppercase tracking-wide text-slate-300">
+                  Belum ada rekening kas/bank.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50 border-b border-slate-100">
+                        <th className="px-6 py-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wide sticky left-0 bg-slate-50/95 backdrop-blur">Rekening</th>
+                        {breakdownCategoryColumns.map((col) => (
+                          <th key={col.categoryId} className="px-6 py-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right whitespace-nowrap">
+                            {col.categoryName}
+                          </th>
+                        ))}
+                        <th className={`px-6 py-4 text-[10px] font-semibold uppercase tracking-wide text-right whitespace-nowrap ${breakdownMode === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          Total {breakdownMode === 'income' ? 'Pemasukan' : 'Pengeluaran'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {breakdownRows.map((row) => {
+                        const list = breakdownMode === 'income' ? row.income : row.expense
+                        const total = breakdownMode === 'income' ? row.totalIncome : row.totalExpense
+                        const amountByCategory = new Map(list.map((item) => [item.categoryId, item.amount]))
+                        return (
+                          <tr key={row.bankAccountId} className="border-b border-slate-50 hover:bg-slate-50/40 transition-colors">
+                            <td className="px-6 py-4 text-xs font-semibold text-slate-900 sticky left-0 bg-white">
+                              <div>{row.bankName}</div>
+                              <div className="text-[10px] font-medium text-slate-400">{row.accountCode} {row.accountName}</div>
+                            </td>
+                            {breakdownCategoryColumns.map((col) => (
+                              <td key={col.categoryId} className="px-6 py-4 text-xs font-medium text-slate-600 text-right whitespace-nowrap">
+                                {amountByCategory.has(col.categoryId) ? formatRupiah(amountByCategory.get(col.categoryId) || 0) : '-'}
+                              </td>
+                            ))}
+                            <td className={`px-6 py-4 text-xs font-bold text-right whitespace-nowrap ${breakdownMode === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {formatRupiah(total)}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-slate-100 bg-slate-50/50">
+                        <td className="px-6 py-4 text-xs font-bold text-slate-900 uppercase tracking-wide sticky left-0 bg-slate-50/95">Total</td>
+                        {breakdownCategoryColumns.map((col) => {
+                          const columnTotal = breakdownRows.reduce((sum, row) => {
+                            const list = breakdownMode === 'income' ? row.income : row.expense
+                            const found = list.find((item) => item.categoryId === col.categoryId)
+                            return sum + (found?.amount || 0)
+                          }, 0)
+                          return (
+                            <td key={col.categoryId} className="px-6 py-4 text-xs font-bold text-slate-700 text-right whitespace-nowrap">
+                              {formatRupiah(columnTotal)}
+                            </td>
+                          )
+                        })}
+                        <td className={`px-6 py-4 text-xs font-bold text-right whitespace-nowrap ${breakdownMode === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {formatRupiah(breakdownRows.reduce((sum, row) => sum + (breakdownMode === 'income' ? row.totalIncome : row.totalExpense), 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
           </motion.div>
         )}
       </AnimatePresence>
