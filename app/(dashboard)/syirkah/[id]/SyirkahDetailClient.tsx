@@ -52,7 +52,7 @@ function createDraftMemberId() {
   return `${randomSegment()}${randomSegment()}-${randomSegment()}-4${randomSegment().slice(1)}-a${randomSegment().slice(1)}-${randomSegment()}${randomSegment()}${randomSegment()}`
 }
 
-export default function SyirkahDetailClient({ orgId, contract, members, netProfit, profitDistribution, accounts, coreJournal, profitSharingJournal }: any) {
+export default function SyirkahDetailClient({ orgId, contract, members, netProfit, profitDistribution, accounts, coreJournal, profitSharingJournal, profitSharingHistory, profitSharingCurrentPeriod }: any) {
   const router = useRouter()
   const normalizedContractStatus = normalizeLocalContractStatus(contract.status)
   const canEstimateProfit = typeof netProfit === 'number' && Number.isFinite(netProfit)
@@ -78,6 +78,10 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
   const [isSyncingCore, setIsSyncingCore] = useState(false)
   const [isSyncingProfitSharing, setIsSyncingProfitSharing] = useState(false)
   const [showQR, setShowQR] = useState(false)
+  const fallbackCurrentPeriod = new Date().toISOString().slice(0, 7)
+  const [profitSharingPeriod, setProfitSharingPeriod] = useState(
+    profitSharingCurrentPeriod || fallbackCurrentPeriod
+  )
 
   // Member form state
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false)
@@ -157,22 +161,23 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
     }
   }
 
-  const runProfitSharingSync = async (showSuccessAlert = false) => {
+  const runProfitSharingSync = async (showSuccessAlert = false, period?: string) => {
     setIsSyncingProfitSharing(true)
     try {
-      const result = await syncSyirkahProfitSharingToCore(contract.id)
+      const result = await syncSyirkahProfitSharingToCore(contract.id, period ? { period } : {})
       if ((result as any).error) {
         alert(`Posting bagi hasil belum berhasil disinkronkan: ${(result as any).error}`)
         return false
       }
 
       if (showSuccessAlert) {
+        const resultPeriod = String((result as any).period || period || '').trim()
         if ((result as any).skipped && (result as any).message) {
           alert((result as any).message)
         } else {
           const entryNumber = String((result as any).entryNumber || '').trim()
           if (entryNumber) {
-            alert(`Bagi hasil syirkah tersinkron ke jurnal Core ${entryNumber}.`)
+            alert(`Bagi hasil syirkah periode ${resultPeriod} tersinkron ke jurnal Core ${entryNumber}.`)
           } else {
             alert((result as any).message || 'Posting bagi hasil syirkah di Core sudah diperbarui.')
           }
@@ -538,18 +543,30 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-slate-800">Posting Bagi Hasil</h3>
               {!isEditingContract && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await runProfitSharingSync(true)
-                    router.refresh()
-                  }}
-                  disabled={isSyncingProfitSharing}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <RefreshCw size={14} className={isSyncingProfitSharing ? 'animate-spin' : ''} />
-                  {isSyncingProfitSharing ? 'Proses...' : 'Posting / Sinkronkan'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <label className="sr-only" htmlFor="profit-sharing-period">Periode Bagi Hasil</label>
+                  <input
+                    id="profit-sharing-period"
+                    type="month"
+                    value={profitSharingPeriod}
+                    max={profitSharingCurrentPeriod || fallbackCurrentPeriod}
+                    onChange={(event) => setProfitSharingPeriod(event.target.value)}
+                    disabled={isSyncingProfitSharing}
+                    className="cursor-pointer rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await runProfitSharingSync(true, profitSharingPeriod)
+                      router.refresh()
+                    }}
+                    disabled={isSyncingProfitSharing || !profitSharingPeriod}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <RefreshCw size={14} className={isSyncingProfitSharing ? 'animate-spin' : ''} />
+                    {isSyncingProfitSharing ? 'Proses...' : 'Posting / Sinkronkan'}
+                  </button>
+                </div>
               )}
             </div>
 
@@ -639,9 +656,44 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                 </div>
                 <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
                   {canPostProfitSharing
-                    ? 'Saat tombol dijalankan, sistem akan membuat jurnal otomatis untuk pembagian laba syirkah dan menghindari jurnal dobel bila nominalnya belum berubah.'
+                    ? 'Pilih periode (bulan) di atas lalu klik Posting/Sinkronkan. Tiap periode punya jurnal sendiri — posting ulang di periode yang sama tidak akan membuat jurnal dobel, tapi periode baru akan membuat jurnal baru meski nominalnya sama.'
                     : 'Sistem hanya akan memposting bagi hasil jika akad sudah ACTIVE/COMPLETED dan nominal dasar pembagian bernilai positif.'}
                 </p>
+
+                <div>
+                  <span className="block text-xs font-bold text-slate-400 mb-2">Riwayat Posting Bagi Hasil</span>
+                  {!Array.isArray(profitSharingHistory) || profitSharingHistory.length === 0 ? (
+                    <p className="text-xs italic text-slate-400">Belum ada riwayat posting.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {profitSharingHistory.map((row: any) => (
+                        <div
+                          key={row.id}
+                          className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs"
+                        >
+                          <div>
+                            <span className="font-bold text-slate-700">{row.period || 'Periode lama'}</span>
+                            <span className="ml-2 text-slate-400">
+                              {row.entry_number} • {row.entry_date ? formatDate(row.entry_date) : 'Tanggal belum tersedia'}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-bold text-emerald-700">{formatRupiah(row.amount)}</span>
+                            <span
+                              className={`ml-2 inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                                row.status === 'POSTED'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-amber-100 text-amber-700'
+                              }`}
+                            >
+                              {row.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

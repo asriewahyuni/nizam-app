@@ -1,8 +1,10 @@
 'use server'
 
+import { createHash } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { queryPostgres } from '@/lib/db/postgres'
 import { revalidatePath } from 'next/cache'
+import { getDateInTimeZone } from '@/lib/utils'
 import { getProfitLoss } from '@/modules/accounting/actions/reports.actions'
 import { createJournalEntry, postJournalEntry } from '@/modules/accounting/actions/journal.actions'
 import {
@@ -81,6 +83,22 @@ type SyirkahCoreSyncOptions = {
   skipRevalidate?: boolean
 }
 
+type SyirkahProfitSharingSyncOptions = SyirkahCoreSyncOptions & {
+  /** Periode bagi hasil yang diposting, format YYYY-MM. Default: bulan berjalan (WIB). */
+  period?: string
+}
+
+export type SyirkahProfitSharingHistoryRow = {
+  id: string
+  entry_number: string
+  entry_date: string
+  status: string
+  /** null untuk jurnal lama sebelum fitur period ditambahkan */
+  period: string | null
+  amount: number
+  source: string | null
+}
+
 type SyirkahCoreJournalDetail = SyirkahCoreJournalSummary & {
   reference_type?: string | null
   lines: Array<{
@@ -154,6 +172,39 @@ function isReferenceConstraintError(error: unknown, constraintName = 'uq_journal
     normalizedMessage.includes('duplicate key')
     && normalizedMessage.includes(constraintName.toLowerCase())
   )
+}
+
+const SYIRKAH_PROFIT_SHARING_PERIOD_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/
+
+function currentSyirkahProfitSharingPeriod() {
+  return getDateInTimeZone('Asia/Jakarta', new Date()).slice(0, 7)
+}
+
+function resolveSyirkahProfitSharingPeriod(rawPeriod?: unknown): { period: string } | { error: string } {
+  const currentPeriod = currentSyirkahProfitSharingPeriod()
+  const normalized = String(rawPeriod || '').trim()
+
+  if (!normalized) return { period: currentPeriod }
+  if (!SYIRKAH_PROFIT_SHARING_PERIOD_PATTERN.test(normalized)) {
+    return { error: 'Format periode bagi hasil tidak valid. Gunakan format YYYY-MM.' }
+  }
+  if (normalized > currentPeriod) {
+    return { error: 'Periode bagi hasil belum bisa diposting untuk bulan yang akan datang.' }
+  }
+
+  return { period: normalized }
+}
+
+/** Turunkan reference_id deterministik dari (contractId, period) agar tiap periode punya jurnal terpisah, memanfaatkan unique constraint uq_journal_ref_per_org yang sudah ada di journal_entries. */
+function deriveSyirkahProfitSharingReferenceId(contractId: string, period: string) {
+  const hash = createHash('sha256').update(`syirkah_profit_sharing:${contractId}:${period}`).digest('hex')
+  return [
+    hash.slice(0, 8),
+    hash.slice(8, 12),
+    hash.slice(12, 16),
+    hash.slice(16, 20),
+    hash.slice(20, 32),
+  ].join('-')
 }
 
 function formatSyirkahDateOnly(date: Date) {
@@ -371,12 +422,14 @@ function buildSyirkahProfitSharingDescription(contractTitle: unknown) {
 function buildSyirkahProfitSharingNotes(
   contract: SyirkahCoreContractRow,
   distribution: SyirkahContractDistributionResolution,
-  amount: number
+  amount: number,
+  period: string
 ) {
   return [
     '[AUTO_SYIRKAH_PROFIT_SHARING]',
     `contract_id=${contract.id}`,
     `contract_type=${String(contract.contract_type || 'SYIRKAH').trim() || 'SYIRKAH'}`,
+    `distribution_period=${period}`,
     `distribution_source=${distribution.source}`,
     `distribution_status=${distribution.status}`,
     `distribution_amount=${amount.toFixed(2)}`,
@@ -387,6 +440,27 @@ function isSyirkahProfitSharingJournalNotes(notes: unknown, contractId: string) 
   const normalizedNotes = String(notes || '')
   if (!normalizedNotes.includes('[AUTO_SYIRKAH_PROFIT_SHARING]')) return false
   return normalizedNotes.includes(`contract_id=${contractId}`)
+}
+
+function isSyirkahProfitSharingJournalNotesForPeriod(notes: unknown, contractId: string, period: string) {
+  if (!isSyirkahProfitSharingJournalNotes(notes, contractId)) return false
+  return String(notes || '').includes(`distribution_period=${period}`)
+}
+
+function parseSyirkahProfitSharingNotesTags(notes: unknown) {
+  const normalizedNotes = String(notes || '')
+  const extract = (key: string) => {
+    const match = normalizedNotes.match(new RegExp(`^${key}=(.*)$`, 'm'))
+    return match ? match[1].trim() : null
+  }
+
+  return {
+    contractId: extract('contract_id'),
+    period: extract('distribution_period'),
+    source: extract('distribution_source'),
+    status: extract('distribution_status'),
+    amount: toMoneyNumber(extract('distribution_amount')),
+  }
 }
 
 async function resolveSyirkahCoreAccounts(
@@ -651,17 +725,20 @@ async function getSyirkahCoreJournalDetail(
   }
 }
 
-async function findSyirkahProfitSharingJournalByReference(
+async function findSyirkahProfitSharingJournalForPeriod(
   supabase: any,
-  contract: Pick<SyirkahCoreContractRow, 'id' | 'org_id'>
+  contract: Pick<SyirkahCoreContractRow, 'id' | 'org_id'>,
+  period: string
 ): Promise<SyirkahCoreJournalDetail | null> {
+  const periodReferenceId = deriveSyirkahProfitSharingReferenceId(contract.id, period)
+
   const { data, error } = await (supabase as any)
     .from('journal_entries')
     .select('id, status, notes, reference_type')
     .eq('org_id', contract.org_id)
-    .eq('reference_id', contract.id)
+    .eq('reference_id', periodReferenceId)
     .order('created_at', { ascending: false })
-    .limit(20)
+    .limit(5)
 
   if (error) return null
 
@@ -671,14 +748,14 @@ async function findSyirkahProfitSharingJournalByReference(
     return (
       referenceType === 'SYIRKAH_PROFIT_SHARING'
       || referenceType === 'MANUAL'
-      || isSyirkahProfitSharingJournalNotes(row.notes, contract.id)
+      || isSyirkahProfitSharingJournalNotesForPeriod(row.notes, contract.id, period)
     )
   })
 
   const preferredRow =
     filteredRows.find((row) =>
       String(row.status || '').trim().toUpperCase() !== 'VOIDED'
-      && isSyirkahProfitSharingJournalNotes(row.notes, contract.id)
+      && isSyirkahProfitSharingJournalNotesForPeriod(row.notes, contract.id, period)
     )
     || filteredRows.find((row) =>
       String(row.status || '').trim().toUpperCase() !== 'VOIDED'
@@ -689,13 +766,46 @@ async function findSyirkahProfitSharingJournalByReference(
       && String(row.reference_type || '').trim().toUpperCase() === 'MANUAL'
     )
     || filteredRows.find((row) => String(row.status || '').trim().toUpperCase() !== 'VOIDED')
-    || filteredRows.find((row) => isSyirkahProfitSharingJournalNotes(row.notes, contract.id))
+    || filteredRows.find((row) => isSyirkahProfitSharingJournalNotesForPeriod(row.notes, contract.id, period))
     || filteredRows[0]
     || null
 
   if (!preferredRow?.id) return null
 
   return getSyirkahCoreJournalDetail(supabase, String(preferredRow.id), contract.org_id)
+}
+
+export async function getSyirkahProfitSharingHistory(
+  orgId: string,
+  contractId: string
+): Promise<SyirkahProfitSharingHistoryRow[]> {
+  const supabase = await createClient()
+
+  const { data, error } = await (supabase as any)
+    .from('journal_entries')
+    .select('id, entry_number, entry_date, status, notes')
+    .eq('org_id', orgId)
+    .ilike('notes', '%[AUTO_SYIRKAH_PROFIT_SHARING]%')
+    .ilike('notes', `%contract_id=${contractId}%`)
+    .neq('status', 'VOIDED')
+    .order('entry_date', { ascending: false })
+    .limit(100)
+
+  if (error) return []
+
+  const rows = (data as Array<Record<string, unknown>> | null) || []
+  return rows.map((row) => {
+    const tags = parseSyirkahProfitSharingNotesTags(row.notes)
+    return {
+      id: String(row.id),
+      entry_number: String(row.entry_number || ''),
+      entry_date: String(row.entry_date || ''),
+      status: String(row.status || ''),
+      period: tags.period,
+      amount: tags.amount,
+      source: tags.source,
+    }
+  })
 }
 
 async function syncSyirkahProfitSharingJournalInPlace(
@@ -1201,31 +1311,31 @@ export async function deleteSyirkahContract(contractId: string, orgId: string) {
     }
   }
 
-  const fallbackProfitSharingJournal =
-    contract?.id && contract?.org_id
-      ? await findSyirkahProfitSharingJournalByReference(supabase, {
-        id: String(contract.id),
-        org_id: String(contract.org_id),
-      })
-      : null
-  const profitSharingJournalEntryId =
-    (hasDedicatedProfitSharingColumns && contract.profit_sharing_journal_entry_id
-      ? String(contract.profit_sharing_journal_entry_id)
-      : '')
-    || fallbackProfitSharingJournal?.id
-    || null
+  // Akad dihapus permanen: bersihkan SEMUA jurnal bagi hasil lintas periode, bukan cuma periode berjalan.
+  const allProfitSharingJournalIds = new Set<string>()
+  if (hasDedicatedProfitSharingColumns && contract.profit_sharing_journal_entry_id) {
+    allProfitSharingJournalIds.add(String(contract.profit_sharing_journal_entry_id))
+  }
+  if (contract?.id && contract?.org_id) {
+    const profitSharingHistory = await getSyirkahProfitSharingHistory(String(contract.org_id), String(contract.id))
+    for (const row of profitSharingHistory) {
+      allProfitSharingJournalIds.add(row.id)
+    }
+  }
 
-  if (profitSharingJournalEntryId) {
+  if (allProfitSharingJournalIds.size > 0) {
     const { data: { user } } = await supabase.auth.getUser()
-    const cleanupResult = await cleanupSyirkahCoreJournal(supabase, {
-      orgId,
-      entryId: profitSharingJournalEntryId,
-      userId: user?.id || null,
-      reason: 'Syirkah dihapus oleh pengguna.',
-    })
+    for (const entryId of allProfitSharingJournalIds) {
+      const cleanupResult = await cleanupSyirkahCoreJournal(supabase, {
+        orgId,
+        entryId,
+        userId: user?.id || null,
+        reason: 'Syirkah dihapus oleh pengguna.',
+      })
 
-    if ('error' in cleanupResult) {
-      return { error: 'Gagal membersihkan jurnal bagi hasil sebelum menghapus akad: ' + cleanupResult.error }
+      if ('error' in cleanupResult) {
+        return { error: 'Gagal membersihkan jurnal bagi hasil sebelum menghapus akad: ' + cleanupResult.error }
+      }
     }
   }
 
@@ -1549,7 +1659,7 @@ export async function syncSyirkahCapitalToCore(
  */
 export async function syncSyirkahProfitSharingToCore(
   contractId: string,
-  options: SyirkahCoreSyncOptions = {}
+  options: SyirkahProfitSharingSyncOptions = {}
 ) {
   const supabase = await createClient()
   const shouldRevalidate = !options.skipRevalidate
@@ -1560,6 +1670,13 @@ export async function syncSyirkahProfitSharingToCore(
   if (!user?.id) {
     return { error: 'Tidak terautentikasi.' }
   }
+
+  const resolvedPeriod = resolveSyirkahProfitSharingPeriod(options.period)
+  if ('error' in resolvedPeriod) {
+    return { error: resolvedPeriod.error }
+  }
+  const period = resolvedPeriod.period
+  const isCurrentPeriod = period === currentSyirkahProfitSharingPeriod()
 
   const contractResult = await loadSyirkahProfitSharingContractCompat(supabase, contractId)
   if (contractResult.error) {
@@ -1574,11 +1691,13 @@ export async function syncSyirkahProfitSharingToCore(
     return { error: 'Akad syirkah tidak ditemukan (id tidak sesuai).' }
   }
 
+  const periodReferenceId = deriveSyirkahProfitSharingReferenceId(normalizedContract.id, period)
+
   let cachedExistingJournal: SyirkahCoreJournalDetail | null | undefined
   const getExistingProfitSharingJournal = async () => {
     if (cachedExistingJournal !== undefined) return cachedExistingJournal
 
-    if (normalizedContract.profit_sharing_journal_entry_id) {
+    if (isCurrentPeriod && normalizedContract.profit_sharing_journal_entry_id) {
       cachedExistingJournal = await getSyirkahCoreJournalDetail(
         supabase,
         normalizedContract.profit_sharing_journal_entry_id,
@@ -1587,12 +1706,15 @@ export async function syncSyirkahProfitSharingToCore(
       if (cachedExistingJournal) return cachedExistingJournal
     }
 
-    cachedExistingJournal = await findSyirkahProfitSharingJournalByReference(supabase, normalizedContract)
+    cachedExistingJournal = await findSyirkahProfitSharingJournalForPeriod(supabase, normalizedContract, period)
     return cachedExistingJournal
   }
 
   const persistProfitSharingLink = async (entryId: string | null) => {
     if (!hasDedicatedColumns) return { success: true as const }
+    // Kolom profit_sharing_journal_entry_id hanya boleh menunjuk ke jurnal periode berjalan;
+    // sinkron untuk periode lain tidak boleh menimpa pointer "current" ini.
+    if (!isCurrentPeriod) return { success: true as const }
 
     const { error: updateError } = await (supabase as any)
       .from('syirkah_contracts')
@@ -1651,6 +1773,7 @@ export async function syncSyirkahProfitSharingToCore(
     return {
       success: true,
       skipped: true,
+      period,
       message,
     }
   }
@@ -1685,13 +1808,11 @@ export async function syncSyirkahProfitSharingToCore(
 
   const { cashAccount, equityAccount } = resolvedAccounts.data
   const existingJournal = await getExistingProfitSharingJournal()
-  // Gunakan tanggal hari ini untuk posting baru agar tidak terkena periode fiskal yang sudah ditutup.
-  // Jika journal sudah ada sebelumnya, pakai tanggal yang lama agar konsisten.
-  const entryDate = existingJournal?.entry_date
-    ? normalizeSyirkahDate(existingJournal.entry_date)
-    : normalizeSyirkahDate(new Date())
+  // Tanggal jurnal mengikuti tanggal 1 dari periode yang diposting, supaya guard periode
+  // fiskal yang sudah ditutup mengevaluasi periode yang relevan (bukan selalu "hari ini").
+  const entryDate = normalizeSyirkahDate(`${period}-01`)
   const description = buildSyirkahProfitSharingDescription(normalizedContract.title)
-  const notes = buildSyirkahProfitSharingNotes(normalizedContract, distribution, distributionAmount)
+  const notes = buildSyirkahProfitSharingNotes(normalizedContract, distribution, distributionAmount, period)
 
   if (isSyirkahProfitSharingJournalAligned(existingJournal, {
     entryDate,
@@ -1726,7 +1847,8 @@ export async function syncSyirkahProfitSharingToCore(
       skipped: true,
       entryId: existingJournal?.id || normalizedContract.profit_sharing_journal_entry_id || null,
       entryNumber: existingJournal?.entry_number || null,
-      message: 'Posting bagi hasil syirkah di Core sudah sinkron.',
+      period,
+      message: `Posting bagi hasil syirkah periode ${period} di Core sudah sinkron.`,
     }
   }
 
@@ -1762,7 +1884,8 @@ export async function syncSyirkahProfitSharingToCore(
       entryId: syncExistingResult.entryId,
       entryNumber: syncExistingResult.entryNumber,
       amount: distributionAmount,
-      message: 'Posting bagi hasil syirkah berhasil diperbarui pada jurnal yang sudah ada.',
+      period,
+      message: `Posting bagi hasil syirkah periode ${period} berhasil diperbarui pada jurnal yang sudah ada.`,
     }
   }
 
@@ -1772,7 +1895,7 @@ export async function syncSyirkahProfitSharingToCore(
     entry_date: entryDate,
     description,
     ...(useLegacyReferenceType ? {} : { reference_type: 'SYIRKAH_PROFIT_SHARING' as const }),
-    reference_id: normalizedContract.id,
+    reference_id: periodReferenceId,
     notes,
     auto_post: true,
     skipRevalidate: options.skipRevalidate,
@@ -1836,7 +1959,8 @@ export async function syncSyirkahProfitSharingToCore(
         entryId: syncExistingResult.entryId,
         entryNumber: syncExistingResult.entryNumber,
         amount: distributionAmount,
-        message: 'Posting bagi hasil syirkah memakai jurnal yang sudah ada untuk referensi akad ini.',
+        period,
+        message: `Posting bagi hasil syirkah periode ${period} memakai jurnal yang sudah ada untuk referensi akad ini.`,
       }
     }
   }
@@ -1934,7 +2058,8 @@ export async function syncSyirkahProfitSharingToCore(
     entryId: newEntryId,
     entryNumber: newEntryNumber || null,
     amount: distributionAmount,
-    message: 'Bagi hasil syirkah berhasil diposting ke jurnal Core.',
+    period,
+    message: `Bagi hasil syirkah periode ${period} berhasil diposting ke jurnal Core.`,
   }
 }
 

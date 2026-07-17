@@ -6,6 +6,7 @@ import {
   getSyirkahContracts,
   getSyirkahMembers,
   getSyirkahWitnesses,
+  getSyirkahProfitSharingHistory,
   syncSyirkahCapitalToCore,
   syncSyirkahProfitSharingToCore,
 } from '@/modules/syirkah/actions/syirkah.actions'
@@ -14,6 +15,7 @@ import SyirkahDetailClient from './SyirkahDetailClient'
 import SyirkahWizard from './SyirkahWizard'
 import { getProfitLoss } from '@/modules/accounting/actions/reports.actions'
 import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
+import { getDateInTimeZone } from '@/lib/utils'
 import {
   buildSyirkahDistributionContext,
   resolveSyirkahContractDistribution,
@@ -63,6 +65,9 @@ export default async function SyirkahDetailPage({ params, searchParams }: {
     normalizedStatus !== 'ACTIVE' && normalizedStatus !== 'COMPLETED' && !!contract.profit_sharing_journal_entry_id
 
   let shouldRefreshContract = false
+  // Auto-sync di sini selalu tanpa `period` eksplisit → selalu menyasar periode bulan berjalan,
+  // supaya page load tidak diam-diam menyentuh jurnal bagi hasil periode lain.
+  let currentPeriodProfitSharingEntryId: string | null = null
   if (shouldEnsureCoreSync || shouldCleanupPrematureCoreSync) {
     const syncResult = await syncSyirkahCapitalToCore(contractId, {
       skipRevalidate: true,
@@ -79,6 +84,9 @@ export default async function SyirkahDetailPage({ params, searchParams }: {
     if (!('error' in syncResult)) {
       shouldRefreshContract = true
     }
+    if ('entryId' in syncResult && syncResult.entryId) {
+      currentPeriodProfitSharingEntryId = String(syncResult.entryId)
+    }
   }
 
   if (shouldRefreshContract) {
@@ -88,19 +96,23 @@ export default async function SyirkahDetailPage({ params, searchParams }: {
 
   const members = await getSyirkahMembers(contractId)
   const witnesses = await getSyirkahWitnesses(contractId)
-  const [pnl, contracts, accounts, coreJournal, profitSharingJournal] = await Promise.all([
+  const profitSharingJournalId =
+    currentPeriodProfitSharingEntryId || contract.profit_sharing_journal_entry_id || null
+  const [pnl, contracts, accounts, coreJournal, profitSharingJournal, profitSharingHistory] = await Promise.all([
     getProfitLoss(activeOrgData.org.id, '2000-01-01'),
     getSyirkahContracts(activeOrgData.org.id),
     getChartOfAccounts(activeOrgData.org.id),
     contract.core_journal_entry_id
       ? getSyirkahCoreJournal(String(contract.core_journal_entry_id), activeOrgData.org.id)
       : Promise.resolve(null),
-    contract.profit_sharing_journal_entry_id
-      ? getSyirkahCoreJournal(String(contract.profit_sharing_journal_entry_id), activeOrgData.org.id)
+    profitSharingJournalId
+      ? getSyirkahCoreJournal(String(profitSharingJournalId), activeOrgData.org.id)
       : Promise.resolve(null),
+    getSyirkahProfitSharingHistory(activeOrgData.org.id, contractId),
   ])
   const distributionContext = buildSyirkahDistributionContext(contracts, pnl.netProfit || 0)
   const contractDistribution = resolveSyirkahContractDistribution(distributionContext, contract)
+  const profitSharingCurrentPeriod = getDateInTimeZone('Asia/Jakarta').slice(0, 7)
 
   return (
     <div className="w-full">
@@ -121,6 +133,8 @@ export default async function SyirkahDetailPage({ params, searchParams }: {
           accounts={accounts}
           coreJournal={coreJournal}
           profitSharingJournal={profitSharingJournal}
+          profitSharingHistory={profitSharingHistory}
+          profitSharingCurrentPeriod={profitSharingCurrentPeriod}
         />
       )}
     </div>
