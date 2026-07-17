@@ -13,8 +13,15 @@ ALTER TABLE public.sales_commission_settlement_items
 ALTER TABLE public.sales_commission_settlement_items
   ALTER COLUMN payment_id SET NOT NULL;
 
-ALTER TABLE public.sales_commission_settlement_items
-  ADD CONSTRAINT sales_commission_settlement_items_payment_id_key UNIQUE (payment_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'sales_commission_settlement_items_payment_id_key'
+  ) THEN
+    ALTER TABLE public.sales_commission_settlement_items
+      ADD CONSTRAINT sales_commission_settlement_items_payment_id_key UNIQUE (payment_id);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_sales_commission_settlement_items_payment
   ON public.sales_commission_settlement_items(payment_id);
