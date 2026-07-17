@@ -17,6 +17,7 @@ import {
 import { listActiveSalesWarehouses } from '@/modules/sales/lib/warehouse-branch-compat.server'
 import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
 import { getDateInTimeZone } from '@/lib/utils'
+import { voidJournalEntry } from '@/modules/accounting/actions/journal.actions'
 
 type ActiveBranchResult =
   | { branchId: string }
@@ -1901,10 +1902,20 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
   return { success: true }
 }
 
-export async function voidSale(orgId: string, saleId: string) {
+export async function voidSale(orgId: string, saleId: string, reason?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const { rows: memberRows } = await queryPostgres<{ role: string }>(
+    `SELECT role FROM org_members WHERE org_id = $1 AND user_id = $2 AND is_active = true LIMIT 1`,
+    [orgId, user.id]
+  )
+  const memberRole = memberRows[0]?.role
+  if (memberRole !== 'owner' && memberRole !== 'admin') {
+    return { error: 'Hanya owner atau admin yang boleh membatalkan penjualan.' }
+  }
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk membatalkan sales order.'
@@ -1930,12 +1941,39 @@ export async function voidSale(orgId: string, saleId: string) {
     return { error: buildClosedPeriodError('Pembatalan Penjualan', voidSaleDate, closedPeriodForVoid) }
   }
 
-  // 2. Atomic void to keep journal, stock_movements, and inventory_stocks in sync.
+  const voidReason = String(reason || '').trim() || 'Pembatalan Sales Order'
+
+  // 2. Balikkan pembayaran yang sudah masuk SEBELUM sale itu sendiri di-void, supaya kas/bank
+  // dan AR tetap sinkron (bukan cuma menandai sale VOIDED sementara uangnya masih tercatat masuk).
+  const { rows: paymentRows } = await queryPostgres<{ id: string }>(
+    `SELECT id FROM sales_payments WHERE sale_id = $1 AND org_id = $2`,
+    [saleId, orgId]
+  )
+  if (paymentRows.length > 0) {
+    const paymentIds = paymentRows.map((row) => row.id)
+    const { rows: paymentJournalRows } = await queryPostgres<{ id: string }>(
+      `SELECT id FROM journal_entries
+       WHERE org_id = $1 AND reference_type = 'PAYMENT_IN' AND reference_id = ANY($2::uuid[]) AND status = 'POSTED'`,
+      [orgId, paymentIds]
+    )
+    for (const journalRow of paymentJournalRows) {
+      const voidPaymentResult = await voidJournalEntry(journalRow.id, orgId, `${voidReason} (pembayaran dibalikkan otomatis)`)
+      if ('error' in voidPaymentResult) {
+        return { error: 'Gagal membalikkan pembayaran sebelum membatalkan penjualan: ' + voidPaymentResult.error }
+      }
+    }
+
+    // Pembayaran lama yang dicatat tanpa jurnal (mis. via paySale() yang deprecated) tidak
+    // tersentuh oleh voidJournalEntry di atas — bersihkan langsung supaya tidak jadi orphan.
+    await queryPostgres(`DELETE FROM sales_payments WHERE sale_id = $1 AND org_id = $2`, [saleId, orgId])
+  }
+
+  // 3. Atomic void to keep journal, stock_movements, and inventory_stocks in sync.
   const { data: rpcRes, error: rpcErr } = await (supabase as any).rpc('void_sale_atomic', {
     p_org_id: orgId,
     p_sale_id: saleId,
     p_user_id: user.id,
-    p_reason: 'Pembatalan Sales Order',
+    p_reason: voidReason,
   })
 
   if (rpcErr || !rpcRes?.success) {
@@ -1962,7 +2000,7 @@ export async function voidSale(orgId: string, saleId: string) {
     }
   }
 
-  // 5. Cancel any pending approval requests for this order
+  // 4. Cancel any pending approval requests for this order
   await (supabase as any)
     .from('approval_requests')
     .update({ status: 'VOIDED', reason: 'Sales Order Dibatalkan', decided_at: new Date().toISOString() })

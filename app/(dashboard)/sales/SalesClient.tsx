@@ -315,7 +315,9 @@ export default function SalesClient({
   coa,
   orgSettings = {},
   activeBranchName,
+  userRole,
 }: any) {
+  const canVoidSale = userRole === 'owner' || userRole === 'admin'
   const [showModal, setShowModal] = useState(false)
   const { confirm, ConfirmUI } = useConfirm()
   const [showBulkImport, setShowBulkImport] = useState(false)
@@ -852,7 +854,12 @@ export default function SalesClient({
   }
 
   const handleVoidPO = async (id: string) => {
-    if (!await confirm('Anda yakin ingin membatalkan Penjualan ini?')) return
+    const sale = (sales || []).find((s: any) => s.id === id)
+    const hasPayments = (sale?.sales_payments || []).length > 0
+    const confirmMessage = hasPayments
+      ? 'Penjualan ini sudah punya pembayaran masuk. Membatalkannya akan menghapus catatan pembayaran tersebut dan membalikkan jurnal kas/banknya. Lanjutkan?'
+      : 'Anda yakin ingin membatalkan Penjualan ini?'
+    if (!await confirm(confirmMessage)) return
     setLoading(true)
     const res: any = await voidSale(orgId, id)
     if (res?.error) setError(res.error)
@@ -1227,8 +1234,8 @@ export default function SalesClient({
                            </button>
                          )}
                          
-                         {(s.status === 'DRAFT' || s.status === 'ORDERED' || (s.status === 'FINISHED' && s.payment_status === 'UNPAID')) && (
-                           <button type="button" onClick={() => handleVoidPO(s.id)} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-slate-100" title="Batalkan Transaksi">
+                         {s.status !== 'VOIDED' && canVoidSale && (
+                           <button type="button" onClick={() => handleVoidPO(s.id)} className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-slate-100" title="Batalkan Transaksi (owner/admin) — pembayaran yang sudah masuk akan otomatis dibalikkan">
                              <XCircle size={16}/>
                            </button>
                          )}

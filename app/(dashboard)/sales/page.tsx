@@ -31,7 +31,7 @@ export default async function SalesPage() {
   return (
     <div className="p-5 space-y-10">
       <Suspense fallback={<div className="p-5 text-center font-semibold animate-pulse">Loading Sales Dashboard...</div>}>
-        <SalesClient 
+        <SalesClient
           orgId={orgId}
           orgName={orgName}
           sales={sales}
@@ -42,6 +42,7 @@ export default async function SalesPage() {
           coa={coa}
           orgSettings={orgSettings}
           activeBranchName={activeBranch?.name || null}
+          userRole={orgData.role}
         />
       </Suspense>
     </div>
