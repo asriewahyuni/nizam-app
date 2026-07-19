@@ -9,7 +9,7 @@ import {
   TrendingUp, Banknote, Star, Clock, FileText,
   AlertTriangle, ClipboardList, Eye, Link2, ExternalLink,
   BookOpen, ArrowDownCircle, X, Copy, Check, Pencil, Trash2, Upload, FolderOpen,
-  TrendingDown, Scale,
+  TrendingDown, Scale, Loader2,
 } from 'lucide-react'
 import {
   createAnggota, updateAnggota,
@@ -35,7 +35,7 @@ import {
 } from '@/modules/kojasmat/actions/kojasmat-keuangan.actions'
 import {
   simpanBankSoal, hapusBankSoal, updateModuleSettings,
-  type KojasmatBankSoal,
+  type KojasmatBankSoal, type ApresiasiTier,
 } from '@/modules/kojasmat/actions/kojasmat-test.actions'
 
 const KATEGORI_PENDAPATAN = ['Penjualan', 'Jasa', 'Pendapatan Lain'] as const
@@ -59,8 +59,12 @@ type Props = {
     nominal_simpanan_pokok: number
     nominal_simpanan_wajib: number
     bank_account_id: string | null
+    apresiasi_tiers: ApresiasiTier[]
+    qris_image_key: string | null
+    qris_image_name: string | null
   }
   bankAccounts: { id: string; bank_name: string; account_number: string }[]
+  qrisPreviewUrl: string | null
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -3032,11 +3036,12 @@ function TabTindakan({ orgId, anggota, proyek, tindakan }: {
   )
 }
 
-function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts }: {
+function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPreviewUrl }: {
   orgId: string
   bankSoal: KojasmatBankSoal[]
   moduleSettings: Props['moduleSettings']
   bankAccounts: Props['bankAccounts']
+  qrisPreviewUrl: string | null
 }) {
   const [pending, startTransition] = useTransition()
   const [modalSoal, setModalSoal] = useState<KojasmatBankSoal | 'new' | null>(null)
@@ -3051,8 +3056,43 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts }: {
     nominal_simpanan_wajib: String(moduleSettings.nominal_simpanan_wajib),
     bank_account_id: moduleSettings.bank_account_id ?? '',
   })
+  const [tierForm, setTierForm] = useState(
+    moduleSettings.apresiasi_tiers.map(t => ({ min_score: String(t.min_score), label: t.label }))
+  )
+  const [qrisUploading, setQrisUploading] = useState(false)
+  const [qrisPreview, setQrisPreview] = useState(qrisPreviewUrl)
+  const [qrisName, setQrisName] = useState(moduleSettings.qris_image_name)
 
   const aktifCount = bankSoal.filter(s => s.is_active).length
+
+  async function handleQrisUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setQrisUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('org_id', orgId)
+      fd.append('ref_type', 'QRIS')
+      const res = await fetch('/api/kojasmat/upload', { method: 'POST', body: fd })
+      const json = await res.json() as { key?: string; name?: string; error?: string }
+      if (!res.ok || json.error || !json.key) return
+      await updateModuleSettings(orgId, { qris_image_key: json.key, qris_image_name: json.name ?? file.name })
+      setQrisPreview(URL.createObjectURL(file))
+      setQrisName(json.name ?? file.name)
+    } finally {
+      setQrisUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  function handleHapusQris() {
+    startTransition(async () => {
+      await updateModuleSettings(orgId, { qris_image_key: null, qris_image_name: null })
+      setQrisPreview(null)
+      setQrisName(null)
+    })
+  }
 
   function openNew() {
     setForm({ pertanyaan: '', pilihan_a: '', pilihan_b: '', pilihan_c: '', pilihan_d: '', jawaban_benar: 'A', is_active: true })
@@ -3090,8 +3130,23 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts }: {
         nominal_simpanan_pokok: Number(settingsForm.nominal_simpanan_pokok) || 0,
         nominal_simpanan_wajib: Number(settingsForm.nominal_simpanan_wajib) || 0,
         bank_account_id: settingsForm.bank_account_id || null,
+        apresiasi_tiers: tierForm
+          .filter(t => t.label.trim())
+          .map(t => ({ min_score: Number(t.min_score) || 0, label: t.label.trim() })),
       })
     })
+  }
+
+  function updateTier(index: number, field: 'min_score' | 'label', value: string) {
+    setTierForm(list => list.map((t, i) => i === index ? { ...t, [field]: value } : t))
+  }
+
+  function addTier() {
+    setTierForm(list => [...list, { min_score: '0', label: '' }])
+  }
+
+  function removeTier(index: number) {
+    setTierForm(list => list.filter((_, i) => i !== index))
   }
 
   const formValid = form.pertanyaan.trim() && form.pilihan_a.trim() && form.pilihan_b.trim()
@@ -3146,6 +3201,77 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts }: {
             </select>
           </div>
         </div>
+
+        <div className="mt-5 pt-5 border-t border-gray-100">
+          <label className="mb-1 block text-sm font-medium text-gray-700">QRIS Pembayaran</label>
+          <p className="text-xs text-gray-500 mb-3">
+            Opsional — calon anggota bisa memilih bayar via transfer bank atau scan QRIS ini.
+          </p>
+          <div className="flex items-start gap-4">
+            {qrisPreview ? (
+              <img src={qrisPreview} alt="QRIS" className="h-32 w-32 rounded-xl border border-gray-200 object-contain shrink-0" />
+            ) : (
+              <div className="flex h-32 w-32 items-center justify-center rounded-xl border border-dashed border-gray-300 text-gray-300 shrink-0">
+                <Wallet className="h-8 w-8" />
+              </div>
+            )}
+            <div className="flex-1 space-y-2">
+              {qrisName && <p className="text-sm text-gray-700 truncate">{qrisName}</p>}
+              <label className={cn(
+                'inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer',
+                qrisUploading ? 'bg-gray-100 text-gray-400 pointer-events-none' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}>
+                {qrisUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                {qrisPreview ? 'Ganti QRIS' : 'Upload QRIS'}
+                <input type="file" className="sr-only" accept=".jpg,.jpeg,.png,.webp"
+                  onChange={handleQrisUpload} disabled={qrisUploading} />
+              </label>
+              {qrisPreview && (
+                <button onClick={handleHapusQris} disabled={pending}
+                  className="ml-2 inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 transition-colors cursor-pointer">
+                  <Trash2 className="h-3.5 w-3.5" /> Hapus
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 pt-5 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="text-sm font-semibold text-gray-900">Apresiasi Hasil Test</h4>
+            <button onClick={addTier}
+              className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer">
+              <Plus className="h-3.5 w-3.5" /> Tambah Tingkat
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Label penghargaan yang ditampilkan ke calon anggota sesuai skor test masuk (mis. Mumtaz, Jayyid Jiddan).
+          </p>
+          <div className="space-y-2">
+            {tierForm.map((t, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input type="number" min={0} max={100}
+                  className="w-20 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  value={t.min_score}
+                  onChange={e => updateTier(i, 'min_score', e.target.value)} />
+                <span className="text-xs text-gray-400 shrink-0">% ke atas →</span>
+                <input
+                  className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  placeholder="Label apresiasi, mis. Mumtaz"
+                  value={t.label}
+                  onChange={e => updateTier(i, 'label', e.target.value)} />
+                <button onClick={() => removeTier(i)}
+                  className="shrink-0 rounded-xl border border-red-200 bg-red-50 p-2 text-red-600 hover:bg-red-100 transition-colors cursor-pointer">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            {tierForm.length === 0 && (
+              <p className="text-xs text-gray-400">Belum ada tingkat apresiasi — tambahkan minimal satu.</p>
+            )}
+          </div>
+        </div>
+
         <div className="mt-4 flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2.5">
           <span className="text-sm text-emerald-700">Total Biaya Simpanan Keanggotaan (SPK)</span>
           <span className="text-sm font-semibold text-emerald-800">
@@ -3255,7 +3381,7 @@ type ActiveTab = 'dashboard' | 'permohonan' | 'anggota' | 'proyek' | 'simpanan' 
 
 export default function KojasmatClient({
   orgId, stats, anggota, proyek, pelatihan, pendaftaran, laporan, tindakan,
-  bankSoal, moduleSettings, bankAccounts,
+  bankSoal, moduleSettings, bankAccounts, qrisPreviewUrl,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
 
@@ -3319,7 +3445,7 @@ export default function KojasmatClient({
         {activeTab === 'pelatihan'  && <TabPelatihan orgId={orgId} pelatihan={pelatihan} anggota={anggota} />}
         {activeTab === 'laporan'    && <TabLaporan laporan={laporan} />}
         {activeTab === 'tindakan'   && <TabTindakan orgId={orgId} anggota={anggota} proyek={proyek} tindakan={tindakan} />}
-        {activeTab === 'soal'       && <TabBankSoal orgId={orgId} bankSoal={bankSoal} moduleSettings={moduleSettings} bankAccounts={bankAccounts} />}
+        {activeTab === 'soal'       && <TabBankSoal orgId={orgId} bankSoal={bankSoal} moduleSettings={moduleSettings} bankAccounts={bankAccounts} qrisPreviewUrl={qrisPreviewUrl} />}
       </div>
     </div>
   )

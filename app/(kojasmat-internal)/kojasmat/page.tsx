@@ -6,7 +6,7 @@ import {
 import {
   getAllPendaftaran, getAllLaporan, getAllTindakan,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
-import { getBankSoal, getModuleSettings } from '@/modules/kojasmat/actions/kojasmat-test.actions'
+import { getBankSoal, getModuleSettings, getInfoPembayaran } from '@/modules/kojasmat/actions/kojasmat-test.actions'
 import { getBankAccounts } from '@/modules/cash/actions/bank.actions'
 import KojasmatClient from './KojasmatClient'
 
@@ -28,6 +28,7 @@ export default async function KojasmatPage() {
   const bankSoal       = await getBankSoal(orgId)
   const moduleSettings = await getModuleSettings(orgId)
   const bankAccounts   = await getBankAccounts(orgId)
+  const infoBayar      = await getInfoPembayaran(orgId)
 
   return (
     <KojasmatClient
@@ -42,6 +43,7 @@ export default async function KojasmatPage() {
       bankSoal={bankSoal}
       moduleSettings={moduleSettings}
       bankAccounts={bankAccounts.map(b => ({ id: b.id, bank_name: b.bank_name, account_number: b.account_number ?? '' }))}
+      qrisPreviewUrl={infoBayar.data.qris_image_url}
     />
   )
 }

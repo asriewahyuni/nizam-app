@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import {
   User, Phone, MapPin, Briefcase, FileText, Upload,
   CheckCircle, ChevronRight, Loader2, X, Eye, EyeOff, ClipboardList, Wallet, XCircle,
-  PiggyBank, HandCoins, Receipt, Info
+  PiggyBank, HandCoins, Receipt, Info, Star
 } from 'lucide-react'
 import {
   buatPendaftaran,
@@ -204,7 +204,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   const [testMasukId, setTestMasukId] = useState<string | null>(null)
   const [soal, setSoal] = useState<{ id: string; pertanyaan: string; pilihan_a: string; pilihan_b: string; pilihan_c: string; pilihan_d: string }[]>([])
   const [jawaban, setJawaban] = useState<Record<string, string>>({})
-  const [testResult, setTestResult] = useState<{ skor: number; jumlah_benar: number; total_soal: number; status: 'LULUS' | 'GAGAL'; passing_threshold: number } | null>(null)
+  const [testResult, setTestResult] = useState<{ skor: number; jumlah_benar: number; total_soal: number; status: 'LULUS' | 'GAGAL'; passing_threshold: number; apresiasi: string | null } | null>(null)
   const [testLoading, setTestLoading] = useState(false)
   const [qIndex, setQIndex] = useState(0)
 
@@ -231,12 +231,12 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
       const res = await submitTestMasuk(testMasukId, jawaban)
       if (res.error) { setError(res.error); return }
       setTestResult(res.data!)
-      if (res.data!.status === 'LULUS') setStep('bayar')
     })
   }
 
   // ── Pembayaran ──
-  const [infoBayar, setInfoBayar] = useState<{ biaya_admin_pendaftaran: number; nominal_simpanan_pokok: number; nominal_simpanan_wajib: number; bank_account: { bank_name: string; account_number: string; account_holder: string } | null } | null>(null)
+  const [infoBayar, setInfoBayar] = useState<{ biaya_admin_pendaftaran: number; nominal_simpanan_pokok: number; nominal_simpanan_wajib: number; bank_account: { bank_name: string; account_number: string; account_holder: string } | null; qris_image_url: string | null } | null>(null)
+  const [metodeBayar, setMetodeBayar] = useState<'TRANSFER' | 'QRIS'>('TRANSFER')
   const [buktiFile, setBuktiFile] = useState<{ key: string; name: string; size: number } | null>(null)
   const [buktiUploading, setBuktiUploading] = useState(false)
   const [setujuSpk, setSetujuSpk] = useState(false)
@@ -247,6 +247,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
     startTransition(async () => {
       const res = await getInfoPembayaran(orgId)
       setInfoBayar(res.data!)
+      if (!res.data!.bank_account && res.data!.qris_image_url) setMetodeBayar('QRIS')
     })
   }
 
@@ -555,7 +556,28 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
               </div>
             )}
 
-            {!testLoading && soal.length > 0 && (!testResult || testResult.status !== 'GAGAL') && (() => {
+            {!testLoading && testResult && testResult.status === 'LULUS' && (
+              <div className="text-center py-6 space-y-4">
+                <CheckCircle className="h-10 w-10 text-emerald-500 mx-auto" />
+                <div>
+                  <p className="text-gray-800 font-semibold">Selamat, Anda Lulus!</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Skor Anda {testResult.skor.toFixed(0)}% ({testResult.jumlah_benar}/{testResult.total_soal} benar)
+                  </p>
+                </div>
+                {testResult.apresiasi && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-4 py-1.5 text-sm font-bold text-amber-700">
+                    <Star className="h-4 w-4" /> {testResult.apresiasi}
+                  </span>
+                )}
+                <button onClick={() => setStep('bayar')}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer">
+                  Lanjut ke Pembayaran <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {!testLoading && soal.length > 0 && !testResult && (() => {
               const s = soal[qIndex]
               const isLast = qIndex === soal.length - 1
               const answered = !!jawaban[s.id]
@@ -701,15 +723,43 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                   </label>
                 </div>
 
-                {infoBayar.bank_account ? (
-                  <div className="rounded-xl border border-gray-200 p-4 text-sm space-y-1">
-                    <p className="text-gray-500">Transfer ke rekening:</p>
-                    <p className="font-semibold text-gray-900">{infoBayar.bank_account.bank_name} — {infoBayar.bank_account.account_number}</p>
-                    <p className="text-gray-600">a.n. {infoBayar.bank_account.account_holder}</p>
+                {infoBayar.bank_account && infoBayar.qris_image_url ? (
+                  <div className="flex gap-2 rounded-xl bg-gray-100 p-1">
+                    <button onClick={() => setMetodeBayar('TRANSFER')}
+                      className={cn(
+                        'flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+                        metodeBayar === 'TRANSFER' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+                      )}>
+                      Transfer Bank
+                    </button>
+                    <button onClick={() => setMetodeBayar('QRIS')}
+                      className={cn(
+                        'flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+                        metodeBayar === 'QRIS' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+                      )}>
+                      QRIS
+                    </button>
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-                    Rekening tujuan belum diatur oleh pengurus. Hubungi pengurus koperasi untuk info rekening.
+                ) : null}
+
+                {metodeBayar === 'TRANSFER' && (
+                  infoBayar.bank_account ? (
+                    <div className="rounded-xl border border-gray-200 p-4 text-sm space-y-1">
+                      <p className="text-gray-500">Transfer ke rekening:</p>
+                      <p className="font-semibold text-gray-900">{infoBayar.bank_account.bank_name} — {infoBayar.bank_account.account_number}</p>
+                      <p className="text-gray-600">a.n. {infoBayar.bank_account.account_holder}</p>
+                    </div>
+                  ) : infoBayar.qris_image_url ? null : (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                      Rekening tujuan belum diatur oleh pengurus. Hubungi pengurus koperasi untuk info rekening.
+                    </div>
+                  )
+                )}
+
+                {metodeBayar === 'QRIS' && infoBayar.qris_image_url && (
+                  <div className="rounded-xl border border-gray-200 p-4 text-center">
+                    <p className="text-sm text-gray-500 mb-3">Scan QRIS berikut untuk membayar:</p>
+                    <img src={infoBayar.qris_image_url} alt="QRIS" className="mx-auto h-56 w-56 object-contain" />
                   </div>
                 )}
 

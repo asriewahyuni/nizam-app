@@ -24,12 +24,30 @@ export type KojasmatBankSoal = {
   updated_at: string
 }
 
+export type ApresiasiTier = { min_score: number; label: string }
+
+const DEFAULT_APRESIASI_TIERS: ApresiasiTier[] = [
+  { min_score: 90, label: 'Mumtaz' },
+  { min_score: 80, label: 'Jayyid Jiddan' },
+  { min_score: 70, label: 'Jayyid' },
+  { min_score: 60, label: 'Maqbul' },
+]
+
 type KojasmatModuleSettings = {
   passing_threshold: number
   biaya_admin_pendaftaran: number
   nominal_simpanan_pokok: number
   nominal_simpanan_wajib: number
   bank_account_id: string | null
+  apresiasi_tiers: ApresiasiTier[]
+  qris_image_key: string | null
+  qris_image_name: string | null
+}
+
+function resolveApresiasi(skor: number, tiers: ApresiasiTier[]): string | null {
+  const sorted = [...tiers].sort((a, b) => b.min_score - a.min_score)
+  const match = sorted.find(t => skor >= t.min_score)
+  return match?.label ?? null
 }
 
 // ─── BANK SOAL (staf) ─────────────────────────────────────────────────────────
@@ -127,6 +145,11 @@ export async function getModuleSettings(orgId: string): Promise<KojasmatModuleSe
     nominal_simpanan_pokok: Number(settings.nominal_simpanan_pokok ?? 0),
     nominal_simpanan_wajib: Number(settings.nominal_simpanan_wajib ?? 0),
     bank_account_id: (settings.bank_account_id as string) ?? null,
+    apresiasi_tiers: Array.isArray(settings.apresiasi_tiers) && settings.apresiasi_tiers.length > 0
+      ? settings.apresiasi_tiers as ApresiasiTier[]
+      : DEFAULT_APRESIASI_TIERS,
+    qris_image_key: (settings.qris_image_key as string) ?? null,
+    qris_image_name: (settings.qris_image_name as string) ?? null,
   }
 }
 
@@ -239,6 +262,9 @@ export async function submitTestMasuk(testMasukId: string, jawaban: Record<strin
       [testMasukId, JSON.stringify(jawaban), jumlahBenar, skor, status]
     )
 
+    const settings = await getModuleSettings(testMasuk.org_id)
+    const apresiasi = resolveApresiasi(skor, settings.apresiasi_tiers)
+
     return {
       data: {
         skor,
@@ -246,6 +272,7 @@ export async function submitTestMasuk(testMasukId: string, jawaban: Record<strin
         total_soal: soalIds.length,
         status,
         passing_threshold: testMasuk.passing_threshold as number,
+        apresiasi,
       }
     }
   } catch (err) {
@@ -268,12 +295,18 @@ export async function getInfoPembayaran(orgId: string) {
     )
     bankAccount = (rows[0] as BankAccountInfo | undefined) ?? null
   }
+  let qrisImageUrl: string | null = null
+  if (settings.qris_image_key) {
+    const { createSignedStorageGetUrl } = await import('@/lib/storage/object-storage.server')
+    qrisImageUrl = await createSignedStorageGetUrl(settings.qris_image_key).catch(() => null)
+  }
   return {
     data: {
       biaya_admin_pendaftaran: settings.biaya_admin_pendaftaran,
       nominal_simpanan_pokok: settings.nominal_simpanan_pokok,
       nominal_simpanan_wajib: settings.nominal_simpanan_wajib,
       bank_account: bankAccount,
+      qris_image_url: qrisImageUrl,
     }
   }
 }
