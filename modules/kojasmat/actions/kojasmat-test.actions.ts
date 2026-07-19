@@ -28,6 +28,7 @@ type KojasmatModuleSettings = {
   passing_threshold: number
   biaya_admin_pendaftaran: number
   nominal_simpanan_pokok: number
+  nominal_simpanan_wajib: number
   bank_account_id: string | null
 }
 
@@ -124,6 +125,7 @@ export async function getModuleSettings(orgId: string): Promise<KojasmatModuleSe
     passing_threshold: Number(settings.passing_threshold ?? DEFAULT_PASSING_THRESHOLD),
     biaya_admin_pendaftaran: Number(settings.biaya_admin_pendaftaran ?? 0),
     nominal_simpanan_pokok: Number(settings.nominal_simpanan_pokok ?? 0),
+    nominal_simpanan_wajib: Number(settings.nominal_simpanan_wajib ?? 0),
     bank_account_id: (settings.bank_account_id as string) ?? null,
   }
 }
@@ -270,6 +272,7 @@ export async function getInfoPembayaran(orgId: string) {
     data: {
       biaya_admin_pendaftaran: settings.biaya_admin_pendaftaran,
       nominal_simpanan_pokok: settings.nominal_simpanan_pokok,
+      nominal_simpanan_wajib: settings.nominal_simpanan_wajib,
       bank_account: bankAccount,
     }
   }
@@ -280,6 +283,7 @@ export async function submitPembayaranPendaftaran(pendaftaranId: string, payload
   org_id: string
   biaya_admin: number
   simpanan_pokok: number
+  simpanan_wajib: number
   file_key: string
   nama_file: string
   file_size?: number
@@ -314,10 +318,10 @@ export async function submitPembayaranPendaftaran(pendaftaranId: string, payload
 
     await queryPostgres(
       `UPDATE kojasmat_pendaftaran
-       SET biaya_admin_dibayar=$2, simpanan_pokok_dibayar=$3, bukti_bayar_dokumen_id=$4,
+       SET biaya_admin_dibayar=$2, simpanan_pokok_dibayar=$3, simpanan_wajib_dibayar=$4, bukti_bayar_dokumen_id=$5,
            status_bayar='SUDAH', dibayar_at=NOW(), updated_at=NOW()
        WHERE id=$1`,
-      [pendaftaranId, payload.biaya_admin, payload.simpanan_pokok, dokumen.id]
+      [pendaftaranId, payload.biaya_admin, payload.simpanan_pokok, payload.simpanan_wajib, dokumen.id]
     )
 
     const aktivasi = await cobaAktivasiOtomatis(pendaftaranId)

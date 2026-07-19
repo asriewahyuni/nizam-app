@@ -167,7 +167,7 @@ export async function buatPendaftaran(payload: {
 // Inti pembuatan anggota dari pendaftaran — dipakai baik oleh staf yang approve manual
 // (status awal CALON) maupun alur otomatis test+bayar (status langsung AKTIF).
 async function createAnggotaFromPendaftaran(
-  pend: KojasmatPendaftaran & { simpanan_pokok_dibayar?: number | null; biaya_admin_dibayar?: number | null },
+  pend: KojasmatPendaftaran & { simpanan_pokok_dibayar?: number | null; simpanan_wajib_dibayar?: number | null; biaya_admin_dibayar?: number | null },
   opts: { status: 'CALON' | 'AKTIF'; reviewedBy?: string | null }
 ) {
   // Buat nomor anggota baru
@@ -240,6 +240,7 @@ async function createAnggotaFromPendaftaran(
   // Setoran awal — hanya untuk aktivasi otomatis (test+bayar), supaya tercatat di jurnal
   if (isAktif) {
     const nominalPokok = Number(pend.simpanan_pokok_dibayar || 0)
+    const nominalWajib = Number(pend.simpanan_wajib_dibayar || 0)
     const nominalAdmin = Number(pend.biaya_admin_dibayar || 0)
     if (nominalPokok > 0) {
       await postSimpananMutasi({
@@ -249,6 +250,17 @@ async function createAnggotaFromPendaftaran(
         jenis_mutasi: 'SETOR',
         jumlah: nominalPokok,
         keterangan: 'Setoran simpanan pokok — pendaftaran anggota baru',
+        created_by: pend.user_id ?? null,
+      })
+    }
+    if (nominalWajib > 0) {
+      await postSimpananMutasi({
+        org_id: pend.org_id,
+        anggota_id: anggota.id,
+        jenis_simpanan: 'WAJIB',
+        jenis_mutasi: 'SETOR',
+        jumlah: nominalWajib,
+        keterangan: 'Setoran simpanan wajib — pendaftaran anggota baru',
         created_by: pend.user_id ?? null,
       })
     }

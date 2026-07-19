@@ -4,7 +4,8 @@ import { useState, useTransition, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import {
   User, Phone, MapPin, Briefcase, FileText, Upload,
-  CheckCircle, ChevronRight, Loader2, X, Eye, EyeOff, ClipboardList, Wallet, XCircle
+  CheckCircle, ChevronRight, Loader2, X, Eye, EyeOff, ClipboardList, Wallet, XCircle,
+  PiggyBank, HandCoins, Receipt, Info
 } from 'lucide-react'
 import {
   buatPendaftaran,
@@ -205,12 +206,14 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   const [jawaban, setJawaban] = useState<Record<string, string>>({})
   const [testResult, setTestResult] = useState<{ skor: number; jumlah_benar: number; total_soal: number; status: 'LULUS' | 'GAGAL'; passing_threshold: number } | null>(null)
   const [testLoading, setTestLoading] = useState(false)
+  const [qIndex, setQIndex] = useState(0)
 
   function mulaiTest() {
     if (!pendaftaranId) return
     setError(null)
     setTestResult(null)
     setJawaban({})
+    setQIndex(0)
     setTestLoading(true)
     startTransition(async () => {
       const res = await mulaiTestMasuk(orgId, pendaftaranId)
@@ -233,9 +236,10 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   }
 
   // ── Pembayaran ──
-  const [infoBayar, setInfoBayar] = useState<{ biaya_admin_pendaftaran: number; nominal_simpanan_pokok: number; bank_account: { bank_name: string; account_number: string; account_holder: string } | null } | null>(null)
+  const [infoBayar, setInfoBayar] = useState<{ biaya_admin_pendaftaran: number; nominal_simpanan_pokok: number; nominal_simpanan_wajib: number; bank_account: { bank_name: string; account_number: string; account_holder: string } | null } | null>(null)
   const [buktiFile, setBuktiFile] = useState<{ key: string; name: string; size: number } | null>(null)
   const [buktiUploading, setBuktiUploading] = useState(false)
+  const [setujuSpk, setSetujuSpk] = useState(false)
   const [aktivasiResult, setAktivasiResult] = useState<{ activated: boolean; kode_anggota?: string; login_identifier?: string | null } | null>(null)
 
   function muatInfoBayar() {
@@ -262,13 +266,14 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   }
 
   function submitBayar() {
-    if (!pendaftaranId || !buktiFile || !infoBayar) return
+    if (!pendaftaranId || !buktiFile || !infoBayar || !setujuSpk) return
     setError(null)
     startTransition(async () => {
       const res = await submitPembayaranPendaftaran(pendaftaranId, {
         org_id: orgId,
         biaya_admin: infoBayar.biaya_admin_pendaftaran,
         simpanan_pokok: infoBayar.nominal_simpanan_pokok,
+        simpanan_wajib: infoBayar.nominal_simpanan_wajib,
         file_key: buktiFile.key,
         nama_file: buktiFile.name,
         file_size: buktiFile.size,
@@ -550,11 +555,25 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
               </div>
             )}
 
-            {!testLoading && soal.length > 0 && (!testResult || testResult.status !== 'GAGAL') && (
-              <div className="space-y-5">
-                {soal.map((s, i) => (
-                  <div key={s.id}>
-                    <p className="text-sm font-medium text-gray-800 mb-2">{i + 1}. {s.pertanyaan}</p>
+            {!testLoading && soal.length > 0 && (!testResult || testResult.status !== 'GAGAL') && (() => {
+              const s = soal[qIndex]
+              const isLast = qIndex === soal.length - 1
+              const answered = !!jawaban[s.id]
+              return (
+                <div className="space-y-5">
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+                      <span>Pertanyaan {qIndex + 1} dari {soal.length}</span>
+                      <span>{Math.round(((qIndex + 1) / soal.length) * 100)}%</span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-gray-100">
+                      <div className="h-1.5 rounded-full bg-emerald-500 transition-all"
+                        style={{ width: `${((qIndex + 1) / soal.length) * 100}%` }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-gray-800 mb-3">{qIndex + 1}. {s.pertanyaan}</p>
                     <div className="space-y-1.5">
                       {(['a', 'b', 'c', 'd'] as const).map(opt => (
                         <label key={opt} className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 transition-colors">
@@ -566,23 +585,42 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                       ))}
                     </div>
                   </div>
-                ))}
 
-                {error && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {error}
+                  {error && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setQIndex(i => Math.max(0, i - 1))}
+                      disabled={qIndex === 0}
+                      className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
+                    >
+                      Sebelumnya
+                    </button>
+                    {isLast ? (
+                      <button
+                        onClick={submitTest}
+                        disabled={!answered || pending}
+                        className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
+                      >
+                        {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Memeriksa...</> : 'Submit Jawaban'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setQIndex(i => Math.min(soal.length - 1, i + 1))}
+                        disabled={!answered}
+                        className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
+                      >
+                        Selanjutnya <ChevronRight className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
-                )}
-
-                <button
-                  onClick={submitTest}
-                  disabled={Object.keys(jawaban).length < soal.length || pending}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
-                >
-                  {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Memeriksa...</> : <>Submit Jawaban <ChevronRight className="h-4 w-4" /></>}
-                </button>
-              </div>
-            )}
+                </div>
+              )
+            })()}
           </div>
         </div>
       </div>
@@ -610,27 +648,57 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                 <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Memuat info pembayaran...
               </div>
             )}
-            {infoBayar && (
+            {infoBayar && (() => {
+              const fmtIdr = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
+              const totalSpk = infoBayar.nominal_simpanan_pokok + infoBayar.nominal_simpanan_wajib + infoBayar.biaya_admin_pendaftaran
+              return (
               <>
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-emerald-700">Biaya Admin Pendaftaran</span>
-                    <span className="font-semibold text-emerald-800">
-                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(infoBayar.biaya_admin_pendaftaran)}
-                    </span>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                    {STEPS.indexOf('bayar') + 1}. Biaya Simpanan Keanggotaan (SPK)
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-3">
+                    Simpanan Keanggotaan (SPK) sebesar <strong className="text-gray-800">{fmtIdr(totalSpk)}</strong>, dengan distribusi sbb:
+                  </p>
+
+                  <div className="rounded-xl border border-gray-200 divide-y divide-gray-100">
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <span className="flex items-center gap-2 text-sm text-gray-700">
+                        <PiggyBank className="h-4 w-4 text-blue-500" /> Simpanan Pokok (SP)
+                      </span>
+                      <span className="text-sm font-semibold text-gray-900">{fmtIdr(infoBayar.nominal_simpanan_pokok)}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <span className="flex items-center gap-2 text-sm text-gray-700">
+                        <HandCoins className="h-4 w-4 text-emerald-500" /> Simpanan Wajib (SW)
+                      </span>
+                      <span className="text-sm font-semibold text-gray-900">{fmtIdr(infoBayar.nominal_simpanan_wajib)}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <span className="flex items-center gap-2 text-sm text-gray-700">
+                        <Receipt className="h-4 w-4 text-amber-500" /> Admin Keanggotaan (ADK)
+                      </span>
+                      <span className="text-sm font-semibold text-gray-900">{fmtIdr(infoBayar.biaya_admin_pendaftaran)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-emerald-700">Simpanan Pokok</span>
-                    <span className="font-semibold text-emerald-800">
-                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(infoBayar.nominal_simpanan_pokok)}
-                    </span>
+
+                  <div className="flex items-center justify-between px-4 py-3 mt-2 rounded-xl bg-emerald-50 border border-emerald-100">
+                    <span className="text-sm font-bold text-emerald-800">Total SPK</span>
+                    <span className="text-sm font-bold text-emerald-900">{fmtIdr(totalSpk)}</span>
                   </div>
-                  <div className="flex justify-between border-t border-emerald-200 pt-2 font-bold">
-                    <span className="text-emerald-800">Total Transfer</span>
-                    <span className="text-emerald-900">
-                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(infoBayar.biaya_admin_pendaftaran + infoBayar.nominal_simpanan_pokok)}
-                    </span>
+
+                  <div className="mt-3 flex items-start gap-2 text-xs text-gray-500">
+                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <p>SP &amp; SW dicatat sebagai simpanan Anda. ADK merupakan biaya administrasi pendaftaran (akad ijarah), tidak dikembalikan.</p>
                   </div>
+
+                  <label className="mt-3 flex items-start gap-2 rounded-xl border border-gray-200 p-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-emerald-600"
+                      checked={setujuSpk} onChange={e => setSetujuSpk(e.target.checked)} />
+                    <span className="text-gray-700">
+                      Saya setuju membayar biaya Simpanan Keanggotaan (SPK) sesuai rincian di atas.
+                    </span>
+                  </label>
                 </div>
 
                 {infoBayar.bank_account ? (
@@ -671,13 +739,14 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
                 <button
                   onClick={submitBayar}
-                  disabled={!buktiFile || pending}
+                  disabled={!buktiFile || !setujuSpk || pending}
                   className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Memproses...</> : <>Konfirmasi Pembayaran <ChevronRight className="h-4 w-4" /></>}
                 </button>
               </>
-            )}
+              )
+            })()}
           </div>
         </div>
       </div>

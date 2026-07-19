@@ -57,6 +57,7 @@ type Props = {
     passing_threshold: number
     biaya_admin_pendaftaran: number
     nominal_simpanan_pokok: number
+    nominal_simpanan_wajib: number
     bank_account_id: string | null
   }
   bankAccounts: { id: string; bank_name: string; account_number: string }[]
@@ -3047,6 +3048,7 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts }: {
     passing_threshold: String(moduleSettings.passing_threshold),
     biaya_admin_pendaftaran: String(moduleSettings.biaya_admin_pendaftaran),
     nominal_simpanan_pokok: String(moduleSettings.nominal_simpanan_pokok),
+    nominal_simpanan_wajib: String(moduleSettings.nominal_simpanan_wajib),
     bank_account_id: moduleSettings.bank_account_id ?? '',
   })
 
@@ -3086,6 +3088,7 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts }: {
         passing_threshold: Number(settingsForm.passing_threshold) || 70,
         biaya_admin_pendaftaran: Number(settingsForm.biaya_admin_pendaftaran) || 0,
         nominal_simpanan_pokok: Number(settingsForm.nominal_simpanan_pokok) || 0,
+        nominal_simpanan_wajib: Number(settingsForm.nominal_simpanan_wajib) || 0,
         bank_account_id: settingsForm.bank_account_id || null,
       })
     })
@@ -3117,11 +3120,18 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts }: {
               onChange={e => setSettingsForm(f => ({ ...f, biaya_admin_pendaftaran: e.target.value }))} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Nominal Simpanan Pokok (Rp)</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Nominal Simpanan Pokok / SP (Rp)</label>
             <input type="number" min={0}
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
               value={settingsForm.nominal_simpanan_pokok}
               onChange={e => setSettingsForm(f => ({ ...f, nominal_simpanan_pokok: e.target.value }))} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Nominal Simpanan Wajib / SW (Rp)</label>
+            <input type="number" min={0}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              value={settingsForm.nominal_simpanan_wajib}
+              onChange={e => setSettingsForm(f => ({ ...f, nominal_simpanan_wajib: e.target.value }))} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Rekening Tujuan Transfer</label>
@@ -3135,6 +3145,12 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts }: {
               ))}
             </select>
           </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2.5">
+          <span className="text-sm text-emerald-700">Total Biaya Simpanan Keanggotaan (SPK)</span>
+          <span className="text-sm font-semibold text-emerald-800">
+            {fmt((Number(settingsForm.nominal_simpanan_pokok) || 0) + (Number(settingsForm.nominal_simpanan_wajib) || 0) + (Number(settingsForm.biaya_admin_pendaftaran) || 0))}
+          </span>
         </div>
         <div className="mt-4 flex justify-end">
           <button onClick={handleSimpanSettings} disabled={pending}
