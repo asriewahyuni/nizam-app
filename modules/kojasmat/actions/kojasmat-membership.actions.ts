@@ -37,6 +37,12 @@ export type KojasmatPendaftaran = {
   ditinjau_oleh?: string
   ditinjau_at?: string
   anggota_id?: string
+  biaya_admin_dibayar?: number | null
+  simpanan_pokok_dibayar?: number | null
+  simpanan_wajib_dibayar?: number | null
+  bukti_bayar_dokumen_id?: string | null
+  status_bayar?: 'BELUM' | 'SUDAH'
+  dibayar_at?: string | null
   created_at: string
   updated_at: string
 }

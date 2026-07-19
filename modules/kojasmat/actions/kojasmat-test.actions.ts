@@ -363,3 +363,35 @@ export async function submitPembayaranPendaftaran(pendaftaranId: string, payload
     return { error: err instanceof Error ? err.message : 'Gagal menyimpan pembayaran' }
   }
 }
+
+// ─── RIWAYAT TEST (staf) ──────────────────────────────────────────────────────
+
+export type KojasmatTestMasukRingkas = {
+  id: string
+  attempt_number: number
+  skor: number | null
+  jumlah_benar: number | null
+  passing_threshold: number
+  status: 'BERLANGSUNG' | 'LULUS' | 'GAGAL'
+  apresiasi: string | null
+  submitted_at: string | null
+  created_at: string
+}
+
+export async function getTestMasukByPendaftaran(orgId: string, pendaftaranId: string): Promise<KojasmatTestMasukRingkas[]> {
+  const session = await getInternalAuthSession()
+  if (!session) return []
+
+  const settings = await getModuleSettings(orgId)
+  const { rows } = await queryPostgres(
+    `SELECT id, attempt_number, skor, jumlah_benar, passing_threshold, status, submitted_at, created_at
+     FROM kojasmat_test_masuk
+     WHERE org_id=$1 AND pendaftaran_id=$2
+     ORDER BY attempt_number ASC`,
+    [orgId, pendaftaranId]
+  )
+  return rows.map((r: any) => ({
+    ...r,
+    apresiasi: r.skor != null ? resolveApresiasi(Number(r.skor), settings.apresiasi_tiers) : null,
+  })) as KojasmatTestMasukRingkas[]
+}

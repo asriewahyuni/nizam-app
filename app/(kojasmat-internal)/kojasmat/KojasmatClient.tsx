@@ -34,8 +34,8 @@ import {
   type KojasmatProyekTransaksi, type KojasmatLaporanKeuanganProyek, type KojasmatPemodalDenganPotensi,
 } from '@/modules/kojasmat/actions/kojasmat-keuangan.actions'
 import {
-  simpanBankSoal, hapusBankSoal, updateModuleSettings,
-  type KojasmatBankSoal, type ApresiasiTier,
+  simpanBankSoal, hapusBankSoal, updateModuleSettings, getTestMasukByPendaftaran,
+  type KojasmatBankSoal, type ApresiasiTier, type KojasmatTestMasukRingkas,
 } from '@/modules/kojasmat/actions/kojasmat-test.actions'
 
 const KATEGORI_PENDAPATAN = ['Penjualan', 'Jasa', 'Pendapatan Lain'] as const
@@ -2474,6 +2474,7 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
   const [selected, setSelected] = useState<KojasmatPendaftaran | null>(null)
   const [dokumen, setDokumen] = useState<KojasmatDokumen[]>([])
   const [loadingDok, setLoadingDok] = useState(false)
+  const [testRiwayat, setTestRiwayat] = useState<KojasmatTestMasukRingkas[]>([])
   const [catatanForm, setCatatanForm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('MENUNGGU')
   const [actionResult, setActionResult] = useState<string | null>(null)
@@ -2489,11 +2490,14 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
     setCatatanForm('')
     setActionResult(null)
     setLoadingDok(true)
+    setTestRiwayat([])
     try {
       const docs = await getDokumenByRef('PENDAFTARAN', p.id)
       // juga cek dokumen yang sudah dipindahkan ke ANGGOTA
       const docsAnggota = p.anggota_id ? await getDokumenByRef('ANGGOTA', p.anggota_id) : []
       setDokumen([...docs, ...docsAnggota])
+      const riwayat = await getTestMasukByPendaftaran(orgId, p.id)
+      setTestRiwayat(riwayat)
     } finally {
       setLoadingDok(false)
     }
@@ -2682,6 +2686,72 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
                       </button>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            {/* Test Masuk */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Riwayat Test Masuk</p>
+              {loadingDok ? (
+                <p className="text-sm text-gray-400">Memuat riwayat test...</p>
+              ) : testRiwayat.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">Belum mengerjakan test masuk</p>
+              ) : (
+                <div className="space-y-2">
+                  {testRiwayat.map(t => (
+                    <div key={t.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-sm">
+                      <div>
+                        <span className="text-gray-500">Percobaan #{t.attempt_number}</span>
+                        {t.skor != null && (
+                          <span className="ml-2 text-gray-800 font-medium">
+                            {Number(t.skor).toFixed(0)}% ({t.jumlah_benar} benar)
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {t.apresiasi && (
+                          <span className="flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                            <Star className="h-3 w-3" /> {t.apresiasi}
+                          </span>
+                        )}
+                        <Badge text={t.status}
+                          cls={t.status === 'LULUS' ? 'bg-emerald-100 text-emerald-700' : t.status === 'GAGAL' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Pembayaran SPK */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Pembayaran SPK</p>
+              {selected.status_bayar !== 'SUDAH' ? (
+                <p className="text-sm text-gray-400 italic">Belum melakukan pembayaran</p>
+              ) : (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-emerald-700">Simpanan Pokok (SP)</span>
+                    <span className="font-medium text-emerald-800">{fmt(Number(selected.simpanan_pokok_dibayar ?? 0))}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-emerald-700">Simpanan Wajib (SW)</span>
+                    <span className="font-medium text-emerald-800">{fmt(Number(selected.simpanan_wajib_dibayar ?? 0))}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-emerald-700">Admin Keanggotaan (ADK)</span>
+                    <span className="font-medium text-emerald-800">{fmt(Number(selected.biaya_admin_dibayar ?? 0))}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-emerald-200 pt-1.5 font-bold">
+                    <span className="text-emerald-800">Total SPK</span>
+                    <span className="text-emerald-900">
+                      {fmt(Number(selected.simpanan_pokok_dibayar ?? 0) + Number(selected.simpanan_wajib_dibayar ?? 0) + Number(selected.biaya_admin_dibayar ?? 0))}
+                    </span>
+                  </div>
+                  {selected.dibayar_at && (
+                    <p className="text-xs text-emerald-600 pt-1">Dibayar: {String(selected.dibayar_at).split('T')[0]}</p>
+                  )}
                 </div>
               )}
             </div>
