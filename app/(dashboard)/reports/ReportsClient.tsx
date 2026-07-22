@@ -29,6 +29,7 @@ interface ReportsClientProps {
   isConsolidated?: boolean
   isParentOrg?: boolean
   balanceSheet: any
+  balanceSheetStart?: any
   profitLoss: any
   cogsTrend?: CogsRevenueTrendRow[]
   cashFlow: {
@@ -66,6 +67,7 @@ interface BalanceTreeRow {
   code: string
   name: string
   balance: number
+  priorBalance: number
   level: number
   hasChildren: boolean
   isSystemComputed?: boolean
@@ -73,8 +75,14 @@ interface BalanceTreeRow {
 
 const BALANCE_EPSILON = 0.01
 
-function buildBalanceTreeRows(accounts: any[] = [], showEmptyAccounts: boolean): BalanceTreeRow[] {
+function buildBalanceTreeRows(accounts: any[] = [], priorAccounts: any[] = [], showEmptyAccounts: boolean): BalanceTreeRow[] {
   if (!Array.isArray(accounts) || accounts.length === 0) return []
+
+  const priorByCode = new Map<string, any>()
+  ;(Array.isArray(priorAccounts) ? priorAccounts : []).forEach((acc: any) => {
+    const code = String(acc?.code || '').trim()
+    if (code) priorByCode.set(code, acc)
+  })
 
   const byId = new Map<string, any>()
   accounts.forEach((acc: any) => {
@@ -105,7 +113,8 @@ function buildBalanceTreeRows(accounts: any[] = [], showEmptyAccounts: boolean):
     const children = account?.id ? (childrenByParent.get(account.id) || []) : []
     const childRows = children.flatMap((child: any) => walk(child, level + 1))
     const ownBalance = Number(account?.balance || 0)
-    const visible = showEmptyAccounts || Math.abs(ownBalance) > BALANCE_EPSILON || childRows.length > 0
+    const ownPriorBalance = Number(priorByCode.get(String(account?.code || '').trim())?.balance || 0)
+    const visible = showEmptyAccounts || Math.abs(ownBalance) > BALANCE_EPSILON || Math.abs(ownPriorBalance) > BALANCE_EPSILON || childRows.length > 0
     if (!visible) return []
 
     return [
@@ -114,6 +123,7 @@ function buildBalanceTreeRows(accounts: any[] = [], showEmptyAccounts: boolean):
         code: String(account?.code || '-'),
         name: String(account?.name || 'Tanpa Nama Akun'),
         balance: ownBalance,
+        priorBalance: ownPriorBalance,
         level,
         hasChildren: children.length > 0,
         isSystemComputed: Boolean(account?.isSystemComputed),
@@ -248,6 +258,7 @@ export default function ReportsClient({
   orgName,
   branchId,
   balanceSheet,
+  balanceSheetStart,
   profitLoss,
   cashFlow,
   cogsTrend = [],
@@ -291,16 +302,26 @@ export default function ReportsClient({
     items: []
   })
   const assetTreeRows = useMemo(
-    () => buildBalanceTreeRows(balanceSheet?.assets || [], showEmptyAccounts),
-    [balanceSheet?.assets, showEmptyAccounts]
+    () => buildBalanceTreeRows(balanceSheet?.assets || [], balanceSheetStart?.assets || [], showEmptyAccounts),
+    [balanceSheet?.assets, balanceSheetStart?.assets, showEmptyAccounts]
   )
   const liabilityTreeRows = useMemo(
-    () => buildBalanceTreeRows(balanceSheet?.liabilities || [], showEmptyAccounts),
-    [balanceSheet?.liabilities, showEmptyAccounts]
+    () => buildBalanceTreeRows(balanceSheet?.liabilities || [], balanceSheetStart?.liabilities || [], showEmptyAccounts),
+    [balanceSheet?.liabilities, balanceSheetStart?.liabilities, showEmptyAccounts]
   )
   const equityTreeRows = useMemo(
-    () => buildBalanceTreeRows(balanceSheet?.equity || [], showEmptyAccounts),
-    [balanceSheet?.equity, showEmptyAccounts]
+    () => buildBalanceTreeRows(balanceSheet?.equity || [], balanceSheetStart?.equity || [], showEmptyAccounts),
+    [balanceSheet?.equity, balanceSheetStart?.equity, showEmptyAccounts]
+  )
+
+  const renderBalanceHeader = () => (
+    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wide pb-2 border-b border-slate-100">
+      <span>Akun</span>
+      <div className="flex items-center gap-4 shrink-0">
+        <span className="w-24 text-right">{formatDate(startDate, 'short')}</span>
+        <span className="w-24 text-right">{formatDate(endDate, 'short')}</span>
+      </div>
+    </div>
   )
 
   const renderBalanceRows = (rows: BalanceTreeRow[]) => (
@@ -319,7 +340,10 @@ export default function ReportsClient({
             )}
           </div>
         </div>
-        <span className="text-slate-900 font-bold shrink-0">{formatRupiah(row.balance)}</span>
+        <div className="flex items-center gap-4 shrink-0">
+          <span className="text-slate-400 font-medium w-24 text-right">{formatRupiah(row.priorBalance)}</span>
+          <span className="text-slate-900 font-bold w-24 text-right">{formatRupiah(row.balance)}</span>
+        </div>
       </div>
     ))
   )
@@ -391,7 +415,14 @@ export default function ReportsClient({
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               {activeTab === 'BS' ? (
                 <div className="flex items-center gap-2 bg-white/10 border border-white/15 px-3 py-2 rounded-xl">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Per Tanggal</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Bandingkan</span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => updateDates(e.target.value, endDate)}
+                    className="text-xs font-semibold text-white bg-transparent outline-none cursor-pointer [color-scheme:dark]"
+                  />
+                  <ArrowRight size={11} className="text-slate-400 shrink-0" />
                   <input
                     type="date"
                     value={endDate}
@@ -503,7 +534,7 @@ export default function ReportsClient({
             ))}
           </div>
           <span className="text-xs text-slate-400 font-medium hidden md:block">
-            {activeTab === 'BS' ? `Per Tanggal: ${formatDate(endDate)}` : `${formatDate(startDate)} — ${formatDate(endDate)}`}
+            {activeTab === 'BS' ? `Perbandingan Saldo: ${formatDate(startDate)} vs ${formatDate(endDate)}` : `${formatDate(startDate)} — ${formatDate(endDate)}`}
           </span>
         </div>
 
@@ -707,13 +738,17 @@ export default function ReportsClient({
                <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-semibold text-slate-400 text-xs uppercase tracking-wide">Aktiva (Aset)</h3>
-                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Per Tanggal: {formatDate(endDate)}</div>
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">{formatDate(startDate)} vs {formatDate(endDate)}</div>
                   </div>
                   <div className="p-8 space-y-3">
+                    {renderBalanceHeader()}
                     {renderBalanceRows(assetTreeRows)}
                     <div className="flex justify-between items-center pt-4 text-emerald-600">
                       <span className="font-semibold uppercase text-xs">Total Aktiva</span>
-                      <span className="font-semibold text-lg">{formatRupiah(balanceSheet.assets.reduce((s:any, x:any) => s + (x.balance || 0), 0))}</span>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <span className="font-semibold text-sm text-emerald-600/60 w-24 text-right">{formatRupiah(balanceSheetStart?.assets?.reduce((s:any, x:any) => s + (x.balance || 0), 0) || 0)}</span>
+                        <span className="font-semibold text-lg w-24 text-right">{formatRupiah(balanceSheet.assets.reduce((s:any, x:any) => s + (x.balance || 0), 0))}</span>
+                      </div>
                     </div>
                   </div>
                </div>
@@ -724,9 +759,10 @@ export default function ReportsClient({
               <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-semibold text-slate-400 text-xs uppercase tracking-wide">Kewajiban & Ekuitas</h3>
-                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Per Tanggal: {formatDate(endDate)}</div>
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">{formatDate(startDate)} vs {formatDate(endDate)}</div>
                   </div>
                   <div className="p-8 space-y-6">
+                    {renderBalanceHeader()}
                     {/* Liabilities */}
                     <div className="space-y-2">
                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Pasiva / Hutang</p>
@@ -743,12 +779,20 @@ export default function ReportsClient({
                     
                     <div className="flex justify-between items-center pt-6 text-blue-600 border-t-2 border-slate-100">
                       <span className="font-semibold uppercase text-xs">Total Pasiva & Ekuitas</span>
-                      <span className="font-semibold text-lg">
-                        {formatRupiah(
-                          balanceSheet.liabilities.reduce((s:any, x:any) => s + (x.balance || 0), 0) +
-                          balanceSheet.equity.reduce((s:any, x:any) => s + (x.balance || 0), 0)
-                        )}
-                      </span>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <span className="font-semibold text-sm text-blue-600/60 w-24 text-right">
+                          {formatRupiah(
+                            (balanceSheetStart?.liabilities?.reduce((s:any, x:any) => s + (x.balance || 0), 0) || 0) +
+                            (balanceSheetStart?.equity?.reduce((s:any, x:any) => s + (x.balance || 0), 0) || 0)
+                          )}
+                        </span>
+                        <span className="font-semibold text-lg w-24 text-right">
+                          {formatRupiah(
+                            balanceSheet.liabilities.reduce((s:any, x:any) => s + (x.balance || 0), 0) +
+                            balanceSheet.equity.reduce((s:any, x:any) => s + (x.balance || 0), 0)
+                          )}
+                        </span>
+                      </div>
                     </div>
                   </div>
               </div>
