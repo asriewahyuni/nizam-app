@@ -64,7 +64,11 @@ export function SearchableSelect({
 
   useEffect(() => {
     if (!isOpen) return
-    const handleScroll = () => { setIsOpen(false); setSearchTerm('') }
+    const handleScroll = (e: Event) => {
+      if (dropdownRef.current?.contains(e.target as Node)) return
+      setIsOpen(false)
+      setSearchTerm('')
+    }
     const handleResize = () => setDropdownStyle(calcDropdownStyle())
     window.addEventListener('scroll', handleScroll, true)
     window.addEventListener('resize', handleResize)
