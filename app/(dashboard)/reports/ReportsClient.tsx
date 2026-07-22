@@ -389,21 +389,33 @@ export default function ReportsClient({
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <div className="flex items-center gap-2 bg-white/10 border border-white/15 px-3 py-2 rounded-xl">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => updateDates(e.target.value, endDate)}
-                  className="text-xs font-semibold text-white bg-transparent outline-none cursor-pointer [color-scheme:dark]"
-                />
-                <ArrowRight size={11} className="text-slate-400 shrink-0" />
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => updateDates(startDate, e.target.value)}
-                  className="text-xs font-semibold text-white bg-transparent outline-none cursor-pointer [color-scheme:dark]"
-                />
-              </div>
+              {activeTab === 'BS' ? (
+                <div className="flex items-center gap-2 bg-white/10 border border-white/15 px-3 py-2 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Per Tanggal</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => updateDates(startDate, e.target.value)}
+                    className="text-xs font-semibold text-white bg-transparent outline-none cursor-pointer [color-scheme:dark]"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-white/10 border border-white/15 px-3 py-2 rounded-xl">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => updateDates(e.target.value, endDate)}
+                    className="text-xs font-semibold text-white bg-transparent outline-none cursor-pointer [color-scheme:dark]"
+                  />
+                  <ArrowRight size={11} className="text-slate-400 shrink-0" />
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => updateDates(startDate, e.target.value)}
+                    className="text-xs font-semibold text-white bg-transparent outline-none cursor-pointer [color-scheme:dark]"
+                  />
+                </div>
+              )}
 
               <button
                 type="button"
@@ -491,7 +503,7 @@ export default function ReportsClient({
             ))}
           </div>
           <span className="text-xs text-slate-400 font-medium hidden md:block">
-            {formatDate(startDate)} — {formatDate(endDate)}
+            {activeTab === 'BS' ? `Per Tanggal: ${formatDate(endDate)}` : `${formatDate(startDate)} — ${formatDate(endDate)}`}
           </span>
         </div>
 
@@ -693,8 +705,9 @@ export default function ReportsClient({
             {/* Asset Side */}
             <div className="space-y-6">
                <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-                  <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100">
+                  <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-semibold text-slate-400 text-xs uppercase tracking-wide">Aktiva (Aset)</h3>
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Per Tanggal: {formatDate(endDate)}</div>
                   </div>
                   <div className="p-8 space-y-3">
                     {renderBalanceRows(assetTreeRows)}
@@ -709,8 +722,9 @@ export default function ReportsClient({
             {/* Liability & Equity Side */}
             <div className="space-y-6">
               <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-                  <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100">
+                  <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-semibold text-slate-400 text-xs uppercase tracking-wide">Kewajiban & Ekuitas</h3>
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Per Tanggal: {formatDate(endDate)}</div>
                   </div>
                   <div className="p-8 space-y-6">
                     {/* Liabilities */}
