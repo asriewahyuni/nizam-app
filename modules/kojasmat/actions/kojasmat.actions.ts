@@ -301,7 +301,7 @@ export async function postSimpananMutasi(payload: {
   org_id: string
   anggota_id: string
   jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA'
-  jenis_mutasi: 'SETOR' | 'TARIK' | 'KOREKSI'
+  jenis_mutasi: 'SETOR' | 'TARIK' | 'BAGI_HASIL' | 'KOREKSI'
   jumlah: number
   keterangan?: string
   tanggal?: string

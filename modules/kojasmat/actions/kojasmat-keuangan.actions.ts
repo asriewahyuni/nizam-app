@@ -7,6 +7,7 @@ import { queryPostgres } from '@/lib/db/postgres'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
 import { jurnalPendapatanProyek, jurnalBebanProyek } from '@/lib/erp-bridge/kojasmat-journals'
+import { postSimpananMutasi } from './kojasmat.actions'
 
 export type KojasmatPemodalDenganPotensi = {
   id: string
@@ -273,6 +274,20 @@ export async function distribusikanBagiHasil(proyekId: string) {
        VALUES ($1,$2,$3,$4,$5,$6,$7,0,'DIBAYAR',NOW())`,
       [proyek.org_id, proyekId, pb.pemodal_id, periode, laporan.labaRugi.labaBersih, pb.porsi_pct, hak]
     )
+
+    // Kredit hak bagi hasil ke simpanan SUKARELA pemodal — tanpa ini status
+    // 'DIBAYAR' di kojasmat_bagi_hasil tercatat tapi saldo anggota tidak pernah bertambah.
+    if (hak > 0) {
+      await postSimpananMutasi({
+        org_id: proyek.org_id,
+        anggota_id: pb.pemodal_id,
+        jenis_simpanan: 'SUKARELA',
+        jenis_mutasi: 'BAGI_HASIL',
+        jumlah: hak,
+        keterangan: `Bagi hasil proyek ${proyek.kode_proyek} periode ${periode}`,
+        created_by: session.user.id,
+      })
+    }
   }
 
   const { rows: trxRows } = await queryPostgres(
