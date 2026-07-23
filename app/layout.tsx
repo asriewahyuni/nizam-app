@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { ServiceWorkerRegister } from '@/components/shared/service-worker-register'
 
 export const viewport: Viewport = {
   themeColor: '#003366',
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="id" data-scroll-behavior="smooth" suppressHydrationWarning className={jakartaSans.variable}>
       <body className="font-sans antialiased bg-[#F8F9FA] text-[#212529]">
+        <ServiceWorkerRegister />
         {children}
       </body>
     </html>
