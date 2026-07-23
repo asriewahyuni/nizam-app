@@ -18,4 +18,23 @@ export async function register() {
   }
 }
 
-export const onRequestError = Sentry.captureRequestError
+export const onRequestError: typeof Sentry.captureRequestError = async (err, req, ctx) => {
+  Sentry.captureRequestError(err, req, ctx)
+  
+  // Notify Slack for unhandled server errors
+  try {
+    const { sendSlackNotification } = await import('@/lib/slack/client')
+    await sendSlackNotification({
+      message: `*Unhandled Request Error*\nAn unexpected error occurred in the Next.js runtime.`,
+      level: 'error',
+      context: {
+        ErrorMessage: err instanceof Error ? err.message : String(err),
+        ErrorStack: err instanceof Error ? err.stack?.substring(0, 500) : 'N/A',
+        Url: req?.url || 'Unknown URL',
+        Method: req?.method || 'Unknown Method'
+      }
+    })
+  } catch (slackError) {
+    // Ignore Slack failure to prevent cascading errors
+  }
+}

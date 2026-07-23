@@ -54,7 +54,7 @@ export const ERPBridge = {
 
     const { orgId, branchId, amount, date, description, referenceType, referenceId, debitAccountId, creditAccountId, autoPost = true } = input
 
-    return await createJournalEntry({
+    const result = await createJournalEntry({
       org_id: orgId,
       branch_id: branchId,
       entry_date: date,
@@ -67,6 +67,28 @@ export const ERPBridge = {
         { account_id: creditAccountId, debit: 0, credit: amount, memo: description }
       ]
     })
+    
+    // Slack notification for large transactions
+    if (result && amount >= 10_000_000) {
+      try {
+        const { sendSlackNotification } = await import('@/lib/slack/client')
+        await sendSlackNotification({
+          message: `*Large Revenue Transaction Recorded* 💰`,
+          level: 'success',
+          context: {
+            Amount: \`Rp \${amount.toLocaleString('id-ID')}\`,
+            Description: description,
+            ReferenceType: referenceType,
+            ReferenceId: referenceId,
+            OrgId: orgId
+          }
+        })
+      } catch (slackError) {
+        console.error('Failed to send Slack notification for large revenue:', slackError)
+      }
+    }
+    
+    return result
   },
 
   /**
@@ -78,7 +100,7 @@ export const ERPBridge = {
 
     const { orgId, branchId, amount, date, description, referenceType, referenceId, debitAccountId, creditAccountId, autoPost = true } = input
 
-    return await createJournalEntry({
+    const result = await createJournalEntry({
       org_id: orgId,
       branch_id: branchId,
       entry_date: date,
@@ -91,6 +113,28 @@ export const ERPBridge = {
         { account_id: creditAccountId, debit: 0, credit: amount, memo: description }
       ]
     })
+
+    // Slack notification for large expenses
+    if (result && amount >= 10_000_000) {
+      try {
+        const { sendSlackNotification } = await import('@/lib/slack/client')
+        await sendSlackNotification({
+          message: `*Large Expense Transaction Recorded* 💸`,
+          level: 'warning',
+          context: {
+            Amount: \`Rp \${amount.toLocaleString('id-ID')}\`,
+            Description: description,
+            ReferenceType: referenceType,
+            ReferenceId: referenceId,
+            OrgId: orgId
+          }
+        })
+      } catch (slackError) {
+        console.error('Failed to send Slack notification for large expense:', slackError)
+      }
+    }
+
+    return result
   },
 
   /**

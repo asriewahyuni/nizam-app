@@ -703,6 +703,23 @@ export async function createInternalAuthUser(input: {
     // legacy_user_id sebagai user.id — cocok dengan org_members.user_id.
     await createSession(userId)
 
+    // Notify Slack about new user registration
+    try {
+      const { sendSlackNotification } = await import('@/lib/slack/client')
+      await sendSlackNotification({
+        message: `*New User Registered*\nA new user has been created in Nizam ERP.`,
+        level: 'success',
+        context: {
+          Email: normalizedEmail || '-',
+          NIK: normalizedNik || '-',
+          Role: normalizedUserType,
+          UserId: resolvedLegacyUserId ?? userId
+        }
+      })
+    } catch (slackError) {
+      console.error('Failed to send Slack notification for new user:', slackError)
+    }
+
     return {
       success: true as const,
       userId: resolvedLegacyUserId ?? userId,
