@@ -9,17 +9,21 @@ import {
   TrendingUp, Banknote, Star, Clock, FileText,
   AlertTriangle, ClipboardList, Eye, Link2, ExternalLink,
   BookOpen, ArrowDownCircle, X, Copy, Check, Pencil, Trash2, Upload, FolderOpen,
-  TrendingDown, Scale, Loader2,
+  TrendingDown, Scale, Loader2, CalendarClock, FileSignature, History, Lock,
 } from 'lucide-react'
 import {
   createAnggota, updateAnggota,
   catatSimpananMutasi,
   getSimpananByAnggota, getMutasiByAnggota,
-  createProyek, updateProyek, deleteProyek, updateProyekStatus, submitProyekKeDPS,
-  submitDpsReview, kirimPenawaranProyek,
+  createProyek, updateProyek, deleteProyek, updateProyekStatus,
+  submitProyekKeDMR, resubmitProyek, submitProyekReview,
+  jadwalkanFunding, bukaFunding, tutupFunding,
+  jadwalkanAkad, tandatanganiAkad, getAkadByProyek, getProyekHistory,
+  kirimPenawaranProyek,
   createPelatihan, daftarPesertaPelatihan, getPesertaPelatihan, luluskanPeserta,
   type KojasmatAnggota, type KojasmatProyek, type KojasmatPelatihan, type KojasmatStats,
   type KojasmatSimpanan, type KojasmatSimpananMutasi,
+  type KojasmatAkad, type KojasmatProyekHistory,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
   setujuiPendaftaran, tolakPendaftaran, mintaRevisiPendaftaran,
@@ -74,16 +78,22 @@ function fmt(n: number) {
 }
 
 const STATUS_PROYEK: Record<string, { label: string; color: string }> = {
-  DRAFT:       { label: 'Draft',       color: 'bg-gray-100 text-gray-600' },
-  REVIEW_DPS:  { label: 'Review DPS',  color: 'bg-yellow-100 text-yellow-700' },
-  DISETUJUI:   { label: 'Disetujui',   color: 'bg-blue-100 text-blue-700' },
-  DITOLAK:     { label: 'Ditolak',     color: 'bg-red-100 text-red-700' },
-  OPEN:        { label: 'Open',        color: 'bg-cyan-100 text-cyan-700' },
-  TERPENUHI:   { label: 'Terpenuhi',   color: 'bg-indigo-100 text-indigo-700' },
-  BERJALAN:    { label: 'Berjalan',    color: 'bg-emerald-100 text-emerald-700' },
-  SELESAI:     { label: 'Selesai',     color: 'bg-emerald-200 text-emerald-800' },
-  BAGI_HASIL:  { label: 'Bagi Hasil',  color: 'bg-purple-100 text-purple-700' },
-  DITUTUP:     { label: 'Ditutup',     color: 'bg-gray-200 text-gray-500' },
+  DRAFT:                { label: 'Draft',               color: 'bg-gray-100 text-gray-600' },
+  MENUNGGU_DMR:         { label: 'Menunggu DMR',         color: 'bg-yellow-100 text-yellow-700' },
+  REVISI_DMR:           { label: 'Revisi DMR',           color: 'bg-orange-100 text-orange-700' },
+  DITOLAK_DMR:          { label: 'Ditolak DMR',          color: 'bg-red-100 text-red-700' },
+  MENUNGGU_DPS:         { label: 'Menunggu DPS',         color: 'bg-amber-100 text-amber-700' },
+  REVISI_DPS:           { label: 'Revisi DPS',           color: 'bg-orange-100 text-orange-700' },
+  DITOLAK_DPS:          { label: 'Ditolak DPS',          color: 'bg-red-100 text-red-700' },
+  DISETUJUI:            { label: 'Disetujui',            color: 'bg-blue-100 text-blue-700' },
+  FUNDING_DIJADWALKAN:  { label: 'Funding Dijadwalkan',  color: 'bg-sky-100 text-sky-700' },
+  FUNDING_AKTIF:        { label: 'Funding Aktif',        color: 'bg-cyan-100 text-cyan-700' },
+  FUNDING_DITUTUP:      { label: 'Funding Ditutup',      color: 'bg-indigo-100 text-indigo-700' },
+  MENUNGGU_AKAD:        { label: 'Menunggu Akad',        color: 'bg-violet-100 text-violet-700' },
+  BERJALAN:             { label: 'Berjalan',             color: 'bg-emerald-100 text-emerald-700' },
+  SELESAI:              { label: 'Selesai',              color: 'bg-emerald-200 text-emerald-800' },
+  BAGI_HASIL:           { label: 'Bagi Hasil',           color: 'bg-purple-100 text-purple-700' },
+  DITUTUP:              { label: 'Ditutup',              color: 'bg-gray-200 text-gray-500' },
 }
 
 const AKAD_COLOR: Record<string, string> = {
@@ -569,12 +579,16 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
         <StatCard icon={TrendingUp} label="Portofolio Pembiayaan" value={fmt(Number(stats.total_pembiayaan))} />
       </div>
 
-      {stats.antrian_dps > 0 && (
+      {(stats.antrian_dmr > 0 || stats.antrian_dps > 0) && (
         <div className="flex items-center gap-3 rounded-xl border border-yellow-200 bg-yellow-50 p-4">
           <Shield className="h-5 w-5 text-yellow-600 shrink-0" />
           <div>
-            <p className="font-medium text-yellow-800">{stats.antrian_dps} proyek menunggu review DPS</p>
-            <p className="text-sm text-yellow-600">Buka tab Proyek → Antrian DPS untuk meninjau</p>
+            <p className="font-medium text-yellow-800">
+              {stats.antrian_dmr > 0 && `${stats.antrian_dmr} proyek menunggu review DMR`}
+              {stats.antrian_dmr > 0 && stats.antrian_dps > 0 && ' · '}
+              {stats.antrian_dps > 0 && `${stats.antrian_dps} proyek menunggu review DPS`}
+            </p>
+            <p className="text-sm text-yellow-600">Buka tab Proyek → Antrian DMR/DPS untuk meninjau</p>
           </div>
         </div>
       )}
@@ -1095,6 +1109,60 @@ function DaftarPemodalPanel({ proyekId }: { proyekId: string }) {
   )
 }
 
+function RiwayatProyekPanel({ proyekId }: { proyekId: string }) {
+  const [history, setHistory] = useState<KojasmatProyekHistory[] | null>(null)
+  const [akad, setAkad] = useState<KojasmatAkad[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getProyekHistory(proyekId).then(l => { if (!cancelled) setHistory(l) })
+    getAkadByProyek(proyekId).then(l => { if (!cancelled) setAkad(l) })
+    return () => { cancelled = true }
+  }, [proyekId])
+
+  const akadAktif = akad?.find(a => a.status !== 'BATAL')
+
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-4">
+      <p className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-1.5">
+        <History className="h-4 w-4" /> Riwayat Proyek
+      </p>
+      {akadAktif && (
+        <div className="mb-3 rounded-xl border border-violet-100 bg-violet-50 p-3 text-xs text-violet-700">
+          <p className="font-medium flex items-center gap-1.5">
+            <FileSignature className="h-3.5 w-3.5" /> Akad — {akadAktif.status === 'DITANDATANGANI' ? 'Sudah ditandatangani' : 'Menunggu tanda tangan'}
+          </p>
+          {akadAktif.jadwal_akad && <p className="mt-1">Jadwal: {String(akadAktif.jadwal_akad).split('T')[0]}</p>}
+          {akadAktif.saksi_nama && <p>Saksi: {akadAktif.saksi_nama}</p>}
+        </div>
+      )}
+      {history === null ? (
+        <p className="text-sm text-gray-400">Memuat riwayat...</p>
+      ) : history.length === 0 ? (
+        <p className="text-sm text-gray-400">Belum ada riwayat perubahan status.</p>
+      ) : (
+        <div className="space-y-2">
+          {history.map(h => (
+            <div key={h.id} className="flex items-start gap-2 text-xs">
+              <div className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300" />
+              <div>
+                <p className="text-gray-700">
+                  <span className="font-medium">{h.aksi.replaceAll('_', ' ')}</span>
+                  {h.status_dari && <> — {STATUS_PROYEK[h.status_dari]?.label ?? h.status_dari} → </>}
+                  {!h.status_dari && <> — </>}
+                  {STATUS_PROYEK[h.status_ke]?.label ?? h.status_ke}
+                </p>
+                <p className="text-gray-400">{new Date(h.created_at).toLocaleString('id-ID')}{h.actor_role ? ` · ${h.actor_role}` : ''}</p>
+                {h.pesan && <p className="text-gray-500 mt-0.5">{h.pesan}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function DetailProyekPanel({ proyek }: { proyek: KojasmatProyek }) {
   const st = STATUS_PROYEK[proyek.status] ?? { label: proyek.status, color: 'bg-gray-100 text-gray-600' }
   const pct = Number(proyek.kebutuhan_modal) > 0
@@ -1158,6 +1226,7 @@ function DetailProyekPanel({ proyek }: { proyek: KojasmatProyek }) {
       </div>
 
       <DaftarPemodalPanel proyekId={proyek.id} />
+      <RiwayatProyekPanel proyekId={proyek.id} />
     </div>
   )
 }
@@ -1341,7 +1410,7 @@ function TabProyek({ orgId, proyek, anggota }: {
   orgId: string; proyek: KojasmatProyek[]; anggota: KojasmatAnggota[]
 }) {
   const [pending, startTransition] = useTransition()
-  const [subTab, setSubTab] = useState<'semua' | 'dps'>('semua')
+  const [subTab, setSubTab] = useState<'semua' | 'dmr' | 'dps'>('semua')
   const [modalNew, setModalNew] = useState(false)
   const [modalEdit, setModalEdit] = useState<KojasmatProyek | null>(null)
   const [modalDelete, setModalDelete] = useState<KojasmatProyek | null>(null)
@@ -1349,15 +1418,22 @@ function TabProyek({ orgId, proyek, anggota }: {
   const [dokProyek, setDokProyek] = useState<KojasmatProyek | null>(null)
   const [keuanganProyek, setKeuanganProyek] = useState<KojasmatProyek | null>(null)
   const [detailProyek, setDetailProyek] = useState<KojasmatProyek | null>(null)
-  const [modalDps, setModalDps] = useState<KojasmatProyek | null>(null)
+  const [modalReview, setModalReview] = useState<{ proyek: KojasmatProyek; tahap: 'DMR' | 'DPS' } | null>(null)
+  const [modalFunding, setModalFunding] = useState<KojasmatProyek | null>(null)
+  const [modalAkad, setModalAkad] = useState<KojasmatProyek | null>(null)
   const [modalPenawaran, setModalPenawaran] = useState<KojasmatProyek | null>(null)
-  const [dpsForm, setDpsForm] = useState<{ keputusan: 'DISETUJUI' | 'DITOLAK' | 'REVISI'; catatan: string }>({ keputusan: 'DISETUJUI', catatan: '' })
+  const [reviewForm, setReviewForm] = useState<{ keputusan: 'DISETUJUI' | 'DITOLAK' | 'REVISI'; catatan: string }>({ keputusan: 'DISETUJUI', catatan: '' })
+  const [fundingForm, setFundingForm] = useState<{ funding_mulai: string; funding_selesai: string; funding_instruksi: string; target_modal_awal: string }>({
+    funding_mulai: new Date().toISOString().slice(0, 10), funding_selesai: '', funding_instruksi: '', target_modal_awal: '',
+  })
+  const [akadForm, setAkadForm] = useState<{ jadwal_akad: string; saksi_nama: string }>({ jadwal_akad: '', saksi_nama: '' })
   const [form, setForm] = useState<ProyekForm>(emptyProyekForm)
   const [editForm, setEditForm] = useState<ProyekForm>(emptyProyekForm)
   const [penawaranIds, setPenawaranIds] = useState<string[]>([])
 
-  const antrianDps = proyek.filter(p => p.status === 'REVIEW_DPS')
-  const displayProyek = subTab === 'dps' ? antrianDps : proyek
+  const antrianDmr = proyek.filter(p => p.status === 'MENUNGGU_DMR')
+  const antrianDps = proyek.filter(p => p.status === 'MENUNGGU_DPS')
+  const displayProyek = subTab === 'dmr' ? antrianDmr : subTab === 'dps' ? antrianDps : proyek
 
   function handleCreate() {
     startTransition(async () => {
@@ -1381,16 +1457,66 @@ function TabProyek({ orgId, proyek, anggota }: {
     })
   }
 
-  function handleDpsReview() {
-    if (!modalDps) return
+  function handleReview() {
+    if (!modalReview) return
     startTransition(async () => {
-      await submitDpsReview({
+      await submitProyekReview({
         org_id: orgId,
-        proyek_id: modalDps.id,
-        keputusan: dpsForm.keputusan,
-        catatan: dpsForm.catatan || undefined,
+        proyek_id: modalReview.proyek.id,
+        tahap: modalReview.tahap,
+        keputusan: reviewForm.keputusan,
+        catatan: reviewForm.catatan || undefined,
       })
-      setModalDps(null)
+      setModalReview(null)
+    })
+  }
+
+  function handleResubmit(id: string) {
+    startTransition(async () => { await resubmitProyek(id) })
+  }
+
+  function handleJadwalkanFunding() {
+    if (!modalFunding || !fundingForm.funding_mulai || !fundingForm.funding_selesai) return
+    startTransition(async () => {
+      await jadwalkanFunding({
+        org_id: orgId,
+        proyek_id: modalFunding.id,
+        funding_mulai: fundingForm.funding_mulai,
+        funding_selesai: fundingForm.funding_selesai,
+        funding_instruksi: fundingForm.funding_instruksi || undefined,
+        target_modal_awal: fundingForm.target_modal_awal ? Number(fundingForm.target_modal_awal) : undefined,
+      })
+      setModalFunding(null)
+    })
+  }
+
+  function handleBukaFunding(id: string) {
+    startTransition(async () => { await bukaFunding(id) })
+  }
+
+  function handleTutupFunding(id: string) {
+    startTransition(async () => { await tutupFunding(id) })
+  }
+
+  function handleJadwalkanAkad() {
+    if (!modalAkad || !akadForm.jadwal_akad) return
+    startTransition(async () => {
+      await jadwalkanAkad({
+        org_id: orgId,
+        proyek_id: modalAkad.id,
+        jadwal_akad: akadForm.jadwal_akad,
+        saksi_nama: akadForm.saksi_nama || undefined,
+      })
+      setModalAkad(null)
+    })
+  }
+
+  function handleTandatanganiAkad(p: KojasmatProyek) {
+    startTransition(async () => {
+      const list = await getAkadByProyek(p.id)
+      const aktif = list.find(a => a.status === 'MENUNGGU_TTD')
+      if (!aktif) return
+      await tandatanganiAkad(aktif.id, p.id)
     })
   }
 
@@ -1463,6 +1589,7 @@ function TabProyek({ orgId, proyek, anggota }: {
         <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1">
           {([
             ['semua', 'Semua Proyek'],
+            ['dmr', `Antrian DMR${antrianDmr.length ? ` (${antrianDmr.length})` : ''}`],
             ['dps', `Antrian DPS${antrianDps.length ? ` (${antrianDps.length})` : ''}`],
           ] as const).map(([key, label]) => (
             <button key={key} onClick={() => setSubTab(key)}
@@ -1481,7 +1608,8 @@ function TabProyek({ orgId, proyek, anggota }: {
       <div className="space-y-3">
         {displayProyek.length === 0 && (
           <div className="rounded-2xl border border-gray-100 bg-white py-12 text-center text-gray-400">
-            {subTab === 'dps' ? 'Tidak ada proyek menunggu review DPS' : 'Belum ada proyek'}
+            {subTab === 'dmr' ? 'Tidak ada proyek menunggu review DMR'
+              : subTab === 'dps' ? 'Tidak ada proyek menunggu review DPS' : 'Belum ada proyek'}
           </div>
         )}
         {displayProyek.map(p => {
@@ -1560,39 +1688,75 @@ function TabProyek({ orgId, proyek, anggota }: {
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {p.status === 'DRAFT' && (
-                  <button onClick={() => startTransition(() => { submitProyekKeDPS(p.id) })}
+                  <button onClick={() => startTransition(() => { submitProyekKeDMR(p.id) })}
                     className="flex items-center gap-1.5 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-1.5 text-xs font-medium text-yellow-700 hover:bg-yellow-100 transition-colors cursor-pointer">
-                    <Send className="h-3.5 w-3.5" /> Kirim ke DPS
+                    <Send className="h-3.5 w-3.5" /> Ajukan ke DMR
                   </button>
                 )}
-                {p.status === 'REVIEW_DPS' && (
-                  <button onClick={() => { setModalDps(p); setDpsForm({ keputusan: 'DISETUJUI' as const, catatan: '' }) }}
+                {p.status === 'MENUNGGU_DMR' && (
+                  <button onClick={() => { setModalReview({ proyek: p, tahap: 'DMR' }); setReviewForm({ keputusan: 'DISETUJUI' as const, catatan: '' }) }}
+                    className="flex items-center gap-1.5 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-1.5 text-xs font-medium text-yellow-700 hover:bg-yellow-100 transition-colors cursor-pointer">
+                    <Shield className="h-3.5 w-3.5" /> Review DMR
+                  </button>
+                )}
+                {(p.status === 'REVISI_DMR' || p.status === 'REVISI_DPS') && (
+                  <button onClick={() => handleResubmit(p.id)}
+                    className="flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100 transition-colors cursor-pointer">
+                    <RefreshCw className="h-3.5 w-3.5" /> Ajukan Ulang
+                  </button>
+                )}
+                {p.status === 'MENUNGGU_DPS' && (
+                  <button onClick={() => { setModalReview({ proyek: p, tahap: 'DPS' }); setReviewForm({ keputusan: 'DISETUJUI' as const, catatan: '' }) }}
                     className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer">
                     <Shield className="h-3.5 w-3.5" /> Review DPS
                   </button>
                 )}
                 {p.status === 'DISETUJUI' && (
-                  <button onClick={() => handleStatus(p.id, 'OPEN')}
+                  <button onClick={() => { setModalFunding(p); setFundingForm({ funding_mulai: new Date().toISOString().slice(0, 10), funding_selesai: '', funding_instruksi: '', target_modal_awal: String(p.kebutuhan_modal) }) }}
+                    className="flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-100 transition-colors cursor-pointer">
+                    <CalendarClock className="h-3.5 w-3.5" /> Jadwalkan Pendanaan
+                  </button>
+                )}
+                {p.status === 'FUNDING_DIJADWALKAN' && (
+                  <button onClick={() => handleBukaFunding(p.id)}
                     className="flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-medium text-cyan-700 hover:bg-cyan-100 transition-colors cursor-pointer">
                     <ArrowUpCircle className="h-3.5 w-3.5" /> Buka Pendanaan
                   </button>
                 )}
-                {p.status === 'OPEN' && (
-                  <button onClick={() => { setModalPenawaran(p); setPenawaranIds([]) }}
-                    className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer">
-                    <Send className="h-3.5 w-3.5" /> Kirim Penawaran
+                {p.status === 'FUNDING_AKTIF' && (
+                  <>
+                    <button onClick={() => { setModalPenawaran(p); setPenawaranIds([]) }}
+                      className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer">
+                      <Send className="h-3.5 w-3.5" /> Kirim Penawaran
+                    </button>
+                    <button onClick={() => handleTutupFunding(p.id)}
+                      className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer">
+                      <Lock className="h-3.5 w-3.5" /> Tutup Pendanaan
+                    </button>
+                  </>
+                )}
+                {p.status === 'FUNDING_DITUTUP' && (
+                  <button onClick={() => { setModalAkad(p); setAkadForm({ jadwal_akad: '', saksi_nama: '' }) }}
+                    className="flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors cursor-pointer">
+                    <FileSignature className="h-3.5 w-3.5" /> Jadwalkan Akad
                   </button>
                 )}
-                {p.status === 'TERPENUHI' && (
-                  <button onClick={() => handleStatus(p.id, 'BERJALAN')}
-                    className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer">
-                    <RefreshCw className="h-3.5 w-3.5" /> Mulai Berjalan
+                {p.status === 'MENUNGGU_AKAD' && (
+                  <button onClick={() => handleTandatanganiAkad(p)}
+                    className="flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors cursor-pointer">
+                    <FileSignature className="h-3.5 w-3.5" /> Tandatangani Akad
                   </button>
                 )}
                 {p.status === 'BERJALAN' && (
                   <button onClick={() => handleStatus(p.id, 'SELESAI')}
                     className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer">
                     <CheckCircle className="h-3.5 w-3.5" /> Tandai Selesai
+                  </button>
+                )}
+                {p.status === 'BAGI_HASIL' && (
+                  <button onClick={() => handleStatus(p.id, 'DITUTUP')}
+                    className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer">
+                    <XCircle className="h-3.5 w-3.5" /> Tutup Proyek
                   </button>
                 )}
               </div>
@@ -1895,27 +2059,27 @@ function TabProyek({ orgId, proyek, anggota }: {
       </Modal>
 
       {/* Modal DPS Review */}
-      <Modal open={!!modalDps} onClose={() => setModalDps(null)} title="Review DPS">
-        {modalDps && (
+      <Modal open={!!modalReview} onClose={() => setModalReview(null)} title={modalReview?.tahap === 'DMR' ? 'Review DMR' : 'Review DPS'}>
+        {modalReview && (
           <div className="space-y-4">
             <div className="rounded-xl bg-amber-50 p-4">
-              <p className="font-medium text-amber-800">{modalDps.nama_proyek}</p>
+              <p className="font-medium text-amber-800">{modalReview.proyek.nama_proyek}</p>
               <p className="text-sm text-amber-600 mt-1">
-                {modalDps.jenis_akad} · {fmt(Number(modalDps.kebutuhan_modal))} · {modalDps.durasi_bulan} bulan
+                {modalReview.proyek.jenis_akad} · {fmt(Number(modalReview.proyek.kebutuhan_modal))} · {modalReview.proyek.durasi_bulan} bulan
               </p>
               <p className="text-sm text-amber-600 mt-1">
-                Nisbah Pengaju {modalDps.nisbah_pengaju ?? 30}% · Nisbah Pemodal {modalDps.nisbah_pemodal ?? 70}%
+                Nisbah Pengaju {modalReview.proyek.nisbah_pengaju ?? 30}% · Nisbah Pemodal {modalReview.proyek.nisbah_pemodal ?? 70}%
               </p>
-              {modalDps.deskripsi && <p className="text-sm text-amber-700 mt-2">{modalDps.deskripsi}</p>}
-              {modalDps.agunan && <p className="text-xs text-amber-600 mt-1">Agunan: {modalDps.agunan}</p>}
+              {modalReview.proyek.deskripsi && <p className="text-sm text-amber-700 mt-2">{modalReview.proyek.deskripsi}</p>}
+              {modalReview.proyek.agunan && <p className="text-xs text-amber-600 mt-1">Agunan: {modalReview.proyek.agunan}</p>}
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Keputusan DPS</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Keputusan {modalReview.tahap}</label>
               <div className="flex gap-2">
                 {(['DISETUJUI', 'REVISI', 'DITOLAK'] as const).map(k => (
-                  <button key={k} onClick={() => setDpsForm(f => ({ ...f, keputusan: k }))}
+                  <button key={k} onClick={() => setReviewForm(f => ({ ...f, keputusan: k }))}
                     className={cn('flex-1 rounded-xl border py-2 text-xs font-medium transition-colors cursor-pointer',
-                      dpsForm.keputusan === k
+                      reviewForm.keputusan === k
                         ? k === 'DISETUJUI' ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                           : k === 'DITOLAK' ? 'border-red-400 bg-red-50 text-red-700'
                           : 'border-yellow-400 bg-yellow-50 text-yellow-700'
@@ -1926,20 +2090,97 @@ function TabProyek({ orgId, proyek, anggota }: {
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Catatan DPS</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Catatan {modalReview.tahap}</label>
               <textarea rows={3}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
                 placeholder="Catatan untuk pengaju..."
-                value={dpsForm.catatan} onChange={e => setDpsForm(f => ({ ...f, catatan: e.target.value }))} />
+                value={reviewForm.catatan} onChange={e => setReviewForm(f => ({ ...f, catatan: e.target.value }))} />
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setModalDps(null)}
+              <button onClick={() => setModalReview(null)}
                 className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
                 Batal
               </button>
-              <button onClick={handleDpsReview} disabled={pending}
+              <button onClick={handleReview} disabled={pending}
                 className="flex-1 rounded-xl bg-amber-500 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50 transition-colors cursor-pointer">
                 {pending ? 'Menyimpan...' : 'Submit Review'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal Jadwalkan Pendanaan */}
+      <Modal open={!!modalFunding} onClose={() => setModalFunding(null)} title="Jadwalkan Pendanaan">
+        {modalFunding && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">Atur jadwal pendanaan untuk <strong>{modalFunding.nama_proyek}</strong>.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Mulai</label>
+                <input type="date"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  value={fundingForm.funding_mulai} onChange={e => setFundingForm(f => ({ ...f, funding_mulai: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Selesai</label>
+                <input type="date"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  value={fundingForm.funding_selesai} onChange={e => setFundingForm(f => ({ ...f, funding_selesai: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Target Modal (Rp)</label>
+              <input type="number"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={fundingForm.target_modal_awal} onChange={e => setFundingForm(f => ({ ...f, target_modal_awal: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Instruksi Pendanaan</label>
+              <textarea rows={3}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
+                placeholder="Instruksi untuk pemodal..."
+                value={fundingForm.funding_instruksi} onChange={e => setFundingForm(f => ({ ...f, funding_instruksi: e.target.value }))} />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setModalFunding(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Batal
+              </button>
+              <button onClick={handleJadwalkanFunding} disabled={pending || !fundingForm.funding_mulai || !fundingForm.funding_selesai}
+                className="flex-1 rounded-xl bg-sky-600 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50 transition-colors cursor-pointer">
+                {pending ? 'Menyimpan...' : 'Jadwalkan'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal Jadwalkan Akad */}
+      <Modal open={!!modalAkad} onClose={() => setModalAkad(null)} title="Jadwalkan Akad">
+        {modalAkad && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">Jadwalkan penandatanganan akad untuk <strong>{modalAkad.nama_proyek}</strong>.</p>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Jadwal Akad</label>
+              <input type="date"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={akadForm.jadwal_akad} onChange={e => setAkadForm(f => ({ ...f, jadwal_akad: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Nama Saksi</label>
+              <input
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={akadForm.saksi_nama} onChange={e => setAkadForm(f => ({ ...f, saksi_nama: e.target.value }))} />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setModalAkad(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Batal
+              </button>
+              <button onClick={handleJadwalkanAkad} disabled={pending || !akadForm.jadwal_akad}
+                className="flex-1 rounded-xl bg-violet-600 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 transition-colors cursor-pointer">
+                {pending ? 'Menyimpan...' : 'Jadwalkan'}
               </button>
             </div>
           </div>
@@ -3462,7 +3703,7 @@ export default function KojasmatClient({
     { key: 'dashboard',   label: 'Dashboard',    icon: LayoutDashboard },
     { key: 'permohonan',  label: 'Permohonan',   icon: ClipboardList,  badge: pendingPendaftaran || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
     { key: 'anggota',     label: 'Anggota',       icon: Users,          badge: stats.total_anggota },
-    { key: 'proyek',      label: 'Proyek',         icon: Briefcase,      badge: stats.antrian_dps || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
+    { key: 'proyek',      label: 'Proyek',         icon: Briefcase,      badge: (stats.antrian_dmr + stats.antrian_dps) || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
     { key: 'simpanan',    label: 'Simpanan',       icon: Wallet },
     { key: 'pelatihan',   label: 'Pelatihan',      icon: GraduationCap },
     { key: 'laporan',     label: 'Laporan',         icon: FileText,      badge: laporan.filter(l => l.status === 'DIKIRIM').length || undefined },

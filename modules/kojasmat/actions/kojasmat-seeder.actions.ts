@@ -229,7 +229,7 @@ export async function seedKojasmatDummyData(orgId: string) {
         durasi_bulan, agunan, status)
      VALUES ($1,$2,'PY-0002','Konveksi Pak Budi',
        'Pengembangan usaha konveksi seragam sekolah. Modal untuk 2 unit mesin jahit industri dan bahan baku awal.',
-       'INAN', 15000000, 5000000, 300000, 12, 'BPKB Motor Revo 2019', 'OPEN')
+       'INAN', 15000000, 5000000, 300000, 12, 'BPKB Motor Revo 2019', 'FUNDING_AKTIF')
      RETURNING id`,
     [orgId, anggotaMap['KJM-003']]
   )
@@ -242,7 +242,7 @@ export async function seedKojasmatDummyData(orgId: string) {
         durasi_bulan, agunan, status)
      VALUES ($1,$2,'PY-0003','Usaha Ternak Ayam Kampung',
        'Pengembangan usaha ternak ayam kampung 500 ekor. Modal untuk kandang, bibit, dan pakan 3 bulan pertama.',
-       'MUDHARABAH', 8000000, 0, 200000, 6, 'Agunan berupa lahan kandang 200m²', 'REVIEW_DPS')
+       'MUDHARABAH', 8000000, 0, 200000, 6, 'Agunan berupa lahan kandang 200m²', 'MENUNGGU_DPS')
      RETURNING id`,
     [orgId, anggotaMap['KJM-001']]
   )
@@ -276,20 +276,20 @@ export async function seedKojasmatDummyData(orgId: string) {
 
   // PY-0001: disetujui
   await queryPostgres(
-    `INSERT INTO kojasmat_dps_review (org_id, proyek_id, reviewer_id, keputusan, catatan, reviewed_at)
-     VALUES ($1,$2,$3,'DISETUJUI','Proyek layak secara syariah. Akad mudharabah sesuai. Agunan memadai.',$4)`,
+    `INSERT INTO kojasmat_proyek_review (org_id, proyek_id, tahap, reviewer_id, keputusan, catatan, proposal_version, reviewed_at)
+     VALUES ($1,$2,'DPS',$3,'DISETUJUI','Proyek layak secara syariah. Akad mudharabah sesuai. Agunan memadai.',1,$4)`,
     [orgId, py1.id, getInternalUserId(session), daysAgo(120)]
   )
   // PY-0002: disetujui
   await queryPostgres(
-    `INSERT INTO kojasmat_dps_review (org_id, proyek_id, reviewer_id, keputusan, catatan, reviewed_at)
-     VALUES ($1,$2,$3,'DISETUJUI','Akad inan syariah compliant. Ujrah wakalah koperasi sudah transparan dan disepakati.',$4)`,
+    `INSERT INTO kojasmat_proyek_review (org_id, proyek_id, tahap, reviewer_id, keputusan, catatan, proposal_version, reviewed_at)
+     VALUES ($1,$2,'DPS',$3,'DISETUJUI','Akad inan syariah compliant. Ujrah wakalah koperasi sudah transparan dan disepakati.',1,$4)`,
     [orgId, py2.id, getInternalUserId(session), daysAgo(14)]
   )
   // PY-0004: disetujui
   await queryPostgres(
-    `INSERT INTO kojasmat_dps_review (org_id, proyek_id, reviewer_id, keputusan, catatan, reviewed_at)
-     VALUES ($1,$2,$3,'DISETUJUI','Akad murabahah valid. Harga jual dan margin sudah transparan.',$4)`,
+    `INSERT INTO kojasmat_proyek_review (org_id, proyek_id, tahap, reviewer_id, keputusan, catatan, proposal_version, reviewed_at)
+     VALUES ($1,$2,'DPS',$3,'DISETUJUI','Akad murabahah valid. Harga jual dan margin sudah transparan.',1,$4)`,
     [orgId, py4.id, getInternalUserId(session), daysAgo(210)]
   )
 

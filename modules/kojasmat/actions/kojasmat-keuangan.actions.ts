@@ -305,6 +305,8 @@ export async function distribusikanBagiHasil(proyekId: string) {
     await jurnalBebanProyek(proyek.org_id, totalDibagikan, String(trxRows[0].id), String(proyek.kode_proyek), 'Distribusi Bagi Hasil')
   } catch (_) { /* jurnal non-fatal */ }
 
+  await queryPostgres(`UPDATE kojasmat_proyek SET status='BAGI_HASIL', updated_at=NOW() WHERE id=$1`, [proyekId])
+
   revalidatePath('/kojasmat')
   return { data: { totalDibagikan, jumlahPemodal: pembiayaan.length } }
 }

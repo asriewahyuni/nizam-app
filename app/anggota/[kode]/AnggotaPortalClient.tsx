@@ -62,15 +62,22 @@ const AKAD_LABEL: Record<string, string> = {
 }
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  DRAFT:      { label: 'Draft',       color: 'bg-gray-100 text-gray-600' },
-  REVIEW_DPS: { label: 'Review DPS',  color: 'bg-yellow-100 text-yellow-700' },
-  DISETUJUI:  { label: 'Disetujui',   color: 'bg-blue-100 text-blue-700' },
-  DITOLAK:    { label: 'Ditolak',     color: 'bg-red-100 text-red-700' },
-  OPEN:       { label: 'Buka Dana',   color: 'bg-cyan-100 text-cyan-700' },
-  TERPENUHI:  { label: 'Terpenuhi',   color: 'bg-indigo-100 text-indigo-700' },
-  BERJALAN:   { label: 'Berjalan',    color: 'bg-emerald-100 text-emerald-700' },
-  SELESAI:    { label: 'Selesai',     color: 'bg-emerald-200 text-emerald-800' },
-  DITUTUP:    { label: 'Ditutup',     color: 'bg-gray-200 text-gray-500' },
+  DRAFT:                { label: 'Draft',               color: 'bg-gray-100 text-gray-600' },
+  MENUNGGU_DMR:         { label: 'Menunggu DMR',         color: 'bg-yellow-100 text-yellow-700' },
+  REVISI_DMR:           { label: 'Revisi DMR',           color: 'bg-orange-100 text-orange-700' },
+  DITOLAK_DMR:          { label: 'Ditolak DMR',          color: 'bg-red-100 text-red-700' },
+  MENUNGGU_DPS:         { label: 'Menunggu DPS',         color: 'bg-amber-100 text-amber-700' },
+  REVISI_DPS:           { label: 'Revisi DPS',           color: 'bg-orange-100 text-orange-700' },
+  DITOLAK_DPS:          { label: 'Ditolak DPS',          color: 'bg-red-100 text-red-700' },
+  DISETUJUI:            { label: 'Disetujui',            color: 'bg-blue-100 text-blue-700' },
+  FUNDING_DIJADWALKAN:  { label: 'Funding Dijadwalkan',  color: 'bg-sky-100 text-sky-700' },
+  FUNDING_AKTIF:        { label: 'Buka Dana',            color: 'bg-cyan-100 text-cyan-700' },
+  FUNDING_DITUTUP:      { label: 'Funding Ditutup',      color: 'bg-indigo-100 text-indigo-700' },
+  MENUNGGU_AKAD:        { label: 'Menunggu Akad',        color: 'bg-violet-100 text-violet-700' },
+  BERJALAN:             { label: 'Berjalan',             color: 'bg-emerald-100 text-emerald-700' },
+  SELESAI:              { label: 'Selesai',              color: 'bg-emerald-200 text-emerald-800' },
+  BAGI_HASIL:           { label: 'Bagi Hasil',           color: 'bg-purple-100 text-purple-700' },
+  DITUTUP:              { label: 'Ditutup',              color: 'bg-gray-200 text-gray-500' },
 }
 
 function Badge({ text, cls }: { text: string; cls: string }) {
@@ -901,7 +908,7 @@ function TabProyek({ anggota, proyekDiajukan }: {
                       <p className="text-xs text-gray-600 leading-relaxed">{p.deskripsi}</p>
                     )}
                     <ProyekDokumenSection proyekId={p.id} orgId={anggota.org_id} />
-                    {!['DRAFT', 'REVIEW_DPS', 'DITOLAK'].includes(p.status) && (
+                    {!['DRAFT', 'MENUNGGU_DMR', 'REVISI_DMR', 'DITOLAK_DMR', 'MENUNGGU_DPS', 'REVISI_DPS', 'DITOLAK_DPS'].includes(p.status) && (
                       <DaftarPemodalPanel proyekId={p.id} />
                     )}
                     {(p.status === 'BERJALAN' || p.status === 'SELESAI') && (
@@ -1127,7 +1134,7 @@ function TabPenawaran({ anggota, penawaran }: {
                   <span>Sisa: <strong className="text-emerald-600">{fmt(sisa)}</strong></span>
                 </div>
 
-                {(p.status === 'TERKIRIM' || p.status === 'DIBACA') && p.proyek_status === 'OPEN' && (
+                {(p.status === 'TERKIRIM' || p.status === 'DIBACA') && p.proyek_status === 'FUNDING_AKTIF' && (
                   <div className="mt-3 flex gap-2">
                     <button onClick={() => { setSheetBiayai(p); setJumlah(''); setKehadiranAkad('SENDIRI') }}
                       className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2.5 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
@@ -1494,7 +1501,7 @@ function TabInvestasi({
             proyek_id?: string; nama_proyek?: string; jenis_akad?: string; proyek_status?: string
           }) => {
             const isOpen = expandedPembiayaan === pm.id
-            const bisaBatalkan = pm.proyek_status === 'OPEN' || pm.proyek_status === 'TERPENUHI'
+            const bisaBatalkan = pm.proyek_status === 'FUNDING_AKTIF' || pm.proyek_status === 'FUNDING_DITUTUP'
             return (
               <div key={pm.id} className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
                 <button
