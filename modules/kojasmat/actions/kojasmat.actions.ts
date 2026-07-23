@@ -192,6 +192,18 @@ export async function getAnggotaByKodeOnly(kode: string, orgId?: string): Promis
   return (rows[0] ?? null) as KojasmatAnggota | null
 }
 
+// Preview data anggota oleh staf hanya boleh untuk owner/admin/manajer organisasi terkait —
+// mencegah karyawan tanpa wewenang mengintip simpanan & data pribadi anggota lain.
+export async function isOrgAdminOrManajemen(userId: string, orgId: string): Promise<boolean> {
+  if (!userId || !orgId) return false
+  const { rows } = await queryPostgres(
+    `SELECT role FROM org_members WHERE user_id = $1 AND org_id = $2 AND is_active = true LIMIT 1`,
+    [userId, orgId]
+  )
+  const role = String(rows[0]?.role || '').toLowerCase()
+  return role === 'owner' || role === 'admin' || role === 'manager'
+}
+
 export async function createAnggota(payload: {
   org_id: string
   nama: string

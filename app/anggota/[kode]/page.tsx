@@ -10,6 +10,7 @@ import {
   getPenawaranByAnggota,
   getProyekTersedia,
   getPelatihanTerjadwal,
+  isOrgAdminOrManajemen,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import { getLaporanByAnggota } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
 import AnggotaPortalClient from './AnggotaPortalClient'
@@ -29,10 +30,14 @@ export default async function AnggotaPortalPage({
   const session = await getInternalAuthSession()
   if (!session) redirect(`/anggota/login?org=${org ?? ''}&redirectTo=/anggota/${kode}${org ? `?org=${org}` : ''}`)
 
-  // Cari anggota by user_id scope ke org, lalu fallback by kode (admin preview)
+  // Cari anggota by user_id scope ke org, lalu fallback by kode HANYA untuk
+  // owner/admin/manajer organisasi terkait (preview) — bukan sembarang staf yang login.
   let anggota = await getAnggotaByUserId(session.user.id, org)
   if (!anggota) {
-    anggota = await getAnggotaByKodeOnly(kode, org)
+    const preview = await getAnggotaByKodeOnly(kode, org)
+    if (preview && await isOrgAdminOrManajemen(session.user.id, preview.org_id)) {
+      anggota = preview
+    }
   }
 
   if (!anggota || anggota.kode_anggota.toUpperCase() !== kode.toUpperCase()) {

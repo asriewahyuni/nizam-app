@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { unstable_noStore as noStore } from 'next/cache'
+import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { getAdminImpersonationState } from '@/modules/auth/actions/auth.actions'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { canAccessAllBranchesForOrg } from '@/modules/organization/lib/branch-access.server'
@@ -47,6 +48,14 @@ export default async function DashboardLayout({
 }) {
   noStore()
   const requestPathname = (await headers()).get('x-pathname') || ''
+
+  // Akun anggota koperasi HANYA boleh mengakses Portal Anggota, bukan area ERP staf ini.
+  const session = await getInternalAuthSession()
+  const loginType = String(session?.user.user_metadata?.login_type || '').toLowerCase()
+  if (loginType === 'anggota' || loginType === 'member') {
+    redirect('/anggota/login')
+  }
+
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
   const runtimeDb = resolveRuntimeDatabaseTarget()
