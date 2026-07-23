@@ -269,7 +269,7 @@ export async function distribusikanBagiHasil(proyekId: string) {
     const hak = totalPemodal * Number(pb.porsi_pct) / 100
     await queryPostgres(
       `INSERT INTO kojasmat_bagi_hasil
-         (org_id, proyek_id, pemodal_id, periode, laba_proyek, porsi_pct, hak_pemodal, hak_koperasi, status, dibayar_at)
+         (org_id, proyek_id, pemodal_id, periode, laba_proyek, porsi_pct, hak_pemodal, ujrah_koperasi, status, dibayar_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,0,'DIBAYAR',NOW())`,
       [proyek.org_id, proyekId, pb.pemodal_id, periode, laporan.labaRugi.labaBersih, pb.porsi_pct, hak]
     )
