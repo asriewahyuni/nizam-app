@@ -5,10 +5,11 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { createClient } from '@/lib/supabase/server'
 import { queryPostgres } from '@/lib/db/postgres'
 import { TRAINING_COURSES } from '@/modules/edu/lib/training-center-mvp'
+import { markLessonComplete } from '@/modules/lms/actions/progress.actions'
 import {
   uploadObjectToStorage,
   buildLmsMediaStorageKey,
-  buildPublicStorageObjectPath,
+  buildLmsStorageObjectPath,
 } from '@/lib/storage/object-storage.server'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -174,7 +175,16 @@ export async function getLmsCourseAnalytics(courseId: string) {
     const totalLessons = Number(lessonRes.rows?.[0]?.count || 0)
 
     // Daftar peserta dan progress
-    const { rows, error } = await queryPostgres(
+    const { rows } = await queryPostgres<{
+      enrollment_id: string
+      status: string
+      started_at: string | null
+      completed_at: string | null
+      final_score: number | null
+      user_name: string | null
+      user_email: string | null
+      completed_lessons: string
+    }>(
       `
         select 
           e.id as enrollment_id,
@@ -197,8 +207,6 @@ export async function getLmsCourseAnalytics(courseId: string) {
       [courseId, orgData.org.id]
     )
     
-    if (error) throw error
-
     return {
       success: true,
       data: rows.map(r => ({
@@ -218,7 +226,7 @@ export async function getLmsCourseAnalytics(courseId: string) {
 
 export async function getLmsBatches(orgId: string) {
   try {
-    const { rows, error } = await queryPostgres(
+    const { rows } = await queryPostgres<Record<string, unknown>>(
       `
         select 
           b.*,
@@ -231,10 +239,6 @@ export async function getLmsBatches(orgId: string) {
       `,
       [orgId]
     )
-    if (error) {
-      console.error('[getLmsBatches]', error)
-      return []
-    }
     return rows
   } catch (err) {
     console.error('[getLmsBatches]', err)
@@ -242,9 +246,22 @@ export async function getLmsBatches(orgId: string) {
   }
 }
 
-export async function getLmsBatchesByCourseId(orgId: string, courseId: string) {
+export async function getLmsBatchesByCourseId(
+  orgId: string,
+  courseId: string,
+): Promise<Array<{
+  id: string
+  name: string
+  learning_courses?: { title?: string } | null
+  [key: string]: unknown
+}>> {
   try {
-    const { rows, error } = await queryPostgres(
+    const { rows } = await queryPostgres<{
+      id: string
+      name: string
+      learning_courses?: { title?: string } | null
+      [key: string]: unknown
+    }>(
       `
         select 
           b.*,
@@ -255,10 +272,6 @@ export async function getLmsBatchesByCourseId(orgId: string, courseId: string) {
       `,
       [orgId, courseId]
     )
-    if (error) {
-      console.error('[getLmsBatchesByCourseId]', error)
-      return []
-    }
     return rows
   } catch (err) {
     console.error('[getLmsBatchesByCourseId]', err)
@@ -778,7 +791,7 @@ export async function uploadLmsMediaAction(_prevState: unknown, formData: FormDa
       contentType: file.type || 'application/octet-stream',
     })
 
-    const url = buildPublicStorageObjectPath(storageKey)
+    const url = buildLmsStorageObjectPath(storageKey)
     return { success: true, url }
   } catch (err) {
     return { error: getErrorMessage(err) }
@@ -812,47 +825,8 @@ export async function swapLmsLessonOrderAction(
 export async function markLessonCompleteAction(lessonId: string) {
   try {
     const orgData = await getActiveOrg()
-    if (!orgData) return { error: 'Unauthorized' }
-    
-    const user = orgData.user
-    if (!user) return { error: 'Not logged in' }
-
-    const supabase = await createClient()
-
-    // 1. Get lesson and course
-    const { data: lesson } = await supabase
-      .from('learning_lessons')
-      .select('course_id')
-      .eq('id', lessonId)
-      .single()
-      
-    if (!lesson) return { error: 'Lesson not found' }
-
-    // 2. Find enrollment
-    const { data: enrollment } = await supabase
-      .from('learning_enrollments')
-      .select('id')
-      .eq('course_id', lesson.course_id)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!enrollment) return { error: 'Not enrolled' }
-
-    // 3. Insert or update progress
-    await supabase.from('learning_lesson_progress').upsert({
-      enrollment_id: enrollment.id,
-      lesson_id: lessonId,
-      status: 'COMPLETED',
-      completed_at: new Date().toISOString()
-    }, {
-      onConflict: 'enrollment_id,lesson_id'
-    })
-
-    // Revalidate
-    revalidatePath('/lms/course/[courseSlug]')
-    revalidatePath('/lms/course/[courseSlug]/lesson/[lessonSlug]')
-    
-    return { success: true }
+    if (!orgData) return { error: 'Anda harus masuk terlebih dahulu.' }
+    return await markLessonComplete(orgData.org.slug, lessonId)
   } catch (err) {
     return { error: getErrorMessage(err) }
   }

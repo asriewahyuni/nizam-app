@@ -29,6 +29,9 @@ describe('Next proxy', () => {
   })
 
   it('delegates normal requests to updateSession', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: null }), { status: 404 })
+    )
     mocks.updateSession.mockResolvedValue(
       new NextResponse(null, {
         status: 200,
@@ -45,5 +48,26 @@ describe('Next proxy', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.updateSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('menulis ulang domain member ke tenant yang benar', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        data: { orgSlug: 'core-islamic-economics', purpose: 'MEMBER_PORTAL' },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+
+    const request = new NextRequest('https://member.coreisec.id/kelas', {
+      headers: { host: 'member.coreisec.id' },
+    })
+    const response = await proxy(request)
+
+    expect(response.headers.get('x-middleware-rewrite')).toContain(
+      '/member/core-islamic-economics/kelas',
+    )
+    expect(mocks.updateSession).not.toHaveBeenCalled()
   })
 })

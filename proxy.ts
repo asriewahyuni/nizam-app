@@ -67,6 +67,40 @@ export async function proxy(request: NextRequest) {
   }
 
   const normalizedHost = String(host || '').trim().toLowerCase().split(':')[0]
+  const shouldAttemptMemberRewrite = Boolean(
+    normalizedHost
+    && !pathname.startsWith('/member')
+    && !pathname.startsWith('/toko')
+    && !pathname.startsWith('/dashboard')
+    && !pathname.startsWith('/ecommerce')
+    && !pathname.startsWith('/lms')
+    && !pathname.startsWith('/login')
+    && !pathname.startsWith('/register')
+    && !pathname.startsWith('/onboarding')
+    && !pathname.startsWith('/auth')
+    && !pathname.startsWith('/expired')
+  )
+
+  if (shouldAttemptMemberRewrite) {
+    try {
+      const resolveUrl = new URL('/api/member/resolve-domain', request.url)
+      resolveUrl.searchParams.set('host', normalizedHost)
+      const response = await fetch(resolveUrl, { cache: 'no-store' })
+
+      if (response.ok) {
+        const payload = await response.json()
+        const orgSlug = String(payload?.data?.orgSlug || '').trim()
+        if (orgSlug) {
+          const rewriteUrl = request.nextUrl.clone()
+          rewriteUrl.pathname = `/member/${orgSlug}${pathname === '/' ? '' : pathname}`
+          return NextResponse.rewrite(rewriteUrl)
+        }
+      }
+    } catch {
+      // Resolver tenant tidak boleh membuat seluruh aplikasi gagal.
+    }
+  }
+
   const shouldAttemptStoreRewrite = Boolean(
     normalizedHost
     && !pathname.startsWith('/toko')

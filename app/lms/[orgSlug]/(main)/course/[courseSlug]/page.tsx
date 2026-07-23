@@ -1,7 +1,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { getLMSCourseDetails } from '@/modules/lms/actions/course.actions'
-import { Book, Play, CheckCircle, ArrowLeft } from 'lucide-react'
+import { Book, Play, CheckCircle, ArrowLeft, Eye, LockKeyhole } from 'lucide-react'
 import BatchSelector from './BatchSelector'
 
 export default async function LMSCourseDetailPage({
@@ -23,7 +23,8 @@ export default async function LMSCourseDetailPage({
     )
   }
 
-  const { course, lessons, batches } = result.data
+  const { course, lessons, batches, access } = result.data
+  const firstAccessibleLesson = lessons.find((lesson) => access.allowed || lesson.is_preview)
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -44,12 +45,26 @@ export default async function LMSCourseDetailPage({
           </p>
           
           <div className="mt-8">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Pilih Angkatan (Batch)</h3>
-            <BatchSelector 
-              orgSlug={orgSlug} 
-              courseSlug={courseSlug} 
-              batches={batches || []}
-            />
+            {access.allowed ? (
+              firstAccessibleLesson ? (
+                <Link
+                  href={`/lms/${orgSlug}/learn/${courseSlug}/${firstAccessibleLesson.slug}`}
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-emerald-700 px-5 font-semibold text-white transition-colors duration-200 hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                >
+                  <Play aria-hidden="true" size={18} />
+                  Mulai atau lanjutkan belajar
+                </Link>
+              ) : null
+            ) : (
+              <>
+                <h3 className="mb-4 text-lg font-bold text-slate-900">Pilih Angkatan</h3>
+                <BatchSelector
+                  orgSlug={orgSlug}
+                  courseSlug={courseSlug}
+                  batches={batches || []}
+                />
+              </>
+            )}
           </div>
         </div>
         
@@ -68,8 +83,10 @@ export default async function LMSCourseDetailPage({
             </div>
           ) : (
             <div className="space-y-4">
-              {lessons.map((lesson: any, index: number) => (
-                <div key={lesson.id} className="flex items-center p-5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-300 hover:shadow-md transition-all group">
+              {lessons.map((lesson, index) => {
+                const canOpen = access.allowed || lesson.is_preview
+                const content = (
+                  <>
                   <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold mr-4 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
                     {index + 1}
                   </div>
@@ -79,9 +96,32 @@ export default async function LMSCourseDetailPage({
                       {lesson.lesson_type}
                     </p>
                   </div>
-                  {/* Public preview doesn't allow play directly without enrollment, maybe just show lock icon or "Preview" */}
-                </div>
-              ))}
+                  {lesson.is_preview ? (
+                    <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                      <Eye aria-hidden="true" size={16} />
+                      Preview
+                    </span>
+                  ) : canOpen ? (
+                    <Play aria-hidden="true" className="text-emerald-700" size={19} />
+                  ) : (
+                    <LockKeyhole aria-label="Terkunci" className="text-slate-400" size={18} />
+                  )}
+                  </>
+                )
+                return canOpen ? (
+                  <Link
+                    key={lesson.id}
+                    href={`/lms/${orgSlug}/learn/${courseSlug}/${lesson.slug}`}
+                    className="group flex min-h-14 cursor-pointer items-center rounded-2xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:border-emerald-300 hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  <div key={lesson.id} className="group flex min-h-14 items-center rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    {content}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

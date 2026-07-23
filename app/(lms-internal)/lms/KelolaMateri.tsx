@@ -107,10 +107,10 @@ export function KelolaMateri({ courseSlug, courseId, lessons: initialLessons }: 
     startTransition(async () => {
       try {
         if (isAdding) {
-          await createLmsLesson(fd)
+          await createLmsLesson(null, fd)
         } else if (editingId) {
           fd.set('lessonId', editingId)
-          await updateLmsLesson(fd)
+          await updateLmsLesson(null, fd)
         }
         setToast({ msg: isAdding ? 'Materi ditambahkan!' : 'Materi diperbarui!', type: 'success' })
         setIsAdding(false)

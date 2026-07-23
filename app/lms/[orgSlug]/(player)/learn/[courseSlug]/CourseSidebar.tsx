@@ -17,7 +17,7 @@ interface CourseSidebarProps {
   orgSlug: string
   courseSlug: string
   lessons: Lesson[]
-  progress: Record<string, boolean>
+  progress: Record<string, { completed: boolean; status: string; lastPositionSeconds: number }>
 }
 
 export default function CourseSidebar({ orgSlug, courseSlug, lessons, progress }: CourseSidebarProps) {
@@ -33,7 +33,7 @@ export default function CourseSidebar({ orgSlug, courseSlug, lessons, progress }
         <div className="flex flex-col">
           {lessons.map((lesson, idx) => {
             const isActive = pathname.includes(`/learn/${courseSlug}/${lesson.slug}`)
-            const isCompleted = progress[lesson.id]
+            const isCompleted = Boolean(progress[lesson.id]?.completed)
 
             return (
               <Link

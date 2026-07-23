@@ -8,6 +8,8 @@ import {
   rejectOrderPayment,
   retryOrderErpSync,
   resetStoreThemeDraftFromTemplate,
+  saveAccessPackage,
+  saveProductEntitlements,
   saveProductVariant,
   saveStoreBasics,
   saveStoreCatalogProduct,
@@ -65,6 +67,14 @@ export async function saveStoreShippingRateAction(formData: FormData) {
 
 export async function saveStoreCatalogProductAction(formData: FormData) {
   return runAction(formData, saveStoreCatalogProduct)
+}
+
+export async function saveProductEntitlementsAction(formData: FormData) {
+  return runAction(formData, saveProductEntitlements)
+}
+
+export async function saveAccessPackageAction(formData: FormData) {
+  return runAction(formData, saveAccessPackage)
 }
 
 export async function saveProductVariantAction(formData: FormData) {

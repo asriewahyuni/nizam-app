@@ -2,6 +2,7 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 import { cookies, headers } from 'next/headers'
 import { queryPostgres } from '@/lib/db/postgres'
 import { INTERNAL_AUTH_SESSION_COOKIE, INTERNAL_AUTH_SESSION_MAX_AGE } from './internal-auth.shared'
+import { verifyWordPressPassword } from './wordpress-password'
 
 const SCRYPT_KEY_LENGTH = 64
 const SCRYPT_SALT_BYTES = 16
@@ -59,6 +60,12 @@ type InternalOrgNikCredentialRow = {
 type InternalAuthUserRow = {
   id: string
   is_active: boolean
+}
+
+type InternalLegacyCredentialRow = {
+  id: string
+  password_hash: string
+  password_scheme: string
 }
 
 function normalizeInput(value: unknown) {
@@ -210,7 +217,7 @@ export async function verifyAndResetInternalAuthPassword(token: string, newPassw
     )
 
     // Auto-login user after successful password reset
-    const sessionId = await createSession(resetRow.user_id)
+    const { sessionId } = await createSession(resetRow.user_id)
 
     return { success: true, sessionId }
   } catch (error) {
@@ -255,8 +262,68 @@ export async function resetInternalAuthPasswordById(userId: string, newPassword:
 
 function normalizeInternalUserType(value: unknown) {
   const normalized = normalizeInput(value).toLowerCase()
-  if (normalized === 'owner' || normalized === 'admin' || normalized === 'staff') return normalized
+  if (
+    normalized === 'owner'
+    || normalized === 'admin'
+    || normalized === 'staff'
+    || normalized === 'member'
+    || normalized === 'tutor'
+    || normalized === 'affiliate'
+  ) return normalized
   return 'staff'
+}
+
+async function upgradeWordPressCredential(
+  candidate: InternalCredentialRow,
+  password: string,
+) {
+  let credential: InternalLegacyCredentialRow | undefined
+  try {
+    const result = await queryPostgres<InternalLegacyCredentialRow>(
+      `SELECT id::text, password_hash, password_scheme
+       FROM public.internal_auth_legacy_credentials
+       WHERE internal_user_id = $1::uuid
+         AND source_system = 'WORDPRESS'
+         AND upgraded_at IS NULL
+       LIMIT 1`,
+      [candidate.id],
+    )
+    credential = result.rows[0]
+  } catch (error) {
+    const message = getErrorMessage(error)
+    if (!message.includes('internal_auth_legacy_credentials')) throw error
+    return false
+  }
+
+  if (!credential) return false
+  const isValid = await verifyWordPressPassword(password, credential.password_hash)
+  if (!isValid) return false
+
+  const newHash = hashPasswordWithScrypt(password)
+  const upgraded = await queryPostgres<{ id: string }>(
+    `WITH consumed AS (
+       UPDATE public.internal_auth_legacy_credentials
+       SET
+         upgraded_at = NOW(),
+         password_hash = '[UPGRADED]',
+         updated_at = NOW()
+       WHERE id = $1::uuid
+         AND internal_user_id = $2::uuid
+         AND upgraded_at IS NULL
+         AND password_hash = $3
+       RETURNING id
+     )
+     UPDATE public.internal_auth_users
+     SET password_hash = $4, updated_at = NOW()
+     WHERE id = $2::uuid
+       AND EXISTS (SELECT 1 FROM consumed)
+     RETURNING id::text`,
+    [credential.id, candidate.id, credential.password_hash, newHash],
+  )
+
+  if (!upgraded.rows[0]) return false
+  candidate.password_hash = newHash
+  return true
 }
 
 async function findInternalAuthUserByIdentity(input: {
@@ -376,10 +443,13 @@ async function createSession(userId: string) {
     secure: process.env.NODE_ENV === 'production',
   })
 
-  return sessionId
+  return { sessionId, token }
 }
 
-export async function createInternalAuthSessionByUserId(internalUserId: string) {
+export async function createInternalAuthSessionByUserId(
+  internalUserId: string,
+  options?: { includeToken?: boolean },
+) {
   const normalizedUserId = normalizeUuid(internalUserId)
   if (!normalizedUserId) {
     return { error: 'User internal tidak valid.' as const }
@@ -400,7 +470,7 @@ export async function createInternalAuthSessionByUserId(internalUserId: string) 
     return { error: 'Akun internal tidak ditemukan atau nonaktif.' as const }
   }
 
-  const sessionId = await createSession(normalizedUserId)
+  const { sessionId, token } = await createSession(normalizedUserId)
   await queryPostgres(
     `
       update public.internal_auth_users
@@ -414,6 +484,7 @@ export async function createInternalAuthSessionByUserId(internalUserId: string) 
     success: true as const,
     sessionId,
     userId: normalizedUserId,
+    ...(options?.includeToken ? { sessionToken: token } : {}),
   }
 }
 
@@ -1033,19 +1104,12 @@ export async function signInWithInternalAuth(input: {
 
     const passwordMatched: InternalCredentialRow[] = []
     for (const candidate of candidates) {
-      if (candidate.password_hash === 'MIGRATED_NO_PASSWORD') {
-        // First-time login for migrated users: the first password they enter becomes their permanent password
-        const newHash = hashPasswordWithScrypt(password)
-        await queryPostgres(
-          `update public.internal_auth_users set password_hash = $1::text, updated_at = now() where id = $2::uuid`,
-          [newHash, candidate.id]
-        )
-        candidate.password_hash = newHash
+      if (verifyScryptPassword(password, candidate.password_hash)) {
         passwordMatched.push(candidate)
         continue
       }
 
-      if (verifyScryptPassword(password, candidate.password_hash)) {
+      if (await upgradeWordPressCredential(candidate, password)) {
         passwordMatched.push(candidate)
         continue
       }
@@ -1106,7 +1170,7 @@ export async function signInWithInternalAuth(input: {
       }
       // Tepat 1 akun di org ini — buat session dan return langsung
       const strictMatched = inStrictOrg[0]
-      const sessionId = await createSession(strictMatched.id)
+      const { sessionId } = await createSession(strictMatched.id)
       await queryPostgres(
         `update public.internal_auth_users set last_login_at = now() where id = $1::uuid`,
         [strictMatched.id]
@@ -1145,7 +1209,7 @@ export async function signInWithInternalAuth(input: {
 
     if (!matched) return { error: 'Email/NIK atau password salah.' as const }
 
-    const sessionId = await createSession(matched.id)
+    const { sessionId } = await createSession(matched.id)
     await queryPostgres(
       `
         update public.internal_auth_users

@@ -1,34 +1,42 @@
 'use server'
 
-import { queryPostgres } from '@/lib/db/postgres'
-import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
-import { cookies } from 'next/headers'
+/**
+ * Action lesson publik yang memakai service akses LMS terpadu.
+ */
+import { resolveLessonAccess } from '@/modules/lms/lib/access.server'
 
-export async function getLMSLessonDetails(orgSlug: string, courseSlug: string, lessonSlug: string) {
-  try {
-    const orgResult = await queryPostgres<{ id: string }>(
-      `select id::text as id from public.organizations where slug = $1 limit 1`,
-      [orgSlug]
-    )
-    if (!orgResult.rows.length) return { error: 'Organisasi tidak ditemukan' }
-    const orgId = orgResult.rows[0].id
+export async function getLMSLessonDetails(
+  orgSlug: string,
+  courseSlug: string,
+  lessonSlug: string,
+) {
+  const decision = await resolveLessonAccess({ orgSlug, courseSlug, lessonSlug })
+  if (!decision.allowed) {
+    return {
+      error: decision.message,
+      code: decision.code,
+      unlocksAt: decision.unlocksAt,
+    }
+  }
 
-    const { rows: lessonRows, error: lessonError } = await queryPostgres(
-      `
-        select 
-          l.id::text, l.course_id::text, l.title, l.content_md, l.media_items, l.lesson_type,
-          c.title as course_title, c.slug as course_slug
-        from public.learning_lessons l
-        join public.learning_courses c on c.id = l.course_id
-        where c.org_id = $1::uuid and c.slug = $2::text and l.slug = $3::text
-        limit 1
-      `,
-      [orgId, courseSlug, lessonSlug]
-    )
-    if (lessonError || !lessonRows.length) return { error: 'Materi tidak ditemukan' }
-
-    return { data: lessonRows[0] }
-  } catch (err: any) {
-    return { error: err.message || 'Unknown error' }
+  const lesson = decision.lesson
+  return {
+    data: {
+      id: lesson.id,
+      course_id: lesson.courseId,
+      title: lesson.title,
+      content_md: lesson.contentHtml,
+      content_html: lesson.contentHtml,
+      media_items: lesson.mediaItems,
+      lesson_type: lesson.lessonType,
+      course_title: lesson.courseTitle,
+      course_slug: lesson.courseSlug,
+      is_preview: lesson.isPreview,
+      assets: lesson.assets,
+      access: {
+        grantId: decision.grantId,
+        staffOverride: decision.isStaffOverride,
+      },
+    },
   }
 }

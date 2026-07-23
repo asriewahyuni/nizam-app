@@ -1,131 +1,359 @@
 'use server'
 
-import { queryPostgres } from '@/lib/db/postgres'
+/**
+ * Pendaftaran course tanpa harga contoh. Akses gratis dibuat atomik; kelas
+ * berbayar selalu diarahkan ke checkout/registrasi dan baru aktif setelah bayar.
+ */
+import { connectPostgresClient, queryPostgres } from '@/lib/db/postgres'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
-import { ERPBridge } from '@/lib/erp-bridge/finances'
 
-export async function enrollUser(orgSlug: string, courseSlug: string) {
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error || 'Kesalahan tidak diketahui')
+}
+
+type CourseRow = {
+  id: string
+  title: string
+}
+
+type BatchRow = {
+  id: string
+  price: number
+  quota: number | null
+  waitlist_enabled: boolean
+  status: string
+}
+
+export async function enrollUser(
+  orgSlug: string,
+  courseSlug: string,
+  batchId?: string,
+) {
+  const session = await getInternalAuthSession()
+  if (!session?.user) return { error: 'Anda harus masuk untuk mendaftar kelas ini.' }
+
+  const client = await connectPostgresClient()
   try {
-    const session = await getInternalAuthSession()
-    if (!session || !session.user) {
-      return { error: 'Anda harus login untuk mendaftar kelas ini' }
-    }
-    const userId = session.user.id
+    await client.query('BEGIN')
 
-    const orgResult = await queryPostgres<{ id: string }>(
-      `select id::text as id from public.organizations where slug = $1 limit 1`,
-      [orgSlug]
+    const courseResult = await client.query<CourseRow & { org_id: string }>(
+      `SELECT course.id::text, course.title, organization.id::text AS org_id
+       FROM public.organizations organization
+       JOIN public.learning_courses course ON course.org_id = organization.id
+       WHERE organization.slug = $1
+         AND organization.is_active = TRUE
+         AND course.slug = $2
+         AND course.is_active = TRUE
+         AND COALESCE(course.status, 'PUBLISHED') = 'PUBLISHED'
+         AND course.deleted_at IS NULL
+       LIMIT 1
+       FOR UPDATE OF course`,
+      [orgSlug, courseSlug],
     )
-    if (!orgResult.rows.length) return { error: 'Organisasi tidak ditemukan' }
-    const orgId = orgResult.rows[0].id
+    const course = courseResult.rows[0]
+    if (!course) throw new Error('Kursus tidak ditemukan.')
 
-    const courseResult = await queryPostgres<{ id: string, name: string }>(
-      `
-        select id::text as id, title as name 
-        from public.learning_courses 
-        where org_id = $1::uuid and slug = $2::text
-        limit 1
-      `,
-      [orgId, courseSlug]
+    const existing = await client.query<{ id: string }>(
+      `SELECT id::text
+       FROM public.learning_access_grants
+       WHERE org_id = $1::uuid
+         AND user_id = $2::uuid
+         AND course_id = $3::uuid
+         AND status = 'ACTIVE'
+         AND starts_at <= NOW()
+         AND (expires_at IS NULL OR expires_at > NOW())
+       LIMIT 1`,
+      [course.org_id, session.user.id, course.id],
     )
-    if (!courseResult.rows.length) return { error: 'Kursus tidak ditemukan' }
-    const courseId = courseResult.rows[0].id
-    const courseName = courseResult.rows[0].name
-
-    // Check if already enrolled
-    const checkResult = await queryPostgres<{ id: string }>(
-      `
-        select id::text as id 
-        from public.learning_enrollments 
-        where org_id = $1::uuid and user_id = $2::uuid and course_id = $3::uuid
-      `,
-      [orgId, userId, courseId]
-    )
-
-    if (checkResult.rows.length) {
+    if (existing.rows[0]) {
+      await client.query('ROLLBACK')
       return { data: { alreadyEnrolled: true } }
     }
 
-    // Mock Price for MVP Phase 1 (Asumsi kelas berbayar Rp 150.000)
-    // Di fase berikutnya harga akan diambil dari lms_course_batches.price
-    const mockPrice = 150000
-
-    // Anti-Silo: Catat Pendapatan ke Buku Besar (GL) jika kelas berbayar
-    if (mockPrice > 0) {
-      // 1101 = Kas/Bank (Default)
-      // 4500 = Pendapatan Program Pelatihan
-      const debitAccountId = await ERPBridge.getDefaultAccount(orgId, '1101')
-      const creditAccountId = await ERPBridge.getDefaultAccount(orgId, '4500')
-
-      if (debitAccountId && creditAccountId) {
-        const revenueRes = await ERPBridge.recordRevenue({
-          orgId,
-          amount: mockPrice,
-          date: new Date().toISOString().split('T')[0],
-          description: `Pendaftaran Kursus LMS: ${courseName}`,
-          referenceType: 'LMS_ENROLLMENT',
-          referenceId: courseId, // Seharusnya enrollment_id, tapi kita butuh uuid
-          debitAccountId,
-          creditAccountId
-        })
-        
-        if ('error' in revenueRes) {
-          console.error("Gagal mencatat jurnal pendapatan LMS:", revenueRes.error)
+    let selectedBatch: BatchRow | null = null
+    if (batchId) {
+      const batchResult = await client.query<BatchRow>(
+        `SELECT
+           id::text,
+           price::float8,
+           quota,
+           waitlist_enabled,
+           status
+         FROM public.lms_course_batches
+         WHERE id = $1::uuid
+           AND org_id = $2::uuid
+           AND course_id = $3::uuid
+           AND deleted_at IS NULL
+         LIMIT 1
+         FOR UPDATE`,
+        [batchId, course.org_id, course.id],
+      )
+      selectedBatch = batchResult.rows[0] || null
+      if (!selectedBatch || selectedBatch.status !== 'OPEN') {
+        throw new Error('Angkatan tidak tersedia atau pendaftarannya sudah ditutup.')
+      }
+    } else {
+      const offeringResult = await client.query<{ batch_count: number; product_count: number }>(
+        `SELECT
+           (
+             SELECT COUNT(*)::int
+             FROM public.lms_course_batches batch
+             WHERE batch.org_id = $1::uuid
+               AND batch.course_id = $2::uuid
+               AND batch.status = 'OPEN'
+               AND batch.deleted_at IS NULL
+           ) AS batch_count,
+           (
+             SELECT COUNT(*)::int
+             FROM public.commerce_product_courses product_course
+             JOIN public.store_products store_product
+               ON store_product.id = product_course.store_product_id
+              AND store_product.org_id = product_course.org_id
+             WHERE product_course.org_id = $1::uuid
+               AND product_course.course_id = $2::uuid
+               AND store_product.is_published = TRUE
+           ) AS product_count`,
+        [course.org_id, course.id],
+      )
+      const offerings = offeringResult.rows[0]
+      if (Number(offerings?.batch_count || 0) > 0) {
+        await client.query('ROLLBACK')
+        return { error: 'Pilih angkatan yang tersedia terlebih dahulu.' }
+      }
+      if (Number(offerings?.product_count || 0) > 0) {
+        await client.query('ROLLBACK')
+        return {
+          data: {
+            requiresCheckout: true,
+            checkoutUrl: `/member/${orgSlug}/checkout?course=${encodeURIComponent(courseSlug)}`,
+          },
         }
       }
     }
 
-    // Insert Enrollment
-    await queryPostgres(
-      `
-        insert into public.learning_enrollments (org_id, user_id, course_id, status)
-        values ($1::uuid, $2::uuid, $3::uuid, 'IN_PROGRESS')
-      `,
-      [orgId, userId, courseId]
+    if (selectedBatch && selectedBatch.price > 0) {
+      await client.query('ROLLBACK')
+      return {
+        data: {
+          requiresCheckout: true,
+          checkoutUrl: `/lms/daftar/${selectedBatch.id}`,
+          batchId: selectedBatch.id,
+        },
+      }
+    }
+
+    if (selectedBatch?.quota && selectedBatch.quota > 0) {
+      const countResult = await client.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count
+         FROM public.lms_registrations
+         WHERE org_id = $1::uuid
+           AND batch_id = $2::uuid
+           AND status = 'CONFIRMED'`,
+        [course.org_id, selectedBatch.id],
+      )
+      if (Number(countResult.rows[0]?.count || 0) >= selectedBatch.quota) {
+        if (!selectedBatch.waitlist_enabled) {
+          throw new Error('Kuota angkatan ini sudah penuh.')
+        }
+        const waitlistResult = await client.query<{ id: string; position: number }>(
+          `INSERT INTO public.lms_waitlist_entries (
+             org_id,
+             batch_id,
+             user_id,
+             position,
+             status
+           )
+           VALUES (
+             $1::uuid,
+             $2::uuid,
+             $3::uuid,
+             (
+               SELECT COALESCE(MAX(position), 0) + 1
+               FROM public.lms_waitlist_entries
+               WHERE batch_id = $2::uuid
+             ),
+             'WAITING'
+           )
+           ON CONFLICT (org_id, batch_id, user_id) DO UPDATE
+           SET updated_at = NOW()
+           RETURNING id::text, position`,
+          [course.org_id, selectedBatch.id, session.user.id],
+        )
+        await client.query('COMMIT')
+        return {
+          data: {
+            waitlisted: true,
+            position: waitlistResult.rows[0]?.position,
+          },
+        }
+      }
+    }
+
+    const idempotencyKey = [
+      'free-enrollment',
+      session.user.id,
+      course.id,
+      selectedBatch?.id || 'no-batch',
+    ].join(':')
+    const grantResult = await client.query<{ id: string }>(
+      `INSERT INTO public.learning_access_grants (
+         org_id,
+         user_id,
+         course_id,
+         batch_id,
+         source_type,
+         source_reference,
+         status,
+         starts_at,
+         idempotency_key,
+         metadata
+       )
+       VALUES (
+         $1::uuid,
+         $2::uuid,
+         $3::uuid,
+         $4::uuid,
+         'TRIAL',
+         'free-public-enrollment',
+         'ACTIVE',
+         NOW(),
+         $5,
+         jsonb_build_object('course_title', $6::text)
+       )
+       ON CONFLICT (org_id, idempotency_key) DO UPDATE
+       SET updated_at = NOW()
+       RETURNING id::text`,
+      [
+        course.org_id,
+        session.user.id,
+        course.id,
+        selectedBatch?.id || null,
+        idempotencyKey,
+        course.title,
+      ],
+    )
+    const grantId = grantResult.rows[0]?.id
+    if (!grantId) throw new Error('Hak akses tidak dapat dibuat.')
+
+    await client.query(
+      `INSERT INTO public.learning_enrollments (
+         org_id,
+         user_id,
+         course_id,
+         batch_id,
+         access_grant_id,
+         status,
+         started_at
+       )
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, 'IN_PROGRESS', NOW())
+       ON CONFLICT (org_id, user_id, course_id) DO UPDATE
+       SET
+         batch_id = COALESCE(EXCLUDED.batch_id, public.learning_enrollments.batch_id),
+         access_grant_id = EXCLUDED.access_grant_id,
+         status = CASE
+           WHEN public.learning_enrollments.status = 'COMPLETED' THEN 'COMPLETED'
+           ELSE 'IN_PROGRESS'
+         END,
+         updated_at = NOW()`,
+      [course.org_id, session.user.id, course.id, selectedBatch?.id || null, grantId],
     )
 
-    return { data: { success: true } }
-  } catch (err: any) {
-    return { error: err.message || 'Gagal mendaftar' }
+    if (selectedBatch) {
+      const fullName = String(session.user.user_metadata.full_name || session.user.email || 'Peserta')
+      const email = session.user.email || `${session.user.id}@member.invalid`
+      await client.query(
+        `INSERT INTO public.lms_registrations (
+           org_id,
+           batch_id,
+           user_id,
+           full_name,
+           email,
+           status,
+           amount_paid,
+           payment_method,
+           idempotency_key
+         )
+         VALUES (
+           $1::uuid, $2::uuid, $3::uuid, $4, $5, 'CONFIRMED', 0, 'FREE', $6
+         )
+         ON CONFLICT (org_id, idempotency_key) DO UPDATE
+         SET status = 'CONFIRMED', updated_at = NOW()`,
+        [course.org_id, selectedBatch.id, session.user.id, fullName, email, idempotencyKey],
+      )
+    }
+
+    await client.query('COMMIT')
+    return { data: { success: true, grantId } }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    return { error: getErrorMessage(error) }
+  } finally {
+    client.release()
   }
 }
 
 export async function getStudentEnrollments(orgSlug: string) {
   try {
     const session = await getInternalAuthSession()
-    if (!session || !session.user) {
-      return { error: 'Not authenticated' }
-    }
-    const userId = session.user.id
+    if (!session?.user) return { error: 'Silakan masuk untuk melihat kelas Anda.' }
 
-    const orgResult = await queryPostgres<{ id: string }>(
-      `select id::text as id from public.organizations where slug = $1 limit 1`,
-      [orgSlug]
+    const result = await queryPostgres<{
+      id: string
+      status: string
+      created_at: string
+      completed_at: string | null
+      title: string
+      slug: string
+      level_code: string | null
+      description: string | null
+      total_lessons: number
+      completed_lessons: number
+      progress_percent: number
+      access_expires_at: string | null
+    }>(
+      `SELECT
+         enrollment.id::text,
+         enrollment.status,
+         enrollment.created_at::text,
+         enrollment.completed_at::text,
+         course.title,
+         course.slug,
+         course.level_code,
+         course.description,
+         enrollment.progress_percent::float8,
+         access_grant.expires_at::text AS access_expires_at,
+         (
+           SELECT COUNT(*)::int
+           FROM public.learning_lessons lesson
+           WHERE lesson.org_id = course.org_id
+             AND lesson.course_id = course.id
+             AND lesson.deleted_at IS NULL
+         ) AS total_lessons,
+         (
+           SELECT COUNT(*)::int
+           FROM public.learning_lesson_progress progress
+           WHERE progress.org_id = enrollment.org_id
+             AND progress.enrollment_id = enrollment.id
+             AND progress.status = 'COMPLETED'
+         ) AS completed_lessons
+       FROM public.organizations organization
+       JOIN public.learning_enrollments enrollment
+         ON enrollment.org_id = organization.id
+        AND enrollment.user_id = $2::uuid
+       JOIN public.learning_courses course
+         ON course.id = enrollment.course_id
+        AND course.org_id = organization.id
+       LEFT JOIN public.learning_access_grants access_grant
+         ON access_grant.id = enrollment.access_grant_id
+        AND access_grant.org_id = enrollment.org_id
+       WHERE organization.slug = $1
+         AND organization.is_active = TRUE
+       ORDER BY enrollment.last_activity_at DESC NULLS LAST, enrollment.created_at DESC`,
+      [orgSlug, session.user.id],
     )
-    if (!orgResult.rows.length) return { error: 'Organisasi tidak ditemukan' }
-    const orgId = orgResult.rows[0].id
 
-    const { rows, error } = await queryPostgres(
-      `
-        select 
-          e.id::text, e.status, e.created_at, e.completed_at,
-          c.title, c.slug, c.level_code, c.description,
-          (select count(*) from public.learning_lessons where course_id = c.id) as total_lessons,
-          (select count(*) from public.learning_lesson_progress where enrollment_id = e.id and status = 'COMPLETED') as completed_lessons
-        from public.learning_enrollments e
-        join public.learning_courses c on c.id = e.course_id
-        where e.org_id = $1::uuid and e.user_id = $2::uuid
-        order by e.created_at desc
-      `,
-      [orgId, userId]
-    )
-
-    if (error) {
-      return { error: 'Gagal memuat kelas saya: ' + error.message }
-    }
-
-    return { data: rows }
-  } catch (err: any) {
-    return { error: err.message || 'Unknown error' }
+    return { data: result.rows }
+  } catch (error) {
+    return { error: `Gagal memuat kelas Anda: ${getErrorMessage(error)}` }
   }
 }

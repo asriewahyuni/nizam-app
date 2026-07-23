@@ -33,23 +33,35 @@ export async function GET(request: Request) {
     }
 
     // Create session
-    const sessionResult = await createInternalAuthSessionByUserId(userRow.id)
-    if (!sessionResult.success) {
-      console.error('[preview/auto-login] Session creation failed:', sessionResult.error)
-      return NextResponse.json({ error: sessionResult.error }, { status: 500 })
+    const sessionResult = await createInternalAuthSessionByUserId(userRow.id, {
+      includeToken: true,
+    })
+    if (!('success' in sessionResult) || !sessionResult.success) {
+      const sessionError = 'error' in sessionResult
+        ? sessionResult.error
+        : 'Preview session creation failed'
+      console.error('[preview/auto-login] Session creation failed:', sessionError)
+      return NextResponse.json({ error: sessionError }, { status: 500 })
     }
 
     // Set session cookie and redirect
     // Use Host header so cloudflared tunnel URL is preserved, not rewritten to 0.0.0.0
-    const host = request.headers.get('host') || 'localhost:3000'
-    const protocol = request.headers.get('x-forwarded-proto') || 'https'
+    const requestUrl = new URL(request.url)
+    const host = request.headers.get('host') || requestUrl.host
+    const protocol =
+      request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ||
+      requestUrl.protocol.replace(':', '')
     const baseUrl = `${protocol}://${host}`
     const redirectUrl = new URL(redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`, baseUrl)
 
     const response = NextResponse.redirect(redirectUrl)
-    response.cookies.set(INTERNAL_AUTH_SESSION_COOKIE, sessionResult.sessionId, {
+    const sessionToken = sessionResult.sessionToken
+    if (!sessionToken) {
+      return NextResponse.json({ error: 'Preview session token missing' }, { status: 500 })
+    }
+    response.cookies.set(INTERNAL_AUTH_SESSION_COOKIE, sessionToken, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: INTERNAL_AUTH_SESSION_MAX_AGE,

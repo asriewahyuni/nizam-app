@@ -10,6 +10,7 @@ import {
   uploadObjectToStorage,
 } from '@/lib/storage/object-storage.server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { syncActivePackageMemberships } from '@/modules/ecommerce/payments/entitlement.service'
 import {
   buildThemeDraftFromTemplate,
   normalizeShippingMatcher,
@@ -21,9 +22,12 @@ import {
   normalizeStoreThemeTokens,
   resolveShippingRateForAddress,
   toThemeTemplateRows,
+  type AdminAccessPackageView,
   type AdminCatalogProductView,
+  type AdminLearningCourseView,
   type AdminOrderEventView,
   type AdminOrderPaymentView,
+  type AdminProductEntitlementView,
   type AdminShippingRateView,
   type AdminShippingZoneView,
   type AdminStoreProductView,
@@ -99,6 +103,58 @@ function toBoolean(value: unknown): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'on' || normalized === 'yes'
 }
 
+function parseIdArray(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return [] as string[]
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return [] as string[]
+    return [...new Set(
+      parsed
+        .map((item) => cleanText(item, 80))
+        .filter((item) => /^[0-9a-f-]{36}$/i.test(item)),
+    )]
+  } catch {
+    return [] as string[]
+  }
+}
+
+function parseCourseSelections(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return [] as Array<{
+      courseId: string
+      accessDurationValue: number | null
+      accessDurationUnit: string | null
+    }>
+  }
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    const seen = new Set<string>()
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return []
+      const record = item as Record<string, unknown>
+      const courseId = cleanText(record.courseId, 80)
+      if (!/^[0-9a-f-]{36}$/i.test(courseId) || seen.has(courseId)) return []
+      seen.add(courseId)
+      const rawDuration = Number(record.accessDurationValue)
+      const accessDurationValue = Number.isInteger(rawDuration) && rawDuration > 0
+        ? rawDuration
+        : null
+      const rawUnit = cleanText(record.accessDurationUnit, 20).toUpperCase().replace(/S$/, '')
+      const accessDurationUnit = ['HOUR', 'DAY', 'WEEK', 'MONTH', 'YEAR'].includes(rawUnit)
+        ? rawUnit
+        : null
+      return [{
+        courseId,
+        accessDurationValue,
+        accessDurationUnit: accessDurationValue ? accessDurationUnit : null,
+      }]
+    })
+  } catch {
+    return []
+  }
+}
+
 function readBooleanWithFallback(formData: FormData, key: string, fallback: boolean) {
   return formData.has(key) ? toBoolean(formData.get(key)) : fallback
 }
@@ -120,6 +176,15 @@ function toJsonObject(value: unknown) {
   }
 
   return {}
+}
+
+function recordRows(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter(
+      (row): row is Record<string, unknown> =>
+        Boolean(row) && typeof row === 'object' && !Array.isArray(row),
+    )
+    : []
 }
 
 function formatPayloadPreview(value: unknown, max = 280) {
@@ -163,9 +228,9 @@ async function resolveStoreCreateDefaults(
     throw new Error(`Gagal membaca daftar rekening penerima: ${bankResult.error.message}`)
   }
 
-  const branchRows = branchResult.data || []
-  const warehouseRows = warehouseResult.data || []
-  const bankRows = bankResult.data || []
+  const branchRows = recordRows(branchResult.data)
+  const warehouseRows = recordRows(warehouseResult.data)
+  const bankRows = recordRows(bankResult.data)
 
   if (!branchRows.length) {
     throw new Error('Belum ada cabang aktif. Buat satu cabang dulu sebelum membuat store.')
@@ -401,6 +466,7 @@ function mapStoreSummary(
     transferInstructions: cleanLongText(settings?.transfer_instructions, 2000),
     heroNotice: cleanText(settings?.hero_notice, 240),
     checkoutNotice: cleanText(settings?.checkout_notice, 240),
+    allowGuestCheckout: Boolean(settings?.allow_member_guest_checkout),
   }
 }
 
@@ -1180,24 +1246,155 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
       created_at: string
     }> }
 
-  const stores = Array.isArray(storesResult.data) ? storesResult.data : []
-  const storeSettings = Array.isArray(settingsResult.data) ? settingsResult.data : []
-  const storeDomains = Array.isArray(domainsResult.data) ? domainsResult.data : []
-  const products = Array.isArray(productsResult.data) ? productsResult.data : []
-  const storeProducts = Array.isArray(storeProductsResult.data) ? storeProductsResult.data : []
-  const mediaRows = Array.isArray(mediaResult.data) ? mediaResult.data : []
-  const variantRows = Array.isArray(variantsResult.data) ? variantsResult.data : []
-  const overrideRows = Array.isArray(overridesResult.data) ? overridesResult.data : []
-  const choiceRows = Array.isArray(choiceResult.data) ? choiceResult.data : []
-  const attributeRows = Array.isArray(attributeResult.data) ? attributeResult.data : []
-  const attributeValueRows = Array.isArray(attributeValueResult.data) ? attributeValueResult.data : []
-  const zoneRows = Array.isArray(zoneResult.data) ? zoneResult.data : []
-  const rateRows = Array.isArray(rateResult.data) ? rateResult.data : []
-  const themeRows = Array.isArray(themeResult.data) ? themeResult.data : []
-  const themeAssetRows = Array.isArray(themeAssetResult.data) ? themeAssetResult.data : []
-  const branchRows = Array.isArray(branchResult.data) ? branchResult.data : []
-  const warehouseRows = Array.isArray(warehouseResult.data) ? warehouseResult.data : []
-  const bankRows = Array.isArray(bankResult.data) ? bankResult.data : []
+  const [learningCourseResult, accessPackageResult, productEntitlementResult] = await Promise.all([
+    queryPostgres<{
+      id: string
+      title: string
+      slug: string
+      access_duration_value: number | null
+      access_duration_unit: string | null
+    }>(
+      `SELECT
+         id::text, title, slug, access_duration_value, access_duration_unit
+       FROM public.learning_courses
+       WHERE org_id = $1::uuid
+         AND deleted_at IS NULL
+       ORDER BY title`,
+      [orgId],
+    ),
+    queryPostgres<{
+      id: string
+      name: string
+      slug: string
+      description: string | null
+      is_active: boolean
+      version: number
+      default_access_duration_value: number | null
+      default_access_duration_unit: string | null
+      courses: Array<{
+        courseId: string
+        accessDurationValue: number | null
+        accessDurationUnit: string | null
+      }>
+      active_subscription_members: number
+    }>(
+      `SELECT
+         access_package.id::text,
+         access_package.name,
+         access_package.slug,
+         access_package.description,
+         access_package.is_active,
+         access_package.version,
+         access_package.default_access_duration_value,
+         access_package.default_access_duration_unit,
+         COALESCE((
+           SELECT JSONB_AGG(
+             JSONB_BUILD_OBJECT(
+               'courseId', package_course.course_id,
+               'accessDurationValue', package_course.access_duration_value,
+               'accessDurationUnit', package_course.access_duration_unit
+             )
+             ORDER BY course.title
+           )
+           FROM public.commerce_access_package_courses package_course
+           JOIN public.learning_courses course
+             ON course.org_id = package_course.org_id
+            AND course.id = package_course.course_id
+           WHERE package_course.org_id = access_package.org_id
+             AND package_course.package_id = access_package.id
+         ), '[]'::jsonb) AS courses,
+         (
+           SELECT COUNT(*)::int
+           FROM public.commerce_memberships membership
+           WHERE membership.org_id = access_package.org_id
+             AND membership.package_id = access_package.id
+             AND membership.subscription_id IS NOT NULL
+             AND membership.status = 'ACTIVE'
+             AND (membership.expires_at IS NULL OR membership.expires_at > NOW())
+         ) AS active_subscription_members
+       FROM public.commerce_access_packages access_package
+       WHERE access_package.org_id = $1::uuid
+       ORDER BY access_package.name`,
+      [orgId],
+    ),
+    queryPostgres<{
+      store_product_id: string
+      direct_courses: Array<{
+        courseId: string
+        accessDurationValue: number | null
+        accessDurationUnit: string | null
+      }>
+      package_ids: string[]
+      resolved_course_ids: string[]
+    }>(
+      `SELECT
+         store_product.id::text AS store_product_id,
+         COALESCE((
+           SELECT JSONB_AGG(
+             JSONB_BUILD_OBJECT(
+               'courseId', product_course.course_id,
+               'accessDurationValue', product_course.access_duration_value,
+               'accessDurationUnit', product_course.access_duration_unit
+             )
+             ORDER BY course.title
+           )
+           FROM public.commerce_product_courses product_course
+           JOIN public.learning_courses course
+             ON course.org_id = product_course.org_id
+            AND course.id = product_course.course_id
+           WHERE product_course.org_id = store_product.org_id
+             AND product_course.store_product_id = store_product.id
+         ), '[]'::jsonb) AS direct_courses,
+         COALESCE((
+           SELECT ARRAY_AGG(product_package.package_id::text ORDER BY access_package.name)
+           FROM public.commerce_product_access_packages product_package
+           JOIN public.commerce_access_packages access_package
+             ON access_package.org_id = product_package.org_id
+            AND access_package.id = product_package.package_id
+           WHERE product_package.org_id = store_product.org_id
+             AND product_package.store_product_id = store_product.id
+         ), '{}'::text[]) AS package_ids,
+         ARRAY(
+           SELECT DISTINCT benefit.course_id::text
+           FROM (
+             SELECT product_course.course_id
+             FROM public.commerce_product_courses product_course
+             WHERE product_course.org_id = store_product.org_id
+               AND product_course.store_product_id = store_product.id
+             UNION
+             SELECT package_course.course_id
+             FROM public.commerce_product_access_packages product_package
+             JOIN public.commerce_access_package_courses package_course
+               ON package_course.org_id = product_package.org_id
+              AND package_course.package_id = product_package.package_id
+             WHERE product_package.org_id = store_product.org_id
+               AND product_package.store_product_id = store_product.id
+           ) benefit
+         ) AS resolved_course_ids
+       FROM public.store_products store_product
+       WHERE store_product.org_id = $1::uuid`,
+      [orgId],
+    ),
+  ])
+
+  const stores = recordRows(storesResult.data)
+  const storeSettings = recordRows(settingsResult.data)
+  const storeDomains = recordRows(domainsResult.data)
+  const products = recordRows(productsResult.data)
+  const storeProducts = recordRows(storeProductsResult.data)
+  const mediaRows = recordRows(mediaResult.data)
+  const variantRows = recordRows(variantsResult.data)
+  const overrideRows = recordRows(overridesResult.data)
+  const choiceRows = recordRows(choiceResult.data)
+  const attributeRows = recordRows(attributeResult.data)
+  const attributeValueRows = recordRows(attributeValueResult.data)
+  const zoneRows = recordRows(zoneResult.data)
+  const rateRows = recordRows(rateResult.data)
+  const themeRows = recordRows(themeResult.data)
+  const themeAssetRows = recordRows(themeAssetResult.data)
+  const branchRows = recordRows(branchResult.data)
+  const warehouseRows = recordRows(warehouseResult.data)
+  const bankRows = recordRows(bankResult.data)
 
   const settingsByStoreId = new Map<string, Record<string, unknown>>(
     storeSettings.map((row) => [String(row.store_id || ''), row as Record<string, unknown>])
@@ -1261,6 +1458,7 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
   }))
 
   const dashboardStoreProducts: AdminStoreProductView[] = storeProducts.map((row) => ({
+    id: String(row.id || ''),
     storeId: String(row.store_id || ''),
     productId: String(row.product_id || ''),
     publicSlug: cleanText(row.public_slug, 120),
@@ -1375,6 +1573,32 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
     createdAt: row.created_at,
   }))
 
+  const dashboardLearningCourses: AdminLearningCourseView[] = learningCourseResult.rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    slug: row.slug,
+    accessDurationValue: row.access_duration_value,
+    accessDurationUnit: row.access_duration_unit,
+  }))
+  const dashboardAccessPackages: AdminAccessPackageView[] = accessPackageResult.rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    description: row.description || '',
+    isActive: row.is_active,
+    version: Number(row.version || 1),
+    defaultAccessDurationValue: row.default_access_duration_value,
+    defaultAccessDurationUnit: row.default_access_duration_unit,
+    courses: row.courses || [],
+    activeSubscriptionMembers: Number(row.active_subscription_members || 0),
+  }))
+  const dashboardProductEntitlements: AdminProductEntitlementView[] = productEntitlementResult.rows.map((row) => ({
+    storeProductId: row.store_product_id,
+    directCourses: row.direct_courses || [],
+    packageIds: row.package_ids || [],
+    resolvedCourseIds: row.resolved_course_ids || [],
+  }))
+
   return {
     stores: dashboardStores,
     products: dashboardProducts,
@@ -1404,6 +1628,9 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
         .join(' • '),
       branchId: row.branch_id ? String(row.branch_id) : null,
     })),
+    learningCourses: dashboardLearningCourses,
+    accessPackages: dashboardAccessPackages,
+    productEntitlements: dashboardProductEntitlements,
   }
 }
 
@@ -1459,6 +1686,7 @@ export async function createStoreRecord(formData: FormData) {
       hero_notice: cleanText(formData.get('hero_notice'), 200),
       checkout_notice: cleanText(formData.get('checkout_notice'), 200),
       transfer_instructions: cleanLongText(formData.get('transfer_instructions'), 2000),
+      allow_member_guest_checkout: false,
     })
 
   if (settingsError) {
@@ -1551,6 +1779,11 @@ export async function saveStoreBasics(formData: FormData) {
     hero_notice: cleanText(formData.get('hero_notice'), 200),
     checkout_notice: cleanText(formData.get('checkout_notice'), 200),
     transfer_instructions: cleanLongText(formData.get('transfer_instructions'), 2000),
+    allow_member_guest_checkout: readBooleanWithFallback(
+      formData,
+      'allow_member_guest_checkout',
+      false,
+    ),
   }
 
   const { error: settingsError } = await admin
@@ -1720,6 +1953,286 @@ export async function saveStoreCatalogProduct(formData: FormData) {
         throw new Error(`Katalog tersimpan, tetapi gambar gagal ditambah: ${mediaError.message}`)
       }
     }
+  }
+}
+
+export async function saveProductEntitlements(formData: FormData) {
+  const { orgId } = await requireActiveOrgAdminContext()
+  const storeProductId = cleanText(formData.get('store_product_id'), 80)
+  const directCourses = parseCourseSelections(formData.get('direct_courses'))
+  const packageIds = parseIdArray(formData.get('package_ids'))
+  if (!storeProductId) throw new Error('Produk store belum dipilih.')
+
+  const client = await connectPostgresClient()
+  try {
+    await client.query('BEGIN')
+    const storeProduct = await client.query<{ id: string }>(
+      `SELECT id::text
+       FROM public.store_products
+       WHERE org_id = $1::uuid AND id = $2::uuid
+       LIMIT 1
+       FOR UPDATE`,
+      [orgId, storeProductId],
+    )
+    if (!storeProduct.rows[0]) throw new Error('Produk store tidak ditemukan.')
+
+    const courseIds = directCourses.map((course) => course.courseId)
+    if (courseIds.length > 0) {
+      const validCourses = await client.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count
+         FROM public.learning_courses
+         WHERE org_id = $1::uuid
+           AND id = ANY($2::uuid[])
+           AND deleted_at IS NULL`,
+        [orgId, courseIds],
+      )
+      if (Number(validCourses.rows[0]?.count || 0) !== courseIds.length) {
+        throw new Error('Ada course yang tidak ditemukan dalam organisasi ini.')
+      }
+    }
+    if (packageIds.length > 0) {
+      const validPackages = await client.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count
+         FROM public.commerce_access_packages
+         WHERE org_id = $1::uuid AND id = ANY($2::uuid[])`,
+        [orgId, packageIds],
+      )
+      if (Number(validPackages.rows[0]?.count || 0) !== packageIds.length) {
+        throw new Error('Ada paket akses yang tidak ditemukan dalam organisasi ini.')
+      }
+    }
+
+    await client.query(
+      `DELETE FROM public.commerce_product_courses
+       WHERE org_id = $1::uuid AND store_product_id = $2::uuid`,
+      [orgId, storeProductId],
+    )
+    for (const course of directCourses) {
+      await client.query(
+        `INSERT INTO public.commerce_product_courses (
+           org_id, store_product_id, course_id,
+           access_duration_value, access_duration_unit
+         ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5)`,
+        [
+          orgId,
+          storeProductId,
+          course.courseId,
+          course.accessDurationValue,
+          course.accessDurationUnit,
+        ],
+      )
+    }
+
+    await client.query(
+      `DELETE FROM public.commerce_product_access_packages
+       WHERE org_id = $1::uuid AND store_product_id = $2::uuid`,
+      [orgId, storeProductId],
+    )
+    for (const packageId of packageIds) {
+      await client.query(
+        `INSERT INTO public.commerce_product_access_packages (
+           org_id, store_product_id, package_id
+         ) VALUES ($1::uuid, $2::uuid, $3::uuid)`,
+        [orgId, storeProductId, packageId],
+      )
+    }
+    await client.query('COMMIT')
+    return {
+      storeProductId,
+      directCourseCount: directCourses.length,
+      packageCount: packageIds.length,
+    }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export async function saveAccessPackage(formData: FormData) {
+  const { orgId, userId } = await requireActiveOrgAdminContext()
+  const requestedPackageId = cleanText(formData.get('package_id'), 80)
+  const name = cleanText(formData.get('name'), 160)
+  const slug = safeSlug(formData.get('slug'), name)
+  const description = cleanLongText(formData.get('description'), 2000)
+  const isActive = readBooleanWithFallback(formData, 'is_active', true)
+  const courses = parseCourseSelections(formData.get('courses'))
+  const defaultDurationValue = toNullableNumber(formData.get('default_access_duration_value'))
+  const normalizedDefaultUnit = cleanText(
+    formData.get('default_access_duration_unit'),
+    20,
+  ).toUpperCase().replace(/S$/, '')
+  const defaultDurationUnit = defaultDurationValue && defaultDurationValue > 0
+    && ['HOUR', 'DAY', 'WEEK', 'MONTH', 'YEAR'].includes(normalizedDefaultUnit)
+    ? normalizedDefaultUnit
+    : null
+  if (!name) throw new Error('Nama paket akses wajib diisi.')
+  if (courses.length === 0) throw new Error('Paket akses harus memiliki minimal satu course.')
+
+  const client = await connectPostgresClient()
+  try {
+    await client.query('BEGIN')
+    const validCourses = await client.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count
+       FROM public.learning_courses
+       WHERE org_id = $1::uuid
+         AND id = ANY($2::uuid[])
+         AND deleted_at IS NULL`,
+      [orgId, courses.map((course) => course.courseId)],
+    )
+    if (Number(validCourses.rows[0]?.count || 0) !== courses.length) {
+      throw new Error('Ada course paket yang tidak ditemukan dalam organisasi ini.')
+    }
+
+    let packageId = requestedPackageId
+    let version = 1
+    let previousSnapshot: Record<string, unknown> = {}
+    if (requestedPackageId) {
+      const existing = await client.query<{
+        id: string
+        version: number
+        name: string
+        slug: string
+        description: string | null
+        is_active: boolean
+        default_access_duration_value: number | null
+        default_access_duration_unit: string | null
+      }>(
+        `SELECT
+           id::text, version, name, slug, description, is_active,
+           default_access_duration_value, default_access_duration_unit
+         FROM public.commerce_access_packages
+         WHERE org_id = $1::uuid AND id = $2::uuid
+         LIMIT 1
+         FOR UPDATE`,
+        [orgId, requestedPackageId],
+      )
+      if (!existing.rows[0]) throw new Error('Paket akses tidak ditemukan.')
+      const previousCourses = await client.query<{
+        course_id: string
+        access_duration_value: number | null
+        access_duration_unit: string | null
+      }>(
+        `SELECT
+           course_id::text, access_duration_value, access_duration_unit
+         FROM public.commerce_access_package_courses
+         WHERE org_id = $1::uuid AND package_id = $2::uuid
+         ORDER BY course_id`,
+        [orgId, requestedPackageId],
+      )
+      previousSnapshot = {
+        ...existing.rows[0],
+        courses: previousCourses.rows,
+      }
+      version = Number(existing.rows[0].version || 1) + 1
+      await client.query(
+        `UPDATE public.commerce_access_packages
+         SET
+           name = $3,
+           slug = $4,
+           description = $5,
+           is_active = $6,
+           version = $7,
+           default_access_duration_value = $8,
+           default_access_duration_unit = $9,
+           updated_at = NOW()
+         WHERE org_id = $1::uuid AND id = $2::uuid`,
+        [
+          orgId,
+          requestedPackageId,
+          name,
+          slug,
+          description || null,
+          isActive,
+          version,
+          defaultDurationValue && defaultDurationValue > 0 ? defaultDurationValue : null,
+          defaultDurationUnit,
+        ],
+      )
+    } else {
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO public.commerce_access_packages (
+           org_id, name, slug, description, is_active, version,
+           default_access_duration_value, default_access_duration_unit
+         ) VALUES (
+           $1::uuid, $2, $3, $4, $5, 1, $6, $7
+         )
+         RETURNING id::text`,
+        [
+          orgId,
+          name,
+          slug,
+          description || null,
+          isActive,
+          defaultDurationValue && defaultDurationValue > 0 ? defaultDurationValue : null,
+          defaultDurationUnit,
+        ],
+      )
+      packageId = inserted.rows[0].id
+    }
+
+    await client.query(
+      `DELETE FROM public.commerce_access_package_courses
+       WHERE org_id = $1::uuid AND package_id = $2::uuid`,
+      [orgId, packageId],
+    )
+    for (const course of courses) {
+      await client.query(
+        `INSERT INTO public.commerce_access_package_courses (
+           org_id, package_id, course_id,
+           access_duration_value, access_duration_unit
+         ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5)`,
+        [
+          orgId,
+          packageId,
+          course.courseId,
+          course.accessDurationValue,
+          course.accessDurationUnit,
+        ],
+      )
+    }
+    const currentSnapshot = {
+      name,
+      slug,
+      description,
+      isActive,
+      version,
+      defaultDurationValue,
+      defaultDurationUnit,
+      courses,
+    }
+    await client.query(
+      `INSERT INTO public.commerce_access_package_events (
+         org_id, package_id, version, event_type, actor_user_id,
+         previous_snapshot, current_snapshot, idempotency_key
+       ) VALUES (
+         $1::uuid, $2::uuid, $3, 'SAVED', $4::uuid,
+         $5::jsonb, $6::jsonb, $7
+       )
+       ON CONFLICT (org_id, idempotency_key) DO NOTHING`,
+      [
+        orgId,
+        packageId,
+        version,
+        userId,
+        JSON.stringify(previousSnapshot),
+        JSON.stringify(currentSnapshot),
+        `access-package:${packageId}:version:${version}`,
+      ],
+    )
+    await syncActivePackageMemberships(client, {
+      orgId,
+      packageId,
+      actorUserId: userId,
+    })
+    await client.query('COMMIT')
+    return { packageId, version }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
   }
 }
 
@@ -2386,7 +2899,7 @@ export async function createCheckoutOrder(input: unknown) {
           orderNumber: String(existingOrder.order_number),
           paymentDueAt: existingOrder.payment_due_at ? String(existingOrder.payment_due_at) : null,
           grandTotal: toNumber(existingOrder.grand_total),
-          transferInstructions: storePayload.transferInstructions,
+          transferInstructions: storePayload.store.transferInstructions,
           orgSlug: context.orgSlug,
           storeSlug: context.storeSlug,
           accessToken: String(existingOrder.public_access_token),
@@ -2490,13 +3003,13 @@ export async function createCheckoutOrder(input: unknown) {
       orderId: String(order.id),
       orderNumber: String(order.order_number || ''),
       paymentDueAt: order.payment_due_at ? String(order.payment_due_at) : null,
-      transferInstructions: storePayload.transferInstructions,
+      transferInstructions: storePayload.store.transferInstructions,
       grandTotal,
       orgSlug: context.orgSlug,
       storeSlug: context.storeSlug,
       accessToken: publicAccessToken,
     }),
-    transferInstructions: storePayload.transferInstructions,
+    transferInstructions: storePayload.store.transferInstructions,
     grandTotal,
   }
 }
@@ -3402,6 +3915,76 @@ export async function approveOrderPayment(formData: FormData) {
   }
 
   try {
+    const modernPayment = await queryPostgres<{
+      intent_id: string
+      provider_code: string
+      provider_reference: string
+      paid_amount: number
+      proof_payment_id: string
+    }>(
+      `SELECT
+         intent.id::text AS intent_id,
+         intent.provider_code,
+         intent.provider_reference,
+         COALESCE(payment.paid_amount, ecommerce_order.grand_total)::float8 AS paid_amount,
+         payment.id::text AS proof_payment_id
+       FROM public.ecommerce_orders ecommerce_order
+       JOIN public.commerce_payment_intents intent
+         ON intent.order_id = ecommerce_order.id
+        AND intent.org_id = ecommerce_order.org_id
+        AND intent.status IN ('PENDING', 'AWAITING_REVIEW')
+       JOIN LATERAL (
+         SELECT payment_row.id, payment_row.paid_amount
+         FROM public.ecommerce_order_payments payment_row
+         WHERE payment_row.org_id = ecommerce_order.org_id
+           AND payment_row.order_id = ecommerce_order.id
+           AND payment_row.status = 'UNDER_REVIEW'
+         ORDER BY payment_row.created_at DESC
+         LIMIT 1
+       ) payment ON TRUE
+       WHERE ecommerce_order.id = $1::uuid
+         AND ecommerce_order.org_id = $2::uuid
+       ORDER BY intent.created_at DESC
+       LIMIT 1`,
+      [orderId, orderState.org_id],
+    )
+    const modern = modernPayment.rows[0]
+    if (modern) {
+      const { finalizePaidCommerceOrder } = await import(
+        '@/modules/ecommerce/payments/commerce-payment.service'
+      )
+      const finalized = await finalizePaidCommerceOrder({
+        orgId: String(orderState.org_id),
+        orderId,
+        paymentIntentId: modern.intent_id,
+        providerCode: modern.provider_code,
+        providerReference: modern.provider_reference,
+        providerEventId: `admin:${userId}:${modern.proof_payment_id}`,
+        paidAmount: Number(modern.paid_amount),
+        idempotencyKey: `manual-approval:${modern.intent_id}`,
+        rawProviderPayload: {
+          proofPaymentId: modern.proof_payment_id,
+          reviewNote,
+          reviewerUserId: userId,
+        },
+      })
+      await queryPostgres(
+        `UPDATE public.ecommerce_order_payments
+         SET status = 'VALIDATED', reviewer_user_id = $3::uuid,
+             reviewed_at = NOW(), review_note = $4, updated_at = NOW()
+         WHERE id = $1::uuid AND org_id = $2::uuid`,
+        [modern.proof_payment_id, orderState.org_id, userId, reviewNote || null],
+      )
+      const sale = await queryPostgres<{ sale_number: string }>(
+        `SELECT sale_number FROM public.sales
+         WHERE id = $1::uuid AND org_id = $2::uuid`,
+        [finalized.saleId, orderState.org_id],
+      )
+      return {
+        saleId: finalized.saleId,
+        saleNumber: sale.rows[0]?.sale_number || '',
+      }
+    }
     return await approveOrderPaymentAtomic(orderId, userId, reviewNote)
   } catch (error) {
     await markOrderErpSyncFailure(admin, String(orderState.id), String(orderState.org_id), userId, error)

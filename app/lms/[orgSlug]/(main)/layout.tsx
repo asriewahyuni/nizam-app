@@ -13,8 +13,9 @@ export default async function LMSLayout({
   params,
 }: {
   children: React.ReactNode
-  params: { orgSlug: string }
+  params: Promise<{ orgSlug: string }>
 }) {
+  const { orgSlug } = await params
   const session = await getInternalAuthSession()
   const isLoggedIn = !!session?.user
 
@@ -28,35 +29,35 @@ export default async function LMSLayout({
                 <BookOpen size={20} />
               </div>
               <div>
-                <Link href={`/lms/${params.orgSlug}`} className="text-lg font-bold text-slate-900 tracking-tight hover:text-indigo-600 transition-colors">
+                <Link href={`/lms/${orgSlug}`} className="text-lg font-bold text-slate-900 tracking-tight hover:text-indigo-600 transition-colors">
                   LMS Portal
                 </Link>
-                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">{params.orgSlug}</p>
+                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">{orgSlug}</p>
               </div>
             </div>
             <nav className="flex items-center gap-6">
               {isLoggedIn ? (
                 <>
-                  <Link href={`/lms/${params.orgSlug}/my-progress`} className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">
+                  <Link href={`/lms/${orgSlug}/my-progress`} className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">
                     Kelas Saya
                   </Link>
                   <div className="flex items-center gap-2 border-l border-slate-200 pl-6">
                     <UserCircle className="text-slate-400" size={24} />
                     <span className="text-sm font-semibold text-slate-700 hidden sm:inline-block">
-                      {session?.user?.fullName || session?.user?.email}
+                      {String(session?.user?.user_metadata.full_name || session?.user?.email || 'Member')}
                     </span>
                   </div>
                 </>
               ) : (
                 <>
                   <Link 
-                    href={`/login?callbackUrl=/lms/${params.orgSlug}`} 
+                    href={`/login?callbackUrl=/lms/${orgSlug}`}
                     className="text-sm font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
                   >
                     Masuk
                   </Link>
                   <Link 
-                    href={`/login?callbackUrl=/lms/${params.orgSlug}`} 
+                    href={`/login?callbackUrl=/lms/${orgSlug}`}
                     className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm hidden sm:block"
                   >
                     Daftar Akun

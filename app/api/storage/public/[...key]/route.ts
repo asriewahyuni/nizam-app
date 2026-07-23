@@ -26,12 +26,21 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ke
   const { key: keySegments } = await context.params
   const key = decodeStorageKeySegments(keySegments)
 
+  // Tautan LMS lama dialihkan ke route yang memeriksa akses, bukan ke bucket.
+  if (key && isPublicLmsMediaStorageKey(key)) {
+    const safePath = key
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => encodeURIComponent(segment))
+      .join('/')
+    return NextResponse.redirect(new URL(`/api/storage/lms/${safePath}`, _request.url), 307)
+  }
+
   if (!key || (
     !isPublicLogoStorageKey(key) &&
     !isPublicThemeAssetStorageKey(key) &&
     !isPublicReceiptStorageKey(key) &&
-    !isPublicAvatarStorageKey(key) &&
-    !isPublicLmsMediaStorageKey(key)
+    !isPublicAvatarStorageKey(key)
   )) {
     return NextResponse.json({ error: 'File tidak ditemukan.' }, { status: 404 })
   }

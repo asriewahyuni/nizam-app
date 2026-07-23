@@ -263,6 +263,13 @@ export function buildPrivateStorageObjectPath(key: string): string {
 }
 
 /**
+ * URL stabil media LMS; route tujuan selalu memeriksa akses course/member.
+ */
+export function buildLmsStorageObjectPath(key: string): string {
+  return `/api/storage/lms/${encodeStorageKeyForPath(key)}`
+}
+
+/**
  * Mengecek prefix agar route publik tidak bocor ke file lain.
  */
 export function isPublicLogoStorageKey(key: string): boolean {

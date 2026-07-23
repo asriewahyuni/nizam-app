@@ -31,7 +31,7 @@ export default async function CoursePlayerLayout(props: {
 
   const { course, lessons } = result.data
 
-  let progressData: Record<string, boolean> = {}
+  let progressData: Record<string, { completed: boolean; status: string; lastPositionSeconds: number }> = {}
   if (session?.user) {
     const progressResult = await getLmsUserProgress(orgSlug, courseSlug)
     if (progressResult.data) {
@@ -39,7 +39,7 @@ export default async function CoursePlayerLayout(props: {
     }
   }
 
-  const completedCount = Object.keys(progressData).length
+  const completedCount = Object.values(progressData).filter((item) => item.completed).length
   const totalCount = lessons.length
   const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
@@ -87,6 +87,24 @@ export default async function CoursePlayerLayout(props: {
           />
         </aside>
       </div>
+      <nav
+        aria-label="Materi course pada layar kecil"
+        className="flex shrink-0 gap-2 overflow-x-auto border-t border-slate-200 bg-white p-2 md:hidden"
+      >
+        {lessons.map((lesson, index) => (
+          <Link
+            key={lesson.id}
+            href={`/lms/${orgSlug}/learn/${courseSlug}/${lesson.slug}`}
+            className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+          >
+            <span>{index + 1}.</span>
+            <span className="max-w-48 truncate">{lesson.title}</span>
+            {progressData[lesson.id]?.completed && (
+              <CheckCircle aria-label="Selesai" size={16} className="text-emerald-700" />
+            )}
+          </Link>
+        ))}
+      </nav>
     </div>
   )
 }

@@ -237,6 +237,7 @@ export type StoreAdminSummary = {
   transferInstructions: string
   heroNotice: string
   checkoutNotice: string
+  allowGuestCheckout: boolean
 }
 
 export type AdminCatalogProductView = {
@@ -250,6 +251,7 @@ export type AdminCatalogProductView = {
 }
 
 export type AdminStoreProductView = {
+  id: string
   storeId: string
   productId: string
   publicSlug: string
@@ -263,6 +265,40 @@ export type AdminStoreProductView = {
   isFeatured: boolean
   isPublished: boolean
   imageUrl: string
+}
+
+export type AdminLearningCourseView = {
+  id: string
+  title: string
+  slug: string
+  accessDurationValue: number | null
+  accessDurationUnit: string | null
+}
+
+export type AdminCourseEntitlementSelection = {
+  courseId: string
+  accessDurationValue: number | null
+  accessDurationUnit: string | null
+}
+
+export type AdminAccessPackageView = {
+  id: string
+  name: string
+  slug: string
+  description: string
+  isActive: boolean
+  version: number
+  defaultAccessDurationValue: number | null
+  defaultAccessDurationUnit: string | null
+  courses: AdminCourseEntitlementSelection[]
+  activeSubscriptionMembers: number
+}
+
+export type AdminProductEntitlementView = {
+  storeProductId: string
+  directCourses: AdminCourseEntitlementSelection[]
+  packageIds: string[]
+  resolvedCourseIds: string[]
 }
 
 export type AdminVariantView = {
@@ -430,6 +466,9 @@ export type EcommerceDashboardData = {
   branches: Array<{ id: string; name: string; code: string }>
   warehouses: Array<{ id: string; name: string; branchId: string | null }>
   bankAccounts: Array<{ id: string; label: string; branchId: string | null }>
+  learningCourses: AdminLearningCourseView[]
+  accessPackages: AdminAccessPackageView[]
+  productEntitlements: AdminProductEntitlementView[]
 }
 
 export type ShippingAddressMatcherInput = {

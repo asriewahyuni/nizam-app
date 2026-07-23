@@ -1,7 +1,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { getLMSLessonDetails } from '@/modules/lms/actions/lesson.actions'
-import MarkCompleteButton from './MarkCompleteButton'
+import { getLessonAssessmentOverview } from '@/modules/lms/actions/assessment.actions'
 import LessonTabs from './LessonTabs'
 import VideoPlayer from './VideoPlayer'
 
@@ -23,12 +23,23 @@ export default async function LMSLearnPage(props: {
   }
 
   const lesson = result.data
+  const assessmentResult = lesson.is_preview
+    ? null
+    : await getLessonAssessmentOverview(
+        params.orgSlug,
+        params.courseSlug,
+        params.lessonSlug,
+      )
+  const assessments = assessmentResult?.data || { quizzes: [], assignments: [] }
 
   // Extract video URL if any
-  let videoUrl = null
+  let videoUrl: string | null = null
   if (lesson.lesson_type === 'VIDEO' && Array.isArray(lesson.media_items)) {
-    const videoMedia = lesson.media_items.find((m: any) => m.type === 'video')
-    if (videoMedia) videoUrl = videoMedia.url
+    const videoMedia = lesson.media_items.find((media: unknown) => {
+      if (!media || typeof media !== 'object') return false
+      return String((media as Record<string, unknown>).type || '') === 'video'
+    }) as Record<string, unknown> | undefined
+    if (videoMedia) videoUrl = String(videoMedia.url || '') || null
   }
 
   return (
@@ -50,6 +61,7 @@ export default async function LMSLearnPage(props: {
           lesson={lesson} 
           orgSlug={params.orgSlug} 
           courseSlug={params.courseSlug} 
+          assessments={assessments}
         />
       </div>
     </div>

@@ -1,0 +1,101 @@
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { ArrowRight, BookOpen, Clock3, Layers3 } from 'lucide-react'
+import { getLMSCourses } from '@/modules/lms/actions/course.actions'
+import { getPortalTenant } from '@/modules/member/lib/portal.server'
+import { formatRupiah } from '@/lib/utils'
+
+export default async function MemberCatalogPage({
+  params,
+}: {
+  params: Promise<{ orgSlug: string }>
+}) {
+  const { orgSlug } = await params
+  const tenant = await getPortalTenant(orgSlug)
+  if (!tenant) notFound()
+  const result = await getLMSCourses(orgSlug)
+  const courses = result.data || []
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="max-w-3xl">
+        <p className="text-sm font-semibold text-emerald-700">Katalog resmi</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Pilih program belajar Anda</h1>
+        <p className="mt-4 text-base leading-7 text-slate-600">
+          Lihat materi, jadwal angkatan, tingkat, dan harga sebelum mendaftar.
+        </p>
+      </div>
+
+      {result.error ? (
+        <div role="alert" className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-900">
+          {result.error}
+        </div>
+      ) : courses.length === 0 ? (
+        <div className="mt-8 rounded-2xl border border-dashed border-emerald-300 bg-white p-10 text-center">
+          <BookOpen aria-hidden="true" className="mx-auto text-emerald-700" size={40} />
+          <h2 className="mt-4 text-lg font-semibold">Katalog belum diterbitkan</h2>
+          <p className="mt-2 text-sm text-slate-600">Silakan kembali lagi setelah program tersedia.</p>
+        </div>
+      ) : (
+        <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {courses.map((course) => (
+            <article
+              key={course.id}
+              className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none"
+            >
+              <div className="flex aspect-[16/8] items-center justify-center bg-gradient-to-br from-emerald-900 to-emerald-600 text-emerald-50">
+                <BookOpen aria-hidden="true" size={42} />
+              </div>
+              <div className="flex flex-1 flex-col p-5">
+                <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-800">
+                    {course.level_code || 'Semua tingkat'}
+                  </span>
+                  {course.is_featured && (
+                    <span className="rounded-full bg-orange-50 px-3 py-1 text-orange-800">Unggulan</span>
+                  )}
+                </div>
+                <h2 className="mt-4 line-clamp-2 text-xl font-bold">{course.title}</h2>
+                <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
+                  {course.description || 'Detail program akan disampaikan pada halaman kelas.'}
+                </p>
+                <div className="mt-5 flex flex-wrap gap-4 text-sm text-slate-600">
+                  <span className="flex items-center gap-2">
+                    <Layers3 aria-hidden="true" size={16} />
+                    {course.lesson_count} materi
+                  </span>
+                  {course.duration_minutes ? (
+                    <span className="flex items-center gap-2">
+                      <Clock3 aria-hidden="true" size={16} />
+                      {Math.ceil(course.duration_minutes / 60)} jam
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-auto flex items-end justify-between gap-4 border-t border-slate-100 pt-5">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Mulai dari</p>
+                    <p className="mt-1 font-bold text-emerald-900">
+                      {course.starting_price == null
+                        ? 'Lihat program'
+                        : course.starting_price === 0
+                          ? 'Gratis'
+                          : formatRupiah(course.starting_price)}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/lms/${tenant.slug}/course/${course.slug}`}
+                    className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                    aria-label={`Lihat program ${course.title}`}
+                  >
+                    Detail
+                    <ArrowRight aria-hidden="true" size={17} />
+                  </Link>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
