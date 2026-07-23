@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   extractIpFromRequest: vi.fn(),
   queryPostgres: vi.fn(),
   getPostgresPool: vi.fn(),
+  connectPostgresClient: vi.fn(),
   deliverWebhook: vi.fn(),
 }))
 
@@ -55,6 +56,7 @@ vi.mock('@/lib/api/validate-key', async () => {
 vi.mock('@/lib/db/postgres', () => ({
   queryPostgres: mocks.queryPostgres,
   getPostgresPool: mocks.getPostgresPool,
+  connectPostgresClient: mocks.connectPostgresClient,
 }))
 
 vi.mock('@/lib/api/webhook', () => ({
@@ -66,6 +68,7 @@ import { GET, POST } from '@/app/api/v1/cash/route'
 describe('Open API cash route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+
     mocks.validateApiKey.mockResolvedValue({
       success: true,
       key: {
@@ -572,6 +575,7 @@ describe('Open API cash route', () => {
     mocks.getPostgresPool.mockReturnValue({
       connect: vi.fn().mockResolvedValue(client),
     })
+    mocks.connectPostgresClient.mockResolvedValue(client)
     mocks.queryPostgres
       .mockResolvedValueOnce({
         rows: [{

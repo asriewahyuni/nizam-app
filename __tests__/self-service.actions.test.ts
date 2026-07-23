@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+
+vi.mock('server-only', () => ({}))
 
 import { createSupabaseMock, success } from './helpers/supabase-mock'
 
@@ -152,12 +154,12 @@ describe('Employee Self Service Actions', () => {
         ],
         attendance: [
           {
-            maybeSingleResult: success({
+            result: success([{
               id: 'att-1',
               status: 'PRESENT',
               check_out: null,
               notes: 'On site',
-            }),
+            }]),
           },
           {
             result: success([]),

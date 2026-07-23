@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+
+vi.mock('server-only', () => ({}))
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),

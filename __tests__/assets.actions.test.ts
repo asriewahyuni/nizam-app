@@ -5,6 +5,7 @@ import { createSupabaseMock, success } from './helpers/supabase-mock'
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   revalidatePath: vi.fn(),
+  queryPostgres: vi.fn(),
   createJournalEntry: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
 }))
@@ -15,6 +16,10 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: mocks.revalidatePath,
+}))
+
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
 }))
 
 vi.mock('@/modules/accounting/actions/journal.actions', () => ({
@@ -34,6 +39,7 @@ import {
 describe('Fixed Assets Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.queryPostgres.mockResolvedValue({ rows: [] })
   })
 
   afterEach(() => {

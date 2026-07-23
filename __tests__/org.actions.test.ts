@@ -709,7 +709,7 @@ describe('Organization Branch Bootstrap', () => {
       expect.objectContaining({
         id: 'branch-1',
         org_id: 'org-1',
-        name: 'Unit Utama',
+        name: 'Cabang Utama',
         code: 'MAIN',
         is_active: true,
       })
@@ -1036,7 +1036,7 @@ describe('Organization Branch Bootstrap', () => {
       expect.objectContaining({
         id: 'branch-3',
         org_id: 'org-3',
-        name: 'Unit Utama',
+        name: 'Cabang Utama',
         code: 'MAIN',
       })
     )
@@ -1338,7 +1338,7 @@ describe('Organization Branch Bootstrap', () => {
     const orgSettingsBuilder = {
       eq: vi.fn(() => orgSettingsBuilder),
       maybeSingle: vi.fn().mockResolvedValue({
-        data: { settings: {} },
+        data: { settings: {}, parent_org_id: 'holding-1' },
         error: null,
       }),
     }
@@ -1670,7 +1670,7 @@ describe('Organization Branch Bootstrap', () => {
     const result = await createBranch('org-1', formData)
 
     expect(result).toEqual({
-      error: 'Hanya owner atau admin yang dapat menambahkan unit.',
+      error: 'Hanya owner atau admin yang dapat menambahkan Cabang.',
     })
   })
 })

@@ -22,7 +22,7 @@ export async function checkClosedFiscalPeriod(
     [orgId, normalizedDate]
   )
 
-  if (!result.rows.length) return null
+  if (!result?.rows?.length) return null
   return String(result.rows[0].name || '').trim() || null
 }
 

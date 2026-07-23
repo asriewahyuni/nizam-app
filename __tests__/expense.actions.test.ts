@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   revalidatePath: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
+  queryPostgres: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -18,6 +19,10 @@ vi.mock('next/cache', () => ({
 
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
+}))
+
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
 }))
 
 import {
@@ -40,6 +45,7 @@ function buildExpenseForm(overrides: Record<string, string> = {}) {
 describe('Expense Claim Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.queryPostgres.mockResolvedValue({ rows: [] })
   })
 
   it('filters expense claims by resolved branch selection', async () => {

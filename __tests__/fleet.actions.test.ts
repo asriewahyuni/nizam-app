@@ -4,6 +4,7 @@ import { createSupabaseMock, failure, success } from './helpers/supabase-mock'
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   revalidatePath: vi.fn(),
+  queryPostgres: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
 }))
 
@@ -13,6 +14,10 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: mocks.revalidatePath,
+}))
+
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
 }))
 
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({
@@ -59,6 +64,7 @@ function getFirstOperationArg(callTable: string, method: string, calls: Array<{ 
 describe('Fleet Server Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.queryPostgres.mockResolvedValue({ rows: [] })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
@@ -309,10 +315,15 @@ describe('Fleet Server Actions', () => {
         ],
         fleet_maintenance_labs: [
           {
-            result: failure('Insert maintenance failed'),
+            singleResult: failure('Insert maintenance failed'),
           },
         ],
       },
+      rpc: {
+        create_fleet_medical_record: [
+          failure('Function not found', 'PGRST202')
+        ]
+      }
     })
     mocks.createClient.mockResolvedValue(supabase.client)
 

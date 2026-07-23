@@ -203,6 +203,15 @@ describe('POS Shift Actions', () => {
           }
         }
 
+        if (table === 'sales_payments') {
+          return {
+            select: vi.fn().mockReturnValue(createEqResolvedQuery({
+              data: [],
+              error: null,
+            })),
+          }
+        }
+
         throw new Error(`Unexpected admin table ${table}`)
       }),
     })
@@ -390,6 +399,15 @@ describe('POS Shift Actions', () => {
         }
 
         if (table === 'pos_shift_settlements') {
+          return {
+            select: vi.fn().mockReturnValue(createEqResolvedQuery({
+              data: [],
+              error: null,
+            })),
+          }
+        }
+
+        if (table === 'sales_payments') {
           return {
             select: vi.fn().mockReturnValue(createEqResolvedQuery({
               data: [],

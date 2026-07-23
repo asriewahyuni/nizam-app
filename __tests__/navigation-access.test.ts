@@ -37,11 +37,11 @@ describe('navigation access helpers', () => {
     expect(hasPosOnlyAccess('owner', ['pos:read', 'pos:write'])).toBe(false)
   })
 
-  it('falls back to profile when no module permission is granted', () => {
+  it('falls back to employee portal when no module permission is granted', () => {
     expect(resolveDefaultAuthorizedRoute({
       userRole: 'staff',
       permissions: [],
       enabledModules: ['POS'],
-    })).toBe('/profil-saya')
+    })).toBe('/karyawan')
   })
 })

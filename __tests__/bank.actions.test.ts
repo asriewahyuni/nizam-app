@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   resolveAccessibleBranchSelection: vi.fn(),
   checkCanManageCoA: vi.fn(),
   nudgeEduModeValidation: vi.fn(),
+  queryPostgres: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -28,6 +29,10 @@ vi.mock('@/modules/edu/lib/progress-hooks.server', () => ({
   nudgeEduModeValidation: mocks.nudgeEduModeValidation,
 }))
 
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
+}))
+
 import {
   createBankAccount,
   createBankTransaction,
@@ -41,6 +46,7 @@ describe('Cash & Bank Branch Context', () => {
     vi.clearAllMocks()
     mocks.checkCanManageCoA.mockResolvedValue({ canManageDirect: true })
     mocks.nudgeEduModeValidation.mockResolvedValue(undefined)
+    mocks.queryPostgres.mockResolvedValue({ rows: [] })
   })
 
   it('stamps active branch when creating a bank account', async () => {
@@ -507,7 +513,7 @@ describe('Cash & Bank Branch Context', () => {
     const result = await createInterOrgCapitalTransfer('org-parent', formData)
 
     expect(result).toEqual({
-      error: 'Akun lawan parent harus akun investasi (kelompok 16xx), misalnya 1601 Investasi pada Entitas Anak / Unit.',
+      error: 'Akun lawan organisasi sumber harus akun investasi (kelompok 16xx), misalnya 1601 Investasi pada Entitas Anak / Unit.',
     })
     expect(rpcMock).not.toHaveBeenCalled()
   })

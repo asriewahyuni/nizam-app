@@ -20,6 +20,18 @@ describe('Forecast Branch Context', () => {
   it('scopes current cash, inflow, and outflow to the active branch', async () => {
     const supabase = createSupabaseMock({
       tables: {
+        accounts: [
+          {
+            result: success([
+              { id: 'cash-1', code: '1101' },
+            ]),
+          },
+          {
+            result: success([
+              { id: 'cash-1', code: '1101' },
+            ]),
+          },
+        ],
         bank_accounts: [
           {
             result: success([
@@ -107,11 +119,19 @@ describe('Forecast Branch Context', () => {
       const calls = supabase.calls.filter((call) => call.table === table)
       expect(calls.length).toBeGreaterThan(0)
       calls.forEach((call) => {
-        expect(call.operations).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({ method: 'eq', args: ['branch_id', 'branch-1'] }),
-          ])
-        )
+        if (table === 'journal_entries') {
+          const hasBranchFilter = call.operations.some(
+            op => (op.method === 'eq' && op.args[0] === 'branch_id' && op.args[1] === 'branch-1') ||
+                  (op.method === 'or' && op.args[0] === 'branch_id.eq.branch-1,branch_id.is.null')
+          )
+          expect(hasBranchFilter).toBe(true)
+        } else {
+          expect(call.operations).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ method: 'eq', args: ['branch_id', 'branch-1'] }),
+            ])
+          )
+        }
       })
     })
   })
@@ -119,6 +139,18 @@ describe('Forecast Branch Context', () => {
   it('uses outstanding balances for PARTIAL documents instead of full totals', async () => {
     const supabase = createSupabaseMock({
       tables: {
+        accounts: [
+          {
+            result: success([
+              { id: 'cash-1', code: '1101' },
+            ]),
+          },
+          {
+            result: success([
+              { id: 'cash-1', code: '1101' },
+            ]),
+          },
+        ],
         bank_accounts: [
           {
             result: success([

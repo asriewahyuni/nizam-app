@@ -4,10 +4,15 @@ import { createSupabaseMock, success } from './helpers/supabase-mock'
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
+  queryPostgres: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: mocks.createClient,
+}))
+
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
 }))
 
 import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.actions'
@@ -15,6 +20,9 @@ import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.ac
 describe('Analytics actions guard for missing accounts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    
+    // Default mock behavior
+    mocks.queryPostgres.mockResolvedValue({ rows: [] })
   })
 
   it('should not throw when journal lines lack accounts', async () => {
@@ -49,6 +57,18 @@ describe('Analytics actions guard for missing accounts', () => {
     })
 
     mocks.createClient.mockResolvedValue(supabase.client)
+    
+    mocks.queryPostgres.mockImplementation((query: string) => {
+      if (query.includes('journal_lines')) {
+        return Promise.resolve({
+          rows: [
+            { debit: '0', credit: '1000', entry_date: '2024-01-15', account_type: 'REVENUE', account_code: '4001', account_name: 'Penjualan' },
+            { debit: '2000', credit: '0', entry_date: '2024-01-15', account_type: null, account_code: null, account_name: null }
+          ]
+        })
+      }
+      return Promise.resolve({ rows: [] })
+    })
 
     // Execute function – should resolve without throwing
     const result = await getDashboardAnalytics('org-1')

@@ -1,37 +1,44 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mockState = vi.hoisted(() => ({
-  queryQueue: [] as Array<() => Promise<unknown>>,
-  connectQueue: [] as Array<() => Promise<unknown>>,
-  poolInstances: [] as MockPool[],
-}))
+vi.mock('server-only', () => ({}))
 
-class MockPool {
-  query = vi.fn(async () => {
-    const next = mockState.queryQueue.shift()
-    if (!next) {
-      return { rows: [] }
-    }
-    return next()
-  })
-
-  connect = vi.fn(async () => {
-    const next = mockState.connectQueue.shift()
-    if (!next) {
-      return { release: vi.fn() }
-    }
-    return next()
-  })
-
-  end = vi.fn(async () => undefined)
-
-  constructor() {
-    mockState.poolInstances.push(this)
+const mockState = vi.hoisted(() => {
+  const state = {
+    queryQueue: [] as Array<() => Promise<unknown>>,
+    connectQueue: [] as Array<() => Promise<unknown>>,
+    poolInstances: [] as any[],
   }
-}
+
+  class MockPool {
+    query = vi.fn(async () => {
+      const next = state.queryQueue.shift()
+      if (!next) {
+        return { rows: [] }
+      }
+      return await next()
+    })
+
+    connect = vi.fn(async () => {
+      const next = state.connectQueue.shift()
+      if (!next) {
+        return { release: vi.fn() }
+      }
+      return next()
+    })
+
+    end = vi.fn(async () => undefined)
+
+    constructor() {
+      state.poolInstances.push(this)
+    }
+  }
+
+  return { ...state, MockPool }
+})
 
 vi.mock('pg', () => ({
-  Pool: MockPool,
+  Pool: mockState.MockPool,
+  types: { setTypeParser: vi.fn() }
 }))
 
 import { closePostgresPool, connectPostgresClient, queryPostgres } from '@/lib/db/postgres'
@@ -41,9 +48,9 @@ describe('Postgres retry', () => {
     process.env.DATABASE_URL = 'postgresql://postgres:secret@maglev.proxy.rlwy.net:25780/railway'
     process.env.PG_RETRY_ATTEMPTS = '2'
     process.env.PG_RETRY_DELAY_MS = '1'
-    mockState.queryQueue = []
-    mockState.connectQueue = []
-    mockState.poolInstances = []
+    mockState.queryQueue.length = 0
+    mockState.connectQueue.length = 0
+    mockState.poolInstances.length = 0
   })
 
   afterEach(async () => {
@@ -62,6 +69,7 @@ describe('Postgres retry', () => {
     )
 
     const result = await queryPostgres<{ ok: number }>('select 1 as ok')
+    console.log('Test result in retry query:', result)
 
     expect(result.rows[0]?.ok).toBe(1)
     expect(mockState.poolInstances).toHaveLength(2)

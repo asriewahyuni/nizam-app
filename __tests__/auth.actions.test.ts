@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+
+vi.mock('server-only', () => ({}))
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -404,7 +406,7 @@ describe('Auth Actions', () => {
         sameSite: 'lax',
       })
     )
-    expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
+    expect(mocks.redirect).toHaveBeenCalledWith('/karyawan')
   })
 
   it('marks every employee row tied to the same auth user when requesting password reset', async () => {

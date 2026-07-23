@@ -76,7 +76,7 @@ export const ERPBridge = {
           message: `*Large Revenue Transaction Recorded* 💰`,
           level: 'success',
           context: {
-            Amount: \`Rp \${amount.toLocaleString('id-ID')}\`,
+            Amount: `Rp ${amount.toLocaleString('id-ID')}`,
             Description: description,
             ReferenceType: referenceType,
             ReferenceId: referenceId,
@@ -122,7 +122,7 @@ export const ERPBridge = {
           message: `*Large Expense Transaction Recorded* 💸`,
           level: 'warning',
           context: {
-            Amount: \`Rp \${amount.toLocaleString('id-ID')}\`,
+            Amount: `Rp ${amount.toLocaleString('id-ID')}`,
             Description: description,
             ReferenceType: referenceType,
             ReferenceId: referenceId,

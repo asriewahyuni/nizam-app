@@ -36,6 +36,8 @@ function createOrderedSalesLookup(rows: any[] = []) {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     neq: vi.fn(() => builder),
+    update: vi.fn(() => builder),
+    insert: vi.fn(() => builder),
     then: (resolve: (value: { data: any[]; error: null }) => unknown) => resolve({ data: rows, error: null }),
   }
 
@@ -47,6 +49,12 @@ describe('Sales Branch Context', () => {
     vi.clearAllMocks()
     mocks.createClient.mockReset()
     mocks.queryPostgres.mockReset()
+    mocks.queryPostgres.mockImplementation((query: string) => {
+      if (query.includes('SELECT role FROM org_members')) {
+        return Promise.resolve({ rows: [{ role: 'owner' }] })
+      }
+      return Promise.resolve({ rows: [] })
+    })
   })
 
   it('rejects creating sales order when no active branch is selected', async () => {
@@ -893,6 +901,7 @@ describe('Sales Branch Context', () => {
     const saleQuery = {
       select: vi.fn(() => saleQuery),
       eq: vi.fn(() => saleQuery),
+      update: vi.fn(() => saleQuery),
       single: vi.fn().mockResolvedValue({
         data: { status: 'ORDERED', warehouse_id: null, shariah_mode: 'CASH' },
       }),
@@ -1273,6 +1282,7 @@ describe('Sales Branch Context', () => {
       select: vi.fn(() => stockMovementQuery),
       eq: vi.fn((..._args: any[]) => stockMovementQuery),
       delete: vi.fn(() => stockMovementQuery),
+      insert: vi.fn(() => stockMovementQuery),
     }
     let stockMovementEqCount = 0
     stockMovementQuery.eq = vi.fn(() => {

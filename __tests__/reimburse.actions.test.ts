@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+
+vi.mock('server-only', () => ({}))
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   revalidatePath: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
   createJournalEntry: vi.fn(),
+  queryPostgres: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -19,6 +22,10 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
+}))
+
 vi.mock('@/modules/accounting/actions/journal.actions', () => ({
   createJournalEntry: mocks.createJournalEntry,
 }))
@@ -28,6 +35,9 @@ import { approveReimbursement, getReimbursements, payReimbursement, rejectReimbu
 describe('Reimbursement Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.createClient.mockReset()
+    mocks.queryPostgres.mockReset()
+    mocks.queryPostgres.mockResolvedValue({ rows: [] })
   })
 
   it('filters reimbursements by active branch', async () => {
