@@ -20,9 +20,17 @@ export const metadata: Metadata = {
   },
 }
 
+import { Plus_Jakarta_Sans } from 'next/font/google'
+
+const jakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-mono',
+})
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" data-scroll-behavior="smooth" suppressHydrationWarning>
+    <html lang="id" data-scroll-behavior="smooth" suppressHydrationWarning className={jakartaSans.variable}>
       <body className="font-sans antialiased bg-[#F8F9FA] text-[#212529]">
         {children}
       </body>
