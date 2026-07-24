@@ -859,7 +859,7 @@ export async function setupLmsCommerceAction() {
 
     // 2. Check or create Warehouse
     let warehouseId = ''
-    const { data: warehouses } = await supabase.from('warehouses').select('id').eq('org_id', orgId).eq('is_active', true).limit(1)
+    const { data: warehouses } = await supabase.from('warehouses').select('id').eq('org_id', orgId).eq('branch_id', branchId).eq('is_active', true).limit(1)
     if (warehouses && warehouses.length > 0) {
       warehouseId = warehouses[0].id
     } else {
@@ -876,7 +876,7 @@ export async function setupLmsCommerceAction() {
 
     // 3. Check or create Bank Account
     let bankId = ''
-    const { data: banks } = await supabase.from('bank_accounts').select('id').eq('org_id', orgId).eq('is_active', true).limit(1)
+    const { data: banks } = await supabase.from('bank_accounts').select('id').eq('org_id', orgId).eq('branch_id', branchId).eq('is_active', true).limit(1)
     if (banks && banks.length > 0) {
       bankId = banks[0].id
     } else {
