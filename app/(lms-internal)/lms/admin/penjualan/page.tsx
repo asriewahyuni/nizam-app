@@ -8,6 +8,7 @@ import { BookOpen, ExternalLink, Layers3, PackageCheck, ShoppingCart } from 'luc
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getEcommerceDashboardData } from '@/modules/ecommerce/lib/ecommerce.server'
 import CourseCommerceManager from '@/modules/ecommerce/components/CourseCommerceManager'
+import { LmsCommerceSetupButton } from './LmsCommerceSetupButton'
 
 export const metadata = {
   title: 'Penjualan Kelas — Nizam LMS',
@@ -111,11 +112,15 @@ export default async function LmsCourseCommercePage() {
         ))}
       </div>
 
-      <CourseCommerceManager
-        orgSlug={String(orgData.org.slug || orgData.org.id)}
-        dashboardData={dashboardData}
-        showContextSelector
-      />
+      {dashboardData.stores.length === 0 ? (
+        <LmsCommerceSetupButton />
+      ) : (
+        <CourseCommerceManager
+          orgSlug={String(orgData.org.slug || orgData.org.id)}
+          dashboardData={dashboardData}
+          showContextSelector
+        />
+      )}
     </div>
   )
 }
