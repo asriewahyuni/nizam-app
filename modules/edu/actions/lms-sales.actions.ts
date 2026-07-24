@@ -1,3 +1,5 @@
+'use server'
+
 
 import { revalidatePath } from 'next/cache'
 import { connectPostgresClient } from '@/lib/db/postgres'
