@@ -580,7 +580,7 @@ export default function CourseCommerceManager({
             )}
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-semibold text-slate-700">
-                Nama paket
+                Nama paket <span className="text-red-500">*</span>
                 <input
                   required
                   value={accessPackageForm.name}
@@ -592,7 +592,7 @@ export default function CourseCommerceManager({
                 />
               </label>
               <label className="text-sm font-semibold text-slate-700">
-                Slug
+                Slug <span className="font-normal text-slate-400">(Opsional)</span>
                 <input
                   value={accessPackageForm.slug}
                   onChange={(event) => setAccessPackageForm((current) => ({
@@ -604,7 +604,7 @@ export default function CourseCommerceManager({
               </label>
             </div>
             <label className="block text-sm font-semibold text-slate-700">
-              Deskripsi
+              Deskripsi <span className="font-normal text-slate-400">(Opsional)</span>
               <textarea
                 rows={3}
                 value={accessPackageForm.description}
@@ -617,7 +617,7 @@ export default function CourseCommerceManager({
             </label>
             <div className="grid gap-3 sm:grid-cols-3">
               <label className="text-sm font-semibold text-slate-700">
-                Durasi default
+                Durasi default <span className="font-normal text-slate-400">(Opsional)</span>
                 <input
                   type="number"
                   min="1"
