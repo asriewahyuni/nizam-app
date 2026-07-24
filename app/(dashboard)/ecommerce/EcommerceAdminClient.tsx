@@ -5,16 +5,12 @@ import {
   useState,
   useTransition,
   type CSSProperties,
-  type Dispatch,
   type FormEvent,
   type ReactNode,
-  type SetStateAction,
 } from 'react'
 import Link from 'next/link'
 import {
-  BookOpen,
   Globe,
-  Layers3,
   Package,
   PencilLine,
   Plus,
@@ -31,9 +27,7 @@ import {
   createStoreAction,
   rejectOrderPaymentAction,
   retryOrderErpSyncAction,
-  saveAccessPackageAction,
   saveProductVariantAction,
-  saveProductEntitlementsAction,
   saveStoreBasicsAction,
   saveStoreCatalogProductAction,
   saveStoreDomainAction,
@@ -53,6 +47,7 @@ import {
 import { formatDate, formatRupiah } from '@/lib/utils'
 import { PageHeader, SafeButton, SectionCard, SectionHeader, StatCard, StatusBadge } from '@/components/ui/NizamUI'
 import ThemeHomepageEditor from '@/app/(dashboard)/ecommerce/ThemeHomepageEditor'
+import CourseCommerceManager from '@/modules/ecommerce/components/CourseCommerceManager'
 
 type EcommerceAdminClientProps = {
   orgSlug: string
@@ -109,61 +104,6 @@ function buildVariantPreset(productId: string) {
     isActive: true,
     isDefault: false,
     isPublished: true,
-  }
-}
-
-type CourseSelectionState = Record<string, {
-  selected: boolean
-  durationValue: string
-  durationUnit: string
-}>
-
-function buildCourseSelectionState(
-  courses: Array<{
-    courseId: string
-    accessDurationValue: number | null
-    accessDurationUnit: string | null
-  }> = [],
-): CourseSelectionState {
-  return Object.fromEntries(courses.map((course) => [
-    course.courseId,
-    {
-      selected: true,
-      durationValue: course.accessDurationValue == null
-        ? ''
-        : String(course.accessDurationValue),
-      durationUnit: course.accessDurationUnit || 'DAY',
-    },
-  ]))
-}
-
-function serializeCourseSelections(state: CourseSelectionState) {
-  return Object.entries(state)
-    .filter(([, selection]) => selection.selected)
-    .map(([courseId, selection]) => ({
-      courseId,
-      accessDurationValue: selection.durationValue
-        ? Number(selection.durationValue)
-        : null,
-      accessDurationUnit: selection.durationValue
-        ? selection.durationUnit
-        : null,
-    }))
-}
-
-function buildAccessPackagePreset(
-  accessPackage?: EcommerceDashboardData['accessPackages'][number] | null,
-) {
-  return {
-    name: accessPackage?.name || '',
-    slug: accessPackage?.slug || '',
-    description: accessPackage?.description || '',
-    isActive: accessPackage?.isActive ?? true,
-    defaultDurationValue: accessPackage?.defaultAccessDurationValue == null
-      ? ''
-      : String(accessPackage.defaultAccessDurationValue),
-    defaultDurationUnit: accessPackage?.defaultAccessDurationUnit || 'MONTH',
-    courses: buildCourseSelectionState(accessPackage?.courses || []),
   }
 }
 
@@ -395,31 +335,11 @@ export default function EcommerceAdminClient({
   const [flash, setFlash] = useState<FlashState>(null)
   const initialStoreId = dashboardData.stores[0]?.id || ''
   const initialProduct = dashboardData.products[0] || null
-  const initialStoreProduct = dashboardData.storeProducts.find((item) => (
-    item.storeId === initialStoreId
-    && item.productId === initialProduct?.id
-  )) || null
-  const initialEntitlement = dashboardData.productEntitlements.find((item) => (
-    item.storeProductId === initialStoreProduct?.id
-  )) || null
-  const initialAccessPackage = dashboardData.accessPackages[0] || null
   const [selectedStoreId, setSelectedStoreId] = useState(initialStoreId)
   const [selectedProductId, setSelectedProductId] = useState(initialProduct?.id || '')
   const [selectedVariantProductId, setSelectedVariantProductId] = useState(initialProduct?.id || '')
   const [catalogForm, setCatalogForm] = useState(() => buildCatalogPreset(initialProduct))
   const [variantForm, setVariantForm] = useState(() => buildVariantPreset(initialProduct?.id || ''))
-  const [directCourseSelections, setDirectCourseSelections] = useState<CourseSelectionState>(
-    () => buildCourseSelectionState(initialEntitlement?.directCourses || []),
-  )
-  const [selectedAccessPackageIds, setSelectedAccessPackageIds] = useState<string[]>(
-    initialEntitlement?.packageIds || [],
-  )
-  const [selectedAccessPackageId, setSelectedAccessPackageId] = useState(
-    initialAccessPackage?.id || '',
-  )
-  const [accessPackageForm, setAccessPackageForm] = useState(
-    () => buildAccessPackagePreset(initialAccessPackage),
-  )
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({})
   const [orderSearch, setOrderSearch] = useState('')
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL')
@@ -466,28 +386,6 @@ export default function EcommerceAdminClient({
     () => dashboardData.products.find((product) => product.id === selectedProductId) || null,
     [dashboardData.products, selectedProductId]
   )
-  const selectedStoreProduct = useMemo(
-    () => dashboardData.storeProducts.find((item) => (
-      item.storeId === selectedStoreId
-      && item.productId === selectedProductId
-    )) || null,
-    [dashboardData.storeProducts, selectedProductId, selectedStoreId],
-  )
-  const selectedAccessPackage = useMemo(
-    () => dashboardData.accessPackages.find((item) => item.id === selectedAccessPackageId) || null,
-    [dashboardData.accessPackages, selectedAccessPackageId],
-  )
-  const resolvedBenefitCourseIds = useMemo(() => {
-    const ids = new Set(
-      serializeCourseSelections(directCourseSelections).map((course) => course.courseId),
-    )
-    dashboardData.accessPackages
-      .filter((accessPackage) => selectedAccessPackageIds.includes(accessPackage.id))
-      .forEach((accessPackage) => {
-        accessPackage.courses.forEach((course) => ids.add(course.courseId))
-      })
-    return [...ids]
-  }, [dashboardData.accessPackages, directCourseSelections, selectedAccessPackageIds])
   const orderEventsByOrderId = useMemo(() => {
     const grouped = new Map<string, EcommerceDashboardData['orderEvents']>()
     dashboardData.orderEvents.forEach((event) => {
@@ -640,54 +538,17 @@ export default function EcommerceAdminClient({
 
   function applyStoreSelection(nextStoreId: string) {
     setSelectedStoreId(nextStoreId)
-    const storeProduct = dashboardData.storeProducts.find((item) => (
-      item.storeId === nextStoreId && item.productId === selectedProductId
-    ))
-    const entitlement = dashboardData.productEntitlements.find((item) => (
-      item.storeProductId === storeProduct?.id
-    ))
-    setDirectCourseSelections(buildCourseSelectionState(entitlement?.directCourses || []))
-    setSelectedAccessPackageIds(entitlement?.packageIds || [])
   }
 
   function applyProductSelection(nextProductId: string) {
     setSelectedProductId(nextProductId)
     const product = dashboardData.products.find((item) => item.id === nextProductId) || null
     setCatalogForm(buildCatalogPreset(product))
-    const storeProduct = dashboardData.storeProducts.find((item) => (
-      item.storeId === selectedStoreId && item.productId === nextProductId
-    ))
-    const entitlement = dashboardData.productEntitlements.find((item) => (
-      item.storeProductId === storeProduct?.id
-    ))
-    setDirectCourseSelections(buildCourseSelectionState(entitlement?.directCourses || []))
-    setSelectedAccessPackageIds(entitlement?.packageIds || [])
   }
 
   function applyVariantProductSelection(nextProductId: string) {
     setSelectedVariantProductId(nextProductId)
     setVariantForm(buildVariantPreset(nextProductId))
-  }
-
-  function applyAccessPackageSelection(packageId: string) {
-    setSelectedAccessPackageId(packageId)
-    const accessPackage = dashboardData.accessPackages.find((item) => item.id === packageId) || null
-    setAccessPackageForm(buildAccessPackagePreset(accessPackage))
-  }
-
-  function toggleCourseSelection(
-    setter: Dispatch<SetStateAction<CourseSelectionState>>,
-    courseId: string,
-    checked: boolean,
-  ) {
-    setter((current) => ({
-      ...current,
-      [courseId]: {
-        selected: checked,
-        durationValue: current[courseId]?.durationValue || '',
-        durationUnit: current[courseId]?.durationUnit || 'DAY',
-      },
-    }))
   }
 
   async function handleAction(
@@ -1306,402 +1167,13 @@ export default function EcommerceAdminClient({
         </SectionCard>
       )}
       {visibleActiveTab === 'katalog' && selectedStore && (
-        <div className="grid gap-8 xl:grid-cols-2">
-          <SectionCard>
-            <SectionHeader
-              title="Manfaat Digital Produk"
-              subtitle="Satu produk boleh memberikan banyak course langsung dan beberapa paket akses sekaligus."
-              icon={BookOpen}
-            />
-            <form
-              onSubmit={(event) => {
-                event.preventDefault()
-                if (!selectedStoreProduct) {
-                  setFlash({
-                    tone: 'error',
-                    text: 'Simpan publikasi produk terlebih dahulu sebelum mengatur course.',
-                  })
-                  return
-                }
-                const formData = new FormData()
-                formData.set('store_product_id', selectedStoreProduct.id)
-                formData.set(
-                  'direct_courses',
-                  JSON.stringify(serializeCourseSelections(directCourseSelections)),
-                )
-                formData.set('package_ids', JSON.stringify(selectedAccessPackageIds))
-                appendStoreContext(formData)
-                void handleAction(
-                  saveProductEntitlementsAction,
-                  formData,
-                  'Manfaat course produk berhasil disimpan.',
-                )
-              }}
-              className="space-y-6 px-6 py-6 sm:px-8"
-            >
-              {!selectedStoreProduct && (
-                <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
-                  Produk ini belum dipublikasikan ke store. Simpan produk pada form katalog terlebih dahulu.
-                </div>
-              )}
-              <fieldset>
-                <legend className="text-sm font-bold text-slate-900">Course langsung</legend>
-                <p className="mt-1 text-sm text-slate-600">
-                  Durasi kosong berarti akses permanen. Course yang juga ada di paket hanya diberikan satu kali.
-                </p>
-                <div className="mt-4 max-h-[420px] space-y-3 overflow-y-auto pr-1">
-                  {dashboardData.learningCourses.map((course) => {
-                    const selection = directCourseSelections[course.id]
-                    const checked = Boolean(selection?.selected)
-                    return (
-                      <div key={course.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <label className="flex min-h-11 cursor-pointer items-center gap-3 font-semibold text-slate-900">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(event) => toggleCourseSelection(
-                              setDirectCourseSelections,
-                              course.id,
-                              event.target.checked,
-                            )}
-                            className="size-4 accent-blue-700"
-                          />
-                          <span className="min-w-0 truncate">{course.title}</span>
-                        </label>
-                        {checked && (
-                          <div className="mt-3 grid gap-2 pl-7 sm:grid-cols-2">
-                            <input
-                              type="number"
-                              min="1"
-                              value={selection?.durationValue || ''}
-                              onChange={(event) => setDirectCourseSelections((current) => ({
-                                ...current,
-                                [course.id]: {
-                                  selected: true,
-                                  durationValue: event.target.value,
-                                  durationUnit: current[course.id]?.durationUnit || 'DAY',
-                                },
-                              }))}
-                              placeholder="Durasi (kosong = permanen)"
-                              aria-label={`Durasi akses ${course.title}`}
-                              className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                            />
-                            <select
-                              value={selection?.durationUnit || 'DAY'}
-                              onChange={(event) => setDirectCourseSelections((current) => ({
-                                ...current,
-                                [course.id]: {
-                                  selected: true,
-                                  durationValue: current[course.id]?.durationValue || '',
-                                  durationUnit: event.target.value,
-                                },
-                              }))}
-                              aria-label={`Satuan durasi ${course.title}`}
-                              className="min-h-11 cursor-pointer rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                            >
-                              <option value="HOUR">Jam</option>
-                              <option value="DAY">Hari</option>
-                              <option value="WEEK">Minggu</option>
-                              <option value="MONTH">Bulan</option>
-                              <option value="YEAR">Tahun</option>
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend className="text-sm font-bold text-slate-900">Paket akses tambahan</legend>
-                <div className="mt-3 grid gap-3">
-                  {dashboardData.accessPackages.length === 0 && (
-                    <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">
-                      Belum ada paket akses. Buat paket pada panel di sebelahnya.
-                    </p>
-                  )}
-                  {dashboardData.accessPackages.map((accessPackage) => (
-                    <label
-                      key={accessPackage.id}
-                      className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 transition-colors duration-200 hover:border-blue-300 focus-within:ring-4 focus-within:ring-blue-100"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedAccessPackageIds.includes(accessPackage.id)}
-                        onChange={(event) => setSelectedAccessPackageIds((current) => (
-                          event.target.checked
-                            ? [...new Set([...current, accessPackage.id])]
-                            : current.filter((id) => id !== accessPackage.id)
-                        ))}
-                        className="mt-1 size-4 accent-blue-700"
-                      />
-                      <span>
-                        <span className="block font-semibold text-slate-900">{accessPackage.name}</span>
-                        <span className="mt-1 block text-sm text-slate-600">
-                          {accessPackage.courses.length} course · versi {accessPackage.version}
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                <div className="flex items-center gap-2 font-bold text-emerald-900">
-                  <Layers3 aria-hidden="true" size={18} />
-                  Hasil akhir: {resolvedBenefitCourseIds.length} course
-                </div>
-                <p className="mt-2 text-sm leading-6 text-emerald-800">
-                  {resolvedBenefitCourseIds
-                    .map((id) => dashboardData.learningCourses.find((course) => course.id === id)?.title)
-                    .filter(Boolean)
-                    .join(', ') || 'Belum ada course dipilih.'}
-                </p>
-              </div>
-              <div className="flex justify-end">
-                <SafeButton type="submit" isLoading={isPending} disabled={!selectedStoreProduct}>
-                  Simpan Manfaat Digital
-                </SafeButton>
-              </div>
-            </form>
-          </SectionCard>
-
-          <SectionCard>
-            <SectionHeader
-              title="Pengelola Paket Akses"
-              subtitle="Paket aktif pada subscription mengikuti perubahan course dan seluruh dampaknya diaudit."
-              icon={Layers3}
-            />
-            <form
-              onSubmit={(event) => {
-                event.preventDefault()
-                const formData = new FormData()
-                if (selectedAccessPackageId) {
-                  formData.set('package_id', selectedAccessPackageId)
-                }
-                formData.set('name', accessPackageForm.name)
-                formData.set('slug', accessPackageForm.slug)
-                formData.set('description', accessPackageForm.description)
-                formData.set('is_active', String(accessPackageForm.isActive))
-                formData.set(
-                  'default_access_duration_value',
-                  accessPackageForm.defaultDurationValue,
-                )
-                formData.set(
-                  'default_access_duration_unit',
-                  accessPackageForm.defaultDurationUnit,
-                )
-                formData.set(
-                  'courses',
-                  JSON.stringify(serializeCourseSelections(accessPackageForm.courses)),
-                )
-                appendStoreContext(formData)
-                void handleAction(
-                  saveAccessPackageAction,
-                  formData,
-                  selectedAccessPackageId
-                    ? 'Paket akses dan membership aktif berhasil diselaraskan.'
-                    : 'Paket akses berhasil dibuat.',
-                )
-              }}
-              className="space-y-5 px-6 py-6 sm:px-8"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <select
-                  value={selectedAccessPackageId}
-                  onChange={(event) => applyAccessPackageSelection(event.target.value)}
-                  className="min-h-11 flex-1 cursor-pointer rounded-xl border border-slate-300 bg-white px-4 font-semibold outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                >
-                  <option value="">Paket baru</option>
-                  {dashboardData.accessPackages.map((accessPackage) => (
-                    <option key={accessPackage.id} value={accessPackage.id}>
-                      {accessPackage.name} · v{accessPackage.version}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => applyAccessPackageSelection('')}
-                  className="min-h-11 cursor-pointer rounded-xl border border-slate-300 bg-white px-4 font-semibold text-slate-700 transition-colors duration-200 hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
-                >
-                  Paket baru
-                </button>
-              </div>
-              {selectedAccessPackage && selectedAccessPackage.activeSubscriptionMembers > 0 && (
-                <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                  Perubahan paket ini memengaruhi {selectedAccessPackage.activeSubscriptionMembers} membership subscription aktif. Akses dari pembelian atau sumber lain tetap aman.
-                </div>
-              )}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-sm font-semibold text-slate-700">
-                  Nama paket
-                  <input
-                    required
-                    value={accessPackageForm.name}
-                    onChange={(event) => setAccessPackageForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))}
-                    className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 px-4 font-normal outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                  />
-                </label>
-                <label className="text-sm font-semibold text-slate-700">
-                  Slug
-                  <input
-                    value={accessPackageForm.slug}
-                    onChange={(event) => setAccessPackageForm((current) => ({
-                      ...current,
-                      slug: event.target.value,
-                    }))}
-                    className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 px-4 font-mono font-normal outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                  />
-                </label>
-              </div>
-              <label className="block text-sm font-semibold text-slate-700">
-                Deskripsi
-                <textarea
-                  rows={3}
-                  value={accessPackageForm.description}
-                  onChange={(event) => setAccessPackageForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))}
-                  className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                />
-              </label>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="text-sm font-semibold text-slate-700">
-                  Durasi default
-                  <input
-                    type="number"
-                    min="1"
-                    value={accessPackageForm.defaultDurationValue}
-                    onChange={(event) => setAccessPackageForm((current) => ({
-                      ...current,
-                      defaultDurationValue: event.target.value,
-                    }))}
-                    placeholder="Permanen"
-                    className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 px-4 font-normal outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                  />
-                </label>
-                <label className="text-sm font-semibold text-slate-700">
-                  Satuan
-                  <select
-                    value={accessPackageForm.defaultDurationUnit}
-                    onChange={(event) => setAccessPackageForm((current) => ({
-                      ...current,
-                      defaultDurationUnit: event.target.value,
-                    }))}
-                    className="mt-2 min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-4 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                  >
-                    <option value="HOUR">Jam</option>
-                    <option value="DAY">Hari</option>
-                    <option value="WEEK">Minggu</option>
-                    <option value="MONTH">Bulan</option>
-                    <option value="YEAR">Tahun</option>
-                  </select>
-                </label>
-                <label className="text-sm font-semibold text-slate-700">
-                  Status
-                  <select
-                    value={String(accessPackageForm.isActive)}
-                    onChange={(event) => setAccessPackageForm((current) => ({
-                      ...current,
-                      isActive: event.target.value === 'true',
-                    }))}
-                    className="mt-2 min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-4 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                  >
-                    <option value="true">Aktif</option>
-                    <option value="false">Nonaktif</option>
-                  </select>
-                </label>
-              </div>
-              <fieldset>
-                <legend className="text-sm font-bold text-slate-900">Course dalam paket</legend>
-                <div className="mt-3 max-h-[420px] space-y-3 overflow-y-auto pr-1">
-                  {dashboardData.learningCourses.map((course) => {
-                    const selection = accessPackageForm.courses[course.id]
-                    const checked = Boolean(selection?.selected)
-                    return (
-                      <div key={course.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <label className="flex min-h-11 cursor-pointer items-center gap-3 font-semibold text-slate-900">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(event) => setAccessPackageForm((current) => ({
-                              ...current,
-                              courses: {
-                                ...current.courses,
-                                [course.id]: {
-                                  selected: event.target.checked,
-                                  durationValue: current.courses[course.id]?.durationValue || '',
-                                  durationUnit: current.courses[course.id]?.durationUnit || 'DAY',
-                                },
-                              },
-                            }))}
-                            className="size-4 accent-blue-700"
-                          />
-                          {course.title}
-                        </label>
-                        {checked && (
-                          <div className="mt-3 grid gap-2 pl-7 sm:grid-cols-2">
-                            <input
-                              type="number"
-                              min="1"
-                              value={selection?.durationValue || ''}
-                              onChange={(event) => setAccessPackageForm((current) => ({
-                                ...current,
-                                courses: {
-                                  ...current.courses,
-                                  [course.id]: {
-                                    selected: true,
-                                    durationValue: event.target.value,
-                                    durationUnit: current.courses[course.id]?.durationUnit || 'DAY',
-                                  },
-                                },
-                              }))}
-                              placeholder="Kosong = pakai default"
-                              aria-label={`Override durasi ${course.title}`}
-                              className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                            />
-                            <select
-                              value={selection?.durationUnit || 'DAY'}
-                              onChange={(event) => setAccessPackageForm((current) => ({
-                                ...current,
-                                courses: {
-                                  ...current.courses,
-                                  [course.id]: {
-                                    selected: true,
-                                    durationValue: current.courses[course.id]?.durationValue || '',
-                                    durationUnit: event.target.value,
-                                  },
-                                },
-                              }))}
-                              aria-label={`Satuan override ${course.title}`}
-                              className="min-h-11 cursor-pointer rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                            >
-                              <option value="HOUR">Jam</option>
-                              <option value="DAY">Hari</option>
-                              <option value="WEEK">Minggu</option>
-                              <option value="MONTH">Bulan</option>
-                              <option value="YEAR">Tahun</option>
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </fieldset>
-              <div className="flex justify-end">
-                <SafeButton type="submit" isLoading={isPending}>
-                  {selectedAccessPackageId ? 'Simpan dan Sinkronkan' : 'Buat Paket'}
-                </SafeButton>
-              </div>
-            </form>
-          </SectionCard>
-        </div>
+        <CourseCommerceManager
+          key={`${selectedStoreId}:${selectedProductId}`}
+          orgSlug={orgSlug}
+          dashboardData={dashboardData}
+          initialStoreId={selectedStoreId}
+          initialProductId={selectedProductId}
+        />
       )}
       {visibleActiveTab === 'theme' && selectedStore && (
         <ThemeHomepageEditor

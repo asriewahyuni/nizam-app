@@ -25,6 +25,7 @@ function revalidateStorePaths(formData: FormData) {
   const storeSlug = String(formData.get('store_slug') || '').trim()
 
   revalidatePath('/ecommerce')
+  revalidatePath('/lms/admin/penjualan')
 
   if (orgSlug && storeSlug) {
     revalidatePath(`/toko/${orgSlug}/${storeSlug}`)
