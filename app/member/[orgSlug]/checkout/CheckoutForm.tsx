@@ -253,7 +253,7 @@ export default function CheckoutForm({
         </div>
         <div className="mt-5 flex gap-3 rounded-xl bg-emerald-900/70 p-4 text-sm leading-6 text-emerald-100">
           <ShieldCheck aria-hidden="true" className="mt-0.5 shrink-0" size={19} />
-          Pembayaran, akses kelas, dan pencatatan ERP diproses dengan kunci anti-duplikat.
+          Pembayaran aman
         </div>
 
         {state.error && (
