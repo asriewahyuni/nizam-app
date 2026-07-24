@@ -143,6 +143,7 @@ export async function quickPublishStoreProductAction(formData: FormData) {
 
     if (insertErr) return { success: false, error: 'Gagal menayangkan produk: ' + insertErr.message }
 
+    revalidatePath('/lms/admin/penjualan')
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || 'Unknown error' }
