@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation'
 import { BookOpen, ExternalLink, Layers3, PackageCheck, ShoppingCart } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getEcommerceDashboardData } from '@/modules/ecommerce/lib/ecommerce.server'
-import CourseCommerceManager from '@/modules/ecommerce/components/CourseCommerceManager'
+import LmsSimpleSalesManager from './LmsSimpleSalesManager'
 import { LmsCommerceSetupButton } from './LmsCommerceSetupButton'
 
 export const metadata = {
@@ -82,14 +82,6 @@ export default async function LmsCourseCommercePage() {
         </div>
       </header>
 
-      <div
-        role="status"
-        className="rounded-xl border border-indigo-200 bg-indigo-50 px-5 py-4 text-sm leading-6 text-indigo-950"
-      >
-        Halaman ini dan E-Commerce memakai satu sumber data. Perubahan dari salah satu halaman
-        langsung berlaku pada halaman lainnya dan pada checkout member.
-      </div>
-
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (
           <section
@@ -115,11 +107,7 @@ export default async function LmsCourseCommercePage() {
       {dashboardData.stores.length === 0 ? (
         <LmsCommerceSetupButton />
       ) : (
-        <CourseCommerceManager
-          orgSlug={String(orgData.org.slug || orgData.org.id)}
-          dashboardData={dashboardData}
-          showContextSelector
-        />
+        <LmsSimpleSalesManager dashboardData={dashboardData} />
       )}
     </div>
   )
