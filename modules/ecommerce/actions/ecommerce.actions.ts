@@ -109,3 +109,42 @@ export async function retryOrderErpSyncAction(formData: FormData) {
 export async function rejectOrderPaymentAction(formData: FormData) {
   return runAction(formData, rejectOrderPayment)
 }
+
+
+import { createClient } from '@/lib/supabase/server'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+
+export async function quickPublishStoreProductAction(formData: FormData) {
+  try {
+    const orgData = await getActiveOrg()
+    if (!orgData) return { success: false, error: 'Anda harus masuk terlebih dahulu.' }
+
+    const storeId = formData.get('store_id')?.toString()
+    const productId = formData.get('product_id')?.toString()
+    const price = Number(formData.get('price') || 0)
+
+    if (!storeId || !productId) return { success: false, error: 'Store dan produk wajib dipilih.' }
+
+    const supabase = await createClient()
+    const orgId = orgData.org.id
+
+    const { data: prod } = await supabase.from('products').select('name').eq('id', productId).eq('org_id', orgId).single()
+    if (!prod) return { success: false, error: 'Produk tidak ditemukan di katalog.' }
+
+    const { error: insertErr } = await supabase.from('store_products').insert({
+      org_id: orgId,
+      store_id: storeId,
+      product_id: productId,
+      public_name: prod.name,
+      public_slug: 'p-' + Math.random().toString(36).substring(2, 8),
+      price_override: price,
+      is_published: true
+    })
+
+    if (insertErr) return { success: false, error: 'Gagal menayangkan produk: ' + insertErr.message }
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Unknown error' }
+  }
+}
