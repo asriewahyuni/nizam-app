@@ -167,7 +167,7 @@ export async function quickCreateLmsProductAction(formData: FormData) {
       name,
       sku: 'LMS-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
       type: 'DIGITAL',
-      base_price: 0,
+      selling_price: 0,
       is_active: true
     }).select('id').single()
 
