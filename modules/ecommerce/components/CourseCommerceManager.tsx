@@ -369,9 +369,9 @@ export default function CourseCommerceManager({
               </div>
             )}
             <fieldset>
-              <legend className="text-sm font-bold text-slate-900">Course langsung</legend>
+              <legend className="text-sm font-bold text-slate-900">Akses Kelas Individual</legend>
               <p className="mt-1 text-sm text-slate-600">
-                Durasi kosong berarti akses permanen. Course yang juga ada di paket hanya diberikan satu kali.
+                Pilih kelas yang akan langsung didapatkan oleh pembeli produk ini. Durasi kosong berarti akses permanen.
               </p>
               <div className="mt-4 max-h-[420px] space-y-3 overflow-y-auto pr-1">
                 {dashboardData.learningCourses.length === 0 && (
@@ -443,7 +443,7 @@ export default function CourseCommerceManager({
             </fieldset>
 
             <fieldset>
-              <legend className="text-sm font-bold text-slate-900">Paket akses tambahan</legend>
+              <legend className="text-sm font-bold text-slate-900">Akses via Bundel / Paket</legend>
               <div className="mt-3 grid gap-3">
                 {dashboardData.accessPackages.length === 0 && (
                   <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">
@@ -663,7 +663,7 @@ export default function CourseCommerceManager({
               </label>
             </div>
             <fieldset>
-              <legend className="text-sm font-bold text-slate-900">Course dalam paket</legend>
+              <legend className="text-sm font-bold text-slate-900">Pilih Kelas untuk Paket Ini</legend>
               <div className="mt-3 max-h-[420px] space-y-3 overflow-y-auto pr-1">
                 {dashboardData.learningCourses.length === 0 && (
                   <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">
