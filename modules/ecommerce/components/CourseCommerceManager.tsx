@@ -16,9 +16,11 @@ import {
 } from 'lucide-react'
 import {
 
+
   saveAccessPackageAction,
   saveProductEntitlementsAction,
-  quickPublishStoreProductAction
+  quickPublishStoreProductAction,
+  quickCreateLmsProductAction
 
 } from '@/modules/ecommerce/actions/ecommerce.actions'
 import type { EcommerceDashboardData } from '@/modules/ecommerce/lib/ecommerce'
@@ -286,9 +288,30 @@ export default function CourseCommerceManager({
                 ))}
               </select>
             </label>
-            <label className="text-sm font-semibold text-slate-700">
-              Produk
+            <div className="text-sm font-semibold text-slate-700">
+              <div className="flex items-center justify-between">
+                <label htmlFor="select-product">Produk</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const name = window.prompt('Masukkan nama produk baru:')
+                    if (name) {
+                      const fd = new FormData()
+                      fd.set('name', name)
+                      runAction(quickCreateLmsProductAction, fd, 'Produk berhasil dibuat.', (res) => {
+                        if (res.data && typeof res.data === 'object' && 'productId' in res.data) {
+                           applySalesContext(selectedStoreId, res.data.productId as string)
+                        }
+                      })
+                    }
+                  }}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline focus:outline-none"
+                >
+                  + Buat Baru
+                </button>
+              </div>
               <select
+                id="select-product"
                 value={selectedProductId}
                 onChange={(event) => applySalesContext(selectedStoreId, event.target.value)}
                 className="mt-2 min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-4 outline-none transition-colors duration-200 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100"
@@ -300,7 +323,7 @@ export default function CourseCommerceManager({
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -335,7 +358,7 @@ export default function CourseCommerceManager({
       <div className="grid gap-8 xl:grid-cols-2">
         <SectionCard>
           <SectionHeader
-            title="Manfaat Digital Produk"
+            title="Digital Produk"
             subtitle="Satu produk boleh memberikan banyak course langsung dan beberapa paket akses sekaligus."
             icon={BookOpen}
           />
@@ -532,7 +555,7 @@ export default function CourseCommerceManager({
                 disabled={!selectedStoreProduct}
                 className="min-h-11"
               >
-                Simpan Manfaat Digital
+                Simpan Produk Digital
               </SafeButton>
             </div>
           </form>
