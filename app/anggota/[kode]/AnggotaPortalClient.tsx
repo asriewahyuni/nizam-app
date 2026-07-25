@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import {
   Wallet, Briefcase, Bell, LogOut, TrendingUp,
@@ -8,11 +8,13 @@ import {
   Star, GraduationCap, FileText, Send, Upload, XCircle,
   ChevronDown, ChevronUp, AlertCircle, Home,
   Heart, Coins, Clock, Users, BadgeCheck, Scale, Banknote, TrendingDown,
+  Loader2, MessageCircle,
 } from 'lucide-react'
 import {
   createProyek, updateStatusPenawaran, createPembiayaan, toggleMinatProyek, batalkanPembiayaan,
+  getProyekDiskusi, kirimPesanDiskusi,
   type KojasmatAnggota, type KojasmatProyek, type KojasmatSimpanan,
-  type KojasmatPenawaran, type KojasmatPembiayaan, type KojasmatPelatihanTerjadwal,
+  type KojasmatPenawaran, type KojasmatPembiayaan, type KojasmatPelatihanTerjadwal, type KojasmatProyekDiskusi,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
   kirimLaporanProyek, simpanDokumen, hapusDokumen, getDokumenByRef,
@@ -595,6 +597,83 @@ function LaporanInvestorPanel({ proyekId, porsiPct }: { proyekId: string; porsiP
       personalAmount={potensiSayaRp}
       personalNote="Estimasi potensi bagi hasil berdasarkan laba bersih saat ini — bukan jaminan hasil aktual."
     />
+  )
+}
+
+function DiskusiPanel({ orgId, proyekId, anggotaNama }: { orgId: string; proyekId: string; anggotaNama: string }) {
+  const [pesan, setPesan] = useState('')
+  const [diskusi, setDiskusi] = useState<KojasmatProyekDiskusi[]>([])
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+
+  const fetchDiskusi = useCallback(async () => {
+    const res = await getProyekDiskusi(proyekId)
+    setDiskusi(res)
+    setLoading(false)
+  }, [proyekId])
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    fetchDiskusi().then(() => {
+      interval = setInterval(fetchDiskusi, 5000)
+    })
+    return () => clearInterval(interval)
+  }, [fetchDiskusi])
+
+  async function handleSend() {
+    if (!pesan.trim() || sending) return
+    setSending(true)
+    const res = await kirimPesanDiskusi({ org_id: orgId, proyek_id: proyekId, pesan })
+    if (res.data) {
+      setPesan('')
+      await fetchDiskusi()
+    }
+    setSending(false)
+  }
+
+  if (loading) return <div className="py-6 text-center text-xs text-gray-400">Memuat diskusi...</div>
+
+  return (
+    <div className="rounded-xl border border-gray-200 overflow-hidden flex flex-col mt-4">
+      <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center gap-2">
+        <MessageCircle className="h-4 w-4 text-gray-500" />
+        <span className="text-xs font-semibold text-gray-700">Ruang Diskusi (Pemodal & Pengurus)</span>
+      </div>
+      <div className="p-4 bg-white max-h-64 overflow-y-auto space-y-4">
+        {diskusi.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-4">Belum ada diskusi.</p>
+        ) : (
+          diskusi.map(d => (
+            <div key={d.id} className="text-sm">
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="font-semibold text-gray-800 text-xs">{d.actor_name}</span>
+                <span className="text-[10px] text-gray-400">
+                  {new Date(d.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <p className="text-gray-700 bg-gray-50 p-2.5 rounded-xl rounded-tl-none inline-block">{d.pesan}</p>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="p-3 bg-gray-50 border-t border-gray-200 flex gap-2">
+        <input 
+          type="text" 
+          value={pesan} 
+          onChange={e => setPesan(e.target.value)} 
+          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          placeholder="Tulis pesan..." 
+          className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+        />
+        <button 
+          onClick={handleSend} 
+          disabled={!pesan.trim() || sending}
+          className="rounded-xl bg-emerald-600 px-3 py-2 text-white hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -1545,6 +1624,7 @@ function TabInvestasi({
                       </div>
                     )}
                     <LaporanInvestorPanel proyekId={pm.proyek_id} porsiPct={Number(pm.porsi_pct)} />
+                    <DiskusiPanel orgId={anggota.org_id} proyekId={pm.proyek_id} anggotaNama={anggota.nama} />
                   </div>
                 )}
               </div>

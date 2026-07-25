@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useTransition, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import {
   Users, Briefcase, Wallet, GraduationCap, LayoutDashboard,
@@ -9,7 +9,7 @@ import {
   TrendingUp, Banknote, Star, Clock, FileText,
   AlertTriangle, ClipboardList, Eye, Link2, ExternalLink,
   BookOpen, ArrowDownCircle, X, Copy, Check, Pencil, Trash2, Upload, FolderOpen,
-  TrendingDown, Scale, Loader2, CalendarClock, FileSignature, History, Lock,
+  TrendingDown, Scale, Loader2, CalendarClock, FileSignature, History, Lock, MessageCircle,
 } from 'lucide-react'
 import {
   createAnggota, updateAnggota,
@@ -23,7 +23,8 @@ import {
   createPelatihan, daftarPesertaPelatihan, getPesertaPelatihan, luluskanPeserta,
   type KojasmatAnggota, type KojasmatProyek, type KojasmatPelatihan, type KojasmatStats,
   type KojasmatSimpanan, type KojasmatSimpananMutasi,
-  type KojasmatAkad, type KojasmatProyekHistory,
+  type KojasmatAkad, type KojasmatProyekHistory, type KojasmatProyekDiskusi,
+  getProyekDiskusi, kirimPesanDiskusi,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
   setujuiPendaftaran, tolakPendaftaran, mintaRevisiPendaftaran,
@@ -1227,6 +1228,86 @@ function DetailProyekPanel({ proyek }: { proyek: KojasmatProyek }) {
 
       <DaftarPemodalPanel proyekId={proyek.id} />
       <RiwayatProyekPanel proyekId={proyek.id} />
+      {proyek.status !== 'DRAFT' && proyek.status !== 'DISETUJUI' && (
+        <DiskusiPanel orgId={proyek.org_id} proyekId={proyek.id} />
+      )}
+    </div>
+  )
+}
+
+function DiskusiPanel({ orgId, proyekId }: { orgId: string; proyekId: string }) {
+  const [pesan, setPesan] = useState('')
+  const [diskusi, setDiskusi] = useState<KojasmatProyekDiskusi[]>([])
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+
+  const fetchDiskusi = useCallback(async () => {
+    const res = await getProyekDiskusi(proyekId)
+    setDiskusi(res)
+    setLoading(false)
+  }, [proyekId])
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    fetchDiskusi().then(() => {
+      interval = setInterval(fetchDiskusi, 5000)
+    })
+    return () => clearInterval(interval)
+  }, [fetchDiskusi])
+
+  async function handleSend() {
+    if (!pesan.trim() || sending) return
+    setSending(true)
+    const res = await kirimPesanDiskusi({ org_id: orgId, proyek_id: proyekId, pesan })
+    if (res.data) {
+      setPesan('')
+      await fetchDiskusi()
+    }
+    setSending(false)
+  }
+
+  if (loading) return <div className="py-6 text-center text-xs text-gray-400">Memuat diskusi...</div>
+
+  return (
+    <div className="rounded-2xl border border-gray-200 overflow-hidden flex flex-col bg-white">
+      <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
+        <MessageCircle className="h-4 w-4 text-gray-500" />
+        <span className="text-sm font-semibold text-gray-700">Ruang Diskusi (Pemodal & Pengurus)</span>
+      </div>
+      <div className="p-4 bg-white max-h-80 overflow-y-auto space-y-4">
+        {diskusi.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">Belum ada diskusi.</p>
+        ) : (
+          diskusi.map(d => (
+            <div key={d.id} className="text-sm">
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="font-semibold text-gray-800 text-sm">{d.actor_name}</span>
+                <span className="text-xs text-gray-400">
+                  {new Date(d.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <p className="text-gray-700 bg-gray-50 p-3 rounded-2xl rounded-tl-none inline-block border border-gray-100">{d.pesan}</p>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="p-3 bg-gray-50 border-t border-gray-200 flex gap-2">
+        <input 
+          type="text" 
+          value={pesan} 
+          onChange={e => setPesan(e.target.value)} 
+          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          placeholder="Tulis balasan (sebagai Admin/Pengurus)..." 
+          className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 bg-white"
+        />
+        <button 
+          onClick={handleSend} 
+          disabled={!pesan.trim() || sending}
+          className="rounded-xl bg-sky-600 px-4 py-2 text-white hover:bg-sky-700 disabled:opacity-50 transition-colors"
+        >
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </button>
+      </div>
     </div>
   )
 }
@@ -1423,8 +1504,8 @@ function TabProyek({ orgId, proyek, anggota }: {
   const [modalAkad, setModalAkad] = useState<KojasmatProyek | null>(null)
   const [modalPenawaran, setModalPenawaran] = useState<KojasmatProyek | null>(null)
   const [reviewForm, setReviewForm] = useState<{ keputusan: 'DISETUJUI' | 'DITOLAK' | 'REVISI'; catatan: string }>({ keputusan: 'DISETUJUI', catatan: '' })
-  const [fundingForm, setFundingForm] = useState<{ funding_mulai: string; funding_selesai: string; funding_instruksi: string; target_modal_awal: string }>({
-    funding_mulai: new Date().toISOString().slice(0, 10), funding_selesai: '', funding_instruksi: '', target_modal_awal: '',
+  const [fundingForm, setFundingForm] = useState<{ funding_mulai: string; funding_selesai: string; funding_instruksi: string; target_modal_awal: string; published_at: string }>({
+    funding_mulai: new Date().toISOString().slice(0, 10), funding_selesai: '', funding_instruksi: '', target_modal_awal: '', published_at: ''
   })
   const [akadForm, setAkadForm] = useState<{ jadwal_akad: string; saksi_nama: string }>({ jadwal_akad: '', saksi_nama: '' })
   const [form, setForm] = useState<ProyekForm>(emptyProyekForm)
@@ -1485,6 +1566,7 @@ function TabProyek({ orgId, proyek, anggota }: {
         funding_selesai: fundingForm.funding_selesai,
         funding_instruksi: fundingForm.funding_instruksi || undefined,
         target_modal_awal: fundingForm.target_modal_awal ? Number(fundingForm.target_modal_awal) : undefined,
+        published_at: fundingForm.published_at ? (new Date(fundingForm.published_at)).toISOString() : undefined,
       })
       setModalFunding(null)
     })
@@ -2134,6 +2216,13 @@ function TabProyek({ orgId, proyek, anggota }: {
               <input type="number"
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                 value={fundingForm.target_modal_awal} onChange={e => setFundingForm(f => ({ ...f, target_modal_awal: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Waktu Rilis ke Publik (Opsional)</label>
+              <input type="datetime-local"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={fundingForm.published_at} onChange={e => setFundingForm(f => ({ ...f, published_at: e.target.value }))} />
+              <p className="text-[10px] text-gray-500 mt-1">Kosongkan jika ingin langsung dirilis saat statusnya menjadi Aktif.</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Instruksi Pendanaan</label>

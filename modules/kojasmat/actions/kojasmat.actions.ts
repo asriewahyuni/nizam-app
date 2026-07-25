@@ -96,6 +96,18 @@ export type KojasmatProyek = {
   is_berminat?: boolean
   sudah_dibiayai?: boolean
   jumlah_minat?: number
+  published_at?: string
+}
+
+export type KojasmatProyekDiskusi = {
+  id: string
+  org_id: string
+  proyek_id: string
+  actor_id: string
+  pesan: string
+  created_at: string
+  // joined fields
+  actor_name?: string
 }
 
 export type KojasmatProyekReview = {
@@ -759,6 +771,7 @@ export async function jadwalkanFunding(payload: {
   funding_selesai: string
   funding_instruksi?: string
   target_modal_awal?: number
+  published_at?: string
 }) {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
@@ -766,9 +779,9 @@ export async function jadwalkanFunding(payload: {
   const { rows } = await queryPostgres(
     `UPDATE kojasmat_proyek
      SET status='FUNDING_DIJADWALKAN', funding_mulai=$2, funding_selesai=$3,
-         funding_instruksi=$4, target_modal_awal=COALESCE($5, kebutuhan_modal), updated_at=NOW()
+         funding_instruksi=$4, target_modal_awal=COALESCE($5, kebutuhan_modal), published_at=COALESCE($6, published_at), updated_at=NOW()
      WHERE id=$1 AND status='DISETUJUI' RETURNING *`,
-    [payload.proyek_id, payload.funding_mulai, payload.funding_selesai, payload.funding_instruksi ?? null, payload.target_modal_awal ?? null]
+    [payload.proyek_id, payload.funding_mulai, payload.funding_selesai, payload.funding_instruksi ?? null, payload.target_modal_awal ?? null, payload.published_at ?? null]
   )
   if (!rows[0]) return { error: 'Proyek tidak dalam status Disetujui' }
 
@@ -782,14 +795,14 @@ export async function jadwalkanFunding(payload: {
   return { data: rows[0] as KojasmatProyek }
 }
 
-export async function bukaFunding(proyekId: string) {
+export async function bukaFunding(proyekId: string, published_at?: string) {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 
   const { rows } = await queryPostgres(
-    `UPDATE kojasmat_proyek SET status='FUNDING_AKTIF', funding_dibuka_at=NOW(), updated_at=NOW()
+    `UPDATE kojasmat_proyek SET status='FUNDING_AKTIF', funding_dibuka_at=NOW(), published_at=COALESCE($2, published_at), updated_at=NOW()
      WHERE id=$1 AND status='FUNDING_DIJADWALKAN' RETURNING *`,
-    [proyekId]
+    [proyekId, published_at ?? null]
   )
   if (!rows[0]) return { error: 'Proyek tidak dalam status Funding Dijadwalkan' }
 
@@ -960,55 +973,77 @@ export async function createPembiayaan(payload: {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 
-  const { rows: [proyek] } = await queryPostgres(
-    `SELECT * FROM kojasmat_proyek WHERE id=$1`,
-    [payload.proyek_id]
-  )
-  if (!proyek) return { error: 'Proyek tidak ditemukan' }
-  if (proyek.status !== 'FUNDING_AKTIF') return { error: 'Proyek tidak dalam status Funding Aktif' }
+  const client = await connectPostgresClient()
+  let resultRow: any = null
+  let proyekData: any = null
 
-  const sisa = Number(proyek.kebutuhan_modal) - Number(proyek.modal_terkumpul)
-  if (payload.jumlah > sisa) {
-    return { error: `Melebihi sisa kebutuhan (Rp ${sisa.toLocaleString('id-ID')})` }
+  try {
+    await client.query('BEGIN')
+
+    const { rows: proyekRows } = await client.query(
+      `SELECT * FROM kojasmat_proyek WHERE id=$1 FOR UPDATE`,
+      [payload.proyek_id]
+    )
+    proyekData = proyekRows[0]
+
+    if (!proyekData) throw new Error('Proyek tidak ditemukan')
+    if (proyekData.status !== 'FUNDING_AKTIF') throw new Error('Proyek tidak dalam status Funding Aktif')
+
+    const sisa = Number(proyekData.kebutuhan_modal) - Number(proyekData.modal_terkumpul)
+    if (payload.jumlah > sisa) {
+      throw new Error(`Melebihi sisa kebutuhan (Rp ${sisa.toLocaleString('id-ID')})`)
+    }
+
+    const porsiPct = (payload.jumlah / Number(proyekData.kebutuhan_modal)) * 100
+    const kehadiranAkad = payload.kehadiran_akad ?? 'SENDIRI'
+    const ujrahDiwakilkan = kehadiranAkad === 'DIWAKILKAN' ? Number(proyekData.ujrah_wakalah_akad ?? 0) : 0
+
+    const { rows } = await client.query(
+      `INSERT INTO kojasmat_pembiayaan (org_id, proyek_id, pemodal_id, jumlah, porsi_pct, kehadiran_akad, ujrah_diwakilkan)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [payload.org_id, payload.proyek_id, payload.pemodal_id, payload.jumlah, porsiPct, kehadiranAkad, ujrahDiwakilkan]
+    )
+    resultRow = rows[0]
+
+    const newModal = Number(proyekData.modal_terkumpul) + payload.jumlah
+    const tutupOtomatis = newModal >= Number(proyekData.kebutuhan_modal)
+    const newStatus = tutupOtomatis ? 'FUNDING_DITUTUP' : proyekData.status
+
+    await client.query(
+      `UPDATE kojasmat_proyek
+       SET modal_terkumpul=$2, status=$3, funding_ditutup_at=CASE WHEN $4 THEN NOW() ELSE funding_ditutup_at END, updated_at=NOW()
+       WHERE id=$1`,
+      [payload.proyek_id, newModal, newStatus, tutupOtomatis]
+    )
+
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    client.release()
+    return { error: error instanceof Error ? error.message : 'Terjadi kesalahan sistem' }
+  } finally {
+    if (client) client.release()
   }
 
-  const porsiPct = (payload.jumlah / Number(proyek.kebutuhan_modal)) * 100
-  const kehadiranAkad = payload.kehadiran_akad ?? 'SENDIRI'
-  const ujrahDiwakilkan = kehadiranAkad === 'DIWAKILKAN' ? Number(proyek.ujrah_wakalah_akad ?? 0) : 0
+  const ujrahDiwakilkan = payload.kehadiran_akad === 'DIWAKILKAN' ? Number(proyekData?.ujrah_wakalah_akad ?? 0) : 0
 
-  const { rows } = await queryPostgres(
-    `INSERT INTO kojasmat_pembiayaan (org_id, proyek_id, pemodal_id, jumlah, porsi_pct, kehadiran_akad, ujrah_diwakilkan)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-    [payload.org_id, payload.proyek_id, payload.pemodal_id, payload.jumlah, porsiPct, kehadiranAkad, ujrahDiwakilkan]
-  )
-
-  const newModal = Number(proyek.modal_terkumpul) + payload.jumlah
-  const tutupOtomatis = newModal >= Number(proyek.kebutuhan_modal)
-  const newStatus = tutupOtomatis ? 'FUNDING_DITUTUP' : proyek.status
-
-  await queryPostgres(
-    `UPDATE kojasmat_proyek
-     SET modal_terkumpul=$2, status=$3, funding_ditutup_at=CASE WHEN $4 THEN NOW() ELSE funding_ditutup_at END, updated_at=NOW()
-     WHERE id=$1`,
-    [payload.proyek_id, newModal, newStatus, tutupOtomatis]
-  )
 
   try {
     await jurnalPenerimaanDanaPemodal(
-      payload.org_id, proyek.jenis_akad as 'MUDHARABAH' | 'MURABAHAH' | 'INAN',
-      payload.jumlah, String(rows[0].id), String(proyek.kode_proyek),
+      payload.org_id, proyekData.jenis_akad as 'MUDHARABAH' | 'MURABAHAH' | 'INAN',
+      payload.jumlah, String(resultRow.id), String(proyekData.kode_proyek),
     )
     if (ujrahDiwakilkan > 0) {
-      if (proyek.jenis_akad === 'MURABAHAH') {
-        await jurnalUjrahMurabahah(payload.org_id, ujrahDiwakilkan, String(rows[0].id), String(proyek.kode_proyek))
+      if (proyekData.jenis_akad === 'MURABAHAH') {
+        await jurnalUjrahMurabahah(payload.org_id, ujrahDiwakilkan, String(resultRow.id), String(proyekData.kode_proyek))
       } else {
-        await jurnalUjrahMudharabah(payload.org_id, ujrahDiwakilkan, String(rows[0].id), String(proyek.kode_proyek))
+        await jurnalUjrahMudharabah(payload.org_id, ujrahDiwakilkan, String(resultRow.id), String(proyekData.kode_proyek))
       }
     }
   } catch (_) { /* jurnal non-fatal */ }
 
   revalidatePath('/kojasmat')
-  return { data: rows[0] as KojasmatPembiayaan }
+  return { data: resultRow }
 }
 
 export async function batalkanPembiayaan(pembiayaanId: string) {
@@ -1236,6 +1271,7 @@ export async function getProyekTersedia(
      WHERE p.org_id = $1
        AND p.status = 'FUNDING_AKTIF'
        AND p.pengaju_id != $2
+       AND (p.published_at IS NULL OR p.published_at <= NOW())
      GROUP BY p.id, a.nama
      ORDER BY
        -- Proyek yang diminati anggota ini duluan
@@ -1366,3 +1402,66 @@ export async function getKojasmatStats(orgId: string): Promise<KojasmatStats> {
     total_simpanan: 0, total_pembiayaan: 0,
   }) as KojasmatStats
 }
+
+// ─── DISKUSI PROYEK ─────────────────────────────────────────────────────────
+
+export async function getProyekDiskusi(proyekId: string): Promise<KojasmatProyekDiskusi[]> {
+  const session = await getInternalAuthSession()
+  if (!session) return []
+
+  // Ambil data anggota atau fallback ke info user admin
+  const { rows } = await queryPostgres(
+    `SELECT d.*, 
+            COALESCE(a.nama, u.email) AS actor_name
+     FROM kojasmat_proyek_diskusi d
+     LEFT JOIN internal_auth_users u ON u.id = d.actor_id
+     LEFT JOIN kojasmat_anggota a ON a.user_id = u.id
+     WHERE d.proyek_id = $1
+     ORDER BY d.created_at ASC`,
+    [proyekId]
+  )
+  return rows as KojasmatProyekDiskusi[]
+}
+
+export async function kirimPesanDiskusi(payload: { org_id: string; proyek_id: string; pesan: string }) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const actorId = getInternalUserId(session)
+  const role = await getActorRole(actorId, payload.org_id)
+  const isAdmin = role === 'owner' || role === 'admin' || role === 'manager'
+
+  // Pastikan actor adalah admin ATAU anggota yang mendanai proyek ini
+  if (!isAdmin) {
+    const { rows: anggota } = await queryPostgres(
+      `SELECT id FROM kojasmat_anggota WHERE user_id=$1 AND org_id=$2 LIMIT 1`,
+      [actorId, payload.org_id]
+    )
+    if (!anggota[0]) return { error: 'Anda bukan anggota koperasi ini' }
+
+    const { rows: pembiayaan } = await queryPostgres(
+      `SELECT id FROM kojasmat_pembiayaan WHERE pemodal_id=$1 AND proyek_id=$2 LIMIT 1`,
+      [anggota[0].id, payload.proyek_id]
+    )
+    if (!pembiayaan[0]) {
+      // Izinkan jika dia adalah pengaju proyek
+      const { rows: proyek } = await queryPostgres(`SELECT pengaju_id FROM kojasmat_proyek WHERE id=$1`, [payload.proyek_id])
+      if (proyek[0]?.pengaju_id !== anggota[0].id) {
+        return { error: 'Hanya admin, pengaju, dan pemodal yang dapat berdiskusi' }
+      }
+    }
+  }
+
+  const { rows } = await queryPostgres(
+    `INSERT INTO kojasmat_proyek_diskusi (org_id, proyek_id, actor_id, pesan)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [payload.org_id, payload.proyek_id, actorId, payload.pesan]
+  )
+
+  // TODO: Implement push notification and email sending to all other investors.
+  // For now, it will just show in the portal.
+
+  revalidatePath('/kojasmat')
+  return { data: rows[0] as KojasmatProyekDiskusi }
+}
+// [DUMMY IMPORT FIX UP] 
