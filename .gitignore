@@ -68,4 +68,4 @@ fix_*.js
 scratch/db-backups/
 .next
 .backups/
-docs/node_modules/*
+docs/node_modules
