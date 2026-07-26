@@ -185,7 +185,11 @@ function ProductCard({
         >
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 via-slate-950/5 to-transparent opacity-80 transition duration-300 group-hover:opacity-100" />
           <div className="absolute left-4 right-4 top-4 flex items-start justify-between gap-3">
-            {product.badgeText ? (
+            {product.subscriptionPlan ? (
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/95 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 shadow-sm">
+                <span>⭐ Paket • {product.subscriptionPlan.durationLabel}</span>
+              </div>
+            ) : product.badgeText ? (
               <div className="inline-flex rounded-full bg-white/92 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-700 shadow-sm">
                 {product.badgeText}
               </div>
@@ -194,10 +198,18 @@ function ProductCard({
             )}
             <div
               className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] shadow-sm ${
-                inStock ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                product.subscriptionPlan
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : inStock
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-rose-50 text-rose-700'
               }`}
             >
-              {inStock ? 'Siap kirim' : 'Habis'}
+              {product.subscriptionPlan
+                ? '⭐ Langganan Aktif'
+                : inStock
+                  ? 'Siap kirim'
+                  : 'Habis'}
             </div>
           </div>
         </div>
@@ -210,24 +222,35 @@ function ProductCard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
-          <span>{product.variants.length > 0 ? `${product.variants.length} varian` : 'Produk tunggal'}</span>
+          {product.subscriptionPlan ? (
+            <span className="font-extrabold text-amber-700">Akses Langganan {product.subscriptionPlan.durationLabel}</span>
+          ) : (
+            <span>{product.variants.length > 0 ? `${product.variants.length} varian` : 'Produk tunggal'}</span>
+          )}
           <span className="h-1 w-1 rounded-full bg-slate-300" />
           <span>{product.gallery.length > 0 ? `${product.gallery.length + 1} foto` : 'Foto utama tersedia'}</span>
         </div>
         <div className="flex items-end justify-between gap-4 border-t border-slate-100 pt-4">
           <div className="space-y-1">
-            <div className="text-2xl font-black tracking-tight text-slate-950">{formatRupiah(product.price)}</div>
+            <div className="text-2xl font-black tracking-tight text-slate-950">
+              {formatRupiah(product.price)}
+              {product.subscriptionPlan && (
+                <span className="ml-1 text-xs font-bold text-slate-500">/ {product.subscriptionPlan.durationLabel}</span>
+              )}
+            </div>
             {product.comparePrice > product.price && (
               <div className="text-xs font-bold text-slate-400 line-through">
                 {formatRupiah(product.comparePrice)}
               </div>
             )}
-            <div className={`text-[11px] font-black uppercase tracking-[0.14em] ${inStock ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {!product.allowQuantity || (product.productType !== 'GOODS' && product.productType !== 'INVENTORY')
-                ? 'Akses Instan'
-                : inStock
-                  ? 'Stok tersedia'
-                  : 'Stok habis'}
+            <div className={`text-[11px] font-black uppercase tracking-[0.14em] ${product.subscriptionPlan || inStock ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {product.subscriptionPlan
+                ? `Paket Langganan • ${product.subscriptionPlan.durationLabel}`
+                : !product.allowQuantity || (product.productType !== 'GOODS' && product.productType !== 'INVENTORY')
+                  ? 'Akses Instan'
+                  : inStock
+                    ? 'Stok tersedia'
+                    : 'Stok habis'}
             </div>
           </div>
           {showQuickAdd ? (
@@ -240,7 +263,7 @@ function ProductCard({
                 style={{ backgroundColor: accent, borderRadius: radius }}
               >
                 <Plus size={14} />
-                Tambah
+                {product.subscriptionPlan ? 'Langganan' : 'Tambah'}
               </button>
               <button
                 type="button"
@@ -258,7 +281,7 @@ function ProductCard({
               className="inline-flex items-center gap-2 px-4 py-3 text-xs font-black text-white"
               style={{ backgroundColor: accent, borderRadius: radius }}
             >
-              Pilih Paket
+              {product.subscriptionPlan ? 'Daftar Langganan' : 'Pilih Paket'}
               <ChevronRight size={14} />
             </button>
           )}

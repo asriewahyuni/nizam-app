@@ -167,6 +167,16 @@ export type StorefrontProductView = {
   productType?: string
   allowQuantity?: boolean
   variants: StorefrontVariantView[]
+  subscriptionPlan?: {
+    id: string
+    name: string
+    billingInterval: string
+    billingIntervalCount: number
+    price: number
+    trialDays: number
+    signupFee: number
+    durationLabel: string
+  }
 }
 
 export type StorefrontShippingRuleMatcher = {
@@ -267,6 +277,16 @@ export type AdminStoreProductView = {
   isFeatured: boolean
   isPublished: boolean
   imageUrl: string
+  subscriptionPlan?: {
+    id: string
+    name: string
+    billingInterval: string
+    billingIntervalCount: number
+    price: number
+    trialDays: number
+    signupFee: number
+    durationLabel: string
+  }
 }
 
 export type AdminLearningCourseView = {

@@ -714,6 +714,7 @@ async function getStorefrontProducts(
 ): Promise<StorefrontProductView[]> {
   const { rows: productRows } = await queryPostgres<{
     product_id: string
+    store_product_id: string
     inventory_product_id: string
     public_slug: string
     public_name: string
@@ -731,6 +732,7 @@ async function getStorefrontProducts(
     `
       SELECT
         sp.product_id,
+        sp.id AS store_product_id,
         sp.product_id AS inventory_product_id,
         sp.public_slug,
         sp.public_name,
@@ -936,6 +938,63 @@ async function getStorefrontProducts(
     variantsByProductId.set(row.product_id, bucket)
   }
 
+  const storeProductIds = [...new Set(productRows.map((row) => row.store_product_id))]
+  const { rows: planRows } = await queryPostgres<{
+    id: string
+    store_product_id: string
+    name: string
+    billing_interval: string
+    billing_interval_count: number
+    price: string
+    trial_days: number
+    signup_fee: string
+  }>(
+    `
+      SELECT
+        id,
+        store_product_id,
+        name,
+        billing_interval,
+        billing_interval_count,
+        price::text,
+        trial_days,
+        signup_fee::text
+      FROM public.commerce_subscription_plans
+      WHERE store_product_id = ANY($1::uuid[])
+        AND is_active = TRUE
+      ORDER BY created_at ASC
+    `,
+    [storeProductIds]
+  )
+
+  const planByStoreProductId = new Map<string, StorefrontProductView['subscriptionPlan']>()
+  for (const p of planRows) {
+    if (!planByStoreProductId.has(p.store_product_id)) {
+      const count = Number(p.billing_interval_count || 1)
+      const interval = String(p.billing_interval || 'YEAR').toUpperCase()
+      let durationLabel = `${count} ${interval}`
+      if (interval === 'YEAR' || interval === 'Y') {
+        durationLabel = `${count} Tahun`
+      } else if (interval === 'MONTH' || interval === 'M') {
+        durationLabel = `${count} Bulan`
+      } else if (interval === 'DAY' || interval === 'D') {
+        durationLabel = count === 365 ? '1 Tahun' : `${count} Hari`
+      } else if (interval === 'WEEK' || interval === 'W') {
+        durationLabel = `${count} Minggu`
+      }
+      planByStoreProductId.set(p.store_product_id, {
+        id: p.id,
+        name: p.name,
+        billingInterval: interval,
+        billingIntervalCount: count,
+        price: toNumber(p.price),
+        trialDays: Number(p.trial_days || 0),
+        signupFee: toNumber(p.signup_fee),
+        durationLabel,
+      })
+    }
+  }
+
   return productRows.map((row) => {
     const productGallery = mediaByKey.get(mediaKeyForRow(row.product_id, null)) || []
     const variants = variantsByProductId.get(row.product_id) || []
@@ -945,6 +1004,7 @@ async function getStorefrontProducts(
       : variants.length
         ? variants.reduce((total, variant) => total + variant.stockQty, 0)
         : toNumber(stockByProductId.get(row.inventory_product_id))
+    const subscriptionPlan = planByStoreProductId.get(row.store_product_id)
 
     return {
       id: row.product_id,
@@ -954,7 +1014,9 @@ async function getStorefrontProducts(
       shortDescription: cleanLongText(row.short_description, 300),
       description: cleanLongText(row.public_description || row.base_description, 3000),
       badgeText: cleanText(row.badge_text, 80),
-      price: toNumber(row.price),
+      price: subscriptionPlan && subscriptionPlan.price > 0
+        ? subscriptionPlan.price
+        : toNumber(row.price),
       comparePrice: toNumber(row.compare_price),
       imageUrl: productGallery[0] || variants[0]?.imageUrl || '',
       gallery: productGallery.length > 0
@@ -966,6 +1028,7 @@ async function getStorefrontProducts(
       productType: row.product_type || 'NON_INVENTORY',
       allowQuantity: isPhysical,
       variants,
+      subscriptionPlan,
     }
   })
 }
@@ -1294,7 +1357,7 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
       created_at: string
     }> }
 
-  const [learningCourseResult, accessPackageResult, productEntitlementResult] = await Promise.all([
+  const [learningCourseResult, accessPackageResult, productEntitlementResult, subscriptionPlanResult] = await Promise.all([
     queryPostgres<{
       id: string
       title: string
@@ -1423,6 +1486,30 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
        WHERE store_product.org_id = $1::uuid`,
       [orgId],
     ),
+    queryPostgres<{
+      id: string
+      store_product_id: string
+      name: string
+      billing_interval: string
+      billing_interval_count: number
+      price: string
+      trial_days: number
+      signup_fee: string
+    }>(
+      `SELECT
+         id::text,
+         store_product_id::text,
+         name,
+         billing_interval,
+         billing_interval_count,
+         price::text,
+         trial_days,
+         signup_fee::text
+       FROM public.commerce_subscription_plans
+       WHERE org_id = $1::uuid
+         AND is_active = TRUE`,
+      [orgId],
+    ),
   ])
 
   const stores = recordRows(storesResult.data)
@@ -1505,6 +1592,34 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
     description: cleanLongText(row.description, 300),
   }))
 
+  const subscriptionPlanByStoreProductId = new Map<string, AdminStoreProductView['subscriptionPlan']>()
+  for (const p of subscriptionPlanResult.rows) {
+    if (!subscriptionPlanByStoreProductId.has(p.store_product_id)) {
+      const count = Number(p.billing_interval_count || 1)
+      const interval = String(p.billing_interval || 'YEAR').toUpperCase()
+      let durationLabel = `${count} ${interval}`
+      if (interval === 'YEAR' || interval === 'Y') {
+        durationLabel = `${count} Tahun`
+      } else if (interval === 'MONTH' || interval === 'M') {
+        durationLabel = `${count} Bulan`
+      } else if (interval === 'DAY' || interval === 'D') {
+        durationLabel = count === 365 ? '1 Tahun' : `${count} Hari`
+      } else if (interval === 'WEEK' || interval === 'W') {
+        durationLabel = `${count} Minggu`
+      }
+      subscriptionPlanByStoreProductId.set(p.store_product_id, {
+        id: p.id,
+        name: p.name,
+        billingInterval: interval,
+        billingIntervalCount: count,
+        price: toNumber(p.price),
+        trialDays: Number(p.trial_days || 0),
+        signupFee: toNumber(p.signup_fee),
+        durationLabel,
+      })
+    }
+  }
+
   const dashboardStoreProducts: AdminStoreProductView[] = storeProducts.map((row) => ({
     id: String(row.id || ''),
     storeId: String(row.store_id || ''),
@@ -1520,6 +1635,7 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
     isFeatured: Boolean(row.is_featured),
     isPublished: Boolean(row.is_published),
     imageUrl: mediaByStoreProduct.get(`${String(row.store_id || '')}:${String(row.product_id || '')}`) || '',
+    subscriptionPlan: subscriptionPlanByStoreProductId.get(String(row.id || '')),
   }))
 
   const dashboardVariants: AdminVariantView[] = variantRows.map((row) => {
