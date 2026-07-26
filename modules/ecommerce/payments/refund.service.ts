@@ -11,6 +11,7 @@ import {
   reconcileEffectiveEnrollments,
   revokeSubscriptionEntitlements,
 } from './entitlement.service'
+import { cancelConsultingOrderForRefund } from '@/modules/consulting/lib/consulting.server'
 
 export async function requestCommerceRefund(input: {
   orgId: string
@@ -18,6 +19,8 @@ export async function requestCommerceRefund(input: {
   reason: string
   requestedBy: string
   idempotencyKey: string
+  allowStartedConsultingOverride?: boolean
+  overrideReason?: string
 }) {
   const orderResult = await queryPostgres<{
     order_number: string
@@ -47,12 +50,58 @@ export async function requestCommerceRefund(input: {
   const order = orderResult.rows[0]
   if (!order) throw new Error('Order berbayar yang dapat direfund tidak ditemukan.')
 
+  const startedConsulting = await queryPostgres<{ total: number }>(
+    `SELECT COUNT(*)::int AS total
+     FROM public.consulting_sessions session
+     JOIN public.consulting_engagements engagement
+       ON engagement.org_id = session.org_id
+      AND engagement.id = session.engagement_id
+     WHERE engagement.org_id = $1::uuid
+       AND engagement.order_id = $2::uuid
+       AND (
+         session.starts_at <= NOW()
+         OR session.status IN ('COMPLETED', 'NO_SHOW')
+       )`,
+    [input.orgId, input.orderId],
+  )
+  const consultingHasStarted = Number(startedConsulting.rows[0]?.total || 0) > 0
+  const overrideReason = String(input.overrideReason || '').trim().slice(0, 1000)
+  if (consultingHasStarted && !input.allowStartedConsultingOverride) {
+    throw new Error(
+      'Sesi Consulting 360 sudah dimulai. Refund membutuhkan override owner/admin dan alasan.',
+    )
+  }
+  if (consultingHasStarted) {
+    if (!overrideReason) throw new Error('Alasan override refund wajib diisi.')
+    const authorization = await queryPostgres<{ role: string }>(
+      `SELECT member.role
+       FROM public.org_members member
+       WHERE member.org_id = $1::uuid
+         AND member.is_active = TRUE
+         AND (
+           member.user_id = $2::uuid
+           OR member.user_id = (
+             SELECT legacy_user_id
+             FROM public.internal_auth_users
+             WHERE id = $2::uuid
+             LIMIT 1
+           )
+         )
+       LIMIT 1`,
+      [input.orgId, input.requestedBy],
+    )
+    if (!['owner', 'admin'].includes(String(authorization.rows[0]?.role || '').toLowerCase())) {
+      throw new Error('Hanya owner atau admin yang boleh mengoverride refund setelah sesi dimulai.')
+    }
+  }
+
   const refundResult = await queryPostgres<{ id: string; status: string }>(
     `INSERT INTO public.commerce_refunds (
        org_id, order_id, payment_intent_id, amount, reason, status,
-       idempotency_key, requested_by
+       idempotency_key, requested_by, policy_override, policy_override_reason
      ) VALUES (
-       $1::uuid, $2::uuid, $3::uuid, $4, $5, 'PENDING', $6, $7::uuid
+       $1::uuid, $2::uuid, $3::uuid, $4, $5, 'PENDING', $6, $7::uuid,
+       $8, $9
      )
      ON CONFLICT (org_id, idempotency_key) DO UPDATE
      SET updated_at = NOW()
@@ -65,6 +114,8 @@ export async function requestCommerceRefund(input: {
       input.reason,
       input.idempotencyKey,
       input.requestedBy,
+      consultingHasStarted,
+      consultingHasStarted ? overrideReason : null,
     ],
   )
   const refund = refundResult.rows[0]
@@ -159,6 +210,7 @@ export async function finalizeCommerceRefund(input: {
       order_status: string
       bank_account_id: string
       user_id: string | null
+      reason: string
     }>(
       `SELECT
          refund.id::text,
@@ -172,7 +224,8 @@ export async function finalizeCommerceRefund(input: {
          refund.status,
          ecommerce_order.status::text AS order_status,
          settings.bank_account_id::text,
-         ecommerce_order.user_id::text
+         ecommerce_order.user_id::text,
+         refund.reason
        FROM public.commerce_refunds refund
        JOIN public.ecommerce_orders ecommerce_order
          ON ecommerce_order.id = refund.order_id
@@ -373,6 +426,12 @@ export async function finalizeCommerceRefund(input: {
          AND status = 'ACTIVE'`,
       [input.orgId, refund.order_id],
     )
+    await cancelConsultingOrderForRefund(client, {
+      orgId: input.orgId,
+      orderId: refund.order_id,
+      actorUserId: input.actorUserId,
+      reason: refund.reason,
+    })
     await client.query(
       `UPDATE public.commerce_payment_intents
        SET status = 'REFUNDED', updated_at = NOW()

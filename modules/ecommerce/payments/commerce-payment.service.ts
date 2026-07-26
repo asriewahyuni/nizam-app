@@ -8,6 +8,7 @@ import type { PoolClient } from 'pg'
 import { connectPostgresClient } from '@/lib/db/postgres'
 import { activateOrderSubscriptions } from './subscription.service'
 import { provisionOrderEntitlements } from './entitlement.service'
+import { activateConsultingOrder } from '@/modules/consulting/lib/consulting.server'
 
 type PaidOrderRow = {
   id: string
@@ -970,6 +971,10 @@ export async function finalizeFreeCommerceOrder(
     orgId: order.org_id,
     orderId: order.id,
   })
+  await activateConsultingOrder(client, {
+    orgId: order.org_id,
+    orderId: order.id,
+  })
   await reservePhysicalOrderItems(client, order, saleId)
   const physicalResult = await client.query<{ has_physical: boolean }>(
     `SELECT EXISTS (
@@ -1289,6 +1294,10 @@ export async function finalizePaidCommerceOrder(
 
     await activateOrderSubscriptions(client, order)
     const accessGrantIds = await provisionOrderEntitlements(client, {
+      orgId: order.org_id,
+      orderId: order.id,
+    })
+    await activateConsultingOrder(client, {
       orgId: order.org_id,
       orderId: order.id,
     })

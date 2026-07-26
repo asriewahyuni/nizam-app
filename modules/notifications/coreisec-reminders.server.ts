@@ -31,6 +31,9 @@ async function dispatchCandidates(candidates: ReminderCandidate[]) {
       if (key.endsWith('_at') && typeof value === 'string') variables[key] = localDate(value)
     }
     if (candidate.email) {
+      const defaultMessage = candidate.event_type === 'CONSULTING_SESSION_REMINDER'
+        ? `Pengingat Consulting 360: sesi "${variables.program_name || 'konsultasi'}" dijadwalkan pada ${variables.starts_at || '-'}.`
+        : undefined
       await enqueueNotification({
         orgId: candidate.org_id,
         userId: candidate.user_id,
@@ -39,6 +42,10 @@ async function dispatchCandidates(candidates: ReminderCandidate[]) {
         recipient: candidate.email,
         templateKey: candidate.event_type,
         variables,
+        subject: candidate.event_type === 'CONSULTING_SESSION_REMINDER'
+          ? 'Pengingat sesi Consulting 360'
+          : undefined,
+        body: defaultMessage,
         idempotencyKey: [
           candidate.event_type,
           candidate.event_id,
@@ -50,6 +57,9 @@ async function dispatchCandidates(candidates: ReminderCandidate[]) {
       enqueued += 1
     }
     if (candidate.phone) {
+      const defaultMessage = candidate.event_type === 'CONSULTING_SESSION_REMINDER'
+        ? `Pengingat Consulting 360: sesi "${variables.program_name || 'konsultasi'}" dijadwalkan pada ${variables.starts_at || '-'}.`
+        : undefined
       await enqueueNotification({
         orgId: candidate.org_id,
         userId: candidate.user_id,
@@ -58,6 +68,7 @@ async function dispatchCandidates(candidates: ReminderCandidate[]) {
         recipient: candidate.phone,
         templateKey: candidate.event_type,
         variables,
+        body: defaultMessage,
         idempotencyKey: [
           candidate.event_type,
           candidate.event_id,
@@ -74,7 +85,7 @@ async function dispatchCandidates(candidates: ReminderCandidate[]) {
 
 export async function enqueueCoreisecReminders(limit = 250) {
   const safeLimit = Math.max(1, Math.min(limit, 1000))
-  const [sessions, assignments, subscriptions, lessons] = await Promise.all([
+  const [sessions, assignments, subscriptions, lessons, consultingSessions] = await Promise.all([
     queryPostgres<ReminderCandidate>(
       `SELECT
          session.org_id::text,
@@ -218,18 +229,74 @@ export async function enqueueCoreisecReminders(limit = 250) {
        LIMIT $1`,
       [safeLimit],
     ),
+    queryPostgres<ReminderCandidate>(
+      `SELECT
+         consulting_session.org_id::text,
+         consulting_session.user_id::text,
+         COALESCE(internal_user.login_email, ecommerce_order.customer_email) AS email,
+         ecommerce_order.customer_phone AS phone,
+         'CONSULTING_SESSION_REMINDER' AS event_type,
+         consulting_session.id::text AS event_id,
+         reminder.offset_minutes,
+         jsonb_build_object(
+           'program_name', store_product.public_name,
+           'consultant_name', instructor.display_name,
+           'starts_at', consulting_session.starts_at::text,
+           'location', COALESCE(
+             consulting_session.meeting_url,
+             consulting_session.location_name,
+             '-'
+           )
+         ) AS variables
+       FROM public.consulting_sessions consulting_session
+       CROSS JOIN LATERAL unnest(
+         consulting_session.reminder_offsets_minutes
+       ) reminder(offset_minutes)
+       JOIN public.consulting_engagements engagement
+         ON engagement.org_id = consulting_session.org_id
+        AND engagement.id = consulting_session.engagement_id
+       JOIN public.consulting_offerings offering
+         ON offering.org_id = engagement.org_id
+        AND offering.id = engagement.offering_id
+       JOIN public.ecommerce_orders ecommerce_order
+         ON ecommerce_order.org_id = engagement.org_id
+        AND ecommerce_order.id = engagement.order_id
+       JOIN public.store_products store_product
+         ON store_product.org_id = offering.org_id
+        AND store_product.id = offering.store_product_id
+       JOIN public.learning_instructor_profiles instructor
+         ON instructor.org_id = consulting_session.org_id
+        AND instructor.id = consulting_session.consultant_id
+       LEFT JOIN LATERAL (
+         SELECT auth_user.login_email
+         FROM public.internal_auth_users auth_user
+         WHERE auth_user.id = consulting_session.user_id
+            OR auth_user.legacy_user_id = consulting_session.user_id
+         ORDER BY CASE WHEN auth_user.id = consulting_session.user_id THEN 0 ELSE 1 END
+         LIMIT 1
+       ) internal_user ON TRUE
+       WHERE consulting_session.status = 'SCHEDULED'
+         AND consulting_session.starts_at
+           - make_interval(mins => reminder.offset_minutes)
+           BETWEEN NOW() - INTERVAL '5 minutes' AND NOW() + INTERVAL '5 minutes'
+       ORDER BY consulting_session.starts_at
+       LIMIT $1`,
+      [safeLimit],
+    ),
   ])
   const candidates = [
     ...sessions.rows,
     ...assignments.rows,
     ...subscriptions.rows,
     ...lessons.rows,
+    ...consultingSessions.rows,
   ]
   return {
     sessions: sessions.rows.length,
     assignments: assignments.rows.length,
     subscriptions: subscriptions.rows.length,
     lessons: lessons.rows.length,
+    consultingSessions: consultingSessions.rows.length,
     enqueued: await dispatchCandidates(candidates),
   }
 }

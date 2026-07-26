@@ -28,10 +28,16 @@ import {
 } from '@/modules/ecommerce/lib/coupon.service'
 import { finalizeFreeCommerceOrder } from '@/modules/ecommerce/payments/commerce-payment.service'
 import {
+  attachConsultingHoldsToOrder,
+  getPublicConsultingOfferings,
+  validateConsultingHoldsForCheckout,
+} from '@/modules/consulting/lib/consulting.server'
+import {
   buildThemeDraftFromTemplate,
   normalizeShippingMatcher,
   normalizeShippingRuleList,
   normalizeStoreCheckoutBranding,
+  normalizeStorefrontProductPageConfig,
   normalizeStorefrontThemeVersion,
   normalizeStoreSlug,
   normalizeStoreThemeLayout,
@@ -481,6 +487,8 @@ function mapStoreSummary(
     isPublished: Boolean(row.is_published),
     domainList: domains,
     transferInstructions: cleanLongText(settings?.transfer_instructions, 2000),
+    seoTitle: cleanText(settings?.seo_title, 200),
+    seoDescription: cleanText(settings?.seo_description, 260),
     heroNotice: cleanText(settings?.hero_notice, 240),
     checkoutNotice: cleanText(settings?.checkout_notice, 240),
     allowGuestCheckout: Boolean(settings?.allow_member_guest_checkout),
@@ -611,10 +619,20 @@ async function getPublicStoreContext(orgSlug: string, storeSlug: string): Promis
       FROM public.stores s
       JOIN public.organizations o ON o.id = s.org_id
       WHERE o.slug = $1
-        AND s.slug = $2
+        AND (
+          lower(s.slug) = lower($2)
+          OR EXISTS (
+            SELECT 1
+            FROM public.store_slug_aliases alias
+            WHERE alias.org_id = s.org_id
+              AND alias.store_id = s.id
+              AND lower(alias.old_slug) = lower($2)
+          )
+        )
         AND COALESCE(o.is_active, TRUE) = TRUE
         AND s.is_active = TRUE
         AND s.is_published = TRUE
+      ORDER BY (lower(s.slug) = lower($2)) DESC
       LIMIT 1
     `,
     [orgSlug, storeSlug]
@@ -631,6 +649,49 @@ async function getPublicStoreContext(orgSlug: string, storeSlug: string): Promis
     branchId: row.branch_id,
     warehouseId: row.warehouse_id,
     bankAccountId: row.bank_account_id,
+  }
+}
+
+export async function resolvePublicStoreCanonicalTarget(input: {
+  orgSlug: string
+  storeSlug: string
+  productSlug?: string | null
+}) {
+  const context = await getPublicStoreContext(input.orgSlug, input.storeSlug)
+  if (!context) return null
+  if (!input.productSlug) {
+    return {
+      orgSlug: context.orgSlug,
+      storeSlug: context.storeSlug,
+      productSlug: null,
+    }
+  }
+
+  const { rows } = await queryPostgres<{ public_slug: string }>(
+    `SELECT product.public_slug
+       FROM public.store_products product
+      WHERE product.store_id = $1::uuid
+        AND product.is_published = TRUE
+        AND (
+          lower(product.public_slug) = lower($2)
+          OR EXISTS (
+            SELECT 1
+              FROM public.store_product_slug_aliases alias
+             WHERE alias.org_id = product.org_id
+               AND alias.store_id = product.store_id
+               AND alias.store_product_id = product.id
+               AND lower(alias.old_slug) = lower($2)
+          )
+        )
+      ORDER BY (lower(product.public_slug) = lower($2)) DESC
+      LIMIT 1`,
+    [context.storeId, input.productSlug],
+  )
+  if (!rows[0]) return null
+  return {
+    orgSlug: context.orgSlug,
+    storeSlug: context.storeSlug,
+    productSlug: rows[0].public_slug,
   }
 }
 
@@ -737,6 +798,8 @@ async function getStorefrontProducts(
     public_name: string
     short_description: string | null
     public_description: string | null
+    seo_title: string | null
+    seo_description: string | null
     badge_text: string | null
     price: string
     compare_price: string
@@ -745,6 +808,8 @@ async function getStorefrontProducts(
     base_description: string | null
     unit: string | null
     product_type: string | null
+    offering_type: 'STANDARD' | 'CONSULTING_1_ON_1' | null
+    analytics_config: unknown
   }>(
     `
       SELECT
@@ -755,6 +820,8 @@ async function getStorefrontProducts(
         sp.public_name,
         sp.short_description,
         sp.public_description,
+        sp.seo_title,
+        sp.seo_description,
         sp.badge_text,
         COALESCE(sp.price_override, p.selling_price, 0)::text AS price,
         COALESCE(sp.compare_price, 0)::text AS compare_price,
@@ -762,7 +829,9 @@ async function getStorefrontProducts(
         sp.is_published,
         p.description AS base_description,
         p.unit,
-        p.type AS product_type
+        p.type AS product_type,
+        sp.offering_type,
+        sp.analytics_config
       FROM public.store_products sp
       JOIN public.products p ON p.id = sp.product_id
       WHERE sp.store_id = $1
@@ -956,6 +1025,56 @@ async function getStorefrontProducts(
   }
 
   const storeProductIds = [...new Set(productRows.map((row) => row.store_product_id))]
+  const consultingByStoreProductId = await getPublicConsultingOfferings(
+    context.orgId,
+    storeProductIds,
+  )
+  const courseBenefitResult = await queryPostgres<{
+    store_product_id: string
+    course_id: string
+    title: string
+    slug: string
+  }>(
+    `WITH resolved_course AS (
+       SELECT
+         direct_course.store_product_id,
+         direct_course.course_id
+       FROM public.commerce_product_courses direct_course
+       WHERE direct_course.org_id = $1::uuid
+         AND direct_course.store_product_id = ANY($2::uuid[])
+       UNION
+       SELECT
+         product_package.store_product_id,
+         package_course.course_id
+       FROM public.commerce_product_access_packages product_package
+       JOIN public.commerce_access_package_courses package_course
+         ON package_course.org_id = product_package.org_id
+        AND package_course.package_id = product_package.package_id
+       WHERE product_package.org_id = $1::uuid
+         AND product_package.store_product_id = ANY($2::uuid[])
+     )
+     SELECT
+       resolved_course.store_product_id::text,
+       course.id::text AS course_id,
+       course.title,
+       course.slug
+     FROM resolved_course
+     JOIN public.learning_courses course
+       ON course.org_id = $1::uuid
+      AND course.id = resolved_course.course_id
+      AND course.deleted_at IS NULL
+     ORDER BY resolved_course.store_product_id, course.title`,
+    [context.orgId, storeProductIds],
+  )
+  const courseBenefitsByStoreProductId = new Map<
+    string,
+    Array<{ id: string; title: string; slug: string }>
+  >()
+  for (const course of courseBenefitResult.rows) {
+    const bucket = courseBenefitsByStoreProductId.get(course.store_product_id) || []
+    bucket.push({ id: course.course_id, title: course.title, slug: course.slug })
+    courseBenefitsByStoreProductId.set(course.store_product_id, bucket)
+  }
   const { rows: planRows } = await queryPostgres<{
     id: string
     store_product_id: string
@@ -1031,6 +1150,8 @@ async function getStorefrontProducts(
       name: row.public_name,
       shortDescription: cleanLongText(row.short_description, 300),
       description: cleanLongText(row.public_description || row.base_description, 3000),
+      seoTitle: cleanText(row.seo_title, 200),
+      seoDescription: cleanText(row.seo_description, 260),
       badgeText: cleanText(row.badge_text, 80),
       price: subscriptionPlan && subscriptionPlan.price > 0
         ? subscriptionPlan.price
@@ -1044,9 +1165,13 @@ async function getStorefrontProducts(
       isPublished: Boolean(row.is_published),
       stockQty: fallbackStock,
       productType: row.product_type || 'NON_INVENTORY',
+      offeringType: row.offering_type || 'STANDARD',
       allowQuantity: isPhysical,
+      pageConfig: normalizeStorefrontProductPageConfig(row.analytics_config),
       variants,
       subscriptionPlan,
+      consulting: consultingByStoreProductId.get(row.store_product_id) || null,
+      courseBenefits: courseBenefitsByStoreProductId.get(row.store_product_id) || [],
     }
   })
 }
@@ -1690,6 +1815,8 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
     publicName: cleanText(row.public_name, 180),
     shortDescription: cleanLongText(row.short_description, 240),
     publicDescription: cleanLongText(row.public_description, 1200),
+    seoTitle: cleanText(row.seo_title, 200),
+    seoDescription: cleanText(row.seo_description, 260),
     priceOverride: toNullableNumber(row.price_override),
     comparePrice: toNullableNumber(row.compare_price),
     badgeText: cleanText(row.badge_text, 80),
@@ -1697,6 +1824,10 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
     isFeatured: Boolean(row.is_featured),
     isPublished: Boolean(row.is_published),
     imageUrl: mediaByStoreProduct.get(`${String(row.store_id || '')}:${String(row.product_id || '')}`) || '',
+    pageConfig: normalizeStorefrontProductPageConfig(row.analytics_config),
+    offeringType: String(row.offering_type || 'STANDARD') === 'CONSULTING_1_ON_1'
+      ? 'CONSULTING_1_ON_1'
+      : 'STANDARD',
     subscriptionPlan: subscriptionPlanByStoreProductId.get(String(row.id || '')),
   }))
 
@@ -1985,6 +2116,15 @@ export async function saveStoreBasics(formData: FormData) {
 
   const storeId = cleanText(formData.get('store_id'), 80)
   if (!storeId) throw new Error('Store tidak valid.')
+  const { data: existingStore, error: existingStoreError } = await admin
+    .from('stores')
+    .select('id, slug')
+    .eq('id', storeId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  if (existingStoreError || !existingStore?.id) {
+    throw new Error(existingStoreError?.message || 'Store tidak ditemukan.')
+  }
 
   const storePatch = {
     name: cleanText(formData.get('name'), 160),
@@ -2013,6 +2153,26 @@ export async function saveStoreBasics(formData: FormData) {
 
   if (storeError) {
     throw new Error(`Gagal menyimpan store: ${storeError.message}`)
+  }
+
+  const previousSlug = cleanText(existingStore.slug, 120)
+  if (previousSlug && previousSlug !== storePatch.slug) {
+    const { error: aliasError } = await admin
+      .from('store_slug_aliases')
+      .upsert({
+        org_id: orgId,
+        store_id: storeId,
+        old_slug: previousSlug,
+      }, { onConflict: 'org_id,old_slug' })
+    if (aliasError) {
+      throw new Error(`Store tersimpan, tetapi alias URL lama gagal dibuat: ${aliasError.message}`)
+    }
+    await admin
+      .from('store_slug_aliases')
+      .delete()
+      .eq('org_id', orgId)
+      .eq('store_id', storeId)
+      .eq('old_slug', storePatch.slug)
   }
 
   const settingsPatch = {
@@ -2295,6 +2455,7 @@ export async function saveProductEntitlements(formData: FormData) {
 export async function saveAccessPackage(formData: FormData) {
   const { orgId, userId } = await requireActiveOrgAdminContext()
   const requestedPackageId = cleanText(formData.get('package_id'), 80)
+  const expectedVersion = toNullableNumber(formData.get('expected_version'))
   const name = cleanText(formData.get('name'), 160)
   const slug = safeSlug(formData.get('slug'), name)
   const description = cleanLongText(formData.get('description'), 2000)
@@ -2351,6 +2512,12 @@ export async function saveAccessPackage(formData: FormData) {
         [orgId, requestedPackageId],
       )
       if (!existing.rows[0]) throw new Error('Paket akses tidak ditemukan.')
+      if (
+        expectedVersion !== null
+        && Number(existing.rows[0].version || 1) !== expectedVersion
+      ) {
+        throw new Error('Paket Akses sudah diubah admin lain. Muat ulang halaman sebelum menyimpan lagi.')
+      }
       const previousCourses = await client.query<{
         course_id: string
         access_duration_value: number | null
@@ -2854,6 +3021,7 @@ type CheckoutInput = {
   customerPhone: string
   customerNote?: string
   couponCode?: string
+  consultingHoldTokens: string[]
   shippingRateId?: string
   address: {
     recipientName: string
@@ -2886,6 +3054,13 @@ function parseCheckoutPayload(input: unknown): CheckoutInput {
     customerPhone: cleanText(source.customerPhone, 80),
     customerNote: cleanLongText(source.customerNote, 500),
     couponCode: normalizeCommerceCouponCode(source.couponCode),
+    consultingHoldTokens: Array.isArray(source.consultingHoldTokens)
+      ? [...new Set(
+          source.consultingHoldTokens
+            .map((value) => cleanText(value, 200))
+            .filter(Boolean),
+        )]
+      : [],
     shippingRateId: cleanText(source.shippingRateId, 80),
     address: {
       recipientName: cleanText(address.recipientName, 160) || cleanText(source.customerName, 160),
@@ -2925,11 +3100,11 @@ async function resolveCheckoutCatalogSnapshot(
     throw new Error('Store tidak ditemukan.')
   }
 
-  const shippingRate = resolveShippingRateForAddress(
-    storePayload.shippingRates,
-    address,
-    shippingRateId || null
-  ) || (storePayload.shippingRates.length === 0 ? {
+  const hasPhysicalItem = items.some((item) => {
+    const product = storePayload.products.find((entry) => entry.id === item.productId)
+    return Boolean(product?.allowQuantity)
+  })
+  const digitalDelivery = {
     id: 'digital-delivery',
     zoneId: 'digital-zone',
     zoneName: 'Digital',
@@ -2942,7 +3117,14 @@ async function resolveCheckoutCatalogSnapshot(
       cities: [],
       postalCodes: [],
     },
-  } : null)
+  }
+  const shippingRate = hasPhysicalItem
+    ? resolveShippingRateForAddress(
+        storePayload.shippingRates,
+        address,
+        shippingRateId || null,
+      )
+    : digitalDelivery
 
   if (!shippingRate) {
     throw new Error('Alamat belum cocok dengan zona ongkir aktif di store ini.')
@@ -3119,7 +3301,10 @@ export async function createCheckoutOrder(input: unknown) {
   if (!context) throw new Error('Store tidak ditemukan.')
 
   const checkStorePayload = await getPublicStorefrontPayload(payload.orgSlug, payload.storeSlug)
-  const requiresPhysicalAddress = (checkStorePayload?.shippingRates.length || 0) > 0
+  const requiresPhysicalAddress = payload.items.some((item) => {
+    const product = checkStorePayload?.products.find((entry) => entry.id === item.productId)
+    return Boolean(product?.allowQuantity)
+  })
 
   if (requiresPhysicalAddress && (!payload.address.line1 || !payload.address.city || !payload.address.province)) {
     throw new Error('Alamat pengiriman belum lengkap.')
@@ -3230,6 +3415,17 @@ export async function createCheckoutOrder(input: unknown) {
 
     if (!createdOrder) {
       const storeProductIds = [...new Set(items.map((item) => item.product.storeProductId))]
+      const hasConsultingProduct = items.some(
+        (item) => item.product.offeringType === 'CONSULTING_1_ON_1',
+      )
+      if (
+        items.some(
+          (item) => item.product.offeringType === 'CONSULTING_1_ON_1'
+            && item.quantity !== 1,
+        )
+      ) {
+        throw new Error('Produk Consulting 360 hanya dapat dibeli satu paket per pesanan.')
+      }
       const learningResult = await client.query<{ has_learning_benefits: boolean }>(
         `SELECT (
            EXISTS (
@@ -3248,6 +3444,7 @@ export async function createCheckoutOrder(input: unknown) {
         [context.orgId, storeProductIds],
       )
       const needsLearningIdentity = Boolean(learningResult.rows[0]?.has_learning_benefits)
+        || hasConsultingProduct
       const normalizedEmail = normalizeCheckoutEmail(payload.customerEmail || '')
       const normalizedPhone = normalizeCheckoutPhone(payload.customerPhone)
       if ((needsLearningIdentity || payload.couponCode) && !normalizedEmail) {
@@ -3264,6 +3461,15 @@ export async function createCheckoutOrder(input: unknown) {
           fullName: payload.customerName,
           email: normalizedEmail,
           phone: normalizedPhone,
+        })
+      }
+
+      if (hasConsultingProduct) {
+        await validateConsultingHoldsForCheckout(client, {
+          orgId: context.orgId,
+          storeId: context.storeId,
+          storeProductIds,
+          holdTokens: payload.consultingHoldTokens,
         })
       }
 
@@ -3437,6 +3643,12 @@ export async function createCheckoutOrder(input: unknown) {
       await snapshotOrderEntitlements(client, {
         orgId: context.orgId,
         orderId: order.id,
+      })
+      await attachConsultingHoldsToOrder(client, {
+        orgId: context.orgId,
+        orderId: order.id,
+        paymentDueAt,
+        holdTokens: payload.consultingHoldTokens,
       })
       if (couponQuote) {
         await client.query(

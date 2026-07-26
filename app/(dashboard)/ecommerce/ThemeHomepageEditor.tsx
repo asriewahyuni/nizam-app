@@ -300,6 +300,8 @@ function buildPreviewProducts(
         name: product.publicName || baseProduct?.name || 'Produk Tanpa Nama',
         shortDescription: product.shortDescription || '',
         description: product.publicDescription || baseProduct?.description || '',
+        seoTitle: product.seoTitle || product.publicName || baseProduct?.name || '',
+        seoDescription: product.seoDescription || product.shortDescription || '',
         badgeText: product.badgeText || '',
         price,
         comparePrice,
@@ -308,6 +310,7 @@ function buildPreviewProducts(
         isFeatured: product.isFeatured,
         isPublished: product.isPublished,
         stockQty: 0,
+        pageConfig: product.pageConfig,
         variants: [],
         priceLabel: formatRupiah(price),
       }

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { connectPostgresClient } from '@/lib/db/postgres'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { normalizeCommerceCouponCode } from '@/modules/ecommerce/lib/coupon.service'
+import { normalizePublicSlug } from '@/modules/ecommerce/lib/lms-domain'
 
 function parseUuidList(value: FormDataEntryValue | null): string[] {
   if (typeof value !== 'string' || !value.trim()) return []
@@ -30,6 +31,10 @@ function parseOptionalDate(value: FormDataEntryValue | null): string | null {
 
 function revalidateLmsSalesPaths() {
   revalidatePath('/lms/admin/penjualan')
+  revalidatePath('/lms/admin/penjualan/paket-akses')
+  revalidatePath('/lms/admin/penjualan/consulting-360')
+  revalidatePath('/lms/admin/penjualan/diskon')
+  revalidatePath('/lms/admin/penjualan/ringkasan')
   revalidatePath('/ecommerce')
 }
 
@@ -37,11 +42,17 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
   try {
     const orgData = await getActiveOrg()
     if (!orgData) return { success: false, error: 'Sesi tidak valid.' }
+    if (!['owner', 'admin', 'manager'].includes(String(orgData.role || '').toLowerCase())) {
+      return { success: false, error: 'Hanya owner, admin, atau manager yang dapat mengelola produk.' }
+    }
     const orgId = orgData.org.id
 
     const productId = formData.get('product_id')?.toString() || ''
     const storeId = formData.get('store_id')?.toString() || ''
     const name = formData.get('name')?.toString().trim()
+    const publicSlug = normalizePublicSlug(formData.get('public_slug'), name || 'produk')
+    const seoTitle = formData.get('seo_title')?.toString().trim().slice(0, 200) || null
+    const seoDescription = formData.get('seo_description')?.toString().trim().slice(0, 260) || null
     const price = Number(formData.get('price') || 0)
     const comparePrice = Number(formData.get('compare_price') || 0)
     const shortDescription = formData.get('short_description')?.toString().trim() || null
@@ -50,6 +61,26 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
     const isFeatured = formData.get('is_featured') === 'true'
     const isPublished = formData.get('is_published') === 'true'
     const imageUrl = formData.get('image_url')?.toString().trim() || null
+    const productPageConfig = {
+      pageLayout: {
+        layout: formData.get('page_layout') === 'TWO_COLUMNS'
+          ? 'TWO_COLUMNS'
+          : 'SINGLE_COLUMN',
+        checkoutButtonLabel: formData.get('checkout_button_label')?.toString().trim().slice(0, 80)
+          || 'Beli Sekarang',
+        benefitTitle: formData.get('benefit_title')?.toString().trim().slice(0, 100)
+          || 'Anda mendapatkan',
+        customerSectionTitle: formData.get('customer_section_title')?.toString().trim().slice(0, 100)
+          || 'Informasi Pribadi',
+        paymentSectionTitle: formData.get('payment_section_title')?.toString().trim().slice(0, 100)
+          || 'Metode Pembayaran & Konfirmasi',
+        paymentMethodLabel: formData.get('payment_method_label')?.toString().trim().slice(0, 120)
+          || 'Transfer Bank / Virtual Account / E-Wallet',
+        showDescription: formData.get('show_description') === 'true',
+        showBuyerNote: formData.get('show_buyer_note') === 'true',
+        showTrustSignals: formData.get('show_trust_signals') === 'true',
+      },
+    }
     
     // Subscription setting
     const isSubscription = formData.get('is_subscription') === 'true'
@@ -58,19 +89,13 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
     const trialDays = Number(formData.get('trial_days') || 0)
     const signupFee = Number(formData.get('signup_fee') || 0)
 
-    // Parse course_ids safely
-    const courseIdsRaw = formData.get('course_ids')?.toString() || '[]'
-    let courseIds: string[] = []
-    try {
-      const parsed = JSON.parse(courseIdsRaw)
-      if (Array.isArray(parsed)) {
-        courseIds = parsed.map((id) => String(id)).filter(Boolean)
-      }
-    } catch {
-      courseIds = []
-    }
+    const courseIds = parseUuidList(formData.get('course_ids'))
+    const packageIds = parseUuidList(formData.get('package_ids'))
 
     if (!name) return { success: false, error: 'Nama produk wajib diisi.' }
+    if (!publicSlug) {
+      return { success: false, error: 'Slug produk tidak valid atau memakai kata yang dicadangkan.' }
+    }
     if (!storeId) return { success: false, error: 'Store tidak valid.' }
 
     const client = await connectPostgresClient()
@@ -80,6 +105,20 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
     await client.query('BEGIN')
 
     try {
+      const storeCheck = await client.query<{ id: string }>(
+        `SELECT id::text
+         FROM public.stores
+         WHERE id = $1::uuid
+           AND org_id = $2::uuid
+           AND is_active = TRUE
+         LIMIT 1
+         FOR UPDATE`,
+        [storeId, orgId],
+      )
+      if (!storeCheck.rows[0]) {
+        throw new Error('Store tidak ditemukan atau sudah tidak aktif.')
+      }
+
       if (!finalProductId) {
         // Create new Product
         const sku = 'LMS-' + Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -90,35 +129,55 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
         finalProductId = prodRes.rows[0].id
       } else {
         // Update existing Product
-        await client.query(
+        const updatedProduct = await client.query(
           "UPDATE products SET name = $1, selling_price = $2 WHERE id = $3 AND org_id = $4",
           [name, price, finalProductId, orgId]
         )
+        if (updatedProduct.rowCount !== 1) {
+          throw new Error('Produk tidak ditemukan dalam organisasi ini.')
+        }
       }
 
-      // Upsert to store_products
-      const publicSlug = 'p-' + Math.random().toString(36).substring(2, 8)
+      const existingStoreProduct = await client.query<{
+        id: string
+        public_slug: string
+      }>(
+        `SELECT id::text, public_slug
+           FROM public.store_products
+          WHERE store_id = $1::uuid
+            AND product_id = $2::uuid
+            AND org_id = $3::uuid
+          LIMIT 1
+          FOR UPDATE`,
+        [storeId, finalProductId, orgId],
+      )
       
       const spRes = await client.query(
         `INSERT INTO store_products (
            org_id, store_id, product_id, public_name, public_slug,
            price_override, compare_price, short_description, public_description,
-           badge_text, is_featured, is_published, product_type, quantity_enabled
+           seo_title, seo_description, badge_text, is_featured, is_published,
+           analytics_config, product_type, quantity_enabled
          )
          VALUES (
-           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-           'DIGITAL', false
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+           $15::jsonb, 'DIGITAL', false
          )
          ON CONFLICT (store_id, product_id)
          DO UPDATE SET
            public_name = EXCLUDED.public_name,
+           public_slug = EXCLUDED.public_slug,
            price_override = EXCLUDED.price_override,
            compare_price = EXCLUDED.compare_price,
            short_description = EXCLUDED.short_description,
            public_description = EXCLUDED.public_description,
+           seo_title = EXCLUDED.seo_title,
+           seo_description = EXCLUDED.seo_description,
            badge_text = EXCLUDED.badge_text,
            is_featured = EXCLUDED.is_featured,
            is_published = EXCLUDED.is_published,
+           analytics_config = COALESCE(store_products.analytics_config, '{}'::jsonb)
+             || EXCLUDED.analytics_config,
            product_type = 'DIGITAL',
            quantity_enabled = false
          RETURNING id`,
@@ -132,13 +191,61 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
           comparePrice > 0 ? comparePrice : null,
           shortDescription,
           publicDescription,
+          seoTitle,
+          seoDescription,
           badgeText,
           isFeatured,
           isPublished,
+          JSON.stringify(productPageConfig),
         ]
       )
       
       const storeProductId = spRes.rows[0].id
+      const previousPublicSlug = existingStoreProduct.rows[0]?.public_slug || ''
+      if (previousPublicSlug && previousPublicSlug !== publicSlug) {
+        await client.query(
+          `INSERT INTO public.store_product_slug_aliases (
+             org_id, store_id, store_product_id, old_slug
+           ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4)
+           ON CONFLICT (store_id, old_slug) DO UPDATE SET
+             store_product_id = EXCLUDED.store_product_id`,
+          [orgId, storeId, storeProductId, previousPublicSlug],
+        )
+        await client.query(
+          `DELETE FROM public.store_product_slug_aliases
+            WHERE org_id = $1::uuid
+              AND store_id = $2::uuid
+              AND store_product_id = $3::uuid
+              AND lower(old_slug) = lower($4)`,
+          [orgId, storeId, storeProductId, publicSlug],
+        )
+      }
+
+      if (courseIds.length > 0) {
+        const courseCheck = await client.query<{ id: string }>(
+          `SELECT id::text
+           FROM public.learning_courses
+           WHERE org_id = $1::uuid
+             AND id = ANY($2::uuid[])
+             AND deleted_at IS NULL`,
+          [orgId, courseIds],
+        )
+        if (courseCheck.rows.length !== courseIds.length) {
+          throw new Error('Ada course yang tidak ditemukan dalam organisasi ini.')
+        }
+      }
+      if (packageIds.length > 0) {
+        const packageCheck = await client.query<{ id: string }>(
+          `SELECT id::text
+           FROM public.commerce_access_packages
+           WHERE org_id = $1::uuid
+             AND id = ANY($2::uuid[])`,
+          [orgId, packageIds],
+        )
+        if (packageCheck.rows.length !== packageIds.length) {
+          throw new Error('Ada Paket Akses yang tidak ditemukan dalam organisasi ini.')
+        }
+      }
 
       // Handle Subscription Plan
       if (isSubscription) {
@@ -198,6 +305,11 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
         "DELETE FROM commerce_product_courses WHERE store_product_id = $1 AND org_id = $2",
         [storeProductId, orgId]
       )
+      await client.query(
+        `DELETE FROM commerce_product_access_packages
+         WHERE store_product_id = $1 AND org_id = $2`,
+        [storeProductId, orgId],
+      )
 
       // Insert new entitlements
       const uniqueCourseIds = Array.from(new Set(courseIds))
@@ -207,6 +319,16 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
         await client.query(
           `INSERT INTO commerce_product_courses (org_id, store_product_id, course_id) VALUES ${values} ON CONFLICT (org_id, store_product_id, course_id) DO NOTHING`,
           params
+        )
+      }
+
+      for (const packageId of packageIds) {
+        await client.query(
+          `INSERT INTO public.commerce_product_access_packages (
+             org_id, store_product_id, package_id
+           ) VALUES ($1::uuid, $2::uuid, $3::uuid)
+           ON CONFLICT (org_id, store_product_id, package_id) DO NOTHING`,
+          [orgId, storeProductId, packageId],
         )
       }
 
@@ -243,13 +365,23 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
     } catch (e) {
       await client.query('ROLLBACK')
       throw e
+    } finally {
+      client.release()
     }
 
-    revalidatePath('/lms/admin/penjualan')
-    revalidatePath('/ecommerce')
-    return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Gagal menyimpan produk.' }
+    revalidateLmsSalesPaths()
+    return { success: true, productId: finalProductId }
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error
+        ? (
+            error.message.toLowerCase().includes('duplicate')
+              ? 'Slug produk sudah dipakai oleh produk lain pada toko ini.'
+              : error.message
+          )
+        : 'Gagal menyimpan produk.',
+    }
   }
 }
 
@@ -257,6 +389,9 @@ export async function deleteLmsSimpleProductAction(formData: FormData) {
   try {
     const orgData = await getActiveOrg()
     if (!orgData) return { success: false, error: 'Sesi tidak valid.' }
+    if (!['owner', 'admin', 'manager'].includes(String(orgData.role || '').toLowerCase())) {
+      return { success: false, error: 'Hanya owner, admin, atau manager yang dapat menghapus produk.' }
+    }
     const orgId = orgData.org.id
     const storeProductId = formData.get('store_product_id')?.toString()
     
@@ -268,6 +403,10 @@ export async function deleteLmsSimpleProductAction(formData: FormData) {
       await client.query('BEGIN')
       await client.query(
         "DELETE FROM commerce_product_courses WHERE store_product_id = $1 AND org_id = $2",
+        [storeProductId, orgId]
+      )
+      await client.query(
+        "DELETE FROM commerce_product_access_packages WHERE store_product_id = $1 AND org_id = $2",
         [storeProductId, orgId]
       )
       await client.query(
@@ -288,11 +427,13 @@ export async function deleteLmsSimpleProductAction(formData: FormData) {
       )
     }
 
-    revalidatePath('/lms/admin/penjualan')
-    revalidatePath('/ecommerce')
+    revalidateLmsSalesPaths()
     return { success: true }
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Gagal menghapus produk.' }
+  } catch (error: unknown) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Gagal menghapus produk.',
+    }
   }
 }
 

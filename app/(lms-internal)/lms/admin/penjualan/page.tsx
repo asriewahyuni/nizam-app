@@ -1,142 +1,167 @@
 /**
- * Pusat penjualan kelas di dalam LMS.
- * Halaman ini memakai data dan action commerce yang sama dengan /ecommerce.
+ * Daftar produk LMS. Consulting 360 dikelola pada bagian tersendiri.
  */
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
-import { BookOpen, ExternalLink, Layers3, PackageCheck, ShoppingCart, TicketPercent } from 'lucide-react'
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { getEcommerceDashboardData } from '@/modules/ecommerce/lib/ecommerce.server'
-import LmsSimpleSalesManager from './LmsSimpleSalesManager'
+import { Boxes, Plus, Search } from 'lucide-react'
+import { getLmsProductSalesData } from '@/modules/ecommerce/lib/lms-sales.server'
 import { LmsCommerceSetupButton } from './LmsCommerceSetupButton'
-import LmsCouponManager from './LmsCouponManager'
+import ProductListClient from './ProductListClient'
+import SalesPagination from './SalesPagination'
 
 export const metadata = {
-  title: 'Penjualan Kelas — Nizam LMS',
-  description: 'Kelola produk kelas, multi-course, paket akses, dan checkout dari LMS.',
+  title: 'Produk Penjualan — Nizam LMS',
+  description: 'Kelola produk kelas dan manfaat LMS.',
 }
 
-export default async function LmsCourseCommercePage() {
-  const orgData = await getActiveOrg()
-  if (!orgData?.org?.id) redirect('/onboarding')
+type SearchParams = Promise<{
+  q?: string
+  status?: string
+  type?: string
+  page?: string
+}>
 
-  const dashboardData = await getEcommerceDashboardData()
-  const activePackages = dashboardData.accessPackages.filter((item) => item.isActive).length
-  const activeCoupons = dashboardData.coupons.filter((item) => item.isActive).length
-  const publishedProducts = dashboardData.storeProducts.filter((item) => item.isPublished).length
-  const productsWithBenefits = dashboardData.productEntitlements.filter(
-    (item) => item.resolvedCourseIds.length > 0,
-  ).length
-  const defaultStoreSlug = dashboardData.stores[0]?.slug || ''
-  const storefrontUrl =
-    orgData.org.slug && defaultStoreSlug
-      ? `/toko/${orgData.org.slug}/${defaultStoreSlug}`
-      : null
+export default async function LmsProductSalesPage({
+  searchParams,
+}: {
+  searchParams: SearchParams
+}) {
+  const query = await searchParams
+  const data = await getLmsProductSalesData()
+  const q = String(query.q || '').trim().toLowerCase()
+  const status = ['published', 'draft'].includes(String(query.status))
+    ? String(query.status)
+    : ''
+  const type = ['subscription', 'onetime'].includes(String(query.type))
+    ? String(query.type)
+    : ''
+  const requestedPage = Math.max(1, Number.parseInt(String(query.page || '1'), 10) || 1)
 
-  const stats = [
-    {
-      label: 'Course Tersedia',
-      value: dashboardData.learningCourses.length,
-      sub: 'Siap dipilih sebagai manfaat',
-      icon: <BookOpen aria-hidden="true" size={18} />,
-      tone: 'border-indigo-100 bg-indigo-50/70 text-indigo-700',
-    },
-    {
-      label: 'Produk Tayang',
-      value: publishedProducts,
-      sub: 'Tersedia pada store',
-      icon: <PackageCheck aria-hidden="true" size={18} />,
-      tone: 'border-emerald-100 bg-emerald-50/70 text-emerald-700',
-    },
-    {
-      label: 'Produk Berisi Course',
-      value: productsWithBenefits,
-      sub: 'Direct atau melalui paket',
-      icon: <ShoppingCart aria-hidden="true" size={18} />,
-      tone: 'border-blue-100 bg-blue-50/70 text-blue-700',
-    },
-    {
-      label: 'Paket Akses Aktif',
-      value: activePackages,
-      sub: 'Dapat dipakai ulang',
-      icon: <Layers3 aria-hidden="true" size={18} />,
-      tone: 'border-amber-100 bg-amber-50/70 text-amber-700',
-    },
-    {
-      label: 'Kode Diskon Aktif',
-      value: activeCoupons,
-      sub: 'Siap dipakai saat checkout',
-      icon: <TicketPercent aria-hidden="true" size={18} />,
-      tone: 'border-violet-100 bg-violet-50/70 text-violet-700',
-    },
-  ]
+  const filteredProducts = data.storeProducts.filter((product) => {
+    if (q && !`${product.publicName} ${product.shortDescription}`.toLowerCase().includes(q)) {
+      return false
+    }
+    if (status === 'published' && !product.isPublished) return false
+    if (status === 'draft' && product.isPublished) return false
+    if (type === 'subscription' && !product.subscriptionPlan) return false
+    if (type === 'onetime' && product.subscriptionPlan) return false
+    return true
+  })
+  const pageSize = 20
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize))
+  const currentPage = Math.min(requestedPage, totalPages)
+  const visibleProducts = filteredProducts.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  )
+  const currentParams = new URLSearchParams()
+  if (query.q) currentParams.set('q', query.q)
+  if (status) currentParams.set('status', status)
+  if (type) currentParams.set('type', type)
+  if (currentPage > 1) currentParams.set('page', String(currentPage))
+  const returnTo = `/lms/admin/penjualan${currentParams.size ? `?${currentParams.toString()}` : ''}`
+
+  if (data.stores.length === 0) {
+    return <LmsCommerceSetupButton />
+  }
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-5 border-b border-slate-200 pb-6 md:flex-row md:items-center md:justify-between">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
-            <ShoppingCart aria-hidden="true" size={15} />
-            LMS · Penjualan
+          <div className="flex items-center gap-2 text-indigo-700">
+            <Boxes aria-hidden="true" size={18} />
+            <span className="text-xs font-bold uppercase tracking-[0.14em]">Katalog LMS</span>
           </div>
-          <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-            Penjualan Kelas
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-            Atur produk kelas, manfaat multi-course, paket akses, dan tautan checkout tanpa keluar dari LMS.
+          <h2 className="mt-2 text-xl font-bold text-slate-950">Produk</h2>
+          <p className="mt-1 text-sm font-medium text-slate-600">
+            {filteredProducts.length} produk ditemukan. Consulting 360 berada di bagian tersendiri.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          {storefrontUrl && (
-            <Link
-              href={storefrontUrl}
-              target="_blank"
-              className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
-            >
-              Kunjungi Toko Publik
-              <ExternalLink aria-hidden="true" size={16} />
-            </Link>
-          )}
-          <Link
-            href="/ecommerce"
-            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
-          >
-            Buka E-Commerce Lengkap
-            <ExternalLink aria-hidden="true" size={16} />
-          </Link>
-        </div>
-      </header>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {stats.map((stat) => (
-          <section
-            key={stat.label}
-            className={`rounded-xl border p-4 shadow-sm ${stat.tone}`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  {stat.label}
-                </p>
-                <p className="mt-2 font-mono text-2xl font-bold text-slate-950">{stat.value}</p>
-              </div>
-              <div className="flex size-10 items-center justify-center rounded-lg bg-white shadow-sm">
-                {stat.icon}
-              </div>
-            </div>
-            <p className="mt-3 text-xs font-medium text-slate-600">{stat.sub}</p>
-          </section>
-        ))}
+        <Link
+          href={`/lms/admin/penjualan/produk/baru?returnTo=${encodeURIComponent(returnTo)}`}
+          className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
+        >
+          <Plus aria-hidden="true" size={17} />
+          Tambah Produk
+        </Link>
       </div>
 
-      {dashboardData.stores.length === 0 ? (
-        <LmsCommerceSetupButton />
-      ) : (
-        <div className="space-y-8">
-          <LmsSimpleSalesManager dashboardData={dashboardData} orgSlug={orgData.org.slug} />
-          <LmsCouponManager dashboardData={dashboardData} />
+      <form
+        action="/lms/admin/penjualan"
+        className="grid gap-3 border-b border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1fr)_180px_180px_auto]"
+      >
+        <label className="relative">
+          <span className="sr-only">Cari produk</span>
+          <Search
+            aria-hidden="true"
+            size={17}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            name="q"
+            defaultValue={query.q || ''}
+            placeholder="Cari nama atau deskripsi…"
+            className="min-h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3 text-sm font-medium text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          />
+        </label>
+        <label>
+          <span className="sr-only">Filter status</span>
+          <select
+            name="status"
+            defaultValue={status}
+            className="min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          >
+            <option value="">Semua status</option>
+            <option value="published">Tayang</option>
+            <option value="draft">Draft</option>
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">Filter jenis produk</span>
+          <select
+            name="type"
+            defaultValue={type}
+            className="min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+          >
+            <option value="">Semua jenis</option>
+            <option value="onetime">Sekali bayar</option>
+            <option value="subscription">Langganan</option>
+          </select>
+        </label>
+        <button
+          type="submit"
+          className="min-h-11 cursor-pointer rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
+        >
+          Terapkan
+        </button>
+      </form>
+
+      {visibleProducts.length === 0 ? (
+        <div className="px-5 py-14 text-center">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
+            <Boxes aria-hidden="true" size={22} />
+          </div>
+          <h3 className="mt-4 font-bold text-slate-950">Produk tidak ditemukan</h3>
+          <p className="mt-1 text-sm font-medium text-slate-600">
+            Ubah filter atau buat produk penjualan LMS yang pertama.
+          </p>
         </div>
+      ) : (
+        <ProductListClient
+          products={visibleProducts}
+          entitlements={data.productEntitlements}
+          orgSlug={data.org.slug}
+          storeSlug={data.stores[0]?.slug || ''}
+          returnTo={returnTo}
+        />
       )}
-    </div>
+
+      <SalesPagination
+        pathname="/lms/admin/penjualan"
+        currentPage={currentPage}
+        totalPages={totalPages}
+        query={{ q: query.q, status, type }}
+      />
+    </section>
   )
 }

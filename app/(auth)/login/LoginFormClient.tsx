@@ -18,12 +18,16 @@ export type OrgContext = {
 
 interface LoginFormProps {
   orgContext?: OrgContext | null
+  tenantContext?: OrgContext | null
 }
 
-function LoginFormInner({ orgContext }: LoginFormProps) {
+function LoginFormInner({ orgContext, tenantContext }: LoginFormProps) {
   const searchParams = useSearchParams()
-  const defaultTab = orgContext ? 'karyawan' : (searchParams.get('tab') === 'karyawan' ? 'karyawan' : 'bisnis')
+  const defaultTab = orgContext
+    ? 'karyawan'
+    : (searchParams.get('tab') === 'karyawan' && !tenantContext ? 'karyawan' : 'bisnis')
   const error = searchParams.get('error')
+  const redirectTo = searchParams.get('redirectTo') || searchParams.get('callbackUrl') || ''
 
   const [tab, setTab] = useState<'bisnis' | 'karyawan'>(defaultTab)
   const [showPass, setShowPass] = useState(false)
@@ -50,6 +54,28 @@ function LoginFormInner({ orgContext }: LoginFormProps) {
 
   return (
     <div>
+      {tenantContext && (
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-indigo-400/25 bg-indigo-400/10 px-4 py-3">
+          {tenantContext.logo_url ? (
+            <img
+              src={tenantContext.logo_url}
+              alt=""
+              className="size-10 shrink-0 rounded-xl object-cover"
+            />
+          ) : (
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-400/15">
+              <Users aria-hidden="true" size={18} className="text-indigo-300" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">
+              Portal LMS resmi
+            </p>
+            <p className="truncate text-sm font-bold text-white">{tenantContext.name}</p>
+          </div>
+        </div>
+      )}
+
       {/* ── Org context badge (saat akses via link slug) ── */}
       {orgContext && (
         <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl">
@@ -68,12 +94,18 @@ function LoginFormInner({ orgContext }: LoginFormProps) {
       )}
 
       <div className="mb-8">
-        <h2 className="text-2xl font-black text-white tracking-tight">Ruang Kendali</h2>
-        <p className="text-slate-400 text-sm mt-1 font-medium">Buka akses untuk melanjutkan sesi aman Anda.</p>
+        <h2 className="text-2xl font-black text-white tracking-tight">
+          {tenantContext ? 'Masuk ke Portal Belajar' : 'Ruang Kendali'}
+        </h2>
+        <p className="text-slate-400 text-sm mt-1 font-medium">
+          {tenantContext
+            ? 'Gunakan akun member Anda untuk melanjutkan belajar.'
+            : 'Buka akses untuk melanjutkan sesi aman Anda.'}
+        </p>
       </div>
 
       {/* Tab Switcher — sembunyikan saat orgContext aktif (selalu karyawan) */}
-      {!orgContext && (
+      {!orgContext && !tenantContext && (
         <div className="flex gap-2 p-1.5 bg-slate-950/50 border border-white/5 rounded-2xl mb-8 shadow-inner">
           <button type="button"
             onClick={() => setTab('bisnis')}
@@ -127,10 +159,12 @@ function LoginFormInner({ orgContext }: LoginFormProps) {
           >
             {/* ── BUSINESS OWNER LOGIN ── */}
             <form action={signIn} className="space-y-5">
-              <input type="hidden" name="redirectTo" value={searchParams.get('redirectTo') || ''} />
+              <input type="hidden" name="redirectTo" value={redirectTo} />
 
               <div className="space-y-1.5">
-                <label htmlFor="bisnis-email" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Email Bisnis</label>
+                <label htmlFor="bisnis-email" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  {tenantContext ? 'Email member' : 'Email Bisnis'}
+                </label>
                 <input
                   id="bisnis-email"
                   name="email"
@@ -174,7 +208,7 @@ function LoginFormInner({ orgContext }: LoginFormProps) {
               </button>
             </form>
 
-            <div className="mt-8 pt-6 border-t border-white/5 space-y-4 text-center">
+            {!tenantContext && <div className="mt-8 pt-6 border-t border-white/5 space-y-4 text-center">
               <p className="text-sm text-slate-500 font-medium">
                 Belum punya akun?{' '}
                 <Link href="/register" className="text-white font-semibold hover:text-blue-400 transition-colors">
@@ -187,7 +221,7 @@ function LoginFormInner({ orgContext }: LoginFormProps) {
               >
                 Coba Demo Gratis
               </Link>
-            </div>
+            </div>}
           </motion.div>
         ) : (
           <motion.div
@@ -199,7 +233,7 @@ function LoginFormInner({ orgContext }: LoginFormProps) {
           >
             {/* ── EMPLOYEE LOGIN ── */}
             <form action={signInWithNik} className="space-y-5">
-              <input type="hidden" name="redirectTo" value={searchParams.get('redirectTo') || ''} />
+              <input type="hidden" name="redirectTo" value={redirectTo} />
               {/* orgId + orgSlug dari slug page — memastikan NIK hanya resolve ke org ini */}
               {orgContext && <input type="hidden" name="orgId" value={orgContext.id} />}
               {orgContext && <input type="hidden" name="orgSlug" value={orgContext.slug} />}
@@ -314,10 +348,10 @@ function LoginFormInner({ orgContext }: LoginFormProps) {
   )
 }
 
-export default function LoginFormClient({ orgContext }: LoginFormProps) {
+export default function LoginFormClient({ orgContext, tenantContext }: LoginFormProps) {
   return (
     <Suspense fallback={<div className="flex items-center justify-center p-8 text-xs font-black uppercase text-slate-500 tracking-widest animate-pulse">Inisialisasi Link...</div>}>
-      <LoginFormInner orgContext={orgContext} />
+      <LoginFormInner orgContext={orgContext} tenantContext={tenantContext} />
     </Suspense>
   )
 }

@@ -181,6 +181,27 @@ function normalizeUuid(value: unknown) {
   return normalized
 }
 
+function normalizeSafeRelativeRedirect(value: unknown, fallback: string) {
+  const candidate = String(value || '').trim()
+  if (
+    !candidate
+    || !candidate.startsWith('/')
+    || candidate.startsWith('//')
+    || candidate.includes('\\')
+    || /[\u0000-\u001F\u007F]/.test(candidate)
+  ) {
+    return fallback
+  }
+
+  try {
+    const parsed = new URL(candidate, 'https://nizam.invalid')
+    if (parsed.origin !== 'https://nizam.invalid') return fallback
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`
+  } catch {
+    return fallback
+  }
+}
+
 function normalizePermissionList(value: unknown) {
   return Array.isArray(value)
     ? value
@@ -798,7 +819,7 @@ export async function signUp(formData: FormData) {
 export async function signIn(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
-  const redirectTo = formData.get('redirectTo') as string | null
+  const redirectTo = normalizeSafeRelativeRedirect(formData.get('redirectTo'), '/dashboard')
 
   if (isInternalAuthProvider()) {
     const cookieStore = await cookies()
@@ -836,7 +857,7 @@ export async function signIn(formData: FormData) {
     }
 
     revalidatePath('/', 'layout')
-    redirect(redirectTo || '/dashboard')
+    redirect(redirectTo)
   }
 
   const supabase = await createClient()
@@ -849,7 +870,7 @@ export async function signIn(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect(redirectTo || '/dashboard')
+  redirect(redirectTo)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1112,7 +1133,7 @@ export async function registerEmployeeAccount(formData: FormData) {
 export async function signInWithNik(formData: FormData) {
   let nik = (formData.get('nik') as string)?.trim()
   const password = (formData.get('password') as string)
-  const redirectTo = (formData.get('redirectTo') as string)
+  const redirectTo = normalizeSafeRelativeRedirect(formData.get('redirectTo'), '/karyawan')
   // orgId dari slug page (strict) — NIK HARUS ada di org ini
   const strictOrgId = normalizeUuid(formData.get('orgId'))
   // orgSlug dikirim dari slug page agar error redirect kembali ke halaman yang benar
@@ -1147,7 +1168,7 @@ export async function signInWithNik(formData: FormData) {
     }
 
     revalidatePath('/', 'layout')
-    return redirect(redirectTo || '/karyawan')
+    return redirect(redirectTo)
   }
 
   const adminClient = await createAdminClient()
@@ -1239,7 +1260,7 @@ export async function signInWithNik(formData: FormData) {
 
         setActiveOrganizationCookie(cookieStore, preferredOrgId)
         revalidatePath('/', 'layout')
-        return redirect(redirectTo || '/karyawan')
+        return redirect(redirectTo)
       }
     }
   }

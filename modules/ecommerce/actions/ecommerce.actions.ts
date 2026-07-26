@@ -26,6 +26,8 @@ function revalidateStorePaths(formData: FormData) {
 
   revalidatePath('/ecommerce')
   revalidatePath('/lms/admin/penjualan')
+  revalidatePath('/lms/admin/penjualan/paket-akses')
+  revalidatePath('/lms/admin/penjualan/ringkasan')
 
   if (orgSlug && storeSlug) {
     revalidatePath(`/toko/${orgSlug}/${storeSlug}`)

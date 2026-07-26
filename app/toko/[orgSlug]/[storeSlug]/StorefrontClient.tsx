@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -30,6 +30,8 @@ import {
   type StorefrontPublicPayload,
 } from '@/modules/ecommerce/lib/ecommerce'
 import { formatRupiah } from '@/lib/utils'
+import type { ConsultingHoldResult } from '@/modules/consulting/lib/consulting'
+import ConsultingBookingSelector from './ConsultingBookingSelector'
 
 type StorefrontClientProps = {
   payload: StorefrontPublicPayload
@@ -37,6 +39,8 @@ type StorefrontClientProps = {
   initialProductSlug?: string | null
   interactive?: boolean
   embedded?: boolean
+  routeMode?: 'standard' | 'custom-domain'
+  viewerAuthenticated?: boolean
 }
 
 type CartEntry = {
@@ -116,13 +120,11 @@ function SectionHeader({
 function EmptyCatalogState({
   accent,
   buttonRadius,
-  orgSlug,
-  storeSlug,
+  collectionHref,
 }: {
   accent: string
   buttonRadius: string
-  orgSlug: string
-  storeSlug: string
+  collectionHref: string
 }) {
   return (
     <div className="overflow-hidden rounded-[32px] border border-dashed border-slate-300 bg-white/90 p-6 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.45)] sm:p-8">
@@ -140,7 +142,7 @@ function EmptyCatalogState({
           </p>
           <div className="flex flex-wrap gap-3">
             <Link
-              href={`/toko/${orgSlug}/${storeSlug}/koleksi`}
+              href={collectionHref}
               className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black text-white"
               style={{ backgroundColor: accent, borderRadius: buttonRadius }}
             >
@@ -203,9 +205,14 @@ function ProductCard({
         >
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 via-slate-950/5 to-transparent opacity-80 transition duration-300 group-hover:opacity-100" />
           <div className="absolute left-4 right-4 top-4 flex items-start justify-between gap-3">
-            {product.subscriptionPlan ? (
+            {product.consulting ? (
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-teal-50/95 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-teal-800 shadow-sm">
+                Consulting 360
+              </div>
+            ) : product.subscriptionPlan ? (
               <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/95 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 shadow-sm">
-                <span>⭐ Paket • {product.subscriptionPlan.durationLabel}</span>
+                <Sparkles aria-hidden="true" size={13} />
+                <span>Paket • {product.subscriptionPlan.durationLabel}</span>
               </div>
             ) : product.badgeText ? (
               <div className="inline-flex rounded-full bg-white/92 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-700 shadow-sm">
@@ -222,7 +229,9 @@ function ProductCard({
                     : 'bg-rose-50 text-rose-700'
                 }`}
             >
-              {product.subscriptionPlan
+              {product.consulting
+                ? `${product.consulting.sessionCount} sesi privat`
+                : product.subscriptionPlan
                 ? '⭐ Langganan Aktif'
                 : inStock
                   ? 'Siap kirim'
@@ -239,7 +248,11 @@ function ProductCard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
-          {product.subscriptionPlan ? (
+          {product.consulting ? (
+            <span className="font-extrabold text-teal-700">
+              {product.consulting.consultants.length} konsultan • {product.consulting.durationMinutes} menit/sesi
+            </span>
+          ) : product.subscriptionPlan ? (
             <span className="font-extrabold text-amber-700">Akses Langganan {product.subscriptionPlan.durationLabel}</span>
           ) : (
             <span>{product.variants.length > 0 ? `${product.variants.length} varian` : 'Produk tunggal'}</span>
@@ -298,7 +311,11 @@ function ProductCard({
               className="inline-flex items-center gap-2 px-4 py-3 text-xs font-black text-white"
               style={{ backgroundColor: accent, borderRadius: radius }}
             >
-              {product.subscriptionPlan ? 'Daftar Langganan' : 'Pilih Paket'}
+              {product.consulting
+                ? 'Pilih Jadwal'
+                : product.subscriptionPlan
+                  ? 'Daftar Langganan'
+                  : 'Pilih Paket'}
               <ChevronRight size={14} />
             </button>
           )}
@@ -314,6 +331,8 @@ export default function StorefrontClient({
   initialProductSlug = null,
   interactive = true,
   embedded = false,
+  routeMode = 'standard',
+  viewerAuthenticated = false,
 }: StorefrontClientProps) {
   const [cart, setCart] = useState<CartEntry[]>([])
   const [selectedVariantByProductId, setSelectedVariantByProductId] = useState<Record<string, string>>({})
@@ -328,6 +347,7 @@ export default function StorefrontClient({
   const [couponAppliedSignature, setCouponAppliedSignature] = useState('')
   const [couponLoading, setCouponLoading] = useState(false)
   const [couponError, setCouponError] = useState('')
+  const [consultingHolds, setConsultingHolds] = useState<Record<string, ConsultingHoldResult>>({})
   const [checkoutForm, setCheckoutForm] = useState({
     customerName: '',
     customerEmail: '',
@@ -348,6 +368,7 @@ export default function StorefrontClient({
   const [singleCheckoutQty, setSingleCheckoutQty] = useState<number>(1)
 
   const selectedProduct = payload.products.find((product) => product.slug === initialProductSlug) || payload.products[0] || null
+  const productPageConfig = selectedProduct?.pageConfig
   const radius = formatStoreThemeRadius(payload.theme.tokens.cardRadius)
   const buttonRadius = formatStoreThemeButtonRadius(payload.theme.tokens.buttonRadius)
   const shadow = formatThemeShadow(payload.theme.tokens.shadow)
@@ -359,6 +380,26 @@ export default function StorefrontClient({
       : pageMode === 'product'
         ? payload.theme.layout.product
         : []
+  const homeHref = routeMode === 'custom-domain'
+    ? '/'
+    : `/toko/${payload.store.orgSlug}/${payload.store.slug}`
+  const collectionHref = routeMode === 'custom-domain'
+    ? '/catalog'
+    : `/toko/${payload.store.orgSlug}/${payload.store.slug}/koleksi`
+  const cartHref = routeMode === 'custom-domain'
+    ? '/cart'
+    : getCartHref(payload.store.orgSlug, payload.store.slug)
+  const productHref = (slug: string) => (
+    routeMode === 'custom-domain'
+      ? `/product/${slug}`
+      : `/toko/${payload.store.orgSlug}/${payload.store.slug}/produk/${slug}`
+  )
+  const primaryPortalHref = viewerAuthenticated ? '/dashboard' : collectionHref
+  const primaryPortalLabel = viewerAuthenticated ? 'Buka Dashboard' : 'Lihat Program'
+  const secondaryPortalHref = viewerAuthenticated
+    ? '/my-courses'
+    : '/login?redirectTo=%2Fdashboard'
+  const secondaryPortalLabel = viewerAuthenticated ? 'Lanjutkan Belajar' : 'Masuk'
 
   useEffect(() => {
     if (!interactive) return
@@ -446,6 +487,13 @@ export default function StorefrontClient({
   const activeCouponQuote = couponQuote && couponAppliedSignature === couponCurrentSignature
     ? couponQuote
     : null
+  const checkoutProducts = couponRequestItems
+    .map((item) => payload.products.find((product) => product.id === item.productId))
+    .filter((product): product is StorefrontProductView => Boolean(product))
+  const consultingCheckoutProducts = checkoutProducts.filter(
+    (product) => product.offeringType === 'CONSULTING_1_ON_1' && product.consulting,
+  )
+  const checkoutNeedsShipping = checkoutProducts.some((product) => Boolean(product.allowQuantity))
   const checkoutDiscountAmount = activeCouponQuote?.discountAmount || 0
   const selectedShippingRate = useMemo(() => (
     resolveShippingRateForAddress(
@@ -470,7 +518,9 @@ export default function StorefrontClient({
   ])
   const cartGrandTotal = Math.max(
     0,
-    cartSubtotal - checkoutDiscountAmount + (selectedShippingRate?.amount || 0),
+    cartSubtotal
+      - checkoutDiscountAmount
+      + (checkoutNeedsShipping ? (selectedShippingRate?.amount || 0) : 0),
   )
   const storeName = payload.store.brandName || payload.store.name
   const storeInitials = getStoreInitials(storeName)
@@ -533,6 +583,8 @@ export default function StorefrontClient({
     setCart((current) => current
       .map((item) => {
         if (item.productId !== productId || item.variantId !== variantId) return item
+        const product = payload.products.find((entry) => entry.id === productId)
+        if (product?.allowQuantity === false && delta > 0) return item
         return { ...item, quantity: Math.max(0, item.quantity + delta) }
       })
       .filter((item) => item.quantity > 0))
@@ -586,6 +638,18 @@ export default function StorefrontClient({
     setCouponError('')
   }
 
+  const handleConsultingHoldChange = useCallback((
+    storeProductId: string,
+    nextHold: ConsultingHoldResult | null,
+  ) => {
+    setConsultingHolds((current) => {
+      const next = { ...current }
+      if (nextHold) next[storeProductId] = nextHold
+      else delete next[storeProductId]
+      return next
+    })
+  }, [])
+
   async function submitCheckout() {
     if (!interactive) return
     const itemsToSubmit = couponRequestItems
@@ -610,8 +674,17 @@ export default function StorefrontClient({
       return
     }
 
-    const isDigitalOnlyStore = payload.shippingRates.length === 0
-    if (!isDigitalOnlyStore && !selectedShippingRate && !checkoutForm.shippingRateId) {
+    const missingConsultingSchedule = consultingCheckoutProducts.find(
+      (product) => !consultingHolds[product.storeProductId],
+    )
+    if (missingConsultingSchedule) {
+      setCheckoutError(
+        `Pilih konsultan dan seluruh jadwal untuk ${missingConsultingSchedule.name} sebelum checkout.`,
+      )
+      return
+    }
+
+    if (checkoutNeedsShipping && !selectedShippingRate && !checkoutForm.shippingRateId) {
       setCheckoutError('Silakan pilih metode/zona pengiriman terlebih dahulu.')
       return
     }
@@ -635,16 +708,21 @@ export default function StorefrontClient({
           customerPhone: checkoutForm.customerPhone,
           customerNote: checkoutForm.customerNote,
           couponCode: activeCouponQuote?.code || undefined,
-          shippingRateId: isDigitalOnlyStore ? undefined : (selectedShippingRate?.id || checkoutForm.shippingRateId),
+          consultingHoldTokens: consultingCheckoutProducts.map(
+            (product) => consultingHolds[product.storeProductId]?.holdToken,
+          ).filter(Boolean),
+          shippingRateId: checkoutNeedsShipping
+            ? (selectedShippingRate?.id || checkoutForm.shippingRateId)
+            : undefined,
           address: {
             recipientName: checkoutForm.recipientName || checkoutForm.customerName,
             phone: checkoutForm.addressPhone || checkoutForm.customerPhone,
-            line1: isDigitalOnlyStore ? 'Alamat Digital' : checkoutForm.line1,
+            line1: checkoutNeedsShipping ? checkoutForm.line1 : 'Alamat Digital',
             line2: checkoutForm.line2,
-            district: isDigitalOnlyStore ? 'Digital' : checkoutForm.district,
-            city: isDigitalOnlyStore ? 'Digital' : checkoutForm.city,
-            province: isDigitalOnlyStore ? 'Digital' : checkoutForm.province,
-            postalCode: isDigitalOnlyStore ? '00000' : checkoutForm.postalCode,
+            district: checkoutNeedsShipping ? checkoutForm.district : 'Digital',
+            city: checkoutNeedsShipping ? checkoutForm.city : 'Digital',
+            province: checkoutNeedsShipping ? checkoutForm.province : 'Digital',
+            postalCode: checkoutNeedsShipping ? checkoutForm.postalCode : '00000',
             country: 'ID',
             notes: checkoutForm.notes,
           },
@@ -660,6 +738,7 @@ export default function StorefrontClient({
       const checkoutData = result.data as CheckoutResult
       setCheckoutResult(checkoutData)
       setCart([])
+      setConsultingHolds({})
       removeCoupon()
       setCheckoutIdempotencyKey(crypto.randomUUID())
 
@@ -792,19 +871,23 @@ export default function StorefrontClient({
               </div>
               <div className="flex flex-wrap gap-3">
                 <a
-                  href={block.ctaHref || '#products'}
-                  className="inline-flex items-center gap-2 px-6 py-4 text-sm font-black text-slate-900"
+                  href={block.ctaHref || (
+                    routeMode === 'custom-domain' ? primaryPortalHref : '#products'
+                  )}
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-2 px-6 py-4 text-sm font-black text-slate-900 transition-opacity duration-200 hover:opacity-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
                   style={{ backgroundColor: '#FFFFFF', borderRadius: buttonRadius }}
                 >
-                  {block.ctaLabel || 'Belanja Sekarang'}
+                  {block.ctaLabel || (
+                    routeMode === 'custom-domain' ? primaryPortalLabel : 'Belanja Sekarang'
+                  )}
                   <ArrowRight size={16} />
                 </a>
                 <Link
-                  href={`/toko/${payload.store.orgSlug}/${payload.store.slug}/koleksi`}
-                  className="inline-flex items-center gap-2 border px-6 py-4 text-sm font-black text-white"
+                  href={routeMode === 'custom-domain' ? secondaryPortalHref : collectionHref}
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-2 border px-6 py-4 text-sm font-black text-white transition-colors duration-200 hover:bg-white/10 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
                   style={{ borderColor: 'rgba(255,255,255,0.3)', borderRadius: buttonRadius }}
                 >
-                  Lihat Koleksi
+                  {routeMode === 'custom-domain' ? secondaryPortalLabel : 'Lihat Koleksi'}
                 </Link>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
@@ -862,7 +945,7 @@ export default function StorefrontClient({
                         type="button"
                         onClick={() => {
                           if (!interactive) return
-                          window.location.assign(`/toko/${payload.store.orgSlug}/${payload.store.slug}/produk/${product.slug}`)
+                          window.location.assign(productHref(product.slug))
                         }}
                         className="grid w-full gap-3 rounded-[22px] border border-white/12 bg-slate-950/16 p-3 text-left transition hover:bg-slate-950/22 sm:grid-cols-[88px_1fr]"
                       >
@@ -954,7 +1037,7 @@ export default function StorefrontClient({
             body={block.body}
             action={(
               <Link
-                href={`/toko/${payload.store.orgSlug}/${payload.store.slug}/koleksi`}
+                href={collectionHref}
                 className="inline-flex items-center gap-2 text-sm font-black text-slate-700"
               >
                 Lihat semua koleksi
@@ -966,8 +1049,7 @@ export default function StorefrontClient({
             <EmptyCatalogState
               accent={payload.theme.tokens.accent}
               buttonRadius={buttonRadius}
-              orgSlug={payload.store.orgSlug}
-              storeSlug={payload.store.slug}
+              collectionHref={collectionHref}
             />
           ) : (
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -978,7 +1060,7 @@ export default function StorefrontClient({
                   onAdd={() => handleAddToCart(product)}
                   onOpen={() => {
                     if (!interactive) return
-                    window.location.assign(`/toko/${payload.store.orgSlug}/${payload.store.slug}/produk/${product.slug}`)
+                    window.location.assign(productHref(product.slug))
                   }}
                   accent={payload.theme.tokens.accent}
                   border={payload.theme.tokens.border}
@@ -1218,11 +1300,11 @@ export default function StorefrontClient({
               ))}
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link href={`/toko/${payload.store.orgSlug}/${payload.store.slug}/produk/${featuredProduct.slug}`} className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black text-white" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
+              <Link href={productHref(featuredProduct.slug)} className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black text-white" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
                 Pilih Paket Ini
                 <ChevronRight size={16} />
               </Link>
-              <Link href={getCartHref(payload.store.orgSlug, payload.store.slug)} className="inline-flex items-center gap-2 border px-5 py-3 text-sm font-black text-slate-700" style={{ borderColor: payload.theme.tokens.border, borderRadius: buttonRadius }}>
+              <Link href={cartHref} className="inline-flex items-center gap-2 border px-5 py-3 text-sm font-black text-slate-700" style={{ borderColor: payload.theme.tokens.border, borderRadius: buttonRadius }}>
                 Buka Keranjang
               </Link>
             </div>
@@ -1254,7 +1336,7 @@ export default function StorefrontClient({
               {block.body || payload.store.subheadline}
             </p>
             {block.ctaLabel && (
-              <Link href={block.ctaHref || getCartHref(payload.store.orgSlug, payload.store.slug)} className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black text-white" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
+              <Link href={block.ctaHref || cartHref} className="inline-flex items-center gap-2 px-5 py-3 text-sm font-black text-white" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
                 {block.ctaLabel}
                 <ExternalLink size={14} />
               </Link>
@@ -1274,7 +1356,7 @@ export default function StorefrontClient({
     : null
   const singleUnitPrice = activeSingleVariant ? activeSingleVariant.price : (selectedProduct ? selectedProduct.price : 0)
   const singleSubtotal = singleUnitPrice * singleCheckoutQty
-  const isDigitalOnlyStore = payload.shippingRates.length === 0
+  const isDigitalOnlyStore = !checkoutNeedsShipping
   const singleGrandTotal = Math.max(
     0,
     singleSubtotal
@@ -1302,7 +1384,7 @@ export default function StorefrontClient({
       className={embedded ? 'min-h-0 overflow-hidden' : 'relative min-h-screen overflow-hidden'}
       style={{
         background: pageMode === 'product'
-          ? '#F8FAFC'
+          ? `linear-gradient(180deg, ${payload.theme.tokens.surface} 0%, ${payload.theme.tokens.surfaceAlt} 100%)`
           : `linear-gradient(180deg, ${payload.theme.tokens.surface} 0%, ${payload.theme.tokens.surfaceAlt} 100%)`,
         fontFamily,
         color: payload.theme.tokens.text,
@@ -1339,22 +1421,41 @@ export default function StorefrontClient({
               </div>
 
               <nav className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 p-1 md:flex">
-                <Link href={`/toko/${payload.store.orgSlug}/${payload.store.slug}`} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Beranda</Link>
-                <Link href={`/toko/${payload.store.orgSlug}/${payload.store.slug}/koleksi`} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Koleksi</Link>
-                <Link href={getCartHref(payload.store.orgSlug, payload.store.slug)} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Keranjang</Link>
+                <Link href={homeHref} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Beranda</Link>
+                <Link href={collectionHref} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Koleksi</Link>
+                <Link href={cartHref} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Keranjang</Link>
               </nav>
 
-              <Link href={getCartHref(payload.store.orgSlug, payload.store.slug)} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black text-white shadow-sm" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
-                <ShoppingCart size={16} />
-                <span className="hidden sm:inline">Keranjang</span>
-                {cartCount}
-              </Link>
+              <div className="flex items-center gap-2">
+                {routeMode === 'custom-domain' && (
+                  <Link
+                    href={viewerAuthenticated ? '/dashboard' : '/login?redirectTo=%2Fdashboard'}
+                    className="inline-flex min-h-11 cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 transition-colors duration-200 hover:bg-slate-50 hover:text-slate-950 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 sm:px-4"
+                  >
+                    {viewerAuthenticated ? 'Dashboard' : 'Masuk'}
+                  </Link>
+                )}
+                <Link href={cartHref} className="inline-flex min-h-11 cursor-pointer items-center gap-2 px-4 py-3 text-sm font-black text-white shadow-sm transition-opacity duration-200 hover:opacity-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
+                  <ShoppingCart size={16} />
+                  <span className="hidden sm:inline">Keranjang</span>
+                  {cartCount}
+                </Link>
+              </div>
             </div>
           </div>
         </header>
       )}
 
-      <main className={pageMode === 'product' ? 'relative mx-auto max-w-xl px-4 pb-20 pt-6 sm:px-6 sm:pt-8' : 'relative mx-auto max-w-7xl space-y-10 px-4 pb-20 sm:px-6 lg:space-y-12 lg:px-8'}>
+      <main className={pageMode === 'product'
+        ? `relative mx-auto px-4 pb-20 pt-6 sm:px-6 sm:pt-8 ${
+          productPageConfig?.layout === 'TWO_COLUMNS' ? 'max-w-6xl' : 'max-w-xl'
+        }`
+        : 'relative mx-auto max-w-7xl space-y-10 px-4 pb-20 sm:px-6 lg:space-y-12 lg:px-8'}>
+        {pageMode === 'product' && pageBlocks.length > 0 && (
+          <div className="mb-5 space-y-5">
+            {pageBlocks.map((block) => renderBlock(block))}
+          </div>
+        )}
         {pageMode === 'collection' && (
           <section className="grid gap-4 rounded-[32px] border bg-white p-6 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] lg:grid-cols-[1fr_auto]" style={{ borderColor: payload.theme.tokens.border }}>
             <div className="space-y-2">
@@ -1372,9 +1473,15 @@ export default function StorefrontClient({
         )}
 
         {pageMode === 'product' && selectedProduct && (
-          <div className="mx-auto max-w-xl space-y-5">
+          <div className={`mx-auto ${
+            productPageConfig?.layout === 'TWO_COLUMNS'
+              ? 'max-w-6xl space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0'
+              : 'max-w-xl space-y-5'
+          }`}>
             {/* Header / Brand Info terintegrasi dengan konten (Mobile-First) */}
-            <div className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white px-5 py-4 shadow-xs">
+            <div className={`flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white px-5 py-4 shadow-xs ${
+              productPageConfig?.layout === 'TWO_COLUMNS' ? 'lg:col-span-2' : ''
+            }`}>
               <div className="flex min-w-0 items-center gap-3.5">
                 {storeLogo ? (
                   <img src={storeLogo} alt={storeName} className="h-11 w-auto max-w-[100px] shrink-0 object-contain" />
@@ -1397,8 +1504,10 @@ export default function StorefrontClient({
             </div>
 
             {/* Optional Deskripsi Produk Ala Sejoli */}
-            {selectedProduct.description && (
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs">
+            {productPageConfig?.showDescription && selectedProduct.description && (
+              <div className={`rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs ${
+                productPageConfig.layout === 'TWO_COLUMNS' ? 'lg:col-span-2' : ''
+              }`}>
                 <div className="text-sm font-medium leading-relaxed text-slate-700 sm:text-base whitespace-pre-line">
                   {selectedProduct.description}
                 </div>
@@ -1434,7 +1543,8 @@ export default function StorefrontClient({
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {isUnlimitedProduct(selectedProduct) ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
-                          ✓ Akses Instan
+                          <CheckCircle2 aria-hidden="true" size={14} />
+                          Akses Instan
                         </span>
                       ) : (
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${getProductStock(selectedProduct) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
@@ -1508,10 +1618,35 @@ export default function StorefrontClient({
                   <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
                     <span className="text-xs font-semibold text-slate-500">Jenis Layanan</span>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">
-                      ✓ Akses Digital • Sekali Bayar
+                      <CheckCircle2 aria-hidden="true" size={14} />
+                      Akses Digital • Sekali Bayar
                     </span>
                   </div>
                 )}
+
+                {(selectedProduct.courseBenefits?.length || selectedProduct.consulting) ? (
+                  <div className="mt-5 rounded-xl border border-teal-200 bg-teal-50 p-4">
+                    <div className="text-sm font-black text-teal-950">
+                      {productPageConfig?.benefitTitle || 'Anda mendapatkan'}
+                    </div>
+                    <div className="mt-3 space-y-2 text-sm font-semibold text-teal-900">
+                      {selectedProduct.consulting ? (
+                        <div className="flex items-start gap-2">
+                          <CheckCircle2 aria-hidden="true" size={17} className="mt-0.5 shrink-0" />
+                          <span>
+                            {selectedProduct.consulting.sessionCount} sesi privat bersama konsultan pilihan
+                          </span>
+                        </div>
+                      ) : null}
+                      {(selectedProduct.courseBenefits || []).map((course) => (
+                        <div key={course.id} className="flex items-start gap-2">
+                          <CheckCircle2 aria-hidden="true" size={17} className="mt-0.5 shrink-0" />
+                          <span>Bonus course: {course.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="mt-5 border-t border-slate-100 pt-4">
                   {renderCouponField()}
@@ -1542,10 +1677,27 @@ export default function StorefrontClient({
               </div>
             </div>
 
+            {selectedProduct.consulting ? (
+              <div className={productPageConfig?.layout === 'TWO_COLUMNS' ? 'lg:col-span-2' : ''}>
+                <ConsultingBookingSelector
+                  orgSlug={payload.store.orgSlug}
+                  storeSlug={payload.store.slug}
+                  storeProductId={selectedProduct.storeProductId}
+                  offering={selectedProduct.consulting}
+                  onHoldChange={(hold) => handleConsultingHoldChange(
+                    selectedProduct.storeProductId,
+                    hold,
+                  )}
+                />
+              </div>
+            ) : null}
+
             {/* Kotak 2: INFORMASI PRIBADI */}
             <div id="informasi-pribadi" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
               <div className="border-b border-slate-200/80 bg-slate-50/70 px-6 py-4">
-                <h2 className="text-base font-bold text-slate-900 sm:text-lg">2. Informasi Pribadi</h2>
+                <h2 className="text-base font-bold text-slate-900 sm:text-lg">
+                  2. {productPageConfig?.customerSectionTitle || 'Informasi Pribadi'}
+                </h2>
               </div>
 
               <div className="p-6 space-y-4">
@@ -1675,25 +1827,29 @@ export default function StorefrontClient({
                   </div>
                 )}
 
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                    Catatan Tambahan (Opsional)
-                  </label>
-                  <textarea
-                    value={checkoutForm.notes}
-                    onChange={(event) => setCheckoutForm((current) => ({ ...current, notes: event.target.value }))}
-                    placeholder="Catatan pesanan, instruksi khusus, atau informasi lainnya..."
-                    rows={2}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                  />
-                </div>
+                {productPageConfig?.showBuyerNote && (
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                      Catatan Tambahan (Opsional)
+                    </label>
+                    <textarea
+                      value={checkoutForm.notes}
+                      onChange={(event) => setCheckoutForm((current) => ({ ...current, notes: event.target.value }))}
+                      placeholder="Catatan pesanan, instruksi khusus, atau informasi lainnya..."
+                      rows={2}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Kotak 3: PILIH METODE PEMBAYARAN & TOMBOL BELI SEKARANG */}
             <div id="metode-pembayaran" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
               <div className="border-b border-slate-200/80 bg-slate-50/70 px-6 py-4">
-                <h2 className="text-base font-bold text-slate-900 sm:text-lg">3. Metode Pembayaran & Konfirmasi</h2>
+                <h2 className="text-base font-bold text-slate-900 sm:text-lg">
+                  3. {productPageConfig?.paymentSectionTitle || 'Metode Pembayaran & Konfirmasi'}
+                </h2>
               </div>
 
               <div className="p-6 space-y-4">
@@ -1702,7 +1858,9 @@ export default function StorefrontClient({
                     <div className="h-2 w-2 rounded-full bg-white" />
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-slate-900">Transfer Bank / Virtual Account / E-Wallet</div>
+                    <div className="text-sm font-bold text-slate-900">
+                      {productPageConfig?.paymentMethodLabel || 'Transfer Bank / Virtual Account / E-Wallet'}
+                    </div>
                     <div className="text-xs text-slate-600">Verifikasi otomatis 24 jam melalui payment gateway.</div>
                   </div>
                 </div>
@@ -1725,26 +1883,37 @@ export default function StorefrontClient({
                         Memproses Pesanan...
                       </span>
                     ) : getProductStock(selectedProduct) > 0 ? (
-                      `Beli Sekarang • ${formatRupiah(singleGrandTotal)}`
+                      `${productPageConfig?.checkoutButtonLabel || 'Beli Sekarang'} • ${formatRupiah(singleGrandTotal)}`
                     ) : (
                       'Stok Sedang Habis'
                     )}
                   </button>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center text-xs font-semibold text-slate-500">
-                  <span>✓ Transaksi Aman & Terenkripsi</span>
-                  <span>•</span>
-                  <span>✓ Akses & Konfirmasi Otomatis</span>
-                  <span>•</span>
-                  <span>✓ Bantuan Admin 24/7</span>
-                </div>
+                {productPageConfig?.showTrustSignals && (
+                  <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center text-xs font-semibold text-slate-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <ShieldCheck aria-hidden="true" size={14} />
+                    Transaksi Aman & Terenkripsi
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <CheckCircle2 aria-hidden="true" size={14} />
+                    Akses & Konfirmasi Otomatis
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Store aria-hidden="true" size={14} />
+                    Bantuan Admin 24/7
+                  </span>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Success state inline */}
             {checkoutResult && (
-              <div id="checkout-result-card" className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/90 shadow-xs">
+              <div id="checkout-result-card" className={`overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/90 shadow-xs ${
+                productPageConfig?.layout === 'TWO_COLUMNS' ? 'lg:col-span-2' : ''
+              }`}>
                 <div className="p-6 sm:p-8 flex items-start gap-4">
                   <div className="rounded-full bg-emerald-600 p-3 text-white shadow-xs">
                     <CheckCircle2 size={24} />
@@ -1811,7 +1980,7 @@ export default function StorefrontClient({
                       <div className="space-y-4 rounded-[22px] border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-sm font-medium leading-relaxed text-slate-500">
                         <div>Keranjang Anda masih kosong. Pilih dulu paket yang ingin dipesan, lalu kembali ke halaman ini untuk lanjut checkout.</div>
                         <Link
-                          href={`/toko/${payload.store.orgSlug}/${payload.store.slug}/koleksi`}
+                          href={collectionHref}
                           className="inline-flex items-center gap-2 text-sm font-black"
                           style={{ color: payload.theme.tokens.accentStrong }}
                         >
@@ -1862,10 +2031,12 @@ export default function StorefrontClient({
                       <span>Subtotal</span>
                       <span className="font-black text-slate-950">{formatRupiah(cartSubtotal)}</span>
                     </div>
-                    <div className="flex items-center justify-between font-medium text-slate-600">
-                      <span>Ongkir</span>
-                      <span className="font-black text-slate-950">{formatRupiah(selectedShippingRate?.amount || 0)}</span>
-                    </div>
+                    {checkoutNeedsShipping ? (
+                      <div className="flex items-center justify-between font-medium text-slate-600">
+                        <span>Ongkir</span>
+                        <span className="font-black text-slate-950">{formatRupiah(selectedShippingRate?.amount || 0)}</span>
+                      </div>
+                    ) : null}
                     {checkoutDiscountAmount > 0 && (
                       <div className="flex items-center justify-between font-semibold text-emerald-700">
                         <span>Kode diskon {activeCouponQuote?.code}</span>
@@ -1908,34 +2079,53 @@ export default function StorefrontClient({
                   )}
 
                   <div className="mt-6 grid gap-3">
+                    {cartLines
+                      .filter((line) => Boolean(line.product?.consulting))
+                      .map((line) => line.product?.consulting ? (
+                        <ConsultingBookingSelector
+                          key={line.product.storeProductId}
+                          orgSlug={payload.store.orgSlug}
+                          storeSlug={payload.store.slug}
+                          storeProductId={line.product.storeProductId}
+                          offering={line.product.consulting}
+                          onHoldChange={(hold) => handleConsultingHoldChange(
+                            line.product?.storeProductId || '',
+                            hold,
+                          )}
+                        />
+                      ) : null)}
                     <input value={checkoutForm.customerName} onChange={(event) => setCheckoutForm((current) => ({ ...current, customerName: event.target.value, recipientName: current.recipientName || event.target.value }))} placeholder="Nama pelanggan" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
                     <div className="grid gap-3 md:grid-cols-2">
                       <input value={checkoutForm.customerEmail} onChange={(event) => setCheckoutForm((current) => ({ ...current, customerEmail: event.target.value }))} placeholder="Email" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
                       <input value={checkoutForm.customerPhone} onChange={(event) => setCheckoutForm((current) => ({ ...current, customerPhone: event.target.value, addressPhone: current.addressPhone || event.target.value }))} placeholder="No. WhatsApp" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
                     </div>
-                    <textarea value={checkoutForm.line1} onChange={(event) => setCheckoutForm((current) => ({ ...current, line1: event.target.value }))} rows={3} placeholder="Alamat lengkap" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <input value={checkoutForm.district} onChange={(event) => setCheckoutForm((current) => ({ ...current, district: event.target.value }))} placeholder="Kecamatan" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
-                      <input value={checkoutForm.city} onChange={(event) => setCheckoutForm((current) => ({ ...current, city: event.target.value }))} placeholder="Kota" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <input value={checkoutForm.province} onChange={(event) => setCheckoutForm((current) => ({ ...current, province: event.target.value }))} placeholder="Provinsi" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
-                      <input value={checkoutForm.postalCode} onChange={(event) => setCheckoutForm((current) => ({ ...current, postalCode: event.target.value }))} placeholder="Kode pos" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
-                    </div>
-                    <select value={selectedShippingRate?.id || checkoutForm.shippingRateId} onChange={(event) => setCheckoutForm((current) => ({ ...current, shippingRateId: event.target.value }))} className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-bold outline-none focus:border-blue-500">
-                      {payload.shippingRates.map((rate) => (
-                        <option key={rate.id} value={rate.id}>{rate.zoneName} • {rate.name} • {formatRupiah(rate.amount)}</option>
-                      ))}
-                    </select>
-                    {selectedShippingRate ? (
-                      <div className="rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">
-                        Ongkir aktif mengikuti alamat: {selectedShippingRate.zoneName} • {selectedShippingRate.name} • {formatRupiah(selectedShippingRate.amount)}
-                      </div>
-                    ) : (
-                      <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700">
-                        Alamat ini belum cocok dengan zona ongkir aktif. Cek lagi kota, provinsi, dan kode pos Anda.
-                      </div>
-                    )}
+                    {!isDigitalOnlyStore ? (
+                      <>
+                        <textarea value={checkoutForm.line1} onChange={(event) => setCheckoutForm((current) => ({ ...current, line1: event.target.value }))} rows={3} placeholder="Alamat lengkap" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <input value={checkoutForm.district} onChange={(event) => setCheckoutForm((current) => ({ ...current, district: event.target.value }))} placeholder="Kecamatan" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
+                          <input value={checkoutForm.city} onChange={(event) => setCheckoutForm((current) => ({ ...current, city: event.target.value }))} placeholder="Kota" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <input value={checkoutForm.province} onChange={(event) => setCheckoutForm((current) => ({ ...current, province: event.target.value }))} placeholder="Provinsi" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
+                          <input value={checkoutForm.postalCode} onChange={(event) => setCheckoutForm((current) => ({ ...current, postalCode: event.target.value }))} placeholder="Kode pos" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
+                        </div>
+                        <select value={selectedShippingRate?.id || checkoutForm.shippingRateId} onChange={(event) => setCheckoutForm((current) => ({ ...current, shippingRateId: event.target.value }))} className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-bold outline-none focus:border-blue-500">
+                          {payload.shippingRates.map((rate) => (
+                            <option key={rate.id} value={rate.id}>{rate.zoneName} • {rate.name} • {formatRupiah(rate.amount)}</option>
+                          ))}
+                        </select>
+                        {selectedShippingRate ? (
+                          <div className="rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">
+                            Ongkir aktif mengikuti alamat: {selectedShippingRate.zoneName} • {selectedShippingRate.name} • {formatRupiah(selectedShippingRate.amount)}
+                          </div>
+                        ) : (
+                          <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700">
+                            Alamat ini belum cocok dengan zona ongkir aktif. Cek lagi kota, provinsi, dan kode pos Anda.
+                          </div>
+                        )}
+                      </>
+                    ) : null}
                     <textarea value={checkoutForm.customerNote} onChange={(event) => setCheckoutForm((current) => ({ ...current, customerNote: event.target.value }))} rows={2} placeholder="Catatan order" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
 
                     {checkoutError && (

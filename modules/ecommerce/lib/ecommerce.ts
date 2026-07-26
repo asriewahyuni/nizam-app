@@ -1,4 +1,5 @@
 import { generateSlug } from '@/lib/utils'
+import type { PublicConsultingOffering } from '@/modules/consulting/lib/consulting'
 
 export const STORE_THEME_BLOCK_TYPES = [
   'hero',
@@ -149,6 +150,60 @@ export type StorefrontVariantView = {
   choices: StorefrontAttributeChoice[]
 }
 
+export type StorefrontProductPageConfig = {
+  layout: 'SINGLE_COLUMN' | 'TWO_COLUMNS'
+  checkoutButtonLabel: string
+  benefitTitle: string
+  customerSectionTitle: string
+  paymentSectionTitle: string
+  paymentMethodLabel: string
+  showDescription: boolean
+  showBuyerNote: boolean
+  showTrustSignals: boolean
+}
+
+export const DEFAULT_STOREFRONT_PRODUCT_PAGE_CONFIG: StorefrontProductPageConfig = {
+  layout: 'SINGLE_COLUMN',
+  checkoutButtonLabel: 'Beli Sekarang',
+  benefitTitle: 'Anda mendapatkan',
+  customerSectionTitle: 'Informasi Pribadi',
+  paymentSectionTitle: 'Metode Pembayaran & Konfirmasi',
+  paymentMethodLabel: 'Transfer Bank / Virtual Account / E-Wallet',
+  showDescription: true,
+  showBuyerNote: true,
+  showTrustSignals: true,
+}
+
+export function normalizeStorefrontProductPageConfig(
+  value: unknown,
+): StorefrontProductPageConfig {
+  const root = value && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : {}
+  const raw = root.pageLayout && typeof root.pageLayout === 'object'
+    ? root.pageLayout as Record<string, unknown>
+    : root
+  const text = (key: string, fallback: string, maxLength = 120) => {
+    const normalized = String(raw[key] || '').trim()
+    return (normalized || fallback).slice(0, maxLength)
+  }
+  const flag = (key: string, fallback: boolean) => (
+    typeof raw[key] === 'boolean' ? Boolean(raw[key]) : fallback
+  )
+
+  return {
+    layout: raw.layout === 'TWO_COLUMNS' ? 'TWO_COLUMNS' : 'SINGLE_COLUMN',
+    checkoutButtonLabel: text('checkoutButtonLabel', DEFAULT_STOREFRONT_PRODUCT_PAGE_CONFIG.checkoutButtonLabel, 80),
+    benefitTitle: text('benefitTitle', DEFAULT_STOREFRONT_PRODUCT_PAGE_CONFIG.benefitTitle, 100),
+    customerSectionTitle: text('customerSectionTitle', DEFAULT_STOREFRONT_PRODUCT_PAGE_CONFIG.customerSectionTitle, 100),
+    paymentSectionTitle: text('paymentSectionTitle', DEFAULT_STOREFRONT_PRODUCT_PAGE_CONFIG.paymentSectionTitle, 100),
+    paymentMethodLabel: text('paymentMethodLabel', DEFAULT_STOREFRONT_PRODUCT_PAGE_CONFIG.paymentMethodLabel, 120),
+    showDescription: flag('showDescription', true),
+    showBuyerNote: flag('showBuyerNote', true),
+    showTrustSignals: flag('showTrustSignals', true),
+  }
+}
+
 export type StorefrontProductView = {
   id: string
   storeProductId: string
@@ -157,6 +212,8 @@ export type StorefrontProductView = {
   name: string
   shortDescription: string
   description: string
+  seoTitle: string
+  seoDescription: string
   badgeText: string
   price: number
   comparePrice: number
@@ -166,7 +223,9 @@ export type StorefrontProductView = {
   isPublished: boolean
   stockQty: number
   productType?: string
+  offeringType?: 'STANDARD' | 'CONSULTING_1_ON_1'
   allowQuantity?: boolean
+  pageConfig: StorefrontProductPageConfig
   variants: StorefrontVariantView[]
   subscriptionPlan?: {
     id: string
@@ -178,6 +237,12 @@ export type StorefrontProductView = {
     signupFee: number
     durationLabel: string
   }
+  consulting?: PublicConsultingOffering | null
+  courseBenefits?: Array<{
+    id: string
+    title: string
+    slug: string
+  }>
 }
 
 export type StorefrontShippingRuleMatcher = {
@@ -248,6 +313,8 @@ export type StoreAdminSummary = {
   isPublished: boolean
   domainList: string[]
   transferInstructions: string
+  seoTitle: string
+  seoDescription: string
   heroNotice: string
   checkoutNotice: string
   allowGuestCheckout: boolean
@@ -271,6 +338,8 @@ export type AdminStoreProductView = {
   publicName: string
   shortDescription: string
   publicDescription: string
+  seoTitle: string
+  seoDescription: string
   priceOverride: number | null
   comparePrice: number | null
   badgeText: string
@@ -278,6 +347,8 @@ export type AdminStoreProductView = {
   isFeatured: boolean
   isPublished: boolean
   imageUrl: string
+  pageConfig: StorefrontProductPageConfig
+  offeringType: 'STANDARD' | 'CONSULTING_1_ON_1'
   subscriptionPlan?: {
     id: string
     name: string

@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation'
 import {
   BadgeCheck,
   BookOpen,
+  BriefcaseBusiness,
+  CalendarClock,
   DatabaseZap,
   GraduationCap,
   LayoutDashboard,
@@ -51,25 +53,30 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
     && currentHost === tenant.primaryHostname.toLowerCase(),
   )
   const basePath = isCustomDomain ? '' : `/member/${tenant.slug}`
-  const callbackPath = basePath || '/'
+  const portalPath = (cleanPath: string, legacyPath: string) => (
+    isCustomDomain ? cleanPath : `${basePath}${legacyPath}`
+  )
+  const callbackPath = isCustomDomain ? '/dashboard' : (basePath || '/')
   const navigation = [
-    { href: basePath || '/', label: 'Beranda', icon: LayoutDashboard },
-    { href: `${basePath}/katalog`, label: 'Katalog', icon: BookOpen },
+    { href: portalPath('/dashboard', ''), label: 'Beranda', icon: LayoutDashboard },
+    { href: portalPath('/courses', '/katalog'), label: 'Katalog', icon: BookOpen },
     ...(member ? [
-      { href: `${basePath}/kelas`, label: 'Kelas Saya', icon: GraduationCap },
-      { href: `${basePath}/pesanan`, label: 'Pesanan', icon: ReceiptText },
-      { href: `${basePath}/langganan`, label: 'Langganan', icon: WalletCards },
-      { href: `${basePath}/sertifikat`, label: 'Sertifikat', icon: BadgeCheck },
+      { href: portalPath('/my-courses', '/kelas'), label: 'Kelas Saya', icon: GraduationCap },
+      { href: portalPath('/consulting', '/konsultasi'), label: 'Consulting 360', icon: BriefcaseBusiness },
+      { href: portalPath('/orders', '/pesanan'), label: 'Pesanan', icon: ReceiptText },
+      { href: portalPath('/subscriptions', '/langganan'), label: 'Langganan', icon: WalletCards },
+      { href: portalPath('/certificates', '/sertifikat'), label: 'Sertifikat', icon: BadgeCheck },
     ] : []),
     ...(member?.isTutor ? [
-      { href: `${basePath}/tutor`, label: 'Panel Tutor', icon: UsersRound },
+      { href: portalPath('/tutor', '/tutor'), label: 'Panel Tutor', icon: UsersRound },
+      { href: portalPath('/tutor/consulting', '/tutor/konsultasi'), label: 'Jadwal Konsultasi', icon: CalendarClock },
     ] : []),
-    ...(member?.isAdmin ? [
+    ...(member?.isAdmin && !isCustomDomain ? [
       { href: `${basePath}/admin/sertifikat`, label: 'Template Sertifikat', icon: BadgeCheck },
       { href: `${basePath}/admin/migrasi`, label: 'Migrasi', icon: DatabaseZap },
     ] : []),
     ...(member?.isAffiliate ? [
-      { href: `${basePath}/afiliasi`, label: 'Afiliasi', icon: PackageCheck },
+      { href: portalPath('/affiliate', '/afiliasi'), label: 'Afiliasi', icon: PackageCheck },
     ] : []),
   ]
 
@@ -118,7 +125,7 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
 
           {member ? (
             <Link
-              href={`${basePath}/profil`}
+              href={portalPath('/profile', '/profil')}
               className="ml-auto flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 2xl:ml-2"
               aria-label={`Buka profil ${member.displayName}`}
             >
@@ -127,7 +134,7 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
             </Link>
           ) : (
             <Link
-              href={`/login?callbackUrl=${encodeURIComponent(callbackPath)}`}
+              href={`/login?redirectTo=${encodeURIComponent(callbackPath)}`}
               className="ml-auto flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-orange-600 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-orange-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-200 2xl:ml-2"
             >
               <LogIn aria-hidden="true" size={18} />

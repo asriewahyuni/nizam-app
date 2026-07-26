@@ -3,6 +3,10 @@ import { updateSession } from '@/lib/supabase/middleware'
 
 const NEXT_ACTION_HEADER = 'next-action'
 const INTERNAL_SESSION_COOKIE = 'nizam_internal_session'
+const ERP_ONLY_PREFIXES = [
+  '/ecommerce',
+  '/lms/admin',
+]
 
 function isServerActionRequest(request: NextRequest) {
   return request.headers.has(NEXT_ACTION_HEADER)
@@ -17,6 +21,174 @@ function createServerActionRedirectResponse(target: string) {
       location: target,
     },
   })
+}
+
+type ResolvedLmsTenant = {
+  orgSlug: string
+  storeSlug: string | null
+  rootBehavior: 'STOREFRONT' | 'LOGIN'
+}
+
+function rewriteTenantPath(
+  pathname: string,
+  tenant: ResolvedLmsTenant,
+): { kind: 'rewrite'; pathname: string } | { kind: 'redirect'; pathname: string } | null {
+  const orgRoot = `/member/${tenant.orgSlug}`
+  const storeRoot = tenant.storeSlug
+    ? `/toko/${tenant.orgSlug}/${tenant.storeSlug}`
+    : null
+
+  if (storeRoot && (pathname === storeRoot || pathname === `${storeRoot}/`)) {
+    return { kind: 'redirect', pathname: '/' }
+  }
+  if (storeRoot && pathname === `${storeRoot}/koleksi`) {
+    return { kind: 'redirect', pathname: '/catalog' }
+  }
+  if (storeRoot && pathname === `${storeRoot}/keranjang`) {
+    return { kind: 'redirect', pathname: '/cart' }
+  }
+  if (storeRoot && pathname.startsWith(`${storeRoot}/produk/`)) {
+    return {
+      kind: 'redirect',
+      pathname: `/product/${pathname.slice(`${storeRoot}/produk/`.length)}`,
+    }
+  }
+  if (storeRoot && pathname.startsWith(`${storeRoot}/pesanan/`)) {
+    return {
+      kind: 'redirect',
+      pathname: `/order/${pathname.slice(`${storeRoot}/pesanan/`.length)}`,
+    }
+  }
+  if (pathname === orgRoot || pathname === `${orgRoot}/`) {
+    return { kind: 'redirect', pathname: '/dashboard' }
+  }
+  const legacyMemberRoutes: Record<string, string> = {
+    [`${orgRoot}/katalog`]: '/courses',
+    [`${orgRoot}/kelas`]: '/my-courses',
+    [`${orgRoot}/pesanan`]: '/orders',
+    [`${orgRoot}/langganan`]: '/subscriptions',
+    [`${orgRoot}/konsultasi`]: '/consulting',
+    [`${orgRoot}/sertifikat`]: '/certificates',
+    [`${orgRoot}/profil`]: '/profile',
+    [`${orgRoot}/afiliasi`]: '/affiliate',
+    [`${orgRoot}/tutor`]: '/tutor',
+    [`${orgRoot}/tutor/konsultasi`]: '/tutor/consulting',
+  }
+  if (legacyMemberRoutes[pathname]) {
+    return { kind: 'redirect', pathname: legacyMemberRoutes[pathname] }
+  }
+  const legacyCourseRoot = `/lms/${tenant.orgSlug}/course/`
+  if (pathname.startsWith(legacyCourseRoot)) {
+    return {
+      kind: 'redirect',
+      pathname: `/course/${pathname.slice(legacyCourseRoot.length)}`,
+    }
+  }
+  const legacyLearnRoot = `/lms/${tenant.orgSlug}/learn/`
+  if (pathname.startsWith(legacyLearnRoot)) {
+    return {
+      kind: 'redirect',
+      pathname: `/learn/${pathname.slice(legacyLearnRoot.length)}`,
+    }
+  }
+
+  if (pathname === '/') {
+    if (tenant.rootBehavior === 'STOREFRONT' && storeRoot) {
+      return { kind: 'rewrite', pathname: storeRoot }
+    }
+    return null
+  }
+
+  if (pathname === '/catalog' && storeRoot) {
+    return { kind: 'rewrite', pathname: `${storeRoot}/koleksi` }
+  }
+  if (pathname === '/cart' && storeRoot) {
+    return { kind: 'rewrite', pathname: `${storeRoot}/keranjang` }
+  }
+  if (pathname.startsWith('/product/') && storeRoot) {
+    return {
+      kind: 'rewrite',
+      pathname: `${storeRoot}/produk/${pathname.slice('/product/'.length)}`,
+    }
+  }
+  if (pathname.startsWith('/produk/') && storeRoot) {
+    return {
+      kind: 'redirect',
+      pathname: `/product/${pathname.slice('/produk/'.length)}`,
+    }
+  }
+  const legacyCleanMemberRoutes: Record<string, string> = {
+    '/katalog': '/courses',
+    '/kelas': '/my-courses',
+    '/pesanan': '/orders',
+    '/langganan': '/subscriptions',
+    '/konsultasi': '/consulting',
+    '/sertifikat': '/certificates',
+    '/profil': '/profile',
+    '/afiliasi': '/affiliate',
+  }
+  if (legacyCleanMemberRoutes[pathname]) {
+    return { kind: 'redirect', pathname: legacyCleanMemberRoutes[pathname] }
+  }
+  if (pathname.startsWith('/order/') && storeRoot) {
+    return {
+      kind: 'rewrite',
+      pathname: `${storeRoot}/pesanan/${pathname.slice('/order/'.length)}`,
+    }
+  }
+
+  if (pathname === '/dashboard') {
+    return { kind: 'rewrite', pathname: orgRoot }
+  }
+  if (pathname === '/courses') {
+    return { kind: 'rewrite', pathname: `${orgRoot}/katalog` }
+  }
+  if (pathname === '/my-courses') {
+    return { kind: 'rewrite', pathname: `${orgRoot}/kelas` }
+  }
+  if (pathname.startsWith('/course/')) {
+    return {
+      kind: 'rewrite',
+      pathname: `/lms/${tenant.orgSlug}/course/${pathname.slice('/course/'.length)}`,
+    }
+  }
+  if (pathname.startsWith('/learn/')) {
+    return {
+      kind: 'rewrite',
+      pathname: `/lms/${tenant.orgSlug}/learn/${pathname.slice('/learn/'.length)}`,
+    }
+  }
+
+  const memberRoutes: Record<string, string> = {
+    '/orders': 'pesanan',
+    '/subscriptions': 'langganan',
+    '/consulting': 'konsultasi',
+    '/certificates': 'sertifikat',
+    '/profile': 'profil',
+    '/affiliate': 'afiliasi',
+    '/tutor': 'tutor',
+  }
+  const exactMemberRoute = memberRoutes[pathname]
+  if (exactMemberRoute) {
+    return { kind: 'rewrite', pathname: `${orgRoot}/${exactMemberRoute}` }
+  }
+  if (pathname === '/tutor/consulting') {
+    return { kind: 'rewrite', pathname: `${orgRoot}/tutor/konsultasi` }
+  }
+  if (pathname.startsWith('/tutor/')) {
+    return {
+      kind: 'rewrite',
+      pathname: `${orgRoot}/tutor/${pathname.slice('/tutor/'.length)}`,
+    }
+  }
+  if (pathname.startsWith('/certificate/verify/')) {
+    return {
+      kind: 'rewrite',
+      pathname: `${orgRoot}/sertifikat/verifikasi/${pathname.slice('/certificate/verify/'.length)}`,
+    }
+  }
+
+  return null
 }
 
 /**
@@ -67,71 +239,64 @@ export async function proxy(request: NextRequest) {
   }
 
   const normalizedHost = String(host || '').trim().toLowerCase().split(':')[0]
-  const shouldAttemptMemberRewrite = Boolean(
+  const shouldResolveLmsTenant = Boolean(
     normalizedHost
-    && !pathname.startsWith('/member')
-    && !pathname.startsWith('/toko')
-    && !pathname.startsWith('/dashboard')
-    && !pathname.startsWith('/ecommerce')
-    && !pathname.startsWith('/lms')
     && !pathname.startsWith('/login')
     && !pathname.startsWith('/register')
-    && !pathname.startsWith('/onboarding')
     && !pathname.startsWith('/auth')
     && !pathname.startsWith('/expired')
+    && !pathname.startsWith('/onboarding')
   )
 
-  if (shouldAttemptMemberRewrite) {
+  if (shouldResolveLmsTenant) {
     try {
-      const resolveUrl = new URL('/api/member/resolve-domain', request.url)
+      const resolveUrl = new URL('/api/lms/resolve-domain', request.url)
       resolveUrl.searchParams.set('host', normalizedHost)
       const response = await fetch(resolveUrl, { cache: 'no-store' })
-
       if (response.ok) {
         const payload = await response.json()
         const orgSlug = String(payload?.data?.orgSlug || '').trim()
+        const storeSlug = String(payload?.data?.storeSlug || '').trim() || null
+        const rootBehavior = payload?.data?.rootBehavior === 'STOREFRONT'
+          ? 'STOREFRONT'
+          : 'LOGIN'
+
         if (orgSlug) {
-          const rewriteUrl = request.nextUrl.clone()
-          rewriteUrl.pathname = `/member/${orgSlug}${pathname === '/' ? '' : pathname}`
-          return NextResponse.rewrite(rewriteUrl)
+          if (ERP_ONLY_PREFIXES.some((prefix) => (
+            pathname === prefix || pathname.startsWith(`${prefix}/`)
+          ))) {
+            return new NextResponse('Halaman tidak ditemukan.', { status: 404 })
+          }
+
+          if (pathname === '/' && rootBehavior === 'LOGIN') {
+            const target = request.cookies.has(INTERNAL_SESSION_COOKIE)
+              ? '/dashboard'
+              : '/login?redirectTo=%2Fdashboard'
+            if (serverActionRequest) {
+              return createServerActionRedirectResponse(target)
+            }
+            return NextResponse.redirect(new URL(target, request.url))
+          }
+
+          const route = rewriteTenantPath(pathname, {
+            orgSlug,
+            storeSlug,
+            rootBehavior,
+          })
+          if (route?.kind === 'redirect') {
+            const redirectUrl = request.nextUrl.clone()
+            redirectUrl.pathname = route.pathname
+            return NextResponse.redirect(redirectUrl, 308)
+          }
+          if (route?.kind === 'rewrite') {
+            const rewriteUrl = request.nextUrl.clone()
+            rewriteUrl.pathname = route.pathname
+            return NextResponse.rewrite(rewriteUrl)
+          }
         }
       }
     } catch {
-      // Resolver tenant tidak boleh membuat seluruh aplikasi gagal.
-    }
-  }
-
-  const shouldAttemptStoreRewrite = Boolean(
-    normalizedHost
-    && !pathname.startsWith('/toko')
-    && !pathname.startsWith('/dashboard')
-    && !pathname.startsWith('/ecommerce')
-    && !pathname.startsWith('/login')
-    && !pathname.startsWith('/register')
-    && !pathname.startsWith('/onboarding')
-    && !pathname.startsWith('/auth')
-    && !pathname.startsWith('/expired')
-  )
-
-  if (shouldAttemptStoreRewrite) {
-    try {
-      const resolveUrl = new URL('/api/ecommerce/resolve-domain', request.url)
-      resolveUrl.searchParams.set('host', normalizedHost)
-
-      const response = await fetch(resolveUrl, { cache: 'no-store' })
-      if (response.ok) {
-        const payload = await response.json()
-        const orgSlug = String(payload?.data?.orgSlug || '').trim()
-        const storeSlug = String(payload?.data?.storeSlug || '').trim()
-
-        if (orgSlug && storeSlug) {
-          const rewriteUrl = request.nextUrl.clone()
-          rewriteUrl.pathname = `/toko/${orgSlug}/${storeSlug}${pathname === '/' ? '' : pathname}`
-          return NextResponse.rewrite(rewriteUrl)
-        }
-      }
-    } catch {
-      // Jika resolver gagal, biarkan request lanjut ke flow normal.
+      // Resolver tenant tidak boleh membuat platform utama gagal.
     }
   }
 

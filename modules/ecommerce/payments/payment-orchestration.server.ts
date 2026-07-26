@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto'
 import { queryPostgres } from '@/lib/db/postgres'
 import { getPaymentProvider } from './provider-registry.server'
 import { finalizePaidCommerceOrder } from './commerce-payment.service'
+import { releaseConsultingOrderHolds } from '@/modules/consulting/lib/consulting.server'
 
 type PaymentOrderRow = {
   id: string
@@ -301,6 +302,34 @@ export async function processPaymentWebhook(input: {
   }
   if (event.status === 'PROCESSED') {
     return { accepted: true, status: 200, duplicate: true }
+  }
+  if (validated.state === 'FAILED' || validated.state === 'EXPIRED') {
+    const intent = await resolvePendingIntent({
+      providerCode: validated.providerCode,
+      orderNumber: validated.orderNumber,
+      providerReference: validated.providerReference,
+      amount: validated.amount,
+    })
+    if (intent) {
+      await queryPostgres(
+        `UPDATE public.commerce_payment_intents
+         SET status = $3, updated_at = NOW()
+         WHERE id = $1::uuid AND org_id = $2::uuid`,
+        [intent.id, intent.org_id, validated.state],
+      )
+      await releaseConsultingOrderHolds({
+        orgId: intent.org_id,
+        orderId: intent.order_id,
+        reason: `Pembayaran ${validated.state.toLowerCase()}; jadwal Consulting 360 dilepas.`,
+      })
+    }
+    await queryPostgres(
+      `UPDATE public.commerce_payment_webhook_events
+       SET status = 'PROCESSED', processed_at = NOW(), error_message = $2
+       WHERE id = $1::uuid`,
+      [event.id, validated.reason || `Status pembayaran ${validated.state}.`],
+    )
+    return { accepted: true, status: 200, released: Boolean(intent) }
   }
   if (validated.state !== 'PAID') {
     await queryPostgres(

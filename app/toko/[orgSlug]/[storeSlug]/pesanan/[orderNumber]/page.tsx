@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
-import { getPublicOrderStatusPayload } from '@/modules/ecommerce/lib/ecommerce.server'
+import { notFound, permanentRedirect } from 'next/navigation'
+import {
+  getPublicOrderStatusPayload,
+  resolvePublicStoreCanonicalTarget,
+} from '@/modules/ecommerce/lib/ecommerce.server'
 import OrderStatusClient from './OrderStatusClient'
 
 type OrderStatusPageProps = {
@@ -20,6 +23,12 @@ export async function generateMetadata({ params }: OrderStatusPageProps): Promis
 export default async function OrderStatusPage({ params, searchParams }: OrderStatusPageProps) {
   const { orgSlug, storeSlug, orderNumber } = await params
   const { token } = await searchParams
+  const canonical = await resolvePublicStoreCanonicalTarget({ orgSlug, storeSlug })
+  if (!canonical) notFound()
+  if (canonical.storeSlug !== storeSlug) {
+    const query = token ? `?token=${encodeURIComponent(token)}` : ''
+    permanentRedirect(`/toko/${orgSlug}/${canonical.storeSlug}/pesanan/${orderNumber}${query}`)
+  }
 
   const payload = await getPublicOrderStatusPayload({
     orgSlug,
