@@ -423,6 +423,7 @@ export default function StorefrontClient({
   const cartGrandTotal = cartSubtotal + (selectedShippingRate?.amount || 0)
   const storeName = payload.store.brandName || payload.store.name
   const storeInitials = getStoreInitials(storeName)
+  const storeLogo = payload.store.logoUrl || ''
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0)
   const visibleProductCount = visibleProducts.length
   const shippingRateCount = payload.shippingRates.length
@@ -1145,9 +1146,13 @@ export default function StorefrontClient({
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between gap-4 rounded-[28px] border bg-white/88 px-4 py-4 shadow-[0_25px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur sm:px-5">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center text-sm font-black text-white" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
-                  {storeInitials}
-                </div>
+                {storeLogo ? (
+                  <img src={storeLogo} alt={storeName} className="h-12 w-auto max-w-[120px] shrink-0 object-contain" />
+                ) : (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center text-sm font-black text-white" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
+                    {storeInitials}
+                  </div>
+                )}
                 <div className="min-w-0">
                   <div className="truncate text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: payload.theme.tokens.muted }}>
                     {payload.store.brandName || 'Official Store'}
@@ -1194,9 +1199,13 @@ export default function StorefrontClient({
             {/* Header / Brand Info terintegrasi dengan konten (Mobile-First) */}
             <div className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white px-5 py-4 shadow-xs">
               <div className="flex min-w-0 items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center text-sm font-bold text-white shadow-xs" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
-                  {storeInitials}
-                </div>
+                {storeLogo ? (
+                  <img src={storeLogo} alt={storeName} className="h-11 w-auto max-w-[100px] shrink-0 object-contain" />
+                ) : (
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center text-sm font-bold text-white shadow-xs" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
+                    {storeInitials}
+                  </div>
+                )}
                 <div className="min-w-0">
                   <div className="truncate text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: payload.theme.tokens.muted }}>
                     {payload.store.brandName || 'Official Store'}
@@ -1227,14 +1236,14 @@ export default function StorefrontClient({
 
               <div className="p-6">
                 <div className="flex items-start gap-4">
-                  <div
-                    className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 bg-cover bg-center sm:h-20 sm:w-20"
-                    style={{
-                      backgroundImage: getProductGallery(selectedProduct)[0]
-                        ? `url(${selectedMediaByProductId[selectedProduct.id] || getProductGallery(selectedProduct)[0]})`
-                        : `linear-gradient(135deg, ${payload.theme.tokens.accentSoft}, #ffffff)`,
-                    }}
-                  />
+                  {(getProductGallery(selectedProduct)[0] || selectedMediaByProductId[selectedProduct.id]) && (
+                    <div
+                      className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 bg-cover bg-center sm:h-20 sm:w-20"
+                      style={{
+                        backgroundImage: `url(${selectedMediaByProductId[selectedProduct.id] || getProductGallery(selectedProduct)[0]})`,
+                      }}
+                    />
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="text-base font-extrabold text-slate-900 sm:text-lg">{selectedProduct.name}</div>
                     {activeSingleVariant?.name && (
