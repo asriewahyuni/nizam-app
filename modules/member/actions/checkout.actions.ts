@@ -804,7 +804,7 @@ export async function createMemberCheckout(
     }
 
     if (!createdOrder) throw new Error('Order tidak dapat dibuat.')
-    const orderAccessUrl = `/toko/${orgSlug}/${createdOrder.storeSlug}/pesanan/${createdOrder.orderNumber}?token=${encodeURIComponent(createdOrder.accessToken)}`
+    const orderAccessUrl = `/store/${orgSlug}/${createdOrder.storeSlug}/order/${createdOrder.orderNumber}?token=${encodeURIComponent(createdOrder.accessToken)}`
     if (createdOrder.total === 0) {
       return {
         success: true,

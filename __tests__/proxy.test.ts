@@ -167,4 +167,33 @@ describe('Next proxy', () => {
       '/member/core-islamic-economics/sertifikat/verifikasi/token-valid',
     )
   })
+
+  it('mengalihkan URL toko lama ke URL store berbahasa Inggris', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: null }), { status: 404 }),
+    )
+    const response = await proxy(new NextRequest(
+      'http://localhost:3000/toko/core-islamic-economics/store-fyrigc/produk/ams-paket?ref=abc',
+      { headers: { host: 'localhost:3000' } },
+    ))
+
+    expect(response.status).toBe(308)
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/store/core-islamic-economics/store-fyrigc/product/ams-paket?ref=abc',
+    )
+  })
+
+  it('menulis ulang URL store Inggris ke route internal storefront', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: null }), { status: 404 }),
+    )
+    const response = await proxy(new NextRequest(
+      'http://localhost:3000/store/core-islamic-economics/store-fyrigc/product/ams-paket',
+      { headers: { host: 'localhost:3000' } },
+    ))
+
+    expect(response.headers.get('x-middleware-rewrite')).toContain(
+      '/toko/core-islamic-economics/store-fyrigc/produk/ams-paket',
+    )
+  })
 })

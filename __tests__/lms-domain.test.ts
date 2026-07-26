@@ -26,7 +26,7 @@ describe('helper custom domain LMS', () => {
     expect(buildTenantPath(
       { customDomain: false, orgSlug: 'core', storeSlug: 'store' },
       { kind: 'product', slug: 'ams' },
-    )).toBe('/toko/core/store/produk/ams')
+    )).toBe('/store/core/store/product/ams')
   })
 
   it('menormalkan override halaman produk tanpa mengubah data tema toko', () => {

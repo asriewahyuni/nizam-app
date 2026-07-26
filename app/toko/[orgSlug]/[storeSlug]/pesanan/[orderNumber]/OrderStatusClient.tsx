@@ -106,7 +106,7 @@ export default function OrderStatusClient({
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            href={`/toko/${payload.store.orgSlug}/${payload.store.slug}`}
+            href={`/store/${payload.store.orgSlug}/${payload.store.slug}`}
             className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700"
           >
             Kembali ke Store

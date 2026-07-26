@@ -12,7 +12,7 @@ export default async function LmsSalesLayout({
   const { org, stores } = await getLmsSalesHeaderData()
   const defaultStore = stores[0]
   const storefrontUrl = defaultStore
-    ? `/toko/${org.slug}/${defaultStore.slug}`
+    ? `/store/${org.slug}/${defaultStore.slug}`
     : null
 
   return (

@@ -259,7 +259,7 @@ export default function ProductEditor({
   const selectedStore = stores.find((store) => store.id === draft.storeId) || stores[0]
   const productUrl = primaryLmsHostname
     ? `https://${primaryLmsHostname}/product/${draft.publicSlug || 'slug-produk'}`
-    : `/toko/${orgSlug}/${selectedStore?.slug || 'store'}/produk/${draft.publicSlug || 'slug-produk'}`
+    : `/store/${orgSlug}/${selectedStore?.slug || 'store'}/product/${draft.publicSlug || 'product-slug'}`
 
   return (
     <form onSubmit={submit} className="space-y-5">

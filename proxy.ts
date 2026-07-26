@@ -29,6 +29,37 @@ type ResolvedLmsTenant = {
   rootBehavior: 'STOREFRONT' | 'LOGIN'
 }
 
+function rewriteStandardStorePath(
+  pathname: string,
+): { kind: 'rewrite'; pathname: string } | { kind: 'redirect'; pathname: string } | null {
+  const legacyMatch = pathname.match(/^\/toko\/([^/]+)\/([^/]+)(\/.*)?$/)
+  if (legacyMatch) {
+    const [, orgSlug, storeSlug, rawSuffix = ''] = legacyMatch
+    let suffix = rawSuffix
+    if (suffix === '/koleksi') suffix = '/catalog'
+    else if (suffix === '/keranjang') suffix = '/cart'
+    else if (suffix.startsWith('/produk/')) suffix = `/product/${suffix.slice('/produk/'.length)}`
+    else if (suffix.startsWith('/pesanan/')) suffix = `/order/${suffix.slice('/pesanan/'.length)}`
+    return {
+      kind: 'redirect',
+      pathname: `/store/${orgSlug}/${storeSlug}${suffix}`,
+    }
+  }
+
+  const canonicalMatch = pathname.match(/^\/store\/([^/]+)\/([^/]+)(\/.*)?$/)
+  if (!canonicalMatch) return null
+  const [, orgSlug, storeSlug, rawSuffix = ''] = canonicalMatch
+  let suffix = rawSuffix
+  if (suffix === '/catalog') suffix = '/koleksi'
+  else if (suffix === '/cart') suffix = '/keranjang'
+  else if (suffix.startsWith('/product/')) suffix = `/produk/${suffix.slice('/product/'.length)}`
+  else if (suffix.startsWith('/order/')) suffix = `/pesanan/${suffix.slice('/order/'.length)}`
+  return {
+    kind: 'rewrite',
+    pathname: `/toko/${orgSlug}/${storeSlug}${suffix}`,
+  }
+}
+
 function rewriteTenantPath(
   pathname: string,
   tenant: ResolvedLmsTenant,
@@ -298,6 +329,18 @@ export async function proxy(request: NextRequest) {
     } catch {
       // Resolver tenant tidak boleh membuat platform utama gagal.
     }
+  }
+
+  const standardStoreRoute = rewriteStandardStorePath(pathname)
+  if (standardStoreRoute?.kind === 'redirect') {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = standardStoreRoute.pathname
+    return NextResponse.redirect(redirectUrl, 308)
+  }
+  if (standardStoreRoute?.kind === 'rewrite') {
+    const rewriteUrl = request.nextUrl.clone()
+    rewriteUrl.pathname = standardStoreRoute.pathname
+    return NextResponse.rewrite(rewriteUrl)
   }
 
   // Preview mode auto-login (only when PREVIEW_MODE=true)

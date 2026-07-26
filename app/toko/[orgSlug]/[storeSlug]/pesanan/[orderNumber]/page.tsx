@@ -27,7 +27,7 @@ export default async function OrderStatusPage({ params, searchParams }: OrderSta
   if (!canonical) notFound()
   if (canonical.storeSlug !== storeSlug) {
     const query = token ? `?token=${encodeURIComponent(token)}` : ''
-    permanentRedirect(`/toko/${orgSlug}/${canonical.storeSlug}/pesanan/${orderNumber}${query}`)
+    permanentRedirect(`/store/${orgSlug}/${canonical.storeSlug}/order/${orderNumber}${query}`)
   }
 
   const payload = await getPublicOrderStatusPayload({

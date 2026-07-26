@@ -235,7 +235,7 @@ export default function LmsStoreSettingsEditor({
               </select>
             )}
             <Link
-              href={`/toko/${orgSlug}/${selectedStore.slug}`}
+              href={`/store/${orgSlug}/${selectedStore.slug}`}
               target="_blank"
               className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-indigo-300 hover:bg-indigo-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
             >

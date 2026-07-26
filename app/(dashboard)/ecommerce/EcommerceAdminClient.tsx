@@ -671,7 +671,7 @@ export default function EcommerceAdminClient({
               <div className="mt-4 flex flex-wrap gap-3">
                 <StatusBadge label={selectedStore.isPublished ? 'Live' : 'Draft'} variant={selectedStore.isPublished ? 'success' : 'neutral'} />
                 <Link
-                  href={`/toko/${orgSlug}/${selectedStore.slug}`}
+                  href={`/store/${orgSlug}/${selectedStore.slug}`}
                   target="_blank"
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold text-slate-700"
                 >
@@ -679,7 +679,7 @@ export default function EcommerceAdminClient({
                 </Link>
                 {storeThemeDraft && (
                   <Link
-                    href={`/toko/${orgSlug}/${selectedStore.slug}?preview=${storeThemeDraft.previewToken}`}
+                    href={`/store/${orgSlug}/${selectedStore.slug}?preview=${storeThemeDraft.previewToken}`}
                     target="_blank"
                     className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-[11px] font-semibold text-blue-700"
                   >
@@ -875,7 +875,7 @@ export default function EcommerceAdminClient({
                         Edit Store Ini
                       </SafeButton>
                       <Link
-                        href={`/toko/${orgSlug}/${selectedStore.slug}`}
+                        href={`/store/${orgSlug}/${selectedStore.slug}`}
                         target="_blank"
                         className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-semibold text-slate-700"
                       >

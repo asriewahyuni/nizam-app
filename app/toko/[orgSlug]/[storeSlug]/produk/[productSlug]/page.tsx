@@ -65,7 +65,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
     permanentRedirect(
       tenant?.orgSlug === orgSlug
         ? `/product/${canonical.productSlug}`
-        : `/toko/${orgSlug}/${canonical.storeSlug}/produk/${canonical.productSlug}`,
+        : `/store/${orgSlug}/${canonical.storeSlug}/product/${canonical.productSlug}`,
     )
   }
   const payload = await getCachedPublicStorefrontPayload(orgSlug, storeSlug, {

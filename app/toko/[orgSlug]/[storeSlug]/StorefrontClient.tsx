@@ -83,7 +83,7 @@ function getStoreInitials(name: string) {
 }
 
 function getCartHref(orgSlug: string, storeSlug: string) {
-  return `/toko/${orgSlug}/${storeSlug}/keranjang`
+  return `/store/${orgSlug}/${storeSlug}/cart`
 }
 
 function SectionHeader({
@@ -382,17 +382,17 @@ export default function StorefrontClient({
         : []
   const homeHref = routeMode === 'custom-domain'
     ? '/'
-    : `/toko/${payload.store.orgSlug}/${payload.store.slug}`
+    : `/store/${payload.store.orgSlug}/${payload.store.slug}`
   const collectionHref = routeMode === 'custom-domain'
     ? '/catalog'
-    : `/toko/${payload.store.orgSlug}/${payload.store.slug}/koleksi`
+    : `/store/${payload.store.orgSlug}/${payload.store.slug}/catalog`
   const cartHref = routeMode === 'custom-domain'
     ? '/cart'
     : getCartHref(payload.store.orgSlug, payload.store.slug)
   const productHref = (slug: string) => (
     routeMode === 'custom-domain'
       ? `/product/${slug}`
-      : `/toko/${payload.store.orgSlug}/${payload.store.slug}/produk/${slug}`
+      : `/store/${payload.store.orgSlug}/${payload.store.slug}/product/${slug}`
   )
   const primaryPortalHref = viewerAuthenticated ? '/dashboard' : collectionHref
   const primaryPortalLabel = viewerAuthenticated ? 'Buka Dashboard' : 'Lihat Program'
@@ -1451,11 +1451,6 @@ export default function StorefrontClient({
           productPageConfig?.layout === 'TWO_COLUMNS' ? 'max-w-6xl' : 'max-w-xl'
         }`
         : 'relative mx-auto max-w-7xl space-y-10 px-4 pb-20 sm:px-6 lg:space-y-12 lg:px-8'}>
-        {pageMode === 'product' && pageBlocks.length > 0 && (
-          <div className="mb-5 space-y-5">
-            {pageBlocks.map((block) => renderBlock(block))}
-          </div>
-        )}
         {pageMode === 'collection' && (
           <section className="grid gap-4 rounded-[32px] border bg-white p-6 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] lg:grid-cols-[1fr_auto]" style={{ borderColor: payload.theme.tokens.border }}>
             <div className="space-y-2">

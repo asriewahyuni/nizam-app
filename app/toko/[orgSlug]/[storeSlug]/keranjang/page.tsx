@@ -34,7 +34,7 @@ export default async function CartPage({ params, searchParams }: CartPageProps) 
   const canonical = await resolvePublicStoreCanonicalTarget({ orgSlug, storeSlug })
   if (!canonical) notFound()
   if (canonical.storeSlug !== storeSlug) {
-    permanentRedirect(`/toko/${orgSlug}/${canonical.storeSlug}/keranjang`)
+    permanentRedirect(`/store/${orgSlug}/${canonical.storeSlug}/cart`)
   }
   const payload = await getCachedPublicStorefrontPayload(orgSlug, storeSlug, {
     previewToken: preview || null,

@@ -96,8 +96,7 @@ const THEME_EDITOR_PAGES: Array<{
   pathSuffix: string
 }> = [
   { key: 'home', label: 'Beranda', previewLabel: 'Homepage Store', pathSuffix: '' },
-  { key: 'collection', label: 'Koleksi', previewLabel: 'Halaman Koleksi', pathSuffix: '/koleksi' },
-  { key: 'product', label: 'Detail Produk', previewLabel: 'Halaman Produk', pathSuffix: '/produk/preview-produk' },
+  { key: 'collection', label: 'Katalog', previewLabel: 'Halaman Katalog', pathSuffix: '/catalog' },
 ]
 
 const TOKEN_COLOR_FIELDS: Array<{
@@ -517,19 +516,19 @@ export default function ThemeHomepageEditor({
     if (!storeThemeDraft) return ''
 
     if (activePage === 'collection') {
-      return `/toko/${orgSlug}/${selectedStore.slug}/koleksi?preview=${storeThemeDraft.previewToken}`
+      return `/store/${orgSlug}/${selectedStore.slug}/catalog?preview=${storeThemeDraft.previewToken}`
     }
 
     if (activePage === 'product') {
       const previewProductSlug = previewProducts[0]?.slug
       if (!previewProductSlug) {
-        return `/toko/${orgSlug}/${selectedStore.slug}?preview=${storeThemeDraft.previewToken}`
+        return `/store/${orgSlug}/${selectedStore.slug}?preview=${storeThemeDraft.previewToken}`
       }
 
-      return `/toko/${orgSlug}/${selectedStore.slug}/produk/${previewProductSlug}?preview=${storeThemeDraft.previewToken}`
+      return `/store/${orgSlug}/${selectedStore.slug}/product/${previewProductSlug}?preview=${storeThemeDraft.previewToken}`
     }
 
-    return `/toko/${orgSlug}/${selectedStore.slug}?preview=${storeThemeDraft.previewToken}`
+    return `/store/${orgSlug}/${selectedStore.slug}?preview=${storeThemeDraft.previewToken}`
   }, [activePage, orgSlug, previewProducts, selectedStore.slug, storeThemeDraft])
 
   function syncJsonFromVisual() {
@@ -771,7 +770,7 @@ export default function ThemeHomepageEditor({
     <SectionCard>
       <SectionHeader
         title="Theme Draft → Preview → Publish"
-        subtitle="Beranda, koleksi, dan detail produk sekarang diedit lewat form visual. Mode JSON tetap ada sebagai jalur cadangan."
+        subtitle="Beranda dan katalog diedit lewat form visual. Halaman produk tetap fokus sebagai checkout dan diatur dari editor produk."
         icon={LayoutTemplate}
         actions={(
           <div className="flex flex-wrap gap-2">

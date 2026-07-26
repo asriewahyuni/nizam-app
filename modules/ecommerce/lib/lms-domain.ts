@@ -139,19 +139,19 @@ export function buildTenantPath(
       return `/member/${context.orgSlug}`
     case 'catalog':
       return context.storeSlug
-        ? `/toko/${context.orgSlug}/${context.storeSlug}/koleksi`
+        ? `/store/${context.orgSlug}/${context.storeSlug}/catalog`
         : `/member/${context.orgSlug}/katalog`
     case 'product':
       return context.storeSlug
-        ? `/toko/${context.orgSlug}/${context.storeSlug}/produk/${route.slug}`
+        ? `/store/${context.orgSlug}/${context.storeSlug}/product/${route.slug}`
         : `/member/${context.orgSlug}/katalog`
     case 'cart':
       return context.storeSlug
-        ? `/toko/${context.orgSlug}/${context.storeSlug}/keranjang`
+        ? `/store/${context.orgSlug}/${context.storeSlug}/cart`
         : `/member/${context.orgSlug}/checkout`
     case 'order':
       return context.storeSlug
-        ? `/toko/${context.orgSlug}/${context.storeSlug}/pesanan/${route.orderNumber}`
+        ? `/store/${context.orgSlug}/${context.storeSlug}/order/${route.orderNumber}`
         : `/member/${context.orgSlug}/pesanan`
     case 'courses':
       return `/member/${context.orgSlug}/katalog`

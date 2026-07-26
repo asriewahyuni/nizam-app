@@ -312,7 +312,7 @@ function generatePublicOrderAccessToken() {
 }
 
 function buildPublicOrderAccessUrl(orgSlug: string, storeSlug: string, orderNumber: string, accessToken: string) {
-  const basePath = buildStoreCanonicalPath(orgSlug, storeSlug, `/pesanan/${orderNumber}`)
+  const basePath = buildStoreCanonicalPath(orgSlug, storeSlug, `/order/${orderNumber}`)
   return `${basePath}?token=${encodeURIComponent(accessToken)}`
 }
 
@@ -1331,9 +1331,9 @@ export async function resolveStoreDomainHost(host: string): Promise<{ orgSlug: s
 export function buildStoreCanonicalPath(orgSlug: string, storeSlug: string, suffix = '') {
   const safeSuffix = (suffix.startsWith('/') ? suffix : `/${suffix}`).replace(/\/+$/, '')
   if (!suffix) {
-    return `/toko/${orgSlug}/${storeSlug}`
+    return `/store/${orgSlug}/${storeSlug}`
   }
-  return `/toko/${orgSlug}/${storeSlug}${safeSuffix}`
+  return `/store/${orgSlug}/${storeSlug}${safeSuffix}`
 }
 
 export async function getEcommerceDashboardData(): Promise<EcommerceDashboardData> {

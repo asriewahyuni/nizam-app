@@ -35,7 +35,7 @@ export default async function StorefrontPage({ params, searchParams }: Storefron
   const canonical = await resolvePublicStoreCanonicalTarget({ orgSlug, storeSlug })
   if (!canonical) notFound()
   if (canonical.storeSlug !== storeSlug) {
-    permanentRedirect(`/toko/${orgSlug}/${canonical.storeSlug}`)
+    permanentRedirect(`/store/${orgSlug}/${canonical.storeSlug}`)
   }
 
   const payload = await getCachedPublicStorefrontPayload(orgSlug, storeSlug, {

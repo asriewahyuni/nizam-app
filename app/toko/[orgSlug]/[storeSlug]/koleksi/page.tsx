@@ -34,7 +34,7 @@ export default async function CollectionPage({ params, searchParams }: Collectio
   const canonical = await resolvePublicStoreCanonicalTarget({ orgSlug, storeSlug })
   if (!canonical) notFound()
   if (canonical.storeSlug !== storeSlug) {
-    permanentRedirect(`/toko/${orgSlug}/${canonical.storeSlug}/koleksi`)
+    permanentRedirect(`/store/${orgSlug}/${canonical.storeSlug}/catalog`)
   }
   const payload = await getCachedPublicStorefrontPayload(orgSlug, storeSlug, {
     previewToken: preview || null,

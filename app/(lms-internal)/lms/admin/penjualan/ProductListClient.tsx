@@ -38,7 +38,7 @@ export default function ProductListClient({
   )
 
   async function copyCheckout(product: AdminStoreProductView) {
-    const path = `/toko/${orgSlug}/${storeSlug}/produk/${product.publicSlug}`
+    const path = `/store/${orgSlug}/${storeSlug}/product/${product.publicSlug}`
     await navigator.clipboard.writeText(`${window.location.origin}${path}`)
     setCopiedId(product.id)
     window.setTimeout(() => {
@@ -85,7 +85,7 @@ export default function ProductListClient({
           <tbody className="divide-y divide-slate-100">
             {products.map((product) => {
               const benefit = entitlementByProduct.get(product.id)
-              const publicPath = `/toko/${orgSlug}/${storeSlug}/produk/${product.publicSlug}`
+              const publicPath = `/store/${orgSlug}/${storeSlug}/product/${product.publicSlug}`
               return (
                 <tr key={product.id} className="transition-colors hover:bg-slate-50/80">
                   <td className="px-4 py-4">
