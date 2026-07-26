@@ -60,6 +60,7 @@ export default function LmsSimpleSalesManager({
   const [formIsFeatured, setFormIsFeatured] = useState(false)
   const [formCourseIds, setFormCourseIds] = useState<string[]>([])
   const [formProductId, setFormProductId] = useState<string | null>(null)
+  const [formImageUrl, setFormImageUrl] = useState('')
 
   // Subscription Form State
   const [formIsSubscription, setFormIsSubscription] = useState(false)
@@ -95,6 +96,7 @@ export default function LmsSimpleSalesManager({
     setFormIsPublished(true)
     setFormIsFeatured(false)
     setFormCourseIds([])
+    setFormImageUrl('')
 
     setFormIsSubscription(false)
     setFormBillingInterval('YEAR')
@@ -117,6 +119,7 @@ export default function LmsSimpleSalesManager({
     setFormPublicDescription(sp.publicDescription || '')
     setFormIsPublished(sp.isPublished)
     setFormIsFeatured(sp.isFeatured || false)
+    setFormImageUrl(sp.imageUrl || '')
 
     const entitlements = dashboardData.productEntitlements.find((e) => e.storeProductId === sp.id)
     if (entitlements) {
@@ -161,6 +164,7 @@ export default function LmsSimpleSalesManager({
     fd.set('is_published', formIsPublished ? 'true' : 'false')
     fd.set('is_featured', formIsFeatured ? 'true' : 'false')
     fd.set('course_ids', JSON.stringify(formCourseIds))
+    fd.set('image_url', formImageUrl)
 
     // Subscription
     fd.set('is_subscription', formIsSubscription ? 'true' : 'false')
@@ -617,6 +621,32 @@ export default function LmsSimpleSalesManager({
                         className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100"
                         placeholder="Jelaskan manfaat, silabus singkat, atau keuntungan memilih paket ini..."
                       />
+                    </label>
+
+                    <label className="block text-sm font-semibold text-slate-700 sm:col-span-2">
+                      Gambar Produk (URL)
+                      <div className="mt-1.5 flex items-start gap-3">
+                        <div className="min-w-0 flex-1">
+                          <input
+                            type="url"
+                            value={formImageUrl}
+                            onChange={(e) => setFormImageUrl(e.target.value)}
+                            className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100"
+                            placeholder="https://example.com/gambar-produk.png"
+                          />
+                          <p className="mt-1 text-[11px] text-slate-500">Paste URL gambar dari hosting atau CDN Anda. Gambar ini akan tampil di halaman toko publik.</p>
+                        </div>
+                        {formImageUrl && (
+                          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                            <img
+                              src={formImageUrl}
+                              alt="Preview"
+                              className="h-full w-full object-cover"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </label>
                   </div>
                 </div>

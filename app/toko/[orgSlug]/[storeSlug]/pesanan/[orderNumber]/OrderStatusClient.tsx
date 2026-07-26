@@ -226,6 +226,12 @@ export default function OrderStatusClient({
                 <span>Subtotal</span>
                 <span className="font-black text-slate-900">{formatRupiah(payload.order.subtotalAmount)}</span>
               </div>
+              {payload.order.discountAmount > 0 && (
+                <div className="flex items-center justify-between font-medium text-emerald-700">
+                  <span>Kode diskon</span>
+                  <span className="font-black">-{formatRupiah(payload.order.discountAmount)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between font-medium text-slate-600">
                 <span>Ongkir</span>
                 <span className="font-black text-slate-900">{formatRupiah(payload.order.shippingAmount)}</span>

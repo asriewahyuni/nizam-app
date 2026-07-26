@@ -4,11 +4,12 @@
  */
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { BookOpen, ExternalLink, Layers3, PackageCheck, ShoppingCart } from 'lucide-react'
+import { BookOpen, ExternalLink, Layers3, PackageCheck, ShoppingCart, TicketPercent } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getEcommerceDashboardData } from '@/modules/ecommerce/lib/ecommerce.server'
 import LmsSimpleSalesManager from './LmsSimpleSalesManager'
 import { LmsCommerceSetupButton } from './LmsCommerceSetupButton'
+import LmsCouponManager from './LmsCouponManager'
 
 export const metadata = {
   title: 'Penjualan Kelas — Nizam LMS',
@@ -21,6 +22,7 @@ export default async function LmsCourseCommercePage() {
 
   const dashboardData = await getEcommerceDashboardData()
   const activePackages = dashboardData.accessPackages.filter((item) => item.isActive).length
+  const activeCoupons = dashboardData.coupons.filter((item) => item.isActive).length
   const publishedProducts = dashboardData.storeProducts.filter((item) => item.isPublished).length
   const productsWithBenefits = dashboardData.productEntitlements.filter(
     (item) => item.resolvedCourseIds.length > 0,
@@ -60,6 +62,13 @@ export default async function LmsCourseCommercePage() {
       icon: <Layers3 aria-hidden="true" size={18} />,
       tone: 'border-amber-100 bg-amber-50/70 text-amber-700',
     },
+    {
+      label: 'Kode Diskon Aktif',
+      value: activeCoupons,
+      sub: 'Siap dipakai saat checkout',
+      icon: <TicketPercent aria-hidden="true" size={18} />,
+      tone: 'border-violet-100 bg-violet-50/70 text-violet-700',
+    },
   ]
 
   return (
@@ -98,7 +107,7 @@ export default async function LmsCourseCommercePage() {
         </div>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {stats.map((stat) => (
           <section
             key={stat.label}
@@ -123,7 +132,10 @@ export default async function LmsCourseCommercePage() {
       {dashboardData.stores.length === 0 ? (
         <LmsCommerceSetupButton />
       ) : (
-        <LmsSimpleSalesManager dashboardData={dashboardData} orgSlug={orgData.org.slug} />
+        <div className="space-y-8">
+          <LmsSimpleSalesManager dashboardData={dashboardData} orgSlug={orgData.org.slug} />
+          <LmsCouponManager dashboardData={dashboardData} />
+        </div>
       )}
     </div>
   )

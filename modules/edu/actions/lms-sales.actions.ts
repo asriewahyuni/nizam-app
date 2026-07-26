@@ -3,6 +3,35 @@
 import { revalidatePath } from 'next/cache'
 import { connectPostgresClient } from '@/lib/db/postgres'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { normalizeCommerceCouponCode } from '@/modules/ecommerce/lib/coupon.service'
+
+function parseUuidList(value: FormDataEntryValue | null): string[] {
+  if (typeof value !== 'string' || !value.trim()) return []
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    return [...new Set(
+      parsed
+        .map((item) => String(item || '').trim())
+        .filter((item) => /^[0-9a-f-]{36}$/i.test(item)),
+    )]
+  } catch {
+    return []
+  }
+}
+
+function parseOptionalDate(value: FormDataEntryValue | null): string | null {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!raw) return null
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) throw new Error('Tanggal kode diskon tidak valid.')
+  return date.toISOString()
+}
+
+function revalidateLmsSalesPaths() {
+  revalidatePath('/lms/admin/penjualan')
+  revalidatePath('/ecommerce')
+}
 
 export async function saveLmsSimpleProductAction(formData: FormData) {
   try {
@@ -20,6 +49,7 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
     const badgeText = formData.get('badge_text')?.toString().trim() || null
     const isFeatured = formData.get('is_featured') === 'true'
     const isPublished = formData.get('is_published') === 'true'
+    const imageUrl = formData.get('image_url')?.toString().trim() || null
     
     // Subscription setting
     const isSubscription = formData.get('is_subscription') === 'true'
@@ -73,9 +103,12 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
         `INSERT INTO store_products (
            org_id, store_id, product_id, public_name, public_slug,
            price_override, compare_price, short_description, public_description,
-           badge_text, is_featured, is_published
+           badge_text, is_featured, is_published, product_type, quantity_enabled
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         VALUES (
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+           'DIGITAL', false
+         )
          ON CONFLICT (store_id, product_id)
          DO UPDATE SET
            public_name = EXCLUDED.public_name,
@@ -85,7 +118,9 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
            public_description = EXCLUDED.public_description,
            badge_text = EXCLUDED.badge_text,
            is_featured = EXCLUDED.is_featured,
-           is_published = EXCLUDED.is_published
+           is_published = EXCLUDED.is_published,
+           product_type = 'DIGITAL',
+           quantity_enabled = false
          RETURNING id`,
         [
           orgId,
@@ -175,6 +210,35 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
         )
       }
 
+      // Handle product image (ecommerce_product_media)
+      if (imageUrl) {
+        const existingMediaRes = await client.query(
+          `SELECT id FROM ecommerce_product_media
+           WHERE org_id = $1 AND store_id = $2 AND product_id = $3 AND variant_id IS NULL
+           LIMIT 1`,
+          [orgId, storeId, finalProductId]
+        )
+        if (existingMediaRes.rows.length > 0) {
+          await client.query(
+            `UPDATE ecommerce_product_media SET url = $1, is_primary = true WHERE id = $2`,
+            [imageUrl, existingMediaRes.rows[0].id]
+          )
+        } else {
+          await client.query(
+            `INSERT INTO ecommerce_product_media (org_id, store_id, product_id, url, is_primary)
+             VALUES ($1, $2, $3, $4, true)`,
+            [orgId, storeId, finalProductId, imageUrl]
+          )
+        }
+      } else {
+        // If image URL cleared, remove existing media
+        await client.query(
+          `DELETE FROM ecommerce_product_media
+           WHERE org_id = $1 AND store_id = $2 AND product_id = $3 AND variant_id IS NULL`,
+          [orgId, storeId, finalProductId]
+        )
+      }
+
       await client.query('COMMIT')
     } catch (e) {
       await client.query('ROLLBACK')
@@ -229,5 +293,185 @@ export async function deleteLmsSimpleProductAction(formData: FormData) {
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || 'Gagal menghapus produk.' }
+  }
+}
+
+/**
+ * Membuat atau mengubah kode diskon LMS. Pembatasan produk menggunakan ID
+ * store_product agar kupon dapat dipakai oleh checkout publik dan portal member.
+ */
+export async function saveLmsCouponAction(formData: FormData) {
+  const orgData = await getActiveOrg()
+  if (!orgData?.org?.id) return { success: false, error: 'Sesi tidak valid.' }
+  if (!['owner', 'admin', 'manager'].includes(orgData.role)) {
+    return { success: false, error: 'Hanya admin yang dapat mengelola kode diskon.' }
+  }
+
+  const orgId = orgData.org.id
+  const couponId = String(formData.get('coupon_id') || '').trim()
+  const code = normalizeCommerceCouponCode(formData.get('code'))
+  const discountType = String(formData.get('discount_type') || '').toUpperCase()
+  const discountValue = Number(formData.get('discount_value') || 0)
+  const minimumAmount = Math.max(0, Number(formData.get('minimum_amount') || 0))
+  const usageLimitRaw = Number(formData.get('usage_limit') || 0)
+  const usageLimit = Number.isInteger(usageLimitRaw) && usageLimitRaw > 0
+    ? usageLimitRaw
+    : null
+  const perUserLimit = Math.max(1, Math.trunc(Number(formData.get('per_user_limit') || 1)))
+  const allowedStoreProductIds = parseUuidList(formData.get('store_product_ids'))
+  const isActive = formData.get('is_active') !== 'false'
+
+  try {
+    if (code.length < 3) {
+      throw new Error('Kode diskon minimal 3 karakter dan hanya boleh berisi huruf, angka, - atau _.')
+    }
+    if (!['FIXED', 'PERCENT'].includes(discountType)) {
+      throw new Error('Jenis diskon tidak valid.')
+    }
+    if (!Number.isFinite(discountValue) || discountValue <= 0) {
+      throw new Error('Nilai diskon harus lebih dari nol.')
+    }
+    if (discountType === 'PERCENT' && discountValue > 100) {
+      throw new Error('Diskon persen tidak boleh lebih dari 100%.')
+    }
+    if (!Number.isFinite(minimumAmount)) {
+      throw new Error('Minimum belanja tidak valid.')
+    }
+
+    const startsAt = parseOptionalDate(formData.get('starts_at'))
+    const expiresAt = parseOptionalDate(formData.get('expires_at'))
+    if (startsAt && expiresAt && new Date(startsAt) >= new Date(expiresAt)) {
+      throw new Error('Tanggal berakhir harus setelah tanggal mulai.')
+    }
+
+    const client = await connectPostgresClient()
+    try {
+      await client.query('BEGIN')
+      if (allowedStoreProductIds.length > 0) {
+        const productCheck = await client.query<{ id: string }>(
+          `SELECT id::text
+           FROM public.store_products
+           WHERE org_id = $1::uuid
+             AND id = ANY($2::uuid[])`,
+          [orgId, allowedStoreProductIds],
+        )
+        if (productCheck.rows.length !== allowedStoreProductIds.length) {
+          throw new Error('Ada produk kupon yang tidak ditemukan pada organisasi ini.')
+        }
+      }
+
+      if (couponId) {
+        const updated = await client.query<{ id: string }>(
+          `UPDATE public.commerce_coupons
+           SET
+             code = $3,
+             discount_type = $4,
+             discount_value = $5,
+             minimum_amount = $6,
+             starts_at = $7::timestamptz,
+             expires_at = $8::timestamptz,
+             usage_limit = $9,
+             per_user_limit = $10,
+             allowed_store_product_ids = $11::uuid[],
+             is_active = $12,
+             updated_at = NOW()
+           WHERE id = $1::uuid
+             AND org_id = $2::uuid
+           RETURNING id::text`,
+          [
+            couponId,
+            orgId,
+            code,
+            discountType,
+            discountValue,
+            minimumAmount,
+            startsAt,
+            expiresAt,
+            usageLimit,
+            perUserLimit,
+            allowedStoreProductIds,
+            isActive,
+          ],
+        )
+        if (!updated.rows[0]) throw new Error('Kode diskon tidak ditemukan.')
+      } else {
+        await client.query(
+          `INSERT INTO public.commerce_coupons (
+             org_id, code, discount_type, discount_value, minimum_amount,
+             starts_at, expires_at, usage_limit, per_user_limit,
+             allowed_store_product_ids, is_active
+           ) VALUES (
+             $1::uuid, $2, $3, $4, $5,
+             $6::timestamptz, $7::timestamptz, $8, $9,
+             $10::uuid[], $11
+           )`,
+          [
+            orgId,
+            code,
+            discountType,
+            discountValue,
+            minimumAmount,
+            startsAt,
+            expiresAt,
+            usageLimit,
+            perUserLimit,
+            allowedStoreProductIds,
+            isActive,
+          ],
+        )
+      }
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
+
+    revalidateLmsSalesPaths()
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Gagal menyimpan kode diskon.'
+    return {
+      success: false,
+      error: message.toLowerCase().includes('duplicate')
+        ? 'Kode diskon tersebut sudah digunakan.'
+        : message,
+    }
+  }
+}
+
+/** Mengaktifkan atau menonaktifkan kode diskon tanpa menghapus riwayat pemakaian. */
+export async function setLmsCouponStatusAction(formData: FormData) {
+  const orgData = await getActiveOrg()
+  if (!orgData?.org?.id) return { success: false, error: 'Sesi tidak valid.' }
+  if (!['owner', 'admin', 'manager'].includes(orgData.role)) {
+    return { success: false, error: 'Hanya admin yang dapat mengelola kode diskon.' }
+  }
+
+  const couponId = String(formData.get('coupon_id') || '').trim()
+  const isActive = formData.get('is_active') === 'true'
+  if (!couponId) return { success: false, error: 'Kode diskon tidak valid.' }
+
+  const client = await connectPostgresClient()
+  try {
+    const result = await client.query<{ id: string }>(
+      `UPDATE public.commerce_coupons
+       SET is_active = $3, updated_at = NOW()
+       WHERE id = $1::uuid
+         AND org_id = $2::uuid
+       RETURNING id::text`,
+      [couponId, orgData.org.id, isActive],
+    )
+    if (!result.rows[0]) return { success: false, error: 'Kode diskon tidak ditemukan.' }
+    revalidateLmsSalesPaths()
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Gagal mengubah status kode diskon.',
+    }
+  } finally {
+    client.release()
   }
 }

@@ -151,6 +151,7 @@ export type StorefrontVariantView = {
 
 export type StorefrontProductView = {
   id: string
+  storeProductId: string
   inventoryProductId: string
   slug: string
   name: string
@@ -323,6 +324,22 @@ export type AdminProductEntitlementView = {
   resolvedCourseIds: string[]
 }
 
+export type AdminCouponView = {
+  id: string
+  code: string
+  discountType: 'FIXED' | 'PERCENT'
+  discountValue: number
+  minimumAmount: number
+  startsAt: string | null
+  expiresAt: string | null
+  usageLimit: number | null
+  perUserLimit: number
+  allowedStoreProductIds: string[]
+  isActive: boolean
+  redemptionCount: number
+  totalDiscountAmount: number
+}
+
 export type AdminVariantView = {
   id: string
   productId: string
@@ -443,6 +460,7 @@ export type PublicOrderStatusPayload = {
     status: string
     paymentStatus: string
     subtotalAmount: number
+    discountAmount: number
     shippingAmount: number
     grandTotal: number
     customerName: string
@@ -491,6 +509,7 @@ export type EcommerceDashboardData = {
   learningCourses: AdminLearningCourseView[]
   accessPackages: AdminAccessPackageView[]
   productEntitlements: AdminProductEntitlementView[]
+  coupons: AdminCouponView[]
 }
 
 export type ShippingAddressMatcherInput = {

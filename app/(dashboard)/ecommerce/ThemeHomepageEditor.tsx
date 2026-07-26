@@ -294,6 +294,7 @@ function buildPreviewProducts(
 
       return {
         id: product.productId,
+        storeProductId: product.id,
         inventoryProductId: product.productId,
         slug: product.publicSlug || baseProduct?.name?.toLowerCase() || product.productId,
         name: product.publicName || baseProduct?.name || 'Produk Tanpa Nama',

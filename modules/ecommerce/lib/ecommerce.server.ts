@@ -10,7 +10,23 @@ import {
   uploadObjectToStorage,
 } from '@/lib/storage/object-storage.server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { syncActivePackageMemberships } from '@/modules/ecommerce/payments/entitlement.service'
+import {
+  snapshotOrderEntitlements,
+  syncActivePackageMemberships,
+} from '@/modules/ecommerce/payments/entitlement.service'
+import {
+  enqueueCheckoutAccountClaim,
+  ensureCheckoutIdentity,
+  normalizeCheckoutEmail,
+  normalizeCheckoutPhone,
+  type CheckoutIdentity,
+} from '@/modules/ecommerce/lib/checkout-identity.server'
+import {
+  normalizeCommerceCouponCode,
+  quoteCommerceCoupon,
+  type CommerceCouponQuote,
+} from '@/modules/ecommerce/lib/coupon.service'
+import { finalizeFreeCommerceOrder } from '@/modules/ecommerce/payments/commerce-payment.service'
 import {
   buildThemeDraftFromTemplate,
   normalizeShippingMatcher,
@@ -24,6 +40,7 @@ import {
   toThemeTemplateRows,
   type AdminAccessPackageView,
   type AdminCatalogProductView,
+  type AdminCouponView,
   type AdminLearningCourseView,
   type AdminOrderEventView,
   type AdminOrderPaymentView,
@@ -1008,6 +1025,7 @@ async function getStorefrontProducts(
 
     return {
       id: row.product_id,
+      storeProductId: row.store_product_id,
       inventoryProductId: row.inventory_product_id,
       slug: row.public_slug,
       name: row.public_name,
@@ -1357,7 +1375,13 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
       created_at: string
     }> }
 
-  const [learningCourseResult, accessPackageResult, productEntitlementResult, subscriptionPlanResult] = await Promise.all([
+  const [
+    learningCourseResult,
+    accessPackageResult,
+    productEntitlementResult,
+    subscriptionPlanResult,
+    couponResult,
+  ] = await Promise.all([
     queryPostgres<{
       id: string
       title: string
@@ -1508,6 +1532,44 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
        FROM public.commerce_subscription_plans
        WHERE org_id = $1::uuid
          AND is_active = TRUE`,
+      [orgId],
+    ),
+    queryPostgres<{
+      id: string
+      code: string
+      discount_type: 'FIXED' | 'PERCENT'
+      discount_value: number
+      minimum_amount: number
+      starts_at: string | null
+      expires_at: string | null
+      usage_limit: number | null
+      per_user_limit: number
+      allowed_store_product_ids: string[]
+      is_active: boolean
+      redemption_count: number
+      total_discount_amount: number
+    }>(
+      `SELECT
+         coupon.id::text,
+         coupon.code,
+         coupon.discount_type,
+         coupon.discount_value::float8,
+         coupon.minimum_amount::float8,
+         coupon.starts_at::text,
+         coupon.expires_at::text,
+         coupon.usage_limit,
+         coupon.per_user_limit,
+         coupon.allowed_store_product_ids::text[],
+         coupon.is_active,
+         COUNT(redemption.id)::int AS redemption_count,
+         COALESCE(SUM(redemption.discount_amount), 0)::float8 AS total_discount_amount
+       FROM public.commerce_coupons coupon
+       LEFT JOIN public.commerce_coupon_redemptions redemption
+         ON redemption.org_id = coupon.org_id
+        AND redemption.coupon_id = coupon.id
+       WHERE coupon.org_id = $1::uuid
+       GROUP BY coupon.id
+       ORDER BY coupon.created_at DESC`,
       [orgId],
     ),
   ])
@@ -1762,6 +1824,21 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
     packageIds: row.package_ids || [],
     resolvedCourseIds: row.resolved_course_ids || [],
   }))
+  const dashboardCoupons: AdminCouponView[] = couponResult.rows.map((row) => ({
+    id: row.id,
+    code: normalizeCommerceCouponCode(row.code),
+    discountType: row.discount_type,
+    discountValue: Number(row.discount_value || 0),
+    minimumAmount: Number(row.minimum_amount || 0),
+    startsAt: row.starts_at,
+    expiresAt: row.expires_at,
+    usageLimit: row.usage_limit,
+    perUserLimit: Number(row.per_user_limit || 1),
+    allowedStoreProductIds: row.allowed_store_product_ids || [],
+    isActive: row.is_active,
+    redemptionCount: Number(row.redemption_count || 0),
+    totalDiscountAmount: Number(row.total_discount_amount || 0),
+  }))
 
   return {
     stores: dashboardStores,
@@ -1795,6 +1872,7 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
     learningCourses: dashboardLearningCourses,
     accessPackages: dashboardAccessPackages,
     productEntitlements: dashboardProductEntitlements,
+    coupons: dashboardCoupons,
   }
 }
 
@@ -2775,6 +2853,7 @@ type CheckoutInput = {
   customerEmail?: string
   customerPhone: string
   customerNote?: string
+  couponCode?: string
   shippingRateId?: string
   address: {
     recipientName: string
@@ -2806,6 +2885,7 @@ function parseCheckoutPayload(input: unknown): CheckoutInput {
     customerEmail: cleanText(source.customerEmail, 160),
     customerPhone: cleanText(source.customerPhone, 80),
     customerNote: cleanLongText(source.customerNote, 500),
+    couponCode: normalizeCommerceCouponCode(source.couponCode),
     shippingRateId: cleanText(source.shippingRateId, 80),
     address: {
       recipientName: cleanText(address.recipientName, 160) || cleanText(source.customerName, 160),
@@ -2902,6 +2982,84 @@ async function resolveCheckoutCatalogSnapshot(
     storePayload,
     shippingRate,
     items: resolvedItems,
+  }
+}
+
+export async function validatePublicCheckoutCoupon(input: unknown) {
+  const source = (
+    typeof input === 'object' && input && !Array.isArray(input)
+      ? input
+      : {}
+  ) as Record<string, unknown>
+  const orgSlug = cleanText(source.orgSlug, 120)
+  const storeSlug = cleanText(source.storeSlug, 120)
+  const couponCode = normalizeCommerceCouponCode(source.couponCode)
+  const customerEmail = normalizeCheckoutEmail(cleanText(source.customerEmail, 200))
+  const clientIp = normalizeIpAddress(source.clientIp)
+  const items: CheckoutItemInput[] = Array.isArray(source.items)
+    ? source.items
+        .map((item) => {
+          const row = (
+            typeof item === 'object' && item && !Array.isArray(item)
+              ? item
+              : {}
+          ) as Record<string, unknown>
+          return {
+            productId: cleanText(row.productId, 80),
+            variantId: cleanText(row.variantId, 80) || null,
+            quantity: Math.max(1, Math.min(999, Math.trunc(toNumber(row.quantity) || 1))),
+          }
+        })
+        .filter((item) => item.productId)
+    : []
+
+  if (!orgSlug || !storeSlug) throw new Error('Store tidak valid.')
+  if (!couponCode) throw new Error('Masukkan kode diskon terlebih dahulu.')
+  if (items.length === 0) throw new Error('Pilih produk sebelum memakai kode diskon.')
+
+  const context = await getPublicStoreContext(orgSlug, storeSlug)
+  if (!context) throw new Error('Store tidak ditemukan.')
+  const admin = (await createAdminClient()) as AdminDb
+  await enforcePublicRateLimit({
+    admin,
+    orgId: context.orgId,
+    storeId: context.storeId,
+    actionType: 'COUPON_VALIDATE',
+    scopeKey: `${context.storeId}:${clientIp || 'anon'}`,
+    ipAddress: clientIp || null,
+    requestKey: couponCode,
+    limit: 30,
+    windowMs: CHECKOUT_RATE_LIMIT_WINDOW_MS,
+    message: 'Terlalu banyak percobaan kode diskon. Coba lagi beberapa menit.',
+  })
+
+  const { items: resolvedItems } = await resolveCheckoutCatalogSnapshot(
+    context,
+    items,
+    undefined,
+    { country: 'ID' },
+  )
+  const client = await connectPostgresClient()
+  try {
+    const quote = await quoteCommerceCoupon(client, {
+      orgId: context.orgId,
+      code: couponCode,
+      email: customerEmail || null,
+      lines: resolvedItems.map((item) => ({
+        storeProductId: item.product.storeProductId,
+        lineSubtotal: (item.variant?.price ?? item.product.price) * item.quantity,
+      })),
+    })
+    return {
+      code: quote.code,
+      discountType: quote.discountType,
+      discountValue: quote.discountValue,
+      discountAmount: quote.discountAmount,
+      subtotal: quote.subtotal,
+      totalAfterDiscount: quote.totalAfterDiscount,
+    }
+  } finally {
+    client.release()
   }
 }
 
@@ -3022,58 +3180,354 @@ export async function createCheckoutOrder(input: unknown) {
     const unitPrice = item.variant?.price ?? item.product.price
     return total + unitPrice * item.quantity
   }, 0)
-  const grandTotal = subtotal + shippingRate.amount
+  const client = await connectPostgresClient()
+  let createdOrder: {
+    id: string
+    orderNumber: string
+    paymentDueAt: string | null
+    grandTotal: number
+    accountClaimRequired: boolean
+    accessToken: string
+  } | null = null
 
-  const { data: order, error: orderError } = await admin
-    .from('ecommerce_orders')
-    .insert({
-      org_id: context.orgId,
-      store_id: context.storeId,
-      branch_id: context.branchId,
-      warehouse_id: context.warehouseId,
-      customer_name: payload.customerName,
-      customer_email: payload.customerEmail || null,
-      customer_phone: payload.customerPhone,
-      customer_note: payload.customerNote || null,
-      checkout_idempotency_key: idempotencyKey || null,
-      public_access_token: publicAccessToken,
-      public_access_token_expires_at: publicAccessTokenExpiresAt,
-      status: 'AWAITING_PAYMENT',
-      payment_status: 'PENDING_UPLOAD',
-      subtotal_amount: subtotal,
-      shipping_amount: shippingRate.amount,
-      grand_total: grandTotal,
-      shipping_zone_id: shippingRate.zoneId,
-      shipping_rate_id: shippingRate.id,
-      shipping_snapshot: shippingRate,
-      pricing_snapshot: {
-        subtotal,
-        shipping: shippingRate.amount,
-        grandTotal,
-      },
-      theme_snapshot: {
-        tokens: theme.tokens,
-        checkout: theme.layout.checkout,
-      },
-      cart_snapshot: {
+  try {
+    await client.query('BEGIN')
+
+    if (idempotencyKey) {
+      const existing = await client.query<{
+        id: string
+        order_number: string
+        payment_due_at: string | null
+        grand_total: number
+        public_access_token: string
+      }>(
+        `SELECT
+           id::text,
+           order_number,
+           payment_due_at::text,
+           grand_total::float8,
+           public_access_token
+         FROM public.ecommerce_orders
+         WHERE store_id = $1::uuid
+           AND checkout_idempotency_key = $2
+         ORDER BY created_at DESC
+         LIMIT 1
+         FOR UPDATE`,
+        [context.storeId, idempotencyKey],
+      )
+      if (existing.rows[0]?.public_access_token) {
+        createdOrder = {
+          id: existing.rows[0].id,
+          orderNumber: existing.rows[0].order_number,
+          paymentDueAt: existing.rows[0].payment_due_at,
+          grandTotal: Number(existing.rows[0].grand_total || 0),
+          accountClaimRequired: false,
+          accessToken: existing.rows[0].public_access_token,
+        }
+        await client.query('COMMIT')
+      }
+    }
+
+    if (!createdOrder) {
+      const storeProductIds = [...new Set(items.map((item) => item.product.storeProductId))]
+      const learningResult = await client.query<{ has_learning_benefits: boolean }>(
+        `SELECT (
+           EXISTS (
+             SELECT 1
+             FROM public.commerce_product_courses product_course
+             WHERE product_course.org_id = $1::uuid
+               AND product_course.store_product_id = ANY($2::uuid[])
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM public.commerce_product_access_packages product_package
+             WHERE product_package.org_id = $1::uuid
+               AND product_package.store_product_id = ANY($2::uuid[])
+           )
+         ) AS has_learning_benefits`,
+        [context.orgId, storeProductIds],
+      )
+      const needsLearningIdentity = Boolean(learningResult.rows[0]?.has_learning_benefits)
+      const normalizedEmail = normalizeCheckoutEmail(payload.customerEmail || '')
+      const normalizedPhone = normalizeCheckoutPhone(payload.customerPhone)
+      if ((needsLearningIdentity || payload.couponCode) && !normalizedEmail) {
+        throw new Error('Email yang valid wajib diisi untuk akses kelas atau penggunaan kode diskon.')
+      }
+      if (needsLearningIdentity && normalizedPhone.length < 8) {
+        throw new Error('Nomor WhatsApp yang valid wajib diisi untuk akses kelas.')
+      }
+
+      let checkoutIdentity: CheckoutIdentity | null = null
+      if (needsLearningIdentity) {
+        checkoutIdentity = await ensureCheckoutIdentity(client, {
+          orgId: context.orgId,
+          fullName: payload.customerName,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+        })
+      }
+
+      let couponQuote: CommerceCouponQuote | null = null
+      if (payload.couponCode) {
+        couponQuote = await quoteCommerceCoupon(client, {
+          orgId: context.orgId,
+          code: payload.couponCode,
+          userId: checkoutIdentity?.userId || null,
+          email: normalizedEmail,
+          lock: true,
+          lines: items.map((item) => ({
+            storeProductId: item.product.storeProductId,
+            lineSubtotal: (item.variant?.price ?? item.product.price) * item.quantity,
+          })),
+        })
+      }
+
+      const discountAmount = couponQuote?.discountAmount || 0
+      const grandTotal = Math.max(0, subtotal - discountAmount + shippingRate.amount)
+      const paymentDueAt = grandTotal > 0
+        ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        : null
+      const usesDigitalShipping = shippingRate.id === 'digital-delivery'
+      const cartSnapshot = {
         itemCount: items.length,
         items: items.map((item) => ({
           productId: item.product.id,
+          storeProductId: item.product.storeProductId,
           productName: item.product.name,
           variantId: item.variant?.id || null,
           variantName: item.variant?.name || null,
           quantity: item.quantity,
           unitPrice: item.variant?.price ?? item.product.price,
         })),
-      },
-      payment_due_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    })
-    .select('*')
-    .single()
+      }
+      const orderResult = await client.query<{
+        id: string
+        order_number: string
+        payment_due_at: string | null
+      }>(
+        `INSERT INTO public.ecommerce_orders (
+           org_id, store_id, branch_id, warehouse_id, user_id,
+           customer_name, customer_email, customer_phone, customer_note,
+           order_number, status, payment_status,
+           subtotal_amount, discount_amount, shipping_amount, grand_total,
+           shipping_zone_id, shipping_rate_id, shipping_snapshot,
+           pricing_snapshot, theme_snapshot, cart_snapshot, attribution,
+           coupon_id, payment_due_at, public_access_token,
+           public_access_token_expires_at, checkout_idempotency_key,
+           idempotency_key
+         ) VALUES (
+           $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid,
+           $6, $7, $8, $9, '',
+           'AWAITING_PAYMENT', 'PENDING_UPLOAD',
+           $10, $11, $12, $13,
+           $14::uuid, $15::uuid, $16::jsonb,
+           $17::jsonb, $18::jsonb, $19::jsonb, $20::jsonb,
+           $21::uuid, $22::timestamptz, $23, $24::timestamptz, $25, $25
+         )
+         RETURNING id::text, order_number, payment_due_at::text`,
+        [
+          context.orgId,
+          context.storeId,
+          context.branchId,
+          context.warehouseId,
+          checkoutIdentity?.userId || null,
+          payload.customerName,
+          normalizedEmail || null,
+          normalizedPhone || payload.customerPhone,
+          payload.customerNote || null,
+          subtotal,
+          discountAmount,
+          shippingRate.amount,
+          grandTotal,
+          usesDigitalShipping ? null : shippingRate.zoneId,
+          usesDigitalShipping ? null : shippingRate.id,
+          JSON.stringify(shippingRate),
+          JSON.stringify({
+            subtotal,
+            discount: discountAmount,
+            shipping: shippingRate.amount,
+            grandTotal,
+            couponCode: couponQuote?.code || null,
+          }),
+          JSON.stringify({
+            tokens: theme.tokens,
+            checkout: theme.layout.checkout,
+          }),
+          JSON.stringify(cartSnapshot),
+          JSON.stringify({
+            source: 'STOREFRONT',
+            couponCode: couponQuote?.code || null,
+          }),
+          couponQuote?.couponId || null,
+          paymentDueAt,
+          publicAccessToken,
+          publicAccessTokenExpiresAt,
+          idempotencyKey || null,
+        ],
+      )
+      const order = orderResult.rows[0]
+      if (!order?.id) throw new Error('Gagal membuat order.')
 
-  if (orderError || !order?.id) {
-    if (idempotencyKey && cleanText(orderError?.message, 240).toLowerCase().includes('duplicate')) {
-      const existingOrder = await findCheckoutOrderByIdempotencyKey(admin, context.storeId, idempotencyKey)
+      for (const item of items) {
+        const variant = item.variant
+        const price = variant?.price ?? item.product.price
+        const comparePrice = variant?.comparePrice ?? item.product.comparePrice
+        const attributes = variant?.choices?.map((choice) => ({
+          attributeId: choice.attributeId,
+          attributeName: choice.attributeName,
+          attributeValueId: choice.attributeValueId,
+          attributeValue: choice.attributeValue,
+        })) || []
+        await client.query(
+          `INSERT INTO public.ecommerce_order_items (
+             org_id, order_id, store_id, product_id, inventory_product_id,
+             variant_id, product_name, variant_name, sku, slug, image_url,
+             unit_label, quantity, unit_price, compare_price,
+             line_subtotal, line_total, attributes
+           ) VALUES (
+             $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid,
+             $6::uuid, $7, $8, $9, $10, $11,
+             'Pcs', $12, $13, $14, $15, $15, $16::jsonb
+           )`,
+          [
+            context.orgId,
+            order.id,
+            context.storeId,
+            item.product.id,
+            variant?.inventoryProductId || item.product.inventoryProductId,
+            variant?.id || null,
+            item.product.name,
+            variant?.name || null,
+            variant?.sku || null,
+            item.product.slug,
+            variant?.imageUrl || item.product.imageUrl || null,
+            item.quantity,
+            price,
+            comparePrice,
+            price * item.quantity,
+            JSON.stringify(attributes),
+          ],
+        )
+      }
+
+      await client.query(
+        `INSERT INTO public.ecommerce_order_addresses (
+           org_id, order_id, address_type, recipient_name, phone,
+           line1, line2, district, city, province, postal_code, country, notes
+         ) VALUES (
+           $1::uuid, $2::uuid, 'SHIPPING', $3, $4,
+           $5, $6, $7, $8, $9, $10, $11, $12
+         )`,
+        [
+          context.orgId,
+          order.id,
+          payload.address.recipientName || payload.customerName,
+          payload.address.phone || payload.customerPhone,
+          payload.address.line1,
+          payload.address.line2 || null,
+          payload.address.district || null,
+          payload.address.city,
+          payload.address.province,
+          payload.address.postalCode || null,
+          payload.address.country || 'ID',
+          payload.address.notes || null,
+        ],
+      )
+
+      await snapshotOrderEntitlements(client, {
+        orgId: context.orgId,
+        orderId: order.id,
+      })
+      if (couponQuote) {
+        await client.query(
+          `INSERT INTO public.commerce_coupon_redemptions (
+             org_id, coupon_id, order_id, user_id, email_normalized,
+             discount_amount, idempotency_key
+           ) VALUES (
+             $1::uuid, $2::uuid, $3::uuid, $4::uuid, lower($5), $6, $7
+           )`,
+          [
+            context.orgId,
+            couponQuote.couponId,
+            order.id,
+            checkoutIdentity?.userId || null,
+            normalizedEmail,
+            couponQuote.discountAmount,
+            `coupon:${order.id}`,
+          ],
+        )
+      }
+
+      if (checkoutIdentity) {
+        await enqueueCheckoutAccountClaim(client, {
+          orgId: context.orgId,
+          orgSlug: context.orgSlug,
+          orderId: order.id,
+          orderNumber: order.order_number,
+          identity: checkoutIdentity,
+        })
+      }
+
+      if (grandTotal === 0) {
+        await finalizeFreeCommerceOrder(client, {
+          orgId: context.orgId,
+          orderId: order.id,
+        })
+      } else {
+        await client.query(
+          `INSERT INTO public.ecommerce_order_payments (
+             org_id, order_id, status, method, provider_code, idempotency_key
+           ) VALUES (
+             $1::uuid, $2::uuid, 'PENDING_UPLOAD', 'BANK_TRANSFER',
+             'MANUAL', $3
+           )`,
+          [context.orgId, order.id, `payment-shell:${order.id}`],
+        )
+      }
+
+      await client.query(
+        `INSERT INTO public.ecommerce_order_events (
+           org_id, order_id, actor_user_id, actor_label,
+           event_type, message, payload
+         ) VALUES (
+           $1::uuid, $2::uuid, $3::uuid, 'STOREFRONT',
+           'ORDER_CREATED', 'Order e-commerce dibuat dari checkout publik.',
+           $4::jsonb
+         )`,
+        [
+          context.orgId,
+          order.id,
+          checkoutIdentity?.userId || null,
+          JSON.stringify({
+            shippingRate,
+            itemCount: items.length,
+            couponCode: couponQuote?.code || null,
+            discountAmount,
+          }),
+        ],
+      )
+      await client.query('COMMIT')
+      createdOrder = {
+        id: order.id,
+        orderNumber: order.order_number,
+        paymentDueAt: order.payment_due_at,
+        grandTotal,
+        accountClaimRequired: Boolean(checkoutIdentity?.created),
+        accessToken: publicAccessToken,
+      }
+    }
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK')
+    } catch {
+      // Transaksi mungkin sudah selesai.
+    }
+    if (idempotencyKey) {
+      const existingOrder = await findCheckoutOrderByIdempotencyKey(
+        admin,
+        context.storeId,
+        idempotencyKey,
+      )
       if (existingOrder?.id && existingOrder.order_number && existingOrder.public_access_token) {
         return formatCheckoutOrderResponse({
           orderId: String(existingOrder.id),
@@ -3087,111 +3541,24 @@ export async function createCheckoutOrder(input: unknown) {
         })
       }
     }
-
-    throw new Error(orderError?.message || 'Gagal membuat order.')
+    throw error
+  } finally {
+    client.release()
   }
 
-  const orderItems = items.map((item) => {
-    const variant = item.variant
-    const price = variant?.price ?? item.product.price
-    const comparePrice = variant?.comparePrice ?? item.product.comparePrice
-    const attributes = variant?.choices?.map((choice) => ({
-      attributeId: choice.attributeId,
-      attributeName: choice.attributeName,
-      attributeValueId: choice.attributeValueId,
-      attributeValue: choice.attributeValue,
-    })) || []
-
-    return {
-      org_id: context.orgId,
-      order_id: order.id,
-      store_id: context.storeId,
-      product_id: item.product.id,
-      inventory_product_id: variant?.inventoryProductId || item.product.inventoryProductId,
-      variant_id: variant?.id || null,
-      product_name: item.product.name,
-      variant_name: variant?.name || null,
-      sku: variant?.sku || null,
-      slug: item.product.slug,
-      image_url: variant?.imageUrl || item.product.imageUrl || null,
-      unit_label: 'Pcs',
-      quantity: item.quantity,
-      unit_price: price,
-      compare_price: comparePrice,
-      line_subtotal: price * item.quantity,
-      line_total: price * item.quantity,
-      attributes,
-    }
-  })
-
-  const { error: itemError } = await admin
-    .from('ecommerce_order_items')
-    .insert(orderItems)
-
-  if (itemError) {
-    throw new Error(`Order dibuat, tetapi item gagal disimpan: ${itemError.message}`)
-  }
-
-  const { error: addressError } = await admin
-    .from('ecommerce_order_addresses')
-    .insert({
-      org_id: context.orgId,
-      order_id: order.id,
-      address_type: 'SHIPPING',
-      recipient_name: payload.address.recipientName || payload.customerName,
-      phone: payload.address.phone || payload.customerPhone,
-      line1: payload.address.line1,
-      line2: payload.address.line2 || null,
-      district: payload.address.district || null,
-      city: payload.address.city,
-      province: payload.address.province,
-      postal_code: payload.address.postalCode || null,
-      country: payload.address.country || 'ID',
-      notes: payload.address.notes || null,
-    })
-
-  if (addressError) {
-    throw new Error(`Order dibuat, tetapi alamat gagal disimpan: ${addressError.message}`)
-  }
-
-  const { error: paymentShellError } = await admin
-    .from('ecommerce_order_payments')
-    .insert({
-      org_id: context.orgId,
-      order_id: order.id,
-      status: 'PENDING_UPLOAD',
-      method: 'BANK_TRANSFER',
-    })
-
-  if (paymentShellError) {
-    throw new Error(`Order dibuat, tetapi shell pembayaran gagal disimpan: ${paymentShellError.message}`)
-  }
-
-  await admin.from('ecommerce_order_events').insert({
-    org_id: context.orgId,
-    order_id: order.id,
-    actor_label: 'STOREFRONT',
-    event_type: 'ORDER_CREATED',
-    message: 'Order e-commerce dibuat dari checkout publik.',
-    payload: {
-      shippingRate,
-      itemCount: items.length,
-    },
-  })
-
+  if (!createdOrder) throw new Error('Order tidak dapat dibuat.')
   return {
     ...formatCheckoutOrderResponse({
-      orderId: String(order.id),
-      orderNumber: String(order.order_number || ''),
-      paymentDueAt: order.payment_due_at ? String(order.payment_due_at) : null,
+      orderId: createdOrder.id,
+      orderNumber: createdOrder.orderNumber,
+      paymentDueAt: createdOrder.paymentDueAt,
       transferInstructions: storePayload.store.transferInstructions,
-      grandTotal,
+      grandTotal: createdOrder.grandTotal,
       orgSlug: context.orgSlug,
       storeSlug: context.storeSlug,
-      accessToken: publicAccessToken,
+      accessToken: createdOrder.accessToken,
     }),
-    transferInstructions: storePayload.store.transferInstructions,
-    grandTotal,
+    accountClaimRequired: createdOrder.accountClaimRequired,
   }
 }
 
@@ -3214,6 +3581,7 @@ async function getPublicOrderRow(input: {
     status: string
     payment_status: string
     subtotal_amount: string
+    discount_amount: string
     shipping_amount: string
     grand_total: string
     created_at: string
@@ -3350,6 +3718,7 @@ export async function getPublicOrderStatusPayload(input: {
       status: order.status,
       paymentStatus: order.payment_status,
       subtotalAmount: toNumber(order.subtotal_amount),
+      discountAmount: toNumber(order.discount_amount),
       shippingAmount: toNumber(order.shipping_amount),
       grandTotal: toNumber(order.grand_total),
       customerName: cleanText(order.customer_name, 160),

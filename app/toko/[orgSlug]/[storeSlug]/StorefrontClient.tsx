@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CheckCircle2,
   ExternalLink,
+  LoaderCircle,
   Minus,
   PackageCheck,
   Plus,
@@ -15,6 +16,8 @@ import {
   Store,
   ShoppingCart,
   Truck,
+  TicketPercent,
+  X,
 } from 'lucide-react'
 import {
   formatStoreThemeButtonRadius,
@@ -48,6 +51,21 @@ type CheckoutResult = {
   transferInstructions: string
   grandTotal: number
   orderAccessUrl: string
+}
+
+type CheckoutRequestItem = {
+  productId: string
+  variantId: string | null
+  quantity: number
+}
+
+type CheckoutCouponQuote = {
+  code: string
+  discountType: 'FIXED' | 'PERCENT'
+  discountValue: number
+  discountAmount: number
+  subtotal: number
+  totalAfterDiscount: number
 }
 
 function getStorageKey(storeId: string) {
@@ -197,13 +215,12 @@ function ProductCard({
               <div />
             )}
             <div
-              className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] shadow-sm ${
-                product.subscriptionPlan
+              className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] shadow-sm ${product.subscriptionPlan
                   ? 'bg-emerald-50 text-emerald-700'
                   : inStock
                     ? 'bg-emerald-50 text-emerald-700'
                     : 'bg-rose-50 text-rose-700'
-              }`}
+                }`}
             >
               {product.subscriptionPlan
                 ? '⭐ Langganan Aktif'
@@ -306,6 +323,11 @@ export default function StorefrontClient({
   const [checkoutError, setCheckoutError] = useState('')
   const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null)
   const [checkoutIdempotencyKey, setCheckoutIdempotencyKey] = useState(() => crypto.randomUUID())
+  const [couponCode, setCouponCode] = useState('')
+  const [couponQuote, setCouponQuote] = useState<CheckoutCouponQuote | null>(null)
+  const [couponAppliedSignature, setCouponAppliedSignature] = useState('')
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState('')
   const [checkoutForm, setCheckoutForm] = useState({
     customerName: '',
     customerEmail: '',
@@ -399,6 +421,32 @@ export default function StorefrontClient({
   }).filter((line) => line.product)
 
   const cartSubtotal = cartLines.reduce((total, line) => total + line.lineTotal, 0)
+  const singleProductForCoupon = selectedProduct
+    ? selectedProduct.variants.find(
+        (variant) => variant.id === selectedVariantByProductId[selectedProduct.id],
+      )
+      || selectedProduct.variants.find((variant) => variant.isDefault)
+      || selectedProduct.variants[0]
+      || null
+    : null
+  const couponRequestItems: CheckoutRequestItem[] = pageMode === 'product' && selectedProduct
+    ? [{
+        productId: selectedProduct.id,
+        variantId: singleProductForCoupon?.id || null,
+        quantity: singleCheckoutQty,
+      }]
+    : cartLines.map((line) => ({
+        productId: line.product?.id || '',
+        variantId: line.variant?.id || null,
+        quantity: line.entry.quantity,
+      })).filter((item) => item.productId)
+  const couponCurrentSignature = JSON.stringify({
+    items: couponRequestItems,
+  })
+  const activeCouponQuote = couponQuote && couponAppliedSignature === couponCurrentSignature
+    ? couponQuote
+    : null
+  const checkoutDiscountAmount = activeCouponQuote?.discountAmount || 0
   const selectedShippingRate = useMemo(() => (
     resolveShippingRateForAddress(
       payload.shippingRates,
@@ -420,7 +468,10 @@ export default function StorefrontClient({
     checkoutForm.shippingRateId,
     payload.shippingRates,
   ])
-  const cartGrandTotal = cartSubtotal + (selectedShippingRate?.amount || 0)
+  const cartGrandTotal = Math.max(
+    0,
+    cartSubtotal - checkoutDiscountAmount + (selectedShippingRate?.amount || 0),
+  )
   const storeName = payload.store.brandName || payload.store.name
   const storeInitials = getStoreInitials(storeName)
   const storeLogo = payload.store.logoUrl || ''
@@ -487,32 +538,75 @@ export default function StorefrontClient({
       .filter((item) => item.quantity > 0))
   }
 
+  async function applyCoupon() {
+    const normalizedCode = couponCode.trim().toUpperCase()
+    if (!normalizedCode) {
+      setCouponError('Masukkan kode diskon terlebih dahulu.')
+      return
+    }
+    if (couponRequestItems.length === 0) {
+      setCouponError('Pilih produk sebelum memakai kode diskon.')
+      return
+    }
+
+    setCouponLoading(true)
+    setCouponError('')
+    try {
+      const response = await fetch('/api/ecommerce/coupon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgSlug: payload.store.orgSlug,
+          storeSlug: payload.store.slug,
+          couponCode: normalizedCode,
+          customerEmail: checkoutForm.customerEmail,
+          items: couponRequestItems,
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Kode diskon tidak dapat dipakai.')
+      }
+      setCouponQuote(result.data as CheckoutCouponQuote)
+      setCouponAppliedSignature(couponCurrentSignature)
+      setCouponCode(normalizedCode)
+    } catch (error) {
+      setCouponQuote(null)
+      setCouponAppliedSignature('')
+      setCouponError(error instanceof Error ? error.message : 'Kode diskon tidak dapat dipakai.')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  function removeCoupon() {
+    setCouponCode('')
+    setCouponQuote(null)
+    setCouponAppliedSignature('')
+    setCouponError('')
+  }
+
   async function submitCheckout() {
     if (!interactive) return
-    const isSingleProductMode = pageMode === 'product' && Boolean(selectedProduct)
-    const activeVariantId = selectedProduct
-      ? (selectedVariantByProductId[selectedProduct.id] || selectedProduct.variants[0]?.id || null)
-      : null
-
-    const itemsToSubmit = isSingleProductMode && selectedProduct
-      ? [{
-          productId: selectedProduct.id,
-          variantId: activeVariantId,
-          quantity: singleCheckoutQty,
-        }]
-      : cartLines.map((line) => ({
-          productId: line.product?.id,
-          variantId: line.variant?.id || null,
-          quantity: line.entry.quantity,
-        }))
+    const itemsToSubmit = couponRequestItems
 
     if (itemsToSubmit.length === 0) {
       setCheckoutError('Silakan pilih produk atau keranjang masih kosong.')
       return
     }
 
-    if (!checkoutForm.customerName || !checkoutForm.customerPhone) {
-      setCheckoutError('Nama lengkap dan nomor WhatsApp wajib diisi.')
+    const normalizedEmail = checkoutForm.customerEmail.trim().toLowerCase()
+    if (
+      !checkoutForm.customerName
+      || !checkoutForm.customerPhone
+      || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
+    ) {
+      setCheckoutError('Nama lengkap, email yang valid, dan nomor WhatsApp wajib diisi.')
+      return
+    }
+
+    if (couponCode.trim() && !activeCouponQuote) {
+      setCheckoutError('Pesanan berubah atau kode diskon belum diterapkan. Tekan “Terapkan” terlebih dahulu.')
       return
     }
 
@@ -540,6 +634,7 @@ export default function StorefrontClient({
           customerEmail: checkoutForm.customerEmail,
           customerPhone: checkoutForm.customerPhone,
           customerNote: checkoutForm.customerNote,
+          couponCode: activeCouponQuote?.code || undefined,
           shippingRateId: isDigitalOnlyStore ? undefined : (selectedShippingRate?.id || checkoutForm.shippingRateId),
           address: {
             recipientName: checkoutForm.recipientName || checkoutForm.customerName,
@@ -565,6 +660,7 @@ export default function StorefrontClient({
       const checkoutData = result.data as CheckoutResult
       setCheckoutResult(checkoutData)
       setCart([])
+      removeCoupon()
       setCheckoutIdempotencyKey(crypto.randomUUID())
 
       if (checkoutData.orderAccessUrl) {
@@ -577,6 +673,82 @@ export default function StorefrontClient({
     } finally {
       setCheckoutLoading(false)
     }
+  }
+
+  function renderCouponField() {
+    const couponIsStale = Boolean(couponQuote && !activeCouponQuote)
+    return (
+      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4">
+        <label htmlFor="checkout-coupon-code" className="flex items-center gap-2 text-sm font-bold text-slate-900">
+          <TicketPercent aria-hidden="true" size={17} className="text-indigo-600" />
+          Punya kode diskon?
+        </label>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <input
+            id="checkout-coupon-code"
+            value={couponCode}
+            onChange={(event) => {
+              setCouponCode(event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))
+              setCouponQuote(null)
+              setCouponAppliedSignature('')
+              setCouponError('')
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                void applyCoupon()
+              }
+            }}
+            placeholder="Contoh: HEMAT20"
+            autoComplete="off"
+            className="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3.5 font-mono text-sm font-bold uppercase text-slate-950 outline-none transition-colors duration-200 placeholder:font-sans placeholder:font-medium placeholder:normal-case placeholder:text-slate-400 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100"
+          />
+          <button
+            type="button"
+            onClick={() => void applyCoupon()}
+            disabled={couponLoading || !couponCode.trim()}
+            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {couponLoading && <LoaderCircle aria-hidden="true" size={16} className="motion-safe:animate-spin" />}
+            {couponLoading ? 'Memeriksa' : 'Terapkan'}
+          </button>
+        </div>
+
+        {activeCouponQuote && (
+          <div role="status" className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800">
+            <div className="flex min-w-0 items-start gap-2">
+              <CheckCircle2 aria-hidden="true" size={17} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-bold">Kode {activeCouponQuote.code} berhasil dipakai</p>
+                <p className="mt-0.5 text-xs font-semibold">
+                  Hemat {formatRupiah(activeCouponQuote.discountAmount)}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={removeCoupon}
+              aria-label={`Hapus kode ${activeCouponQuote.code}`}
+              className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl text-emerald-700 transition-colors duration-200 hover:bg-emerald-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100"
+            >
+              <X aria-hidden="true" size={17} />
+            </button>
+          </div>
+        )}
+
+        {couponIsStale && (
+          <div role="status" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs font-semibold text-amber-800">
+            Pilihan atau jumlah produk berubah. Terapkan kembali kode diskon.
+          </div>
+        )}
+
+        {couponError && (
+          <div role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-xs font-semibold text-rose-800">
+            {couponError}
+          </div>
+        )}
+      </div>
+    )
   }
 
   function renderBlock(block: StoreThemeBlock) {
@@ -1103,7 +1275,12 @@ export default function StorefrontClient({
   const singleUnitPrice = activeSingleVariant ? activeSingleVariant.price : (selectedProduct ? selectedProduct.price : 0)
   const singleSubtotal = singleUnitPrice * singleCheckoutQty
   const isDigitalOnlyStore = payload.shippingRates.length === 0
-  const singleGrandTotal = singleSubtotal + (isDigitalOnlyStore ? 0 : (selectedShippingRate?.amount || 0))
+  const singleGrandTotal = Math.max(
+    0,
+    singleSubtotal
+      - checkoutDiscountAmount
+      + (isDigitalOnlyStore ? 0 : (selectedShippingRate?.amount || 0)),
+  )
 
   const allowQuantityIncrement = useMemo(() => {
     if (isDigitalOnlyStore) return false
@@ -1257,7 +1434,7 @@ export default function StorefrontClient({
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {isUnlimitedProduct(selectedProduct) ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
-                          ✓ Akses Instan (Produk Digital)
+                          ✓ Akses Instan
                         </span>
                       ) : (
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${getProductStock(selectedProduct) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
@@ -1336,6 +1513,10 @@ export default function StorefrontClient({
                   </div>
                 )}
 
+                <div className="mt-5 border-t border-slate-100 pt-4">
+                  {renderCouponField()}
+                </div>
+
                 <div className="-mx-6 -mb-6 mt-6 border-t border-slate-200/80 bg-slate-50/60 px-6 py-4 space-y-2 text-sm">
                   <div className="flex justify-between text-slate-600 font-medium">
                     <span>Subtotal {allowQuantityIncrement ? `(${singleCheckoutQty} item)` : ''}</span>
@@ -1345,6 +1526,12 @@ export default function StorefrontClient({
                     <div className="flex justify-between text-slate-600 font-medium">
                       <span>Ongkos Kirim</span>
                       <span className="font-semibold text-slate-900">{formatRupiah(selectedShippingRate?.amount || 0)}</span>
+                    </div>
+                  )}
+                  {checkoutDiscountAmount > 0 && (
+                    <div className="flex justify-between font-semibold text-emerald-700">
+                      <span>Kode diskon {activeCouponQuote?.code}</span>
+                      <span>-{formatRupiah(checkoutDiscountAmount)}</span>
                     </div>
                   )}
                   <div className="border-t border-slate-200/80 pt-3 flex items-center justify-between">
@@ -1667,6 +1854,9 @@ export default function StorefrontClient({
                   <div className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: payload.theme.tokens.muted }}>
                     Ringkasan Nilai
                   </div>
+                  <div className="mt-4">
+                    {renderCouponField()}
+                  </div>
                   <div className="mt-5 space-y-4 text-sm">
                     <div className="flex items-center justify-between font-medium text-slate-600">
                       <span>Subtotal</span>
@@ -1676,6 +1866,12 @@ export default function StorefrontClient({
                       <span>Ongkir</span>
                       <span className="font-black text-slate-950">{formatRupiah(selectedShippingRate?.amount || 0)}</span>
                     </div>
+                    {checkoutDiscountAmount > 0 && (
+                      <div className="flex items-center justify-between font-semibold text-emerald-700">
+                        <span>Kode diskon {activeCouponQuote?.code}</span>
+                        <span className="font-black">-{formatRupiah(checkoutDiscountAmount)}</span>
+                      </div>
+                    )}
                     <div className="rounded-[22px] bg-slate-950 px-4 py-4 text-white">
                       <div className="flex items-center justify-between text-base">
                         <span className="font-black">Total akhir</span>
@@ -1748,7 +1944,7 @@ export default function StorefrontClient({
                       </div>
                     )}
 
-                    <button type="button" onClick={submitCheckout} disabled={checkoutLoading || !selectedShippingRate} className="inline-flex items-center justify-center gap-2 px-5 py-4 text-sm font-black text-white disabled:opacity-60" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
+                    <button type="button" onClick={submitCheckout} disabled={checkoutLoading || (!isDigitalOnlyStore && !selectedShippingRate)} className="inline-flex cursor-pointer items-center justify-center gap-2 px-5 py-4 text-sm font-black text-white transition-opacity duration-200 hover:opacity-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
                       {checkoutLoading ? 'Memproses checkout...' : 'Buat Order'}
                       <ArrowRight size={16} />
                     </button>
