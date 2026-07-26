@@ -164,6 +164,8 @@ export type StorefrontProductView = {
   isFeatured: boolean
   isPublished: boolean
   stockQty: number
+  productType?: string
+  allowQuantity?: boolean
   variants: StorefrontVariantView[]
 }
 

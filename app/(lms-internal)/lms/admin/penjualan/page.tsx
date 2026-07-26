@@ -25,6 +25,12 @@ export default async function LmsCourseCommercePage() {
   const productsWithBenefits = dashboardData.productEntitlements.filter(
     (item) => item.resolvedCourseIds.length > 0,
   ).length
+  const defaultStoreSlug = dashboardData.stores[0]?.slug || ''
+  const storefrontUrl =
+    orgData.org.slug && defaultStoreSlug
+      ? `/toko/${orgData.org.slug}/${defaultStoreSlug}`
+      : null
+
   const stats = [
     {
       label: 'Course Tersedia',
@@ -72,6 +78,16 @@ export default async function LmsCourseCommercePage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
+          {storefrontUrl && (
+            <Link
+              href={storefrontUrl}
+              target="_blank"
+              className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
+            >
+              Kunjungi Toko Publik
+              <ExternalLink aria-hidden="true" size={16} />
+            </Link>
+          )}
           <Link
             href="/ecommerce"
             className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
@@ -107,7 +123,7 @@ export default async function LmsCourseCommercePage() {
       {dashboardData.stores.length === 0 ? (
         <LmsCommerceSetupButton />
       ) : (
-        <LmsSimpleSalesManager dashboardData={dashboardData} />
+        <LmsSimpleSalesManager dashboardData={dashboardData} orgSlug={orgData.org.slug} />
       )}
     </div>
   )

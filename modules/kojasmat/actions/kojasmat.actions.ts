@@ -621,6 +621,15 @@ async function recordProyekHistory(payload: {
   actor_role?: string | null
   proposal_version?: number | null
 }) {
+  let proposal_version = payload.proposal_version
+  if (proposal_version == null) {
+    const { rows } = await queryPostgres(
+      `SELECT proposal_version FROM kojasmat_proyek WHERE id=$1`,
+      [payload.proyek_id]
+    )
+    proposal_version = rows[0]?.proposal_version ?? 1
+  }
+
   await queryPostgres(
     `INSERT INTO kojasmat_proyek_history
        (org_id, proyek_id, status_dari, status_ke, aksi, pesan, actor_id, actor_role, proposal_version)
@@ -628,7 +637,7 @@ async function recordProyekHistory(payload: {
     [
       payload.org_id, payload.proyek_id, payload.status_dari ?? null, payload.status_ke,
       payload.aksi, payload.pesan ?? null, payload.actor_id ?? null, payload.actor_role ?? null,
-      payload.proposal_version ?? null,
+      proposal_version,
     ]
   )
 }

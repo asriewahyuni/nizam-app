@@ -65,7 +65,7 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
 
       // Delete existing entitlements
       await client.query(
-        "DELETE FROM product_course_entitlements WHERE store_product_id = $1 AND org_id = $2",
+        "DELETE FROM commerce_product_courses WHERE store_product_id = $1 AND org_id = $2",
         [storeProductId, orgId]
       )
 
@@ -74,7 +74,7 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
         const values = courseIds.map((cid, i) => \`(\$1, \$2, \$\${i + 3})\`).join(',')
         const params = [orgId, storeProductId, ...courseIds]
         await client.query(
-          \`INSERT INTO product_course_entitlements (org_id, store_product_id, course_id) VALUES \${values}\`,
+          \`INSERT INTO commerce_product_courses (org_id, store_product_id, course_id) VALUES \${values} ON CONFLICT (org_id, store_product_id, course_id) DO NOTHING\`,
           params
         )
       }

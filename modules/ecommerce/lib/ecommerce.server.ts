@@ -527,7 +527,7 @@ async function ensureStoreThemeShell(
         layout: draftSeed.layout,
         branding: { checkout: normalizeStoreCheckoutBranding(draftSeed.layout.checkout) },
         published_at: new Date().toISOString(),
-        created_by: input.userId,
+        created_by: input.userId || null,
       })
 
     if (publishedError) {
@@ -563,7 +563,7 @@ async function ensureStoreThemeShell(
         tokens: source.tokens || draftSeed.tokens,
         layout: source.layout || draftSeed.layout,
         branding: source.branding || { checkout: normalizeStoreCheckoutBranding(draftSeed.layout.checkout) },
-        created_by: input.userId,
+        created_by: input.userId || null,
       })
 
     if (draftError) {
@@ -650,20 +650,59 @@ async function getStoreThemeVersion(
   }
 
   if (!selected) {
-    const { data: draft } = await admin
-      .from('store_theme_versions')
-      .select('*')
-      .eq('store_id', storeId)
-      .eq('status', 'DRAFT')
+    const { data: storeRow } = await admin
+      .from('stores')
+      .select('id, org_id')
+      .eq('id', storeId)
       .maybeSingle()
 
-    if (draft?.id) {
-      selected = draft as Record<string, unknown>
+    if (storeRow?.id) {
+      try {
+        await ensureStoreThemeShell(admin, {
+          orgId: String(storeRow.org_id),
+          storeId: String(storeRow.id),
+          templateKey: 'modern-retail',
+          userId: null,
+        })
+
+        const { data: autoPublished } = await admin
+          .from('store_theme_versions')
+          .select('*')
+          .eq('store_id', storeId)
+          .eq('status', 'PUBLISHED')
+          .maybeSingle()
+
+        if (autoPublished?.id) {
+          selected = autoPublished as Record<string, unknown>
+        } else {
+          const { data: autoDraft } = await admin
+            .from('store_theme_versions')
+            .select('*')
+            .eq('store_id', storeId)
+            .eq('status', 'DRAFT')
+            .maybeSingle()
+
+          if (autoDraft?.id) {
+            selected = autoDraft as Record<string, unknown>
+          }
+        }
+      } catch (err) {
+        console.error('Auto-seed store theme failed:', err)
+      }
     }
   }
 
   if (!selected) {
-    throw new Error('Theme toko belum tersedia.')
+    const fallbackSeed = buildThemeDraftFromTemplate('modern-retail')
+    selected = {
+      id: `default-theme-${storeId}`,
+      store_id: storeId,
+      version_name: 'Modern Retail Default',
+      status: 'PUBLISHED',
+      tokens: fallbackSeed.tokens,
+      layout: fallbackSeed.layout,
+      branding: { checkout: normalizeStoreCheckoutBranding(fallbackSeed.layout.checkout) },
+    }
   }
 
   return normalizeStorefrontThemeVersion(selected)
@@ -871,8 +910,12 @@ async function getStorefrontProducts(
     mediaByKey.set(key, bucket)
   }
 
+  const isPhysicalType = (type: string | undefined | null) => type === 'GOODS' || type === 'INVENTORY'
+  const productTypeById = new Map(productRows.map((row) => [row.product_id, row.product_type]))
+
   const variantsByProductId = new Map<string, StorefrontVariantView[]>()
   for (const row of variantRows) {
+    const isPhysical = isPhysicalType(productTypeById.get(row.product_id))
     const variant: StorefrontVariantView = {
       id: row.id,
       inventoryProductId: row.inventory_product_id,
@@ -883,7 +926,7 @@ async function getStorefrontProducts(
       imageUrl: cleanText(row.image_url, 500) || mediaByKey.get(mediaKeyForRow(row.product_id, row.id))?.[0] || '',
       isDefault: Boolean(row.is_default),
       isPublished: Boolean(row.is_published ?? true),
-      stockQty: toNumber(stockByProductId.get(row.inventory_product_id)),
+      stockQty: !isPhysical ? 999999 : toNumber(stockByProductId.get(row.inventory_product_id)),
       choices: choicesByVariantId.get(row.id) || [],
     }
 
@@ -896,9 +939,12 @@ async function getStorefrontProducts(
   return productRows.map((row) => {
     const productGallery = mediaByKey.get(mediaKeyForRow(row.product_id, null)) || []
     const variants = variantsByProductId.get(row.product_id) || []
-    const fallbackStock = variants.length
-      ? variants.reduce((total, variant) => total + variant.stockQty, 0)
-      : toNumber(stockByProductId.get(row.inventory_product_id))
+    const isPhysical = isPhysicalType(row.product_type)
+    const fallbackStock = !isPhysical
+      ? 999999
+      : variants.length
+        ? variants.reduce((total, variant) => total + variant.stockQty, 0)
+        : toNumber(stockByProductId.get(row.inventory_product_id))
 
     return {
       id: row.product_id,
@@ -917,6 +963,8 @@ async function getStorefrontProducts(
       isFeatured: Boolean(row.is_featured),
       isPublished: Boolean(row.is_published),
       stockQty: fallbackStock,
+      productType: row.product_type || 'NON_INVENTORY',
+      allowQuantity: isPhysical,
       variants,
     }
   })
@@ -2644,15 +2692,15 @@ function parseCheckoutPayload(input: unknown): CheckoutInput {
     customerNote: cleanLongText(source.customerNote, 500),
     shippingRateId: cleanText(source.shippingRateId, 80),
     address: {
-      recipientName: cleanText(address.recipientName, 160),
-      phone: cleanText(address.phone, 80),
-      line1: cleanLongText(address.line1, 240),
+      recipientName: cleanText(address.recipientName, 160) || cleanText(source.customerName, 160),
+      phone: cleanText(address.phone, 80) || cleanText(source.customerPhone, 80),
+      line1: cleanLongText(address.line1, 240) || 'Alamat Digital',
       line2: cleanLongText(address.line2, 240),
-      district: cleanText(address.district, 120),
-      city: cleanText(address.city, 120),
-      province: cleanText(address.province, 120),
-      postalCode: cleanText(address.postalCode, 32),
-      country: cleanText(address.country, 40),
+      district: cleanText(address.district, 120) || 'Digital',
+      city: cleanText(address.city, 120) || 'Digital',
+      province: cleanText(address.province, 120) || 'Digital',
+      postalCode: cleanText(address.postalCode, 32) || '00000',
+      country: cleanText(address.country, 40) || 'ID',
       notes: cleanLongText(address.notes, 240),
     },
     items: Array.isArray(source.items)
@@ -2685,7 +2733,20 @@ async function resolveCheckoutCatalogSnapshot(
     storePayload.shippingRates,
     address,
     shippingRateId || null
-  )
+  ) || (storePayload.shippingRates.length === 0 ? {
+    id: 'digital-delivery',
+    zoneId: 'digital-zone',
+    zoneName: 'Digital',
+    name: 'Akses Instan / Tanpa Ongkir',
+    amount: 0,
+    etaLabel: 'Langsung aktif',
+    matcher: {
+      countries: ['ID'],
+      provinces: [],
+      cities: [],
+      postalCodes: [],
+    },
+  } : null)
 
   if (!shippingRate) {
     throw new Error('Alamat belum cocok dengan zona ongkir aktif di store ini.')
@@ -2778,13 +2839,17 @@ export async function createCheckoutOrder(input: unknown) {
   const payload = parseCheckoutPayload(input)
   if (!payload.orgSlug || !payload.storeSlug) throw new Error('Store tidak valid.')
   if (!payload.customerName || !payload.customerPhone) throw new Error('Nama dan nomor pelanggan wajib diisi.')
-  if (!payload.address.line1 || !payload.address.city || !payload.address.province) {
-    throw new Error('Alamat pengiriman belum lengkap.')
-  }
   if (payload.items.length === 0) throw new Error('Keranjang masih kosong.')
 
   const context = await getPublicStoreContext(payload.orgSlug, payload.storeSlug)
   if (!context) throw new Error('Store tidak ditemukan.')
+
+  const checkStorePayload = await getPublicStorefrontPayload(payload.orgSlug, payload.storeSlug)
+  const requiresPhysicalAddress = (checkStorePayload?.shippingRates.length || 0) > 0
+
+  if (requiresPhysicalAddress && (!payload.address.line1 || !payload.address.city || !payload.address.province)) {
+    throw new Error('Alamat pengiriman belum lengkap.')
+  }
 
   const admin = (await createAdminClient()) as AdminDb
   const idempotencyKey = cleanClientKey(payload.idempotencyKey)

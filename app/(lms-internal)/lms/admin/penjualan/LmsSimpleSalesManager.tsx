@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Edit2, Trash2, X, Check, Search, BookOpen } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Check, Search, BookOpen, ExternalLink, Copy, Store } from 'lucide-react'
 import type { EcommerceDashboardData } from '@/modules/ecommerce/lib/ecommerce'
 import { SafeButton, SectionCard, SectionHeader, StatusBadge } from '@/components/ui/NizamUI'
 import { formatRupiah } from '@/lib/utils'
@@ -9,15 +9,20 @@ import { saveLmsSimpleProductAction, deleteLmsSimpleProductAction } from '@/modu
 
 export default function LmsSimpleSalesManager({
   dashboardData,
+  orgSlug,
 }: {
   dashboardData: EcommerceDashboardData
+  orgSlug?: string
 }) {
   const [isPending, startTransition] = useTransition()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [copiedText, setCopiedText] = useState<string | null>(null)
 
   // Default to the first store, or empty if none.
   const defaultStoreId = dashboardData.stores[0]?.id || ''
+  const storeSlug = dashboardData.stores[0]?.slug || ''
+  const hasStorefront = Boolean(orgSlug && storeSlug)
 
   // Form State
   const [formName, setFormName] = useState('')
@@ -28,6 +33,18 @@ export default function LmsSimpleSalesManager({
   
   // Flash state
   const [flash, setFlash] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+
+  function copyToClipboard(relativePath: string, message?: string) {
+    const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${relativePath}` : relativePath
+    navigator.clipboard.writeText(fullUrl)
+    setCopiedText(relativePath)
+    if (message) {
+      setFlash({ tone: 'success', text: message })
+    }
+    setTimeout(() => {
+      setCopiedText((prev) => (prev === relativePath ? null : prev))
+    }, 2500)
+  }
 
   function openCreateModal() {
     setEditingId(null)
@@ -48,7 +65,11 @@ export default function LmsSimpleSalesManager({
     setFormIsPublished(sp.isPublished)
     
     const entitlements = dashboardData.productEntitlements.find(e => e.storeProductId === sp.id)
-    setFormCourseIds(entitlements?.resolvedCourseIds || [])
+    if (entitlements) {
+      setFormCourseIds(entitlements.resolvedCourseIds)
+    } else {
+      setFormCourseIds([])
+    }
     
     setIsModalOpen(true)
     setFlash(null)
@@ -78,15 +99,13 @@ export default function LmsSimpleSalesManager({
     })
   }
 
-  function handleDelete(storeProductId: string) {
-    if (!window.confirm('Yakin ingin menurunkan tayangan produk ini?')) return
-
+  function handleDelete(id: string) {
+    if (!confirm('Apakah Anda yakin ingin menghapus produk ini dari store?')) return
     const fd = new FormData()
-    fd.set('store_product_id', storeProductId)
-
+    fd.append('store_product_id', id)
     startTransition(async () => {
       const res = await deleteLmsSimpleProductAction(fd)
-      if (res?.error) {
+      if (!res.success) {
         alert(res.error)
       }
     })
@@ -94,6 +113,54 @@ export default function LmsSimpleSalesManager({
 
   return (
     <SectionCard>
+      {hasStorefront && (
+        <div className="flex flex-col gap-4 border-b border-slate-200 bg-gradient-to-r from-indigo-50/80 via-blue-50/60 to-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+              <Store size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                  Toko Publik Aktif
+                </span>
+              </div>
+              <p className="text-sm font-medium text-slate-700">
+                Siswa dapat langsung memilih dan berbelanja kelas tanpa perlu membuka E-Commerce Lengkap.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={`/toko/${orgSlug}/${storeSlug}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-3.5 py-2 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-600 hover:text-white"
+            >
+              <ExternalLink size={14} />
+              Buka Etalase Toko
+            </a>
+            <button
+              type="button"
+              onClick={() => copyToClipboard(`/toko/${orgSlug}/${storeSlug}`, 'Link etalase toko berhasil disalin!')}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+            >
+              {copiedText === `/toko/${orgSlug}/${storeSlug}` ? (
+                <>
+                  <Check size={14} />
+                  Tersalin!
+                </>
+              ) : (
+                <>
+                  <Copy size={14} />
+                  Salin Link Toko
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
         <div>
           <h2 className="text-lg font-bold text-slate-900">Katalog Penjualan LMS</h2>
@@ -116,13 +183,14 @@ export default function LmsSimpleSalesManager({
               <th className="px-5 py-4 font-semibold">Harga</th>
               <th className="px-5 py-4 font-semibold">Manfaat Kelas</th>
               <th className="px-5 py-4 font-semibold">Status</th>
+              <th className="px-5 py-4 font-semibold">Tautan Publik</th>
               <th className="px-5 py-4 font-semibold text-right sm:px-8">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {dashboardData.storeProducts.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-slate-500 sm:px-8">
+                <td colSpan={6} className="px-5 py-8 text-center text-slate-500 sm:px-8">
                   Belum ada produk yang dijual. Klik Tambah Produk untuk mulai.
                 </td>
               </tr>
@@ -146,6 +214,48 @@ export default function LmsSimpleSalesManager({
                         label={sp.isPublished ? 'Tayang' : 'Draft'}
                         variant={sp.isPublished ? 'success' : 'warning'}
                       />
+                    </td>
+                    <td className="px-5 py-4">
+                      {hasStorefront && sp.isPublished ? (
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`/toko/${orgSlug}/${storeSlug}/produk/${sp.publicSlug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Buka halaman publik produk ini"
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+                          >
+                            Buka <ExternalLink size={13} />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyToClipboard(
+                                `/toko/${orgSlug}/${storeSlug}/produk/${sp.publicSlug}`,
+                                `Link produk ${sp.publicName} berhasil disalin!`,
+                              )
+                            }
+                            title="Salin link checkout produk"
+                            className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-indigo-600 hover:text-white"
+                          >
+                            {copiedText === `/toko/${orgSlug}/${storeSlug}/produk/${sp.publicSlug}` ? (
+                              <>
+                                <Check size={13} />
+                                Tersalin
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={13} />
+                                Salin
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">
+                          {sp.isPublished ? 'Storefront belum aktif' : 'Aktifkan Tayang untuk link'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-right sm:px-8">
                       <div className="flex justify-end gap-2">

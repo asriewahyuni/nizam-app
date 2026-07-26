@@ -223,7 +223,11 @@ function ProductCard({
               </div>
             )}
             <div className={`text-[11px] font-black uppercase tracking-[0.14em] ${inStock ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {inStock ? 'Stok tersedia' : 'Stok habis'}
+              {!product.allowQuantity || (product.productType !== 'GOODS' && product.productType !== 'INVENTORY')
+                ? 'Akses Instan'
+                : inStock
+                  ? 'Stok tersedia'
+                  : 'Stok habis'}
             </div>
           </div>
           {showQuickAdd ? (
@@ -295,6 +299,8 @@ export default function StorefrontClient({
     notes: '',
     shippingRateId: payload.shippingRates[0]?.id || '',
   })
+
+  const [singleCheckoutQty, setSingleCheckoutQty] = useState<number>(1)
 
   const selectedProduct = payload.products.find((product) => product.slug === initialProductSlug) || payload.products[0] || null
   const radius = formatStoreThemeRadius(payload.theme.tokens.cardRadius)
@@ -407,7 +413,14 @@ export default function StorefrontClient({
       || null
   }
 
-  function getProductStock(product: StorefrontProductView) {
+  function isUnlimitedProduct(product: StorefrontProductView): boolean {
+    return !product.allowQuantity || (product.productType !== 'GOODS' && product.productType !== 'INVENTORY')
+  }
+
+  function getProductStock(product: StorefrontProductView): number {
+    if (isUnlimitedProduct(product)) {
+      return 999999
+    }
     const selectedVariant = getSelectedVariant(product)
     return selectedVariant?.stockQty ?? product.stockQty
   }
@@ -452,8 +465,36 @@ export default function StorefrontClient({
 
   async function submitCheckout() {
     if (!interactive) return
-    if (cartLines.length === 0) {
-      setCheckoutError('Keranjang masih kosong.')
+    const isSingleProductMode = pageMode === 'product' && Boolean(selectedProduct)
+    const activeVariantId = selectedProduct
+      ? (selectedVariantByProductId[selectedProduct.id] || selectedProduct.variants[0]?.id || null)
+      : null
+
+    const itemsToSubmit = isSingleProductMode && selectedProduct
+      ? [{
+          productId: selectedProduct.id,
+          variantId: activeVariantId,
+          quantity: singleCheckoutQty,
+        }]
+      : cartLines.map((line) => ({
+          productId: line.product?.id,
+          variantId: line.variant?.id || null,
+          quantity: line.entry.quantity,
+        }))
+
+    if (itemsToSubmit.length === 0) {
+      setCheckoutError('Silakan pilih produk atau keranjang masih kosong.')
+      return
+    }
+
+    if (!checkoutForm.customerName || !checkoutForm.customerPhone) {
+      setCheckoutError('Nama lengkap dan nomor WhatsApp wajib diisi.')
+      return
+    }
+
+    const isDigitalOnlyStore = payload.shippingRates.length === 0
+    if (!isDigitalOnlyStore && !selectedShippingRate && !checkoutForm.shippingRateId) {
+      setCheckoutError('Silakan pilih metode/zona pengiriman terlebih dahulu.')
       return
     }
 
@@ -475,24 +516,20 @@ export default function StorefrontClient({
           customerEmail: checkoutForm.customerEmail,
           customerPhone: checkoutForm.customerPhone,
           customerNote: checkoutForm.customerNote,
-          shippingRateId: selectedShippingRate?.id || checkoutForm.shippingRateId,
+          shippingRateId: isDigitalOnlyStore ? undefined : (selectedShippingRate?.id || checkoutForm.shippingRateId),
           address: {
             recipientName: checkoutForm.recipientName || checkoutForm.customerName,
             phone: checkoutForm.addressPhone || checkoutForm.customerPhone,
-            line1: checkoutForm.line1,
+            line1: isDigitalOnlyStore ? 'Alamat Digital' : checkoutForm.line1,
             line2: checkoutForm.line2,
-            district: checkoutForm.district,
-            city: checkoutForm.city,
-            province: checkoutForm.province,
-            postalCode: checkoutForm.postalCode,
+            district: isDigitalOnlyStore ? 'Digital' : checkoutForm.district,
+            city: isDigitalOnlyStore ? 'Digital' : checkoutForm.city,
+            province: isDigitalOnlyStore ? 'Digital' : checkoutForm.province,
+            postalCode: isDigitalOnlyStore ? '00000' : checkoutForm.postalCode,
             country: 'ID',
             notes: checkoutForm.notes,
           },
-          items: cartLines.map((line) => ({
-            productId: line.product?.id,
-            variantId: line.variant?.id || null,
-            quantity: line.entry.quantity,
-          })),
+          items: itemsToSubmit,
         }),
       })
 
@@ -972,7 +1009,11 @@ export default function StorefrontClient({
             <div className="grid gap-3 sm:grid-cols-3">
               {[
                 `Harga ${formatRupiah(featuredProduct.price)}`,
-                getProductStock(featuredProduct) > 0 ? `Stok ${getProductStock(featuredProduct)}` : 'Stok habis',
+                isUnlimitedProduct(featuredProduct)
+                  ? 'Akses Instan • Digital'
+                  : getProductStock(featuredProduct) > 0
+                    ? `Stok ${getProductStock(featuredProduct)}`
+                    : 'Stok habis',
                 featuredProduct.variants.length > 0 ? `${featuredProduct.variants.length} varian` : 'Produk tunggal',
               ].map((item) => (
                 <div key={item} className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">
@@ -1030,16 +1071,45 @@ export default function StorefrontClient({
     return null
   }
 
+  const activeSingleVariant = selectedProduct
+    ? (selectedVariantByProductId[selectedProduct.id]
+      ? selectedProduct.variants.find((v) => v.id === selectedVariantByProductId[selectedProduct.id]) || selectedProduct.variants[0] || null
+      : selectedProduct.variants[0] || null)
+    : null
+  const singleUnitPrice = activeSingleVariant ? activeSingleVariant.price : (selectedProduct ? selectedProduct.price : 0)
+  const singleSubtotal = singleUnitPrice * singleCheckoutQty
+  const isDigitalOnlyStore = payload.shippingRates.length === 0
+  const singleGrandTotal = singleSubtotal + (isDigitalOnlyStore ? 0 : (selectedShippingRate?.amount || 0))
+
+  const allowQuantityIncrement = useMemo(() => {
+    if (isDigitalOnlyStore) return false
+    if (selectedProduct && selectedProduct.allowQuantity === false) return false
+    if (selectedProduct && (selectedProduct.productType === 'COURSE' || selectedProduct.productType === 'DIGITAL' || selectedProduct.productType === 'SERVICE')) {
+      return false
+    }
+    return true
+  }, [isDigitalOnlyStore, selectedProduct])
+
+  useEffect(() => {
+    if (!allowQuantityIncrement && singleCheckoutQty !== 1) {
+      setSingleCheckoutQty(1)
+    }
+  }, [allowQuantityIncrement, singleCheckoutQty])
+
   return (
     <div
       className={embedded ? 'min-h-0 overflow-hidden' : 'relative min-h-screen overflow-hidden'}
       style={{
-        background: `linear-gradient(180deg, ${payload.theme.tokens.surface} 0%, ${payload.theme.tokens.surfaceAlt} 100%)`,
+        background: pageMode === 'product'
+          ? '#F8FAFC'
+          : `linear-gradient(180deg, ${payload.theme.tokens.surface} 0%, ${payload.theme.tokens.surfaceAlt} 100%)`,
         fontFamily,
         color: payload.theme.tokens.text,
       }}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(15,118,110,0.09),transparent_26%),radial-gradient(circle_at_top_right,rgba(15,23,42,0.07),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.06),transparent_30%)]" />
+      {pageMode !== 'product' && (
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(15,118,110,0.09),transparent_26%),radial-gradient(circle_at_top_right,rgba(15,23,42,0.07),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.06),transparent_30%)]" />
+      )}
 
       {payload.previewMode && (
         <div className="sticky top-0 z-50 border-b bg-amber-50 px-6 py-3 text-center text-sm font-black text-amber-700">
@@ -1047,37 +1117,39 @@ export default function StorefrontClient({
         </div>
       )}
 
-      <header className={`${embedded ? 'relative' : 'sticky top-0'} z-40`}>
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-4 rounded-[28px] border bg-white/88 px-4 py-4 shadow-[0_25px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur sm:px-5">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center text-sm font-black text-white" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
-                {storeInitials}
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: payload.theme.tokens.muted }}>
-                  {payload.store.brandName || 'Official Store'}
+      {pageMode !== 'product' && (
+        <header className={`${embedded ? 'relative' : 'sticky top-0'} z-40`}>
+          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between gap-4 rounded-[28px] border bg-white/88 px-4 py-4 shadow-[0_25px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur sm:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center text-sm font-black text-white" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
+                  {storeInitials}
                 </div>
-                <div className="truncate text-sm font-black text-slate-950">{payload.store.name}</div>
+                <div className="min-w-0">
+                  <div className="truncate text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: payload.theme.tokens.muted }}>
+                    {payload.store.brandName || 'Official Store'}
+                  </div>
+                  <div className="truncate text-sm font-black text-slate-950">{payload.store.name}</div>
+                </div>
               </div>
+
+              <nav className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 p-1 md:flex">
+                <Link href={`/toko/${payload.store.orgSlug}/${payload.store.slug}`} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Beranda</Link>
+                <Link href={`/toko/${payload.store.orgSlug}/${payload.store.slug}/koleksi`} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Koleksi</Link>
+                <Link href={getCartHref(payload.store.orgSlug, payload.store.slug)} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Keranjang</Link>
+              </nav>
+
+              <Link href={getCartHref(payload.store.orgSlug, payload.store.slug)} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black text-white shadow-sm" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
+                <ShoppingCart size={16} />
+                <span className="hidden sm:inline">Keranjang</span>
+                {cartCount}
+              </Link>
             </div>
-
-            <nav className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 p-1 md:flex">
-              <Link href={`/toko/${payload.store.orgSlug}/${payload.store.slug}`} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Beranda</Link>
-              <Link href={`/toko/${payload.store.orgSlug}/${payload.store.slug}/koleksi`} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Koleksi</Link>
-              <Link href={getCartHref(payload.store.orgSlug, payload.store.slug)} className="rounded-full px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-white hover:text-slate-950">Keranjang</Link>
-            </nav>
-
-            <Link href={getCartHref(payload.store.orgSlug, payload.store.slug)} className="inline-flex items-center gap-2 px-4 py-3 text-sm font-black text-white shadow-sm" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
-              <ShoppingCart size={16} />
-              <span className="hidden sm:inline">Keranjang</span>
-              {cartCount}
-            </Link>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <main className="relative mx-auto max-w-7xl space-y-10 px-4 pb-20 sm:px-6 lg:space-y-12 lg:px-8">
+      <main className={pageMode === 'product' ? 'relative mx-auto max-w-xl px-4 pb-20 pt-6 sm:px-6 sm:pt-8' : 'relative mx-auto max-w-7xl space-y-10 px-4 pb-20 sm:px-6 lg:space-y-12 lg:px-8'}>
         {pageMode === 'collection' && (
           <section className="grid gap-4 rounded-[32px] border bg-white p-6 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] lg:grid-cols-[1fr_auto]" style={{ borderColor: payload.theme.tokens.border }}>
             <div className="space-y-2">
@@ -1095,148 +1167,403 @@ export default function StorefrontClient({
         )}
 
         {pageMode === 'product' && selectedProduct && (
-          <section className="grid gap-8 overflow-hidden border bg-white p-6 lg:grid-cols-[0.92fr_1.08fr]" style={{ borderColor: payload.theme.tokens.border, borderRadius: radius, boxShadow: shadow }}>
-            <div className="space-y-4">
-              <Link href={`/toko/${payload.store.orgSlug}/${payload.store.slug}/koleksi`} className="inline-flex items-center gap-2 text-sm font-black text-slate-500 hover:text-slate-900">
-                <ChevronRight size={16} className="rotate-180" />
-                Kembali ke koleksi
-              </Link>
-              <div
-                className="min-h-[420px] rounded-[32px] bg-cover bg-center"
-                style={{
-                  backgroundImage: getProductGallery(selectedProduct)[0]
-                    ? `url(${selectedMediaByProductId[selectedProduct.id] || getProductGallery(selectedProduct)[0]})`
-                    : `linear-gradient(135deg, ${payload.theme.tokens.accentSoft}, #ffffff)`,
-                }}
-              />
-              {getProductGallery(selectedProduct).length > 1 && (
-                <div className="grid grid-cols-4 gap-3">
-                  {getProductGallery(selectedProduct).slice(0, 8).map((imageUrl) => (
-                    <button
-                      key={imageUrl}
-                      type="button"
-                      onClick={() => setSelectedMediaByProductId((current) => ({ ...current, [selectedProduct.id]: imageUrl }))}
-                      className="h-20 rounded-[18px] border bg-cover bg-center transition"
-                      style={{
-                        borderColor:
-                          (selectedMediaByProductId[selectedProduct.id] || getProductGallery(selectedProduct)[0]) === imageUrl
-                            ? payload.theme.tokens.accent
-                            : payload.theme.tokens.border,
-                        backgroundImage: `url(${imageUrl})`,
-                      }}
+          <div className="mx-auto max-w-xl space-y-5">
+            {/* Header / Brand Info terintegrasi dengan konten (Mobile-First) */}
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white px-5 py-4 shadow-xs">
+              <div className="flex min-w-0 items-center gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center text-sm font-bold text-white shadow-xs" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
+                  {storeInitials}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: payload.theme.tokens.muted }}>
+                    {payload.store.brandName || 'Official Store'}
+                  </div>
+                  <div className="truncate text-base font-extrabold text-slate-900">{payload.store.name}</div>
+                </div>
+              </div>
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/60 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">
+                <ShieldCheck size={14} className="text-emerald-600" />
+                <span className="hidden sm:inline">Checkout </span>Aman
+              </div>
+            </div>
+
+            {/* Optional Deskripsi Produk Ala Sejoli */}
+            {selectedProduct.description && (
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs">
+                <div className="text-sm font-medium leading-relaxed text-slate-700 sm:text-base whitespace-pre-line">
+                  {selectedProduct.description}
+                </div>
+              </div>
+            )}
+
+            {/* Kotak 1: DETAIL PESANAN (Produk, Varian, Qty, Total Bayar) */}
+            <div id="produk-dibeli" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+              <div className="border-b border-slate-200/80 bg-slate-50/70 px-6 py-4">
+                <h2 className="text-base font-bold text-slate-900 sm:text-lg">1. Detail Pesanan</h2>
+              </div>
+
+              <div className="p-6">
+                <div className="flex items-start gap-4">
+                  <div
+                    className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 bg-cover bg-center sm:h-20 sm:w-20"
+                    style={{
+                      backgroundImage: getProductGallery(selectedProduct)[0]
+                        ? `url(${selectedMediaByProductId[selectedProduct.id] || getProductGallery(selectedProduct)[0]})`
+                        : `linear-gradient(135deg, ${payload.theme.tokens.accentSoft}, #ffffff)`,
+                    }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-base font-extrabold text-slate-900 sm:text-lg">{selectedProduct.name}</div>
+                    {activeSingleVariant?.name && (
+                      <div className="mt-1 inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                        Varian: {activeSingleVariant.name}
+                      </div>
+                    )}
+                    <div className="mt-1.5 text-sm font-bold text-slate-700">
+                      {formatRupiah(singleUnitPrice)}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {isUnlimitedProduct(selectedProduct) ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                          ✓ Akses Instan (Produk Digital)
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${getProductStock(selectedProduct) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                          {getProductStock(selectedProduct) > 0 ? `Stok Tersedia: ${getProductStock(selectedProduct)}` : 'Stok Habis'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-base font-extrabold text-slate-900 sm:text-lg">{formatRupiah(singleSubtotal)}</div>
+                    <div className="mt-0.5 text-[11px] font-medium text-slate-400">subtotal</div>
+                  </div>
+                </div>
+
+                {selectedProduct.variants.length > 0 && (
+                  <div className="mt-5 space-y-2 border-t border-slate-100 pt-4">
+                    <div className="text-xs font-semibold text-slate-600">Pilih Varian:</div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {selectedProduct.variants.map((variant) => {
+                        const active = selectedVariantByProductId[selectedProduct.id] === variant.id
+                        return (
+                          <button
+                            type="button"
+                            key={variant.id}
+                            onClick={() => {
+                              setSelectedVariantByProductId((current) => ({ ...current, [selectedProduct.id]: variant.id }))
+                              if (variant.imageUrl) {
+                                setSelectedMediaByProductId((current) => ({ ...current, [selectedProduct.id]: variant.imageUrl }))
+                              }
+                            }}
+                            className="rounded-xl border px-3.5 py-2.5 text-left transition"
+                            style={{
+                              borderColor: active ? payload.theme.tokens.accent : '#E2E8F0',
+                              backgroundColor: active ? payload.theme.tokens.accentSoft : '#FFFFFF',
+                            }}
+                          >
+                            <div className="font-bold text-slate-900">{variant.name}</div>
+                            <div className="mt-0.5 text-xs text-slate-500">
+                              {variant.choices.map((choice) => `${choice.attributeName}: ${choice.attributeValue}`).join(' • ')}
+                            </div>
+                            <div className="mt-1 text-sm font-bold text-slate-900">{formatRupiah(variant.price)}</div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {allowQuantityIncrement ? (
+                  <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+                    <span className="text-sm font-semibold text-slate-700">Jumlah Pesanan</span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setSingleCheckoutQty((c) => Math.max(1, c - 1))}
+                        className="rounded-full border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:bg-slate-100"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <div className="w-8 text-center text-sm font-extrabold text-slate-900">{singleCheckoutQty}</div>
+                      <button
+                        type="button"
+                        onClick={() => setSingleCheckoutQty((c) => Math.min(99, c + 1))}
+                        className="rounded-full border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:bg-slate-100"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+                    <span className="text-xs font-semibold text-slate-500">Jenis Layanan</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">
+                      ✓ Akses Digital • Sekali Bayar
+                    </span>
+                  </div>
+                )}
+
+                <div className="-mx-6 -mb-6 mt-6 border-t border-slate-200/80 bg-slate-50/60 px-6 py-4 space-y-2 text-sm">
+                  <div className="flex justify-between text-slate-600 font-medium">
+                    <span>Subtotal {allowQuantityIncrement ? `(${singleCheckoutQty} item)` : ''}</span>
+                    <span className="font-semibold text-slate-900">{formatRupiah(singleSubtotal)}</span>
+                  </div>
+                  {!isDigitalOnlyStore && (
+                    <div className="flex justify-between text-slate-600 font-medium">
+                      <span>Ongkos Kirim</span>
+                      <span className="font-semibold text-slate-900">{formatRupiah(selectedShippingRate?.amount || 0)}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-slate-200/80 pt-3 flex items-center justify-between">
+                    <span className="text-base font-bold text-slate-900">Total Bayar</span>
+                    <span className="text-xl font-extrabold text-emerald-700">{formatRupiah(singleGrandTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Kotak 2: INFORMASI PRIBADI */}
+            <div id="informasi-pribadi" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+              <div className="border-b border-slate-200/80 bg-slate-50/70 px-6 py-4">
+                <h2 className="text-base font-bold text-slate-900 sm:text-lg">2. Informasi Pribadi</h2>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                    Nama Lengkap <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    value={checkoutForm.customerName}
+                    onChange={(event) =>
+                      setCheckoutForm((current) => ({
+                        ...current,
+                        customerName: event.target.value,
+                        recipientName: current.recipientName || event.target.value,
+                      }))
+                    }
+                    placeholder="Contoh: Abdullah Nizam"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                      Alamat Email <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={checkoutForm.customerEmail}
+                      onChange={(event) => setCheckoutForm((current) => ({ ...current, customerEmail: event.target.value }))}
+                      placeholder="email@contoh.com"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
                     />
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="space-y-6">
-              {selectedProduct.badgeText && (
-                <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">
-                  {selectedProduct.badgeText}
-                </div>
-              )}
-              <div className="space-y-3">
-                <h1 className="text-4xl font-black tracking-[-0.04em] text-slate-950 sm:text-5xl">{selectedProduct.name}</h1>
-                <p className="text-sm font-medium leading-relaxed text-slate-500 sm:text-base">{selectedProduct.description}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  getProductStock(selectedProduct) > 0 ? `Stok ${getProductStock(selectedProduct)}` : 'Stok habis',
-                  selectedProduct.variants.length > 0 ? `${selectedProduct.variants.length} varian` : 'Produk tunggal',
-                  selectedProduct.gallery.length > 0 ? `${selectedProduct.gallery.length + 1} foto` : 'Foto utama',
-                ].map((item) => (
-                  <div key={item} className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-slate-600">
-                    {item}
                   </div>
-                ))}
-              </div>
-              <div className={`inline-flex rounded-full px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] ${
-                getProductStock(selectedProduct) > 0
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-rose-50 text-rose-700'
-              }`}>
-                {getProductStock(selectedProduct) > 0 ? `Stok tersedia: ${getProductStock(selectedProduct)}` : 'Stok sedang habis'}
-              </div>
 
-              {selectedProduct.variants.length > 0 && (
-                <div className="space-y-3">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: payload.theme.tokens.muted }}>Pilih Varian</div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {selectedProduct.variants.map((variant) => {
-                      const active = selectedVariantByProductId[selectedProduct.id] === variant.id
-                      return (
-                        <button
-                          type="button"
-                          key={variant.id}
-                          onClick={() => {
-                            setSelectedVariantByProductId((current) => ({ ...current, [selectedProduct.id]: variant.id }))
-                            if (variant.imageUrl) {
-                              setSelectedMediaByProductId((current) => ({ ...current, [selectedProduct.id]: variant.imageUrl }))
-                            }
-                          }}
-                          className="border px-4 py-4 text-left transition"
-                          style={{
-                            borderColor: active ? payload.theme.tokens.accent : payload.theme.tokens.border,
-                            borderRadius: radius,
-                            backgroundColor: active ? payload.theme.tokens.accentSoft : '#FFFFFF',
-                          }}
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                      Nomor WhatsApp <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      value={checkoutForm.customerPhone}
+                      onChange={(event) =>
+                        setCheckoutForm((current) => ({
+                          ...current,
+                          customerPhone: event.target.value,
+                          addressPhone: current.addressPhone || event.target.value,
+                        }))
+                      }
+                      placeholder="08xxxxxxxxxx"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                    />
+                  </div>
+                </div>
+
+                {!isDigitalOnlyStore && (
+                  <div className="space-y-4 border-t border-slate-100 pt-4">
+                    <div className="text-xs font-semibold text-slate-700">Alamat Pengiriman Fisik</div>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                          Zona Ongkir <span className="text-rose-500">*</span>
+                        </label>
+                        <select
+                          value={checkoutForm.shippingRateId}
+                          onChange={(event) => setCheckoutForm((current) => ({ ...current, shippingRateId: event.target.value }))}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
                         >
-                          <div className="font-black text-slate-900">{variant.name}</div>
-                          <div className="mt-1 text-sm font-medium text-slate-500">
-                            {variant.choices.map((choice) => `${choice.attributeName}: ${choice.attributeValue}`).join(' • ')}
-                          </div>
-                          <div className="mt-2 text-sm font-black text-slate-900">{formatRupiah(variant.price)}</div>
-                          <div className={`mt-2 text-[11px] font-black uppercase tracking-[0.14em] ${
-                            variant.stockQty > 0 ? 'text-emerald-600' : 'text-rose-600'
-                          }`}>
-                            {variant.stockQty > 0 ? `Stok ${variant.stockQty}` : 'Stok habis'}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
+                          {payload.shippingRates.map((rate) => (
+                            <option key={rate.id} value={rate.id}>
+                              {rate.name} - {formatRupiah(rate.amount)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="text-3xl font-black text-slate-900">
-                  {formatRupiah(getSelectedVariant(selectedProduct)?.price || selectedProduct.price)}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleAddToCart(selectedProduct)}
-                  disabled={getProductStock(selectedProduct) <= 0}
-                  className="inline-flex items-center gap-2 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}
-                >
-                  <Plus size={16} />
-                  {getProductStock(selectedProduct) > 0 ? 'Tambah ke Keranjang' : 'Stok Habis'}
-                </button>
-                <Link
-                  href={getCartHref(payload.store.orgSlug, payload.store.slug)}
-                  className="inline-flex items-center gap-2 border px-5 py-4 text-sm font-black text-slate-700"
-                  style={{ borderColor: payload.theme.tokens.border, borderRadius: buttonRadius }}
-                >
-                  Buka Keranjang
-                  <ArrowRight size={16} />
-                </Link>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  'Checkout tanpa akun',
-                  'Upload bukti bayar setelah order',
-                  'Status pesanan bisa dibuka lagi kapan saja',
-                ].map((item) => (
-                  <div key={item} className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-700">
-                    {item}
+                      <div className="sm:col-span-2">
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                          Alamat Lengkap <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          value={checkoutForm.line1}
+                          onChange={(event) => setCheckoutForm((current) => ({ ...current, line1: event.target.value }))}
+                          placeholder="Nama jalan, nomor rumah, RT/RW..."
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-4">
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">Kecamatan</label>
+                        <input
+                          value={checkoutForm.district}
+                          onChange={(event) => setCheckoutForm((current) => ({ ...current, district: event.target.value }))}
+                          placeholder="Kecamatan"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">Kota/Kab</label>
+                        <input
+                          value={checkoutForm.city}
+                          onChange={(event) => setCheckoutForm((current) => ({ ...current, city: event.target.value }))}
+                          placeholder="Kota/Kabupaten"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">Provinsi</label>
+                        <input
+                          value={checkoutForm.province}
+                          onChange={(event) => setCheckoutForm((current) => ({ ...current, province: event.target.value }))}
+                          placeholder="Provinsi"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">Kode Pos</label>
+                        <input
+                          value={checkoutForm.postalCode}
+                          onChange={(event) => setCheckoutForm((current) => ({ ...current, postalCode: event.target.value }))}
+                          placeholder="Kode Pos"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                        />
+                      </div>
+                    </div>
                   </div>
-                ))}
+                )}
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                    Catatan Tambahan (Opsional)
+                  </label>
+                  <textarea
+                    value={checkoutForm.notes}
+                    onChange={(event) => setCheckoutForm((current) => ({ ...current, notes: event.target.value }))}
+                    placeholder="Catatan pesanan, instruksi khusus, atau informasi lainnya..."
+                    rows={2}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  />
+                </div>
               </div>
             </div>
-          </section>
+
+            {/* Kotak 3: PILIH METODE PEMBAYARAN & TOMBOL BELI SEKARANG */}
+            <div id="metode-pembayaran" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+              <div className="border-b border-slate-200/80 bg-slate-50/70 px-6 py-4">
+                <h2 className="text-base font-bold text-slate-900 sm:text-lg">3. Metode Pembayaran & Konfirmasi</h2>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="flex items-center gap-3.5 rounded-xl border-2 border-emerald-600 bg-emerald-50/40 p-4">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-emerald-600 bg-emerald-600">
+                    <div className="h-2 w-2 rounded-full bg-white" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">Transfer Bank / Virtual Account / E-Wallet</div>
+                    <div className="text-xs text-slate-600">Verifikasi otomatis 24 jam melalui payment gateway.</div>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedProduct) {
+                        void submitCheckout()
+                      }
+                    }}
+                    disabled={checkoutLoading || getProductStock(selectedProduct) <= 0}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-base font-bold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{ backgroundColor: payload.theme.tokens.accent }}
+                  >
+                    {checkoutLoading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        Memproses Pesanan...
+                      </span>
+                    ) : getProductStock(selectedProduct) > 0 ? (
+                      `Beli Sekarang • ${formatRupiah(singleGrandTotal)}`
+                    ) : (
+                      'Stok Sedang Habis'
+                    )}
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center text-xs font-semibold text-slate-500">
+                  <span>✓ Transaksi Aman & Terenkripsi</span>
+                  <span>•</span>
+                  <span>✓ Akses & Konfirmasi Otomatis</span>
+                  <span>•</span>
+                  <span>✓ Bantuan Admin 24/7</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Success state inline */}
+            {checkoutResult && (
+              <div id="checkout-result-card" className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/90 shadow-xs">
+                <div className="p-6 sm:p-8 flex items-start gap-4">
+                  <div className="rounded-full bg-emerald-600 p-3 text-white shadow-xs">
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-emerald-950">
+                      Pesanan Berhasil Dibuat! (#{checkoutResult.orderNumber})
+                    </h3>
+                    <p className="text-sm font-medium text-emerald-800">
+                      Silakan lanjutkan ke halaman instruksi pembayaran untuk menyelesaikannya.
+                    </p>
+                    {checkoutResult.transferInstructions && (
+                      <div className="mt-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm font-medium text-slate-700">
+                        {checkoutResult.transferInstructions}
+                      </div>
+                    )}
+                    <div className="pt-3">
+                      <Link
+                        href={checkoutResult.orderAccessUrl}
+                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-6 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-800"
+                      >
+                        Buka Instruksi & Bukti Bayar Sekarang
+                        <ArrowRight size={16} />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Minimal Sejoli Secure Footer */}
+            <footer className="mx-auto max-w-3xl border-t border-slate-200/80 pt-8 pb-4 text-center text-xs font-semibold text-slate-400">
+              <p>© {new Date().getFullYear()} {payload.store.brandName || payload.store.name}. Secure 100% Single-Page Checkout.</p>
+            </footer>
+          </div>
         )}
 
-        {pageBlocks.map((block) => renderBlock(block))}
+        {pageMode !== 'product' && pageBlocks.map((block) => renderBlock(block))}
 
         {pageMode === 'cart' && (
           <section className="space-y-6">

@@ -4,7 +4,6 @@
 import { revalidatePath } from 'next/cache'
 import { connectPostgresClient } from '@/lib/db/postgres'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { createClient } from '@/lib/supabase/server'
 
 export async function saveLmsSimpleProductAction(formData: FormData) {
   try {
@@ -18,14 +17,21 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
     const price = Number(formData.get('price') || 0)
     const isPublished = formData.get('is_published') === 'true'
     
-    // Parse course_ids as stringified array or split by comma
+    // Parse course_ids safely
     const courseIdsRaw = formData.get('course_ids')?.toString() || '[]'
-    const courseIds = JSON.parse(courseIdsRaw) as string[]
+    let courseIds: string[] = []
+    try {
+      const parsed = JSON.parse(courseIdsRaw)
+      if (Array.isArray(parsed)) {
+        courseIds = parsed.map((id) => String(id)).filter(Boolean)
+      }
+    } catch {
+      courseIds = []
+    }
 
     if (!name) return { success: false, error: 'Nama produk wajib diisi.' }
     if (!storeId) return { success: false, error: 'Store tidak valid.' }
 
-    const supabase = await createClient()
     const client = await connectPostgresClient()
 
     let finalProductId = productId
@@ -65,16 +71,17 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
 
       // Delete existing entitlements
       await client.query(
-        "DELETE FROM product_course_entitlements WHERE store_product_id = $1 AND org_id = $2",
+        "DELETE FROM commerce_product_courses WHERE store_product_id = $1 AND org_id = $2",
         [storeProductId, orgId]
       )
 
       // Insert new entitlements
-      if (courseIds.length > 0) {
-        const values = courseIds.map((cid, i) => `($1, $2, $${i + 3})`).join(',')
-        const params = [orgId, storeProductId, ...courseIds]
+      const uniqueCourseIds = Array.from(new Set(courseIds))
+      if (uniqueCourseIds.length > 0) {
+        const values = uniqueCourseIds.map((cid, i) => `($1, $2, $${i + 3})`).join(',')
+        const params = [orgId, storeProductId, ...uniqueCourseIds]
         await client.query(
-          `INSERT INTO product_course_entitlements (org_id, store_product_id, course_id) VALUES ${values}`,
+          `INSERT INTO commerce_product_courses (org_id, store_product_id, course_id) VALUES ${values} ON CONFLICT (org_id, store_product_id, course_id) DO NOTHING`,
           params
         )
       }
@@ -86,6 +93,7 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
     }
 
     revalidatePath('/lms/admin/penjualan')
+    revalidatePath('/ecommerce')
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || 'Gagal menyimpan produk.' }
@@ -110,8 +118,10 @@ export async function deleteLmsSimpleProductAction(formData: FormData) {
     )
 
     revalidatePath('/lms/admin/penjualan')
+    revalidatePath('/ecommerce')
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || 'Gagal menghapus produk.' }
   }
 }
+
