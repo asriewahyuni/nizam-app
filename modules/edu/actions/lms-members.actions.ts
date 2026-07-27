@@ -271,11 +271,16 @@ export async function getLmsAdminMembers(
     const completed = Number(row.completed_count || 0)
     const enrolled = Number(row.enrolled_count || 0)
 
+    // Legacy-imported enrollments (e.g. Sejoli/WordPress migration) never carry a
+    // completed_at/status signal, so completed_count is always 0 for those members.
+    // Fall back to enrolled_count so active legacy members still rank above idle ones.
+    const engagementScore = completed > 0 ? completed : enrolled
+
     // Calculate level index
     let levelIndex = 0
-    if (completed >= 6) levelIndex = 3
-    else if (completed >= 3) levelIndex = 2
-    else if (completed >= 1) levelIndex = 1
+    if (engagementScore >= 6) levelIndex = 3
+    else if (engagementScore >= 3) levelIndex = 2
+    else if (engagementScore >= 1) levelIndex = 1
 
     const levelName = settings.levelNames[levelIndex] || settings.levelNames[0] || 'Level 0'
 
