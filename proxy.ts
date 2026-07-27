@@ -64,6 +64,33 @@ async function resolveLmsTenant(host: string): Promise<ResolvedLmsTenant | null>
   }
 }
 
+/**
+ * Cari hostname custom domain terverifikasi milik org+store tertentu (arah
+ * kebalikan dari resolveLmsTenant: org/store slug -> domain). Dipakai supaya
+ * URL berbasis path (/store/{org}/{store}/...) di domain default selalu
+ * diarahkan ke domain brandingnya sendiri kalau sudah terverifikasi.
+ */
+async function resolveVerifiedCustomDomain(orgSlug: string, storeSlug: string): Promise<string | null> {
+  try {
+    const { rows } = await queryPostgres<{ hostname: string }>(
+      `SELECT domain.hostname
+       FROM public.organization_domains domain
+       JOIN public.organizations org ON org.id = domain.org_id
+       JOIN public.stores store ON store.id = domain.store_id AND store.org_id = domain.org_id
+       WHERE org.slug = $1
+         AND store.slug = $2
+         AND domain.status = 'VERIFIED'
+         AND domain.purpose IN ('LMS', 'MEMBER_PORTAL')
+       ORDER BY (domain.purpose = 'LMS') DESC, domain.is_primary DESC, domain.created_at
+       LIMIT 1`,
+      [orgSlug, storeSlug],
+    )
+    return rows[0]?.hostname || null
+  } catch {
+    return null
+  }
+}
+
 function rewriteStandardStorePath(
   pathname: string,
 ): { kind: 'rewrite'; pathname: string } | { kind: 'redirect'; pathname: string } | null {
@@ -355,6 +382,27 @@ export async function proxy(request: NextRequest) {
       }
     } catch {
       // Resolver tenant tidak boleh membuat platform utama gagal.
+    }
+  }
+
+  // Kalau org sudah punya custom domain terverifikasi untuk store ini, arahkan
+  // URL path-based (/store/{org}/{store}/...) di domain manapun ke domain
+  // brandingnya sendiri, bukan cuma di-rewrite diam-diam di domain default.
+  const canonicalStoreMatch = pathname.match(/^\/store\/([^/]+)\/([^/]+)(\/.*)?$/)
+  if (canonicalStoreMatch) {
+    const [, orgSlug, storeSlug, rawSuffix = ''] = canonicalStoreMatch
+    try {
+      const customHost = await resolveVerifiedCustomDomain(orgSlug, storeSlug)
+      if (customHost && customHost !== normalizedHost) {
+        const target = new URL(`https://${customHost}${rawSuffix || '/'}`)
+        target.search = request.nextUrl.search
+        if (serverActionRequest) {
+          return createServerActionRedirectResponse(target.toString())
+        }
+        return NextResponse.redirect(target, 301)
+      }
+    } catch {
+      // Lookup custom domain tidak boleh membuat platform utama gagal.
     }
   }
 

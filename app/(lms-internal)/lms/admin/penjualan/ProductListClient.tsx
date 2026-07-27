@@ -91,7 +91,9 @@ export default function ProductListClient({
           <tbody className="divide-y divide-slate-100">
             {products.map((product) => {
               const benefit = entitlementByProduct.get(product.id)
-              const publicPath = `/store/${orgSlug}/${storeSlug}/product/${product.publicSlug}`
+              const publicPath = primaryLmsHostname
+                ? `https://${primaryLmsHostname}/product/${product.publicSlug}`
+                : `/store/${orgSlug}/${storeSlug}/product/${product.publicSlug}`
               return (
                 <tr key={product.id} className="transition-colors hover:bg-slate-50/80">
                   <td className="px-4 py-4">
