@@ -27,37 +27,37 @@ export default async function LMSCourseDetailPage({
   const firstAccessibleLesson = lessons.find((lesson) => access.allowed || lesson.is_preview)
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <Link href={`/lms/${orgSlug}`} className="inline-flex items-center text-sm font-semibold text-slate-500 hover:text-indigo-600 mb-8 transition-colors">
-        <ArrowLeft size={16} className="mr-2" /> Kembali ke Katalog
+    <div className="px-4 py-6">
+      <Link href={`/lms/${orgSlug}`} className="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-indigo-600 mb-5 transition-colors">
+        <ArrowLeft size={14} className="mr-1.5" /> Kembali ke Katalog
       </Link>
 
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mb-10">
-        <div className="p-10 border-b border-slate-100 bg-slate-50">
-          <div className="flex items-center gap-3 mb-6">
-            <span className="px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold uppercase tracking-widest rounded-md">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+        <div className="p-4 border-b border-slate-100 bg-slate-50">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-widest rounded">
               {course.level_code || 'ALL LEVEL'}
             </span>
           </div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-4 tracking-tight">{course.title}</h1>
-          <p className="text-lg text-slate-600 leading-relaxed max-w-3xl mb-8">
+          <h1 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">{course.title}</h1>
+          <p className="text-xs text-slate-600 leading-relaxed mb-6">
             {course.description || 'Tidak ada deskripsi kursus.'}
           </p>
           
-          <div className="mt-8">
+          <div>
             {access.allowed ? (
               firstAccessibleLesson ? (
                 <Link
                   href={`/lms/${orgSlug}/learn/${courseSlug}/${firstAccessibleLesson.slug}`}
-                  className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-emerald-700 px-5 font-semibold text-white transition-colors duration-200 hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                  className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-semibold text-white transition-colors duration-200 hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
                 >
-                  <Play aria-hidden="true" size={18} />
+                  <Play aria-hidden="true" size={16} />
                   Mulai atau lanjutkan belajar
                 </Link>
               ) : null
             ) : (
               <>
-                <h3 className="mb-4 text-lg font-bold text-slate-900">Pilih Angkatan</h3>
+                <h3 className="mb-3 text-sm font-bold text-slate-900">Pilih Angkatan</h3>
                 <BatchSelector
                   orgSlug={orgSlug}
                   courseSlug={courseSlug}
@@ -68,43 +68,43 @@ export default async function LMSCourseDetailPage({
           </div>
         </div>
         
-        <div className="p-10">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-slate-900">Materi Kursus</h2>
-            <div className="text-sm font-semibold text-slate-500">
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-lg font-bold text-slate-900">Materi Kursus</h2>
+            <div className="text-xs font-semibold text-slate-500">
               {lessons.length} Modul
             </div>
           </div>
 
           {lessons.length === 0 ? (
-            <div className="text-center py-10 bg-slate-50 rounded-xl border border-slate-100">
-              <Book size={32} className="mx-auto text-slate-300 mb-3" />
-              <p className="text-slate-500 font-medium">Belum ada materi untuk kursus ini.</p>
+            <div className="text-center py-6 bg-slate-50 rounded-xl border border-slate-100">
+              <Book size={28} className="mx-auto text-slate-300 mb-2" />
+              <p className="text-xs text-slate-500 font-medium">Belum ada materi untuk kursus ini.</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {lessons.map((lesson, index) => {
                 const canOpen = access.allowed || lesson.is_preview
                 const content = (
                   <>
-                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold mr-4 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold mr-3 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors shrink-0">
                     {index + 1}
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-slate-900">{lesson.title}</h3>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mt-1">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-bold text-slate-900 truncate">{lesson.title}</h3>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mt-0.5">
                       {lesson.lesson_type}
                     </p>
                   </div>
                   {lesson.is_preview ? (
-                    <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700">
-                      <Eye aria-hidden="true" size={16} />
+                    <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 shrink-0">
+                      <Eye aria-hidden="true" size={14} />
                       Preview
                     </span>
                   ) : canOpen ? (
-                    <Play aria-hidden="true" className="text-emerald-700" size={19} />
+                    <Play aria-hidden="true" className="text-emerald-700 shrink-0" size={16} />
                   ) : (
-                    <LockKeyhole aria-label="Terkunci" className="text-slate-400" size={18} />
+                    <LockKeyhole aria-label="Terkunci" className="text-slate-400 shrink-0" size={15} />
                   )}
                   </>
                 )
@@ -112,12 +112,12 @@ export default async function LMSCourseDetailPage({
                   <Link
                     key={lesson.id}
                     href={`/lms/${orgSlug}/learn/${courseSlug}/${lesson.slug}`}
-                    className="group flex min-h-14 cursor-pointer items-center rounded-2xl border border-slate-200 bg-white p-5 transition-all duration-200 hover:border-emerald-300 hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                    className="group flex min-h-12 cursor-pointer items-center rounded-xl border border-slate-200 bg-white p-3.5 transition-all duration-200 hover:border-emerald-300 hover:shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
                   >
                     {content}
                   </Link>
                 ) : (
-                  <div key={lesson.id} className="group flex min-h-14 items-center rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <div key={lesson.id} className="group flex min-h-12 items-center rounded-xl border border-slate-200 bg-slate-50 p-3.5">
                     {content}
                   </div>
                 )

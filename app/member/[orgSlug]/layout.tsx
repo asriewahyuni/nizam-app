@@ -158,10 +158,6 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
               <p className="text-sm font-semibold">{tenant.portalName}</p>
               <p className="mt-1 text-xs text-emerald-100/75">Pembelajaran dan transaksi dilindungi Nizam ERP.</p>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-emerald-100/90">
-              <ShieldCheck aria-hidden="true" size={16} />
-              Akses terisolasi per organisasi
-            </div>
           </div>
         </footer>
       </div>
