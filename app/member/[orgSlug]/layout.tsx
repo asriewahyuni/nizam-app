@@ -3,26 +3,15 @@ import { headers } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
-  BadgeCheck,
   BookOpen,
-  BriefcaseBusiness,
-  CalendarClock,
-  DatabaseZap,
-  GraduationCap,
-  LayoutDashboard,
   LogIn,
-  Menu,
-  PackageCheck,
-  ReceiptText,
-  ShieldCheck,
   UserRound,
-  UsersRound,
-  WalletCards,
 } from 'lucide-react'
 import {
   getPortalMemberContext,
   getPortalTenant,
 } from '@/modules/member/lib/portal.server'
+import MemberNavigationClient from './MemberNavigationClient'
 
 type LayoutProps = {
   children: React.ReactNode
@@ -33,10 +22,10 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
   const { orgSlug } = await params
   const tenant = await getPortalTenant(orgSlug)
   return {
-    title: tenant ? `${tenant.portalName} — Portal Member` : 'Portal Member',
+    title: tenant ? `${tenant.portalName} — Member Portal` : 'Member Portal',
     description: tenant
-      ? `Kelas, pesanan, langganan, dan sertifikat ${tenant.portalName}.`
-      : 'Portal pembelajaran dan member.',
+      ? `Courses, orders, subscriptions, and certificates for ${tenant.portalName}.`
+      : 'Learning and member portal.',
   }
 }
 
@@ -57,30 +46,6 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
     isCustomDomain ? cleanPath : `${basePath}${legacyPath}`
   )
   const callbackPath = isCustomDomain ? '/dashboard' : (basePath || '/')
-  const navigation = [
-    { href: portalPath('/dashboard', ''), label: 'Beranda', icon: LayoutDashboard },
-    ...(tenant.slug !== 'core-isec' ? [
-      { href: portalPath('/courses', '/katalog'), label: 'Katalog', icon: BookOpen }
-    ] : []),
-    ...(member ? [
-      { href: portalPath('/my-courses', '/kelas'), label: 'Kelas Saya', icon: GraduationCap },
-      { href: portalPath('/consulting', '/konsultasi'), label: 'Consulting 360', icon: BriefcaseBusiness },
-      { href: portalPath('/orders', '/pesanan'), label: 'Pesanan', icon: ReceiptText },
-      { href: portalPath('/subscriptions', '/langganan'), label: 'Langganan', icon: WalletCards },
-      { href: portalPath('/certificates', '/sertifikat'), label: 'Sertifikat', icon: BadgeCheck },
-    ] : []),
-    ...(member?.isTutor ? [
-      { href: portalPath('/tutor', '/tutor'), label: 'Panel Tutor', icon: UsersRound },
-      { href: portalPath('/tutor/consulting', '/tutor/konsultasi'), label: 'Jadwal Konsultasi', icon: CalendarClock },
-    ] : []),
-    ...(member?.isAdmin && !isCustomDomain ? [
-      { href: `${basePath}/admin/sertifikat`, label: 'Template Sertifikat', icon: BadgeCheck },
-      { href: `${basePath}/admin/migrasi`, label: 'Migrasi', icon: DatabaseZap },
-    ] : []),
-    ...(member ? [
-      { href: portalPath('/affiliate', '/afiliasi'), label: 'Afiliasi', icon: PackageCheck },
-    ] : []),
-  ]
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950 antialiased">
@@ -88,18 +53,18 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
         href="#konten-utama"
         className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-lg bg-[var(--color-primary,theme(colors.emerald.800))] px-4 py-3 text-sm font-semibold text-white shadow-lg transition-transform focus:translate-y-0 focus:outline-none focus:ring-4 focus:ring-[var(--color-primary,theme(colors.emerald.300))]"
       >
-        Lewati ke konten
+        Skip to content
       </a>
 
       <div
-        className="mx-auto flex min-h-screen max-w-[480px] w-full flex-col border-x border-slate-200/80 bg-[#f7fbf9] shadow-2xl"
+        className="mx-auto flex min-h-screen max-w-[480px] w-full flex-col border-x border-slate-200/80 bg-[#f7fbf9] shadow-2xl relative"
         style={tenant.primaryColor ? {
           '--color-primary': tenant.primaryColor,
           '--color-accent': tenant.accentColor || tenant.primaryColor,
           '--color-accent-hover': tenant.accentColorHover || tenant.accentColor || tenant.primaryColor,
         } as React.CSSProperties : undefined}
       >
-        <header className="sticky top-0 z-50 border-b border-[var(--color-primary,theme(colors.emerald.950))]/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+        <header className="sticky top-0 z-40 border-b border-[var(--color-primary,theme(colors.emerald.950))]/10 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/75 shadow-sm">
           <div className="flex min-h-16 items-center gap-3 px-4 justify-between">
             <Link
               href={basePath || '/'}
@@ -118,7 +83,7 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold tracking-tight">{tenant.portalName}</span>
-                    <span className="block text-[10px] font-medium text-[var(--color-accent,theme(colors.emerald.800))]">Portal member</span>
+                    <span className="block text-[10px] font-medium text-[var(--color-accent,theme(colors.emerald.800))]">Member Portal</span>
                   </span>
                 </>
               )}
@@ -128,7 +93,7 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
               <Link
                 href={portalPath('/profile', '/profil')}
                 className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors duration-200 hover:border-[var(--color-accent,theme(colors.emerald.300))] hover:bg-[var(--color-primary,theme(colors.emerald.700))]/5 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary,theme(colors.emerald.200))]"
-                aria-label={`Buka profil ${member.displayName}`}
+                aria-label={`Open profile of ${member.displayName}`}
               >
                 <UserRound aria-hidden="true" size={16} />
                 <span className="max-w-24 truncate">{member.displayName}</span>
@@ -139,46 +104,32 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
                 className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl bg-[var(--color-accent,theme(colors.orange.600))] hover:bg-[var(--color-accent-hover,theme(colors.orange.700))] px-3.5 text-xs font-semibold text-white transition-colors duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-accent,theme(colors.orange.200))]"
               >
                 <LogIn aria-hidden="true" size={16} />
-                Masuk
+                Sign In
               </Link>
             )}
           </div>
-
-          <nav
-            aria-label="Navigasi portal"
-            className="flex gap-1 overflow-x-auto border-t border-slate-100 px-3 py-2"
-          >
-            {navigation.map((item) => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-600 transition-colors duration-200 hover:bg-[var(--color-primary,theme(colors.emerald.700))]/5 hover:text-[var(--color-primary,theme(colors.emerald.900))] focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary,theme(colors.emerald.200))]"
-                >
-                  <Icon aria-hidden="true" size={15} />
-                  {item.label}
-                </Link>
-              )
-            })}
-            <span className="sr-only">
-              <Menu aria-hidden="true" />
-            </span>
-          </nav>
         </header>
 
-        <main id="konten-utama" className="flex-grow min-h-[calc(100vh-14rem)]">
+        <main id="konten-utama" className="flex-grow min-h-[calc(100vh-14rem)] pb-24">
           {children}
         </main>
 
-        <footer className="border-t border-[var(--color-primary,theme(colors.emerald.950))]/10 bg-[var(--color-primary,theme(colors.emerald.950))] text-slate-100">
+        <footer className="border-t border-[var(--color-primary,theme(colors.emerald.950))]/10 bg-[var(--color-primary,theme(colors.emerald.950))] text-slate-100 pb-20">
           <div className="flex flex-col gap-3 px-4 py-6">
             <div>
               <p className="text-sm font-semibold">{tenant.portalName}</p>
-              <p className="mt-1 text-xs text-slate-300/80">Pembelajaran dan transaksi dilindungi Nizam ERP.</p>
+              <p className="mt-1 text-xs text-slate-300/80 font-medium">Learning and transactions secured by Nizam ERP.</p>
             </div>
           </div>
         </footer>
+
+        <MemberNavigationClient
+          member={member}
+          tenantSlug={tenant.slug}
+          isCustomDomain={isCustomDomain}
+          basePath={basePath}
+          portalPath={portalPath}
+        />
       </div>
     </div>
   )

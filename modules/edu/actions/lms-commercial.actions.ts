@@ -580,15 +580,24 @@ export async function createLmsLesson(
     const lessonType = (formData.get('lessonType') as string) || 'TEXT'
     const isRequired = formData.get('isRequired') !== 'false'
     const videoUrl   = (formData.get('videoUrl') as string)?.trim() || null
+    const attachmentsJson = formData.get('attachmentsJson') as string
 
     if (!courseId || !title) return { error: 'courseId dan title wajib diisi.' }
 
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now()
 
+    let parsedAttachments: any[] = []
+    if (attachmentsJson) {
+      try {
+        parsedAttachments = JSON.parse(attachmentsJson)
+      } catch (e) {}
+    }
+
     let mediaItems: any[] = []
     if (lessonType === 'VIDEO' && videoUrl) {
-      mediaItems = [{ type: 'video', url: videoUrl }]
+      mediaItems.push({ type: 'video', url: videoUrl })
     }
+    mediaItems = [...mediaItems, ...parsedAttachments]
 
     // Dapatkan max sort_order
     const { data: maxSort } = await supabase
@@ -635,8 +644,16 @@ export async function updateLmsLesson(
     const lessonType = (formData.get('lessonType') as string) || 'TEXT'
     const isRequired = formData.get('isRequired') !== 'false'
     const videoUrl   = (formData.get('videoUrl') as string)?.trim() || null
+    const attachmentsJson = formData.get('attachmentsJson') as string
 
     if (!lessonId || !title) return { error: 'lessonId dan title wajib diisi.' }
+
+    let parsedAttachments: any[] = []
+    if (attachmentsJson) {
+      try {
+        parsedAttachments = JSON.parse(attachmentsJson)
+      } catch (e) {}
+    }
 
     // Dapatkan data lesson sebelumnya untuk memelihara media_items lain jika ada
     const { data: oldLesson } = await supabase
@@ -646,13 +663,11 @@ export async function updateLmsLesson(
       .eq('org_id', orgData.org.id)
       .single()
 
-    let mediaItems: any[] = Array.isArray(oldLesson?.media_items) ? oldLesson?.media_items : []
-    // Filter out old video
-    mediaItems = mediaItems.filter((m: any) => m.type !== 'video')
-    
+    let mediaItems: any[] = []
     if (lessonType === 'VIDEO' && videoUrl) {
       mediaItems.push({ type: 'video', url: videoUrl })
     }
+    mediaItems = [...mediaItems, ...parsedAttachments]
 
     const { error } = await supabase
       .from('learning_lessons')

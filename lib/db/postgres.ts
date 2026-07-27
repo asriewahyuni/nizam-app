@@ -60,6 +60,8 @@ function createPool() {
     idleTimeoutMillis,
     connectionTimeoutMillis,
     ssl: resolveSslConfig(connectionString),
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
   })
 }
 
