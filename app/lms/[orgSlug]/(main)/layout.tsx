@@ -25,15 +25,27 @@ export default async function LMSLayout({
         <header className="sticky top-0 z-50 border-b border-emerald-950/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
           <div className="flex min-h-16 items-center gap-3 px-4 justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 bg-emerald-700 rounded-xl flex items-center justify-center text-white shadow-sm">
-                <BookOpen size={19} />
-              </div>
-              <div>
-                <Link href={`/lms/${orgSlug}`} className="text-sm font-bold text-slate-900 tracking-tight hover:text-indigo-600 transition-colors">
-                  LMS Portal
+              {orgSlug === 'core-isec' ? (
+                <Link href={`/lms/${orgSlug}`}>
+                  <img
+                    src="https://coreisec.id/wp-content/uploads/2022/07/CI-Class-h.png"
+                    alt="LMS Portal"
+                    className="h-8 w-auto object-contain"
+                  />
                 </Link>
-                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">{orgSlug}</p>
-              </div>
+              ) : (
+                <>
+                  <div className="w-10 h-10 bg-emerald-700 rounded-xl flex items-center justify-center text-white shadow-sm">
+                    <BookOpen size={19} />
+                  </div>
+                  <div>
+                    <Link href={`/lms/${orgSlug}`} className="text-sm font-bold text-slate-900 tracking-tight hover:text-indigo-600 transition-colors">
+                      LMS Portal
+                    </Link>
+                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">{orgSlug}</p>
+                  </div>
+                </>
+              )}
             </div>
             <nav className="flex items-center gap-4">
               {isLoggedIn ? (

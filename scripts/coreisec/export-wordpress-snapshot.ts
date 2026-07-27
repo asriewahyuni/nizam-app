@@ -45,6 +45,8 @@ async function main() {
   const child = spawn('ssh', [
     '-o', 'BatchMode=yes',
     '-o', 'ConnectTimeout=15',
+    '-o', 'ServerAliveInterval=20',
+    '-o', 'ServerAliveCountMax=6',
     host,
     remoteCommand,
   ], { stdio: ['pipe', 'pipe', 'pipe'] })

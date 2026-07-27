@@ -75,7 +75,7 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
       { href: `${basePath}/admin/sertifikat`, label: 'Template Sertifikat', icon: BadgeCheck },
       { href: `${basePath}/admin/migrasi`, label: 'Migrasi', icon: DatabaseZap },
     ] : []),
-    ...(member?.isAffiliate ? [
+    ...(member ? [
       { href: portalPath('/affiliate', '/afiliasi'), label: 'Afiliasi', icon: PackageCheck },
     ] : []),
   ]
@@ -96,13 +96,23 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
               href={basePath || '/'}
               className="group flex min-h-11 min-w-0 cursor-pointer items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
             >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-white shadow-sm transition-colors duration-200 group-hover:bg-emerald-800">
-                <BookOpen aria-hidden="true" size={19} />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold tracking-tight">{tenant.portalName}</span>
-                <span className="block text-[10px] font-medium text-emerald-800">Portal member</span>
-              </span>
+              {tenant.slug === 'core-isec' || currentHost.includes('coreisec.id') ? (
+                <img
+                  src="https://coreisec.id/wp-content/uploads/2022/07/CI-Class-h.png"
+                  alt={tenant.portalName}
+                  className="h-8 w-auto object-contain"
+                />
+              ) : (
+                <>
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-white shadow-sm transition-colors duration-200 group-hover:bg-emerald-800">
+                    <BookOpen aria-hidden="true" size={19} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold tracking-tight">{tenant.portalName}</span>
+                    <span className="block text-[10px] font-medium text-emerald-800">Portal member</span>
+                  </span>
+                </>
+              )}
             </Link>
 
             {member ? (

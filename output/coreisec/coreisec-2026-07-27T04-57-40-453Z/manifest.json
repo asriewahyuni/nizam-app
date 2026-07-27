@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "sourceSystem": "WORDPRESS_COREISEC",
+  "snapshotId": "coreisec-2026-07-27T04-57-40-453Z",
+  "exportedAt": "2026-07-27T04:57:45.694Z",
+  "sourceUrl": "ssh://ubuntu@43.133.147.191/var/www/coreisec.id",
+  "counts": {
+    "user": 1297,
+    "course": 74,
+    "section": 139,
+    "lesson": 776,
+    "lesson_asset": 1122,
+    "quiz": 11,
+    "question": 120,
+    "product": 151,
+    "product_course": 114,
+    "affiliate": 47,
+    "enrollment": 1837,
+    "progress": 740,
+    "order_archive": 2229,
+    "subscription": 197,
+    "coupon": 73,
+    "commission": 260,
+    "cms_content": 73,
+    "cms_redirect": 73,
+    "media": 651
+  },
+  "aggregateChecksums": {
+    "user": "ada5077b9e5e0824c5f89bbb4ef12d14250621af7afdab6532e76268ac2290fd",
+    "course": "737fa65f80be94a57407364a54b47d46b61f058ecd6f6e733836678e7a50a3fb",
+    "section": "d900186d8b174252464aeae922a5b3cc426fffab3a2f39aed94afe83f9ae082e",
+    "lesson": "16ed3066751c689cc166f13a2e60206bdaa723ea30f0725102a24221bf9973a2",
+    "lesson_asset": "ffaafb607a5f35a6aab699c34fd6908517bb5eefbeb75af474113a8bf764c3ac",
+    "quiz": "f3d75696083c040d3b68e92eb22ec8c98b1bafe558b03c631b1da10eb4bd6fbe",
+    "question": "72b0b871531fded6a8db505c965dc49c1e7306c6a8d53d8a0e014f84a5d7357d",
+    "product": "1dadb745137e4c3cf0546a6c9ecbf0534e49b8d79598e86c1cca3fb8a6b14465",
+    "product_course": "94927d6d6d16b4b7f9f9faeea1cbadb41e3d03d43b1130699070fa16ab25bc29",
+    "affiliate": "f31013495bb86aef7a2a3bc63b6e1431b98b55410a517ac7d6d1a7f58ed7fd5f",
+    "enrollment": "3387568a458d59562a17bd7356a2b6bd7931863b6a49b5ef8b7890fb9f1a1c83",
+    "progress": "7152c3ee5cddfcc0beda51b2feba6e4d6f03f2cdf954e81996572c0168397968",
+    "order_archive": "051893d55d0c454981b3d97a7164da4ee085488ee03554659c53a36f9e970427",
+    "subscription": "94c351a2d0e0a1dc6d8eb0dca0386e4ba2c172867cc1ce1f2b18a434762360e2",
+    "coupon": "a74b70463661b9246318ac750d2430abfd9c68ae18ff537ee115cca4919de911",
+    "commission": "c2a5c3a9d49d38fbde80ece7eb474f90d3bbecff86bc6064a2ecf9230ce0eb21",
+    "cms_content": "428797f4b7fd9a9f0a7a78ad160a876846700875d4b833c7055f386cd8dfdfda",
+    "cms_redirect": "4e036cb3c1e7898f1d0cc788e918a969dcb11db0ccb939b5fb1e0f0f254f3020",
+    "media": "bfd29603b0308e99ca9936557c013f369aabe2911d0e2b3b17eec3167c64e6ab"
+  },
+  "target": {
+    "orgId": "81b0de5c-2e89-49f9-b2b0-7401d3f9dad3",
+    "storeId": "53a49576-95c0-4d32-b33d-7363f28bf1b0"
+  }
+}

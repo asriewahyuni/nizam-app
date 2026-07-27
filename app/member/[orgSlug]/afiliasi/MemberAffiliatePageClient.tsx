@@ -98,12 +98,12 @@ export function MemberAffiliatePageClient({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 font-sans">
+    <div className="px-4 py-6 font-sans">
       {/* Alert Notification */}
       {message && (
-        <div className={`mb-6 rounded-2xl p-4 border text-sm font-medium flex items-center justify-between shadow-sm ${message.type === 'success' ? 'bg-emerald-900/10 border-emerald-500/30 text-emerald-700' : 'bg-rose-900/10 border-rose-500/30 text-rose-700'}`}>
+        <div className={`mb-6 rounded-2xl p-4 border text-xs font-medium flex items-center justify-between shadow-sm ${message.type === 'success' ? 'bg-emerald-900/10 border-emerald-500/30 text-emerald-700' : 'bg-rose-900/10 border-rose-500/30 text-rose-700'}`}>
           <div className="flex items-center gap-2">
-            <CheckCircle2 size={18} />
+            <CheckCircle2 size={16} />
             <span>{message.text}</span>
           </div>
           <button type="button" onClick={() => setMessage(null)} className="cursor-pointer text-xs underline font-semibold">Tutup</button>
@@ -111,53 +111,53 @@ export function MemberAffiliatePageClient({
       )}
 
       {/* Hero / Shareable Card Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 p-6 sm:p-10 text-white shadow-2xl border border-emerald-500/20">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 p-5 text-white shadow-xl border border-emerald-500/20">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
         <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
-          <div className="max-w-xl space-y-4">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-semibold uppercase tracking-wider">
-              <Sparkles size={14} className="text-emerald-400 animate-pulse" />
+        <div className="relative z-10 flex flex-col gap-5">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-semibold uppercase tracking-wider">
+              <Sparkles size={12} className="text-emerald-400 animate-pulse" />
               <span>Program Afiliasi Resmi {tenantName}</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+            <h1 className="text-2xl font-extrabold tracking-tight leading-tight">
               Promosikan Kelas &amp; Dapatkan Komisi Hingga <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">20%+</span>
             </h1>
-            <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+            <p className="text-slate-300 text-xs leading-relaxed">
               Bagikan tautan edukasi berkualitas kepada komunitas Anda. Dapatkan komisi transparan setiap kali ada pendaftar baru lewat rekomendasi Anda.
             </p>
           </div>
 
           {/* Opt-In or Code Box */}
-          <div className="w-full lg:w-auto shrink-0">
+          <div className="w-full shrink-0">
             {!dashboard.isActivated ? (
-              <div className="rounded-2xl bg-white/10 backdrop-blur-md p-6 border border-white/20 text-center max-w-sm">
-                <Lock className="mx-auto text-emerald-400 mb-3" size={32} />
-                <h3 className="font-bold text-lg text-white">Aktifkan Akun Afiliasi</h3>
-                <p className="text-xs text-slate-300 mt-1 mb-4">
+              <div className="rounded-2xl bg-white/10 backdrop-blur-md p-5 border border-white/20 text-center w-full">
+                <Lock className="mx-auto text-emerald-400 mb-2.5" size={28} />
+                <h3 className="font-bold text-base text-white">Aktifkan Akun Afiliasi</h3>
+                <p className="text-[11px] text-slate-300 mt-1 mb-4">
                   Klik di bawah ini untuk mengaktifkan kode referral Anda dan mulai membagikan kelas.
                 </p>
                 <button
                   type="button"
                   onClick={handleActivate}
                   disabled={isPending}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-3 text-sm font-bold text-slate-950 shadow-lg hover:from-emerald-400 hover:to-teal-400 transition-all cursor-pointer disabled:opacity-50"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3 text-xs font-bold text-slate-950 shadow-lg hover:from-emerald-400 hover:to-teal-400 transition-all cursor-pointer disabled:opacity-50"
                 >
-                  <Flame size={18} />
+                  <Flame size={16} />
                   <span>{isPending ? 'Mengaktifkan...' : 'Aktifkan Akun Afiliasi Saya'}</span>
                 </button>
               </div>
             ) : (
-              <div className="rounded-2xl bg-slate-900/80 backdrop-blur-xl p-5 border border-emerald-500/30 shadow-xl min-w-[320px]">
-                <div className="flex items-center justify-between mb-2 text-xs font-semibold text-slate-400">
+              <div className="rounded-2xl bg-slate-900/80 backdrop-blur-xl p-4 border border-emerald-500/30 shadow-xl w-full">
+                <div className="flex items-center justify-between mb-1.5 text-[10px] font-semibold text-slate-400">
                   <span className="flex items-center gap-1.5 text-emerald-400">
-                    <Link2 size={14} /> Tautan Referral Utama
+                    <Link2 size={12} /> Tautan Referral Utama
                   </span>
-                  <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[10px] uppercase font-bold">Aktif</span>
+                  <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[9px] uppercase font-bold">Aktif</span>
                 </div>
-                <div className="flex items-center gap-2 mb-3">
-                  <code className="flex-1 overflow-x-auto rounded-lg bg-black/40 px-3 py-2 text-xs font-mono text-emerald-300 border border-white/10">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <code className="flex-1 overflow-x-auto rounded-lg bg-black/40 px-2.5 py-2 text-xs font-mono text-emerald-300 border border-white/10">
                     {mainReferralUrl}
                   </code>
                   <button
@@ -166,13 +166,13 @@ export function MemberAffiliatePageClient({
                     className="p-2.5 rounded-lg bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition cursor-pointer shrink-0"
                     title="Salin Link"
                   >
-                    {copiedCode ? <Check size={16} /> : <Copy size={16} />}
+                    {copiedCode ? <Check size={14} /> : <Copy size={14} />}
                   </button>
                 </div>
-                <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-white/10">
+                <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-white/10">
                   <span>Kode Unik: <strong className="text-white font-mono">{dashboard.referralCode}</strong></span>
                   <span className="text-emerald-400 font-medium flex items-center gap-1">
-                    <Share2 size={12} /> Shareable Card
+                    <Share2 size={10} /> Shareable Card
                   </span>
                 </div>
               </div>
@@ -182,92 +182,92 @@ export function MemberAffiliatePageClient({
       </div>
 
       {/* KPI Cards (Statistik Aset & Komisi) */}
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition">
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm hover:shadow-md transition">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold uppercase tracking-wider">Menunggu Masa Tahan</span>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-600"><MousePointerClick size={18} /></div>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Masa Tahan</span>
+            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600"><MousePointerClick size={16} /></div>
           </div>
-          <p className="mt-3 text-2xl font-black text-slate-900">{formatRupiah(dashboard.pendingAmount)}</p>
-          <p className="mt-1 text-xs text-slate-500">Komisi dalam verifikasi</p>
+          <p className="mt-2 text-base font-black text-slate-900">{formatRupiah(dashboard.pendingAmount)}</p>
+          <p className="mt-0.5 text-[10px] text-slate-500">Dalam verifikasi</p>
         </div>
 
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm hover:shadow-md transition">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3.5 shadow-sm hover:shadow-md transition">
           <div className="flex items-center justify-between text-emerald-700">
-            <span className="text-xs font-semibold uppercase tracking-wider">Siap Ditarik (Payable)</span>
-            <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700"><HandCoins size={18} /></div>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Siap Tarik</span>
+            <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700"><HandCoins size={16} /></div>
           </div>
-          <p className="mt-3 text-2xl font-black text-emerald-900">{formatRupiah(dashboard.payableAmount)}</p>
+          <p className="mt-2 text-base font-black text-emerald-900">{formatRupiah(dashboard.payableAmount)}</p>
           {dashboard.payableAmount > 0 && dashboard.isActivated ? (
             <button
               type="button"
               onClick={() => setShowPayoutModal(true)}
-              className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer underline"
+              className="mt-1.5 block text-[10px] font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer underline text-left"
             >
-              Tarik Dana Sekarang &rarr;
+              Tarik Dana &rarr;
             </button>
           ) : (
-            <p className="mt-1 text-xs text-emerald-600 font-medium">Min. penarikan Rp 50.000</p>
+            <p className="mt-0.5 text-[9px] text-emerald-600 font-medium">Min. Rp 50.000</p>
           )}
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm hover:shadow-md transition">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold uppercase tracking-wider">Telah Dicairkan</span>
-            <div className="p-2 rounded-xl bg-blue-50 text-blue-600"><Wallet size={18} /></div>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Dicairkan</span>
+            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600"><Wallet size={16} /></div>
           </div>
-          <p className="mt-3 text-2xl font-black text-slate-900">{formatRupiah(dashboard.paidAmount)}</p>
-          <p className="mt-1 text-xs text-slate-500">Total komisi dicairkan</p>
+          <p className="mt-2 text-base font-black text-slate-900">{formatRupiah(dashboard.paidAmount)}</p>
+          <p className="mt-0.5 text-[10px] text-slate-500">Total komisi</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm hover:shadow-md transition">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold uppercase tracking-wider">Total Pembeli</span>
-            <div className="p-2 rounded-xl bg-purple-50 text-purple-600"><Users size={18} /></div>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Pembeli</span>
+            <div className="p-1.5 rounded-lg bg-purple-50 text-purple-600"><Users size={16} /></div>
           </div>
-          <p className="mt-3 text-2xl font-black text-slate-900">{dashboard.conversionCount} Penjualan</p>
-          <p className="mt-1 text-xs text-slate-500">Konversi pendaftaran</p>
+          <p className="mt-2 text-base font-black text-slate-900">{dashboard.conversionCount} Penjualan</p>
+          <p className="mt-0.5 text-[10px] text-slate-500">Konversi referal</p>
         </div>
       </div>
 
       {/* Main Tabs Navigation */}
-      <div className="mt-10 flex border-b border-slate-200 gap-6">
+      <div className="mt-8 flex border-b border-slate-200 gap-4 overflow-x-auto whitespace-nowrap scrollbar-none pb-0.5">
         <button
           type="button"
           onClick={() => setActiveTab('courses')}
-          className={`pb-3 text-sm font-bold border-b-2 transition flex items-center gap-2 cursor-pointer ${activeTab === 'courses' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
+          className={`pb-2.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'courses' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
         >
-          <Sparkles size={16} />
-          <span>Katalog Kelas Afiliasi ({dashboard.eligibleCourses.length})</span>
+          <Sparkles size={14} />
+          <span>Katalog Kelas ({dashboard.eligibleCourses.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('leaderboard')}
-          className={`pb-3 text-sm font-bold border-b-2 transition flex items-center gap-2 cursor-pointer ${activeTab === 'leaderboard' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
+          className={`pb-2.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'leaderboard' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
         >
-          <Trophy size={16} />
-          <span>Leaderboard Mitra 🏆</span>
+          <Trophy size={14} />
+          <span>Leaderboard 🏆</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('commissions')}
-          className={`pb-3 text-sm font-bold border-b-2 transition flex items-center gap-2 cursor-pointer ${activeTab === 'commissions' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
+          className={`pb-2.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'commissions' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
         >
-          <HandCoins size={16} />
+          <HandCoins size={14} />
           <span>Riwayat Komisi</span>
         </button>
       </div>
 
       {/* Tab Content 1: Katalog Kelas Afiliasi */}
       {activeTab === 'courses' && (
-        <div className="mt-6">
-          <p className="text-sm text-slate-600 mb-6">
+        <div className="mt-5">
+          <p className="text-xs text-slate-600 mb-5">
             Pilih kelas yang ingin Anda promosikan. Dapatkan komisi instan untuk setiap peserta yang mendaftar melalui link referral khusus Anda.
           </p>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-col gap-4">
             {dashboard.eligibleCourses.map((course) => {
               const courseRefUrl = dashboard.isActivated
                 ? `https://${referralHost}/course/${course.slug}?ref=${encodeURIComponent(dashboard.referralCode)}`
@@ -324,32 +324,31 @@ export function MemberAffiliatePageClient({
           </div>
         </div>
       )}
-
       {/* Tab Content 2: Leaderboard Afiliasi */}
       {activeTab === 'leaderboard' && (
-        <div className="mt-6">
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 to-slate-800 p-5 rounded-2xl text-white">
+        <div className="mt-5">
+          <div className="mb-5 flex flex-col gap-3 bg-gradient-to-r from-slate-900 to-slate-800 p-4 rounded-2xl text-white">
             <div>
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                <Award className="text-amber-400" size={20} /> Klasemen Peringkat Mitra Afiliasi
+              <h3 className="font-bold text-base flex items-center gap-1.5">
+                <Award className="text-amber-400" size={18} /> Klasemen Peringkat Mitra
               </h3>
-              <p className="text-xs text-slate-300 mt-1">
+              <p className="text-[10px] text-slate-300 mt-1 leading-relaxed">
                 Peringkat diperbarui secara otomatis berdasarkan total penjualan &amp; komisi. Nama ditampilkan tersamar demi privasi.
               </p>
             </div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-xs font-semibold text-amber-300 shrink-0">
-              <Flame size={14} /> Top 10 Performa Terbaik
+            <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white/10 text-[10px] font-semibold text-amber-300 self-start">
+              <Flame size={12} /> Top 10 Performa Terbaik
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-left text-sm border-collapse">
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table className="w-full text-left text-xs border-collapse min-w-[400px]">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3.5 px-5">Peringkat</th>
-                  <th className="py-3.5 px-5">Nama Mitra</th>
-                  <th className="py-3.5 px-5 text-center">Total Penjualan</th>
-                  <th className="py-3.5 px-5 text-right">Total Komisi</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="py-3 px-4">Peringkat</th>
+                  <th className="py-3 px-4">Nama Mitra</th>
+                  <th className="py-3 px-4 text-center">Penjualan</th>
+                  <th className="py-3 px-4 text-right">Total Komisi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -365,20 +364,20 @@ export function MemberAffiliatePageClient({
 
                     return (
                       <tr key={entry.affiliateProfileId} className={`hover:bg-slate-50/80 transition ${isTop1 ? 'bg-amber-50/40' : ''}`}>
-                        <td className="py-4 px-5 font-bold">
-                          {isTop1 && <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400 text-slate-950 font-black text-xs shadow">🥇 1</span>}
-                          {isTop2 && <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-300 text-slate-950 font-black text-xs shadow">🥈 2</span>}
-                          {isTop3 && <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700 text-white font-black text-xs shadow">🥉 3</span>}
-                          {!isTop1 && !isTop2 && !isTop3 && <span className="text-slate-500 font-semibold pl-2">#{entry.rank}</span>}
+                        <td className="py-3 px-4 font-bold">
+                          {isTop1 && <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] shadow">🥇 1</span>}
+                          {isTop2 && <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-300 text-slate-950 font-black text-[10px] shadow">🥈 2</span>}
+                          {isTop3 && <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-700 text-white font-black text-[10px] shadow">🥉 3</span>}
+                          {!isTop1 && !isTop2 && !isTop3 && <span className="text-slate-500 font-semibold pl-1.5">#{entry.rank}</span>}
                         </td>
-                        <td className="py-4 px-5">
+                        <td className="py-3 px-4">
                           <div className="font-bold text-slate-900">{entry.maskedDisplayName}</div>
-                          <div className="text-xs text-slate-400 font-mono">Kode: {entry.referralCode}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">Kode: {entry.referralCode}</div>
                         </td>
-                        <td className="py-4 px-5 text-center font-semibold text-slate-700">
-                          {entry.totalConversions} transaksi
+                        <td className="py-3 px-4 text-center font-semibold text-slate-700">
+                          {entry.totalConversions}
                         </td>
-                        <td className="py-4 px-5 text-right font-black text-emerald-700">
+                        <td className="py-3 px-4 text-right font-black text-emerald-700">
                           {formatRupiah(entry.totalCommissionAmount)}
                         </td>
                       </tr>
@@ -393,19 +392,19 @@ export function MemberAffiliatePageClient({
 
       {/* Tab Content 3: Riwayat Komisi & Penarikan */}
       {activeTab === 'commissions' && (
-        <div className="mt-6 space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="mt-5 space-y-4">
+          <div className="flex flex-col gap-3.5 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
             <div>
-              <h3 className="font-bold text-slate-900 text-base">Saldo Komisi Siap Ditarik</h3>
-              <p className="text-xs text-slate-500">Saldo yang telah melewati masa tahan dan dapat ditransfer ke rekening Anda.</p>
+              <h3 className="font-bold text-slate-900 text-sm">Saldo Komisi Siap Ditarik</h3>
+              <p className="text-[10px] text-slate-500 mt-0.5">Saldo yang telah melewati masa tahan dan dapat dicairkan ke rekening Anda.</p>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xl font-black text-emerald-700">{formatRupiah(dashboard.payableAmount)}</span>
+            <div className="flex items-center justify-between gap-4 pt-1">
+              <span className="text-lg font-black text-emerald-700">{formatRupiah(dashboard.payableAmount)}</span>
               {dashboard.payableAmount >= 50000 && dashboard.isActivated && (
                 <button
                   type="button"
                   onClick={() => setShowPayoutModal(true)}
-                  className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer shadow-sm"
+                  className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer shadow-sm"
                 >
                   Cairkan Dana
                 </button>
@@ -414,24 +413,24 @@ export function MemberAffiliatePageClient({
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 p-5 font-bold text-slate-900">
+            <div className="border-b border-slate-100 p-4 font-bold text-slate-900 text-sm">
               Riwayat Komisi Per Transaksi ({dashboard.commissions.length})
             </div>
             <ul className="divide-y divide-slate-100">
               {dashboard.commissions.length === 0 ? (
-                <li className="p-8 text-center text-slate-500 text-sm">Belum ada riwayat komisi.</li>
+                <li className="p-6 text-center text-slate-500 text-xs">Belum ada riwayat komisi.</li>
               ) : (
                 dashboard.commissions.map((comm) => (
-                  <li key={comm.id} className="flex items-center justify-between p-5 hover:bg-slate-50 transition">
+                  <li key={comm.id} className="flex items-center justify-between p-4 hover:bg-slate-50 transition">
                     <div>
-                      <p className="font-bold text-slate-900">{comm.orderNumber || 'Komisi Penjualan Kelas'}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="font-bold text-slate-900 text-xs">{comm.orderNumber || 'Komisi Penjualan Kelas'}</p>
+                      <p className="mt-0.5 text-[10px] text-slate-500">
                         {new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(comm.createdAt))}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-black text-emerald-700">{formatRupiah(comm.amount)}</p>
-                      <span className={`inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${comm.status === 'PAID' ? 'bg-blue-100 text-blue-700' : comm.status === 'PAYABLE' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      <p className="font-black text-emerald-700 text-xs">{formatRupiah(comm.amount)}</p>
+                      <span className={`inline-block mt-0.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${comm.status === 'PAID' ? 'bg-blue-100 text-blue-700' : comm.status === 'PAYABLE' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                         {comm.status}
                       </span>
                     </div>
