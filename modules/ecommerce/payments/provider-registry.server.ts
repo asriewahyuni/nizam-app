@@ -4,6 +4,7 @@
  */
 import 'server-only'
 
+import { queryPostgres } from '@/lib/db/postgres'
 import type { PaymentProvider } from './payment-provider'
 import { ManualPaymentProvider } from './manual.provider'
 import { MootaPaymentProvider } from './moota.provider'
@@ -15,14 +16,49 @@ function requiredEnv(name: string) {
   return value
 }
 
-export function getPaymentProvider(providerCode: string): PaymentProvider {
+export type ManualProviderContext = {
+  orgId: string
+  storeId?: string | null
+}
+
+async function resolveManualTransferAccount(context?: ManualProviderContext) {
+  if (!context?.orgId || !context?.storeId) {
+    return { bankName: '', accountNumber: '', accountHolder: '' }
+  }
+  const result = await queryPostgres<{
+    bank_name: string
+    account_number: string
+    account_holder: string | null
+  }>(
+    `SELECT bank.bank_name, bank.account_number, bank.account_holder
+     FROM public.stores store
+     JOIN public.bank_accounts bank
+       ON bank.id = store.bank_account_id AND bank.org_id = store.org_id
+     WHERE store.id = $1::uuid AND store.org_id = $2::uuid
+     LIMIT 1`,
+    [context.storeId, context.orgId],
+  )
+  const row = result.rows[0]
+  if (!row) return { bankName: '', accountNumber: '', accountHolder: '' }
+  return {
+    bankName: row.bank_name,
+    accountNumber: row.account_number,
+    accountHolder: row.account_holder || '',
+  }
+}
+
+export async function getPaymentProvider(
+  providerCode: string,
+  context?: ManualProviderContext,
+): Promise<PaymentProvider> {
   const normalized = providerCode.trim().toUpperCase()
 
   if (normalized === 'MANUAL') {
+    const account = await resolveManualTransferAccount(context)
     return new ManualPaymentProvider({
-      bankName: requiredEnv('COREISEC_MANUAL_BANK_NAME'),
-      accountNumber: requiredEnv('COREISEC_MANUAL_BANK_ACCOUNT_NUMBER'),
-      accountHolder: requiredEnv('COREISEC_MANUAL_BANK_ACCOUNT_HOLDER'),
+      bankName: account.bankName,
+      accountNumber: account.accountNumber,
+      accountHolder: account.accountHolder,
       instructions: process.env.COREISEC_MANUAL_PAYMENT_INSTRUCTIONS,
     })
   }

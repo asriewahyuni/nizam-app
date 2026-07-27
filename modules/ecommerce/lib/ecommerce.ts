@@ -277,6 +277,9 @@ export type StorefrontStoreView = {
   supportPhone: string
   whatsappPhone: string
   transferInstructions: string
+  bankName: string
+  bankAccountNumber: string
+  bankAccountHolder: string
   seoTitle: string
   seoDescription: string
   heroNotice: string

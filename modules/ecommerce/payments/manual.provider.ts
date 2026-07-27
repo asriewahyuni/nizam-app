@@ -21,6 +21,9 @@ export class ManualPaymentProvider implements PaymentProvider {
   constructor(private readonly config: ManualPaymentConfig) {}
 
   async createPayment(input: CreatePaymentInput) {
+    if (!this.config.accountNumber) {
+      throw new Error('Rekening transfer manual toko ini belum dikonfigurasi. Atur rekening penerima di pengaturan toko.')
+    }
     return {
       providerCode: this.code,
       providerReference: `MANUAL:${input.orderNumber}`,

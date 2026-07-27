@@ -1245,6 +1245,23 @@ async function getStorefrontStoreView(admin: AdminDb, context: PublicStoreContex
     .eq('store_id', context.storeId)
     .maybeSingle()
 
+  let bankName = ''
+  let bankAccountNumber = ''
+  let bankAccountHolder = ''
+  if (storeRow.bank_account_id) {
+    const { data: bankRow } = await admin
+      .from('bank_accounts')
+      .select('bank_name, account_number, account_holder')
+      .eq('id', storeRow.bank_account_id)
+      .eq('org_id', storeRow.org_id)
+      .maybeSingle()
+    if (bankRow) {
+      bankName = cleanText(bankRow.bank_name, 120)
+      bankAccountNumber = cleanText(bankRow.account_number, 60)
+      bankAccountHolder = cleanText(bankRow.account_holder, 160)
+    }
+  }
+
   return {
     id: String(storeRow.id),
     orgId: String(storeRow.org_id),
@@ -1260,6 +1277,9 @@ async function getStorefrontStoreView(admin: AdminDb, context: PublicStoreContex
     supportPhone: cleanText(storeRow.support_phone, 80),
     whatsappPhone: cleanText(storeRow.whatsapp_phone, 80),
     transferInstructions: cleanLongText(settingsRow?.transfer_instructions, 2000),
+    bankName,
+    bankAccountNumber,
+    bankAccountHolder,
     seoTitle: cleanText(settingsRow?.seo_title, 200) || cleanText(storeRow.name, 160),
     seoDescription: cleanText(settingsRow?.seo_description, 260) || cleanText(storeRow.subheadline, 240),
     heroNotice: cleanText(settingsRow?.hero_notice, 200),
@@ -3272,6 +3292,9 @@ function formatCheckoutOrderResponse(args: {
   paymentDueAt: string | null
   grandTotal: number
   transferInstructions: string
+  bankName: string
+  bankAccountNumber: string
+  bankAccountHolder: string
   orgSlug: string
   storeSlug: string
   accessToken: string
@@ -3281,6 +3304,9 @@ function formatCheckoutOrderResponse(args: {
     orderNumber: args.orderNumber,
     paymentDueAt: args.paymentDueAt,
     transferInstructions: args.transferInstructions,
+    bankName: args.bankName,
+    bankAccountNumber: args.bankAccountNumber,
+    bankAccountHolder: args.bankAccountHolder,
     grandTotal: args.grandTotal,
     orderAccessUrl: buildPublicOrderAccessUrl(
       args.orgSlug,
@@ -3323,6 +3349,9 @@ export async function createCheckoutOrder(input: unknown) {
         paymentDueAt: existingOrder.payment_due_at ? String(existingOrder.payment_due_at) : null,
         grandTotal: toNumber(existingOrder.grand_total),
         transferInstructions: storeView.transferInstructions,
+        bankName: storeView.bankName,
+        bankAccountNumber: storeView.bankAccountNumber,
+        bankAccountHolder: storeView.bankAccountHolder,
         orgSlug: context.orgSlug,
         storeSlug: context.storeSlug,
         accessToken: String(existingOrder.public_access_token),
@@ -3747,6 +3776,9 @@ export async function createCheckoutOrder(input: unknown) {
           paymentDueAt: existingOrder.payment_due_at ? String(existingOrder.payment_due_at) : null,
           grandTotal: toNumber(existingOrder.grand_total),
           transferInstructions: storePayload.store.transferInstructions,
+        bankName: storePayload.store.bankName,
+        bankAccountNumber: storePayload.store.bankAccountNumber,
+        bankAccountHolder: storePayload.store.bankAccountHolder,
           orgSlug: context.orgSlug,
           storeSlug: context.storeSlug,
           accessToken: String(existingOrder.public_access_token),
@@ -3765,6 +3797,9 @@ export async function createCheckoutOrder(input: unknown) {
       orderNumber: createdOrder.orderNumber,
       paymentDueAt: createdOrder.paymentDueAt,
       transferInstructions: storePayload.store.transferInstructions,
+      bankName: storePayload.store.bankName,
+      bankAccountNumber: storePayload.store.bankAccountNumber,
+      bankAccountHolder: storePayload.store.bankAccountHolder,
       grandTotal: createdOrder.grandTotal,
       orgSlug: context.orgSlug,
       storeSlug: context.storeSlug,

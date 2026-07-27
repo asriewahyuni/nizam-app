@@ -11,6 +11,7 @@ import {
   BookOpen,
   Calendar,
   Settings,
+  ChevronLeft,
   ChevronRight,
   UserCheck,
   Users,
@@ -32,12 +33,18 @@ interface MembersAdminClientProps {
   initialMembers: MemberSummary[]
   initialSettings: LmsGamificationSettings
   totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
 }
 
 export function MembersAdminClient({
   initialMembers,
   initialSettings,
   totalCount,
+  page,
+  pageSize,
+  totalPages,
 }: MembersAdminClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -65,6 +72,17 @@ export function MembersAdminClient({
       params.set(key, value)
     } else {
       params.delete(key)
+    }
+    params.delete('page')
+    router.push(`/lms/admin/members?${params.toString()}`)
+  }
+
+  const handlePageChange = (nextPage: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (nextPage > 1) {
+      params.set('page', String(nextPage))
+    } else {
+      params.delete('page')
     }
     router.push(`/lms/admin/members?${params.toString()}`)
   }
@@ -306,6 +324,39 @@ export function MembersAdminClient({
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <nav
+            aria-label="Navigasi halaman member"
+            className="flex flex-col gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p className="text-xs font-medium text-slate-500">
+              Halaman <span className="font-bold text-slate-900">{page}</span> dari {totalPages}
+              {' · '}
+              {totalCount} member total ({pageSize} per halaman)
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handlePageChange(Math.max(1, page - 1))}
+                disabled={page <= 1}
+                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition-colors duration-150 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-400"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                Sebelumnya
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
+                disabled={page >= totalPages}
+                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition-colors duration-150 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:hover:border-slate-200 disabled:hover:bg-slate-50 disabled:hover:text-slate-400"
+              >
+                Berikutnya
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          </nav>
+        )}
       </div>
 
       {/* Gamification Settings Modal */}

@@ -6,7 +6,9 @@ import {
   ArrowRight,
   ChevronRight,
   CheckCircle2,
+  Copy,
   ExternalLink,
+  Landmark,
   LoaderCircle,
   Minus,
   PackageCheck,
@@ -53,6 +55,9 @@ type CheckoutResult = {
   orderNumber: string
   paymentDueAt: string | null
   transferInstructions: string
+  bankName: string
+  bankAccountNumber: string
+  bankAccountHolder: string
   grandTotal: number
   orderAccessUrl: string
 }
@@ -341,6 +346,7 @@ export default function StorefrontClient({
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
   const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null)
+  const [copiedAccountNumber, setCopiedAccountNumber] = useState(false)
   const [checkoutIdempotencyKey, setCheckoutIdempotencyKey] = useState(() => crypto.randomUUID())
   const [couponCode, setCouponCode] = useState('')
   const [couponQuote, setCouponQuote] = useState<CheckoutCouponQuote | null>(null)
@@ -752,6 +758,48 @@ export default function StorefrontClient({
     } finally {
       setCheckoutLoading(false)
     }
+  }
+
+  function copyAccountNumber(accountNumber: string) {
+    if (!accountNumber) return
+    navigator.clipboard?.writeText(accountNumber).then(() => {
+      setCopiedAccountNumber(true)
+      window.setTimeout(() => setCopiedAccountNumber(false), 2000)
+    }).catch(() => {})
+  }
+
+  function renderBankAccountBox() {
+    if (!payload.store.bankAccountNumber) return null
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+          <Landmark aria-hidden="true" size={14} />
+          Rekening Tujuan Transfer
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-bold text-slate-900">{payload.store.bankName}</div>
+            <div className="font-mono text-lg font-black tracking-wide text-slate-950">
+              {payload.store.bankAccountNumber}
+            </div>
+            {payload.store.bankAccountHolder && (
+              <div className="text-xs text-slate-600">an. {payload.store.bankAccountHolder}</div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => copyAccountNumber(payload.store.bankAccountNumber)}
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-2xs transition-colors duration-150 hover:border-slate-400 hover:bg-slate-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
+          >
+            <Copy aria-hidden="true" size={13} />
+            {copiedAccountNumber ? 'Tersalin' : 'Salin'}
+          </button>
+        </div>
+        {payload.store.transferInstructions && (
+          <p className="mt-3 text-xs text-slate-600">{payload.store.transferInstructions}</p>
+        )}
+      </div>
+    )
   }
 
   function renderCouponField() {
@@ -1860,6 +1908,8 @@ export default function StorefrontClient({
                   </div>
                 </div>
 
+                {renderBankAccountBox()}
+
                 <div className="pt-2">
                   <button
                     type="button"
@@ -2122,6 +2172,8 @@ export default function StorefrontClient({
                       </>
                     ) : null}
                     <textarea value={checkoutForm.customerNote} onChange={(event) => setCheckoutForm((current) => ({ ...current, customerNote: event.target.value }))} rows={2} placeholder="Catatan order" className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 font-medium outline-none focus:border-blue-500" />
+
+                    {renderBankAccountBox()}
 
                     {checkoutError && (
                       <div className="rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">

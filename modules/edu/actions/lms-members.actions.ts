@@ -174,48 +174,116 @@ export async function updateLmsGamificationSettings(
 
 // ── Fetch Members List ────────────────────────────────────────────────────────
 
+const MEMBERS_SORT_COLUMNS: Record<string, string> = {
+  joined_asc: 'joined_at ASC',
+  name_asc: 'name ASC',
+  name_desc: 'name DESC',
+  courses_desc: 'enrolled_count DESC, joined_at DESC',
+  joined_desc: 'joined_at DESC',
+  level_desc: 'level_index DESC, joined_at DESC',
+}
+
 export async function getLmsAdminMembers(
   search = '',
   levelFilter = 'ALL',
   courseFilter = 'ALL',
-  sortBy = 'level_desc'
-): Promise<{ members: MemberSummary[]; settings: LmsGamificationSettings; totalCount: number }> {
+  sortBy = 'level_desc',
+  page = 1,
+  pageSize = 25
+): Promise<{
+  members: MemberSummary[]
+  settings: LmsGamificationSettings
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+}> {
   const orgData = await assertOrgAdmin()
   const orgId = orgData.org.id
   const settings = await getLmsGamificationSettings(orgId)
 
-  // 1. Query all org members with user metadata and course progress
+  const safePage = Math.max(1, Math.trunc(page) || 1)
+  const safePageSize = Math.min(100, Math.max(1, Math.trunc(pageSize) || 25))
+  const orderClause = MEMBERS_SORT_COLUMNS[sortBy] || MEMBERS_SORT_COLUMNS.level_desc
+
+  // Filters are applied inside SQL (not after fetching every member into JS) so
+  // pagination reflects the filtered set, and so ~1300-row orgs don't have to
+  // ship every row + run per-row badge lookups just to render one page.
+  const conditions: string[] = []
+  const params: unknown[] = [orgId]
+  let paramIdx = 2
+
+  const trimmedSearch = search.trim().toLowerCase()
+  if (trimmedSearch) {
+    conditions.push(
+      `(lower(name) LIKE $${paramIdx} OR lower(email) LIKE $${paramIdx} OR lower(COALESCE(phone, '')) LIKE $${paramIdx})`
+    )
+    params.push(`%${trimmedSearch}%`)
+    paramIdx++
+  }
+
+  if (levelFilter && levelFilter !== 'ALL' && Number.isInteger(Number(levelFilter))) {
+    conditions.push(`level_index = $${paramIdx}`)
+    params.push(Number(levelFilter))
+    paramIdx++
+  }
+
+  if (courseFilter === 'ENROLLED') conditions.push('enrolled_count > 0')
+  else if (courseFilter === 'COMPLETED') conditions.push('completed_count > 0')
+  else if (courseFilter === 'NOT_ENROLLED') conditions.push('enrolled_count = 0')
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const limitIdx = paramIdx
+  const offsetIdx = paramIdx + 1
+  params.push(safePageSize, (safePage - 1) * safePageSize)
+
   const membersQuery = `
-    SELECT 
-      m.user_id::text AS user_id,
-      m.role::text AS role,
-      m.is_active,
-      m.joined_at::text AS joined_at,
-      COALESCE(iu.login_email, au.email, 'unknown@example.com') AS email,
-      iu.phone AS phone,
-      COALESCE(
-        au.raw_user_meta_data->>'full_name',
-        au.raw_user_meta_data->>'name',
-        split_part(COALESCE(iu.login_email, au.email, 'User'), '@', 1)
-      ) AS name,
-      (
-        SELECT COUNT(*)::int
+    WITH base AS (
+      SELECT
+        m.user_id::text AS user_id,
+        m.role::text AS role,
+        m.is_active,
+        m.joined_at::text AS joined_at,
+        COALESCE(iu.login_email, au.email, 'unknown@example.com') AS email,
+        iu.phone AS phone,
+        COALESCE(
+          au.raw_user_meta_data->>'full_name',
+          au.raw_user_meta_data->>'name',
+          split_part(COALESCE(iu.login_email, au.email, 'User'), '@', 1)
+        ) AS name,
+        COALESCE(ec.enrolled_count, 0) AS enrolled_count,
+        COALESCE(ec.completed_count, 0) AS completed_count
+      FROM public.org_members m
+      LEFT JOIN public.internal_auth_users iu
+        ON COALESCE(iu.legacy_user_id, iu.id) = m.user_id
+      LEFT JOIN auth.users au
+        ON au.id = m.user_id
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(*)::int AS enrolled_count,
+          COUNT(*) FILTER (WHERE e.status = 'COMPLETED' OR e.completed_at IS NOT NULL)::int AS completed_count
         FROM public.learning_enrollments e
         WHERE e.org_id = $1::uuid AND e.user_id = m.user_id
-      ) AS enrolled_count,
-      (
-        SELECT COUNT(*)::int
-        FROM public.learning_enrollments e
-        WHERE e.org_id = $1::uuid AND e.user_id = m.user_id
-          AND (e.status = 'COMPLETED' OR e.completed_at IS NOT NULL)
-      ) AS completed_count
-    FROM public.org_members m
-    LEFT JOIN public.internal_auth_users iu
-      ON COALESCE(iu.legacy_user_id, iu.id) = m.user_id
-    LEFT JOIN auth.users au
-      ON au.id = m.user_id
-    WHERE m.org_id = $1::uuid
-      AND COALESCE(iu.login_email, au.email, '') NOT LIKE 'legacy-deleted+%@invalid.coreisec.id'
+      ) ec ON true
+      WHERE m.org_id = $1::uuid
+        AND COALESCE(iu.login_email, au.email, '') NOT LIKE 'legacy-deleted+%@invalid.coreisec.id'
+    ),
+    scored AS (
+      SELECT
+        *,
+        CASE
+          WHEN (enrolled_count + completed_count * 2) >= 6 THEN 3
+          WHEN (enrolled_count + completed_count * 2) >= 3 THEN 2
+          WHEN (enrolled_count + completed_count * 2) >= 1 THEN 1
+          ELSE 0
+        END AS level_index
+      FROM base
+    )
+    SELECT *, COUNT(*) OVER()::int AS total_count
+    FROM scored
+    ${whereClause}
+    ORDER BY ${orderClause}
+    LIMIT $${limitIdx} OFFSET $${offsetIdx}
   `
 
   const { rows: memberRows } = await queryPostgres<{
@@ -228,66 +296,59 @@ export async function getLmsAdminMembers(
     name: string
     enrolled_count: number
     completed_count: number
-  }>(membersQuery, [orgId])
+    level_index: number
+    total_count: number
+  }>(membersQuery, params)
 
-  // 2. Query all awarded badges for this org
-  const badgesQuery = `
-    SELECT 
-      ba.user_id::text AS user_id,
-      COALESCE(bt.title, bt.name, ba.badge_number, 'Special Badge') AS title,
-      COALESCE(bt.description, 'Awarded achievement') AS description,
-      COALESCE(bt.primary_color, '#0F766E') AS color,
-      COALESCE(bt.icon_name, 'award') AS icon_name,
-      ba.awarded_at::text AS awarded_at,
-      ba.id::text AS id
-    FROM public.learning_badge_awards ba
-    LEFT JOIN public.learning_badge_templates bt ON bt.id = ba.template_id
-    WHERE ba.org_id = $1::uuid AND ba.status = 'ACTIVE'
-  `
-  const { rows: badgeRows } = await queryPostgres<{
-    user_id: string
-    title: string
-    description: string
-    color: string
-    icon_name: string
-    awarded_at: string
-    id: string
-  }>(badgesQuery, [orgId])
+  const totalCount = memberRows[0]?.total_count || 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / safePageSize))
+  const pageUserIds = memberRows.map((row) => row.user_id)
 
-  // Group badges by user_id
+  // Badges are only needed for the members actually rendered on this page.
   const badgesByUser = new Map<string, MemberBadge[]>()
-  for (const b of badgeRows) {
-    const list = badgesByUser.get(b.user_id) || []
-    list.push({
-      id: b.id,
-      title: b.title,
-      description: b.description,
-      color: b.color,
-      iconName: b.icon_name,
-      awardedAt: b.awarded_at,
-      isMilestone: false,
-    })
-    badgesByUser.set(b.user_id, list)
+  if (pageUserIds.length > 0) {
+    const badgesQuery = `
+      SELECT
+        ba.user_id::text AS user_id,
+        COALESCE(bt.title, bt.name, ba.badge_number, 'Special Badge') AS title,
+        COALESCE(bt.description, 'Awarded achievement') AS description,
+        COALESCE(bt.primary_color, '#0F766E') AS color,
+        COALESCE(bt.icon_name, 'award') AS icon_name,
+        ba.awarded_at::text AS awarded_at,
+        ba.id::text AS id
+      FROM public.learning_badge_awards ba
+      LEFT JOIN public.learning_badge_templates bt ON bt.id = ba.template_id
+      WHERE ba.org_id = $1::uuid AND ba.status = 'ACTIVE' AND ba.user_id = ANY($2::uuid[])
+    `
+    const { rows: badgeRows } = await queryPostgres<{
+      user_id: string
+      title: string
+      description: string
+      color: string
+      icon_name: string
+      awarded_at: string
+      id: string
+    }>(badgesQuery, [orgId, pageUserIds])
+
+    for (const b of badgeRows) {
+      const list = badgesByUser.get(b.user_id) || []
+      list.push({
+        id: b.id,
+        title: b.title,
+        description: b.description,
+        color: b.color,
+        iconName: b.icon_name,
+        awardedAt: b.awarded_at,
+        isMilestone: false,
+      })
+      badgesByUser.set(b.user_id, list)
+    }
   }
 
-  // 3. Process members, calculate level and milestone badges
-  let members: MemberSummary[] = memberRows.map((row) => {
+  const members: MemberSummary[] = memberRows.map((row) => {
     const completed = Number(row.completed_count || 0)
     const enrolled = Number(row.enrolled_count || 0)
-
-    // Most legacy-imported enrollments (Sejoli/WordPress) never carry a completed_at
-    // signal, so enrolled_count is the baseline engagement score. Real completions
-    // (now backfilled from Sejoli's native lesson-completion data) add extra weight
-    // on top instead of replacing the baseline, so finishing a course never makes a
-    // member's level drop below what plain enrollment already earned them.
-    const engagementScore = enrolled + completed * 2
-
-    // Calculate level index
-    let levelIndex = 0
-    if (engagementScore >= 6) levelIndex = 3
-    else if (engagementScore >= 3) levelIndex = 2
-    else if (engagementScore >= 1) levelIndex = 1
-
+    const levelIndex = Number(row.level_index || 0)
     const levelName = settings.levelNames[levelIndex] || settings.levelNames[0] || 'Level 0'
 
     // Gather badges (awarded + milestones)
@@ -352,56 +413,13 @@ export async function getLmsAdminMembers(
     }
   })
 
-  // 4. Apply filters
-  if (search.trim()) {
-    const q = search.trim().toLowerCase()
-    members = members.filter(
-      (m) =>
-        m.name.toLowerCase().includes(q) ||
-        m.email.toLowerCase().includes(q) ||
-        (m.phone || '').toLowerCase().includes(q)
-    )
-  }
-
-  if (levelFilter && levelFilter !== 'ALL') {
-    const targetLevel = Number(levelFilter)
-    members = members.filter((m) => m.levelIndex === targetLevel)
-  }
-
-  if (courseFilter && courseFilter !== 'ALL') {
-    if (courseFilter === 'ENROLLED') {
-      members = members.filter((m) => m.enrolledCount > 0)
-    } else if (courseFilter === 'COMPLETED') {
-      members = members.filter((m) => m.completedCount > 0)
-    } else if (courseFilter === 'NOT_ENROLLED') {
-      members = members.filter((m) => m.enrolledCount === 0)
-    }
-  }
-
-  // 5. Apply sorting
-  members.sort((a, b) => {
-    switch (sortBy) {
-      case 'joined_asc':
-        return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime()
-      case 'name_asc':
-        return a.name.localeCompare(b.name)
-      case 'name_desc':
-        return b.name.localeCompare(a.name)
-      case 'courses_desc':
-        return b.enrolledCount - a.enrolledCount
-      case 'joined_desc':
-        return new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime()
-      case 'level_desc':
-      default:
-        // Primary: highest level first; tiebreaker: newest member first
-        return b.levelIndex - a.levelIndex || new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime()
-    }
-  })
-
   return {
     members,
     settings,
-    totalCount: members.length,
+    totalCount,
+    page: safePage,
+    pageSize: safePageSize,
+    totalPages,
   }
 }
 

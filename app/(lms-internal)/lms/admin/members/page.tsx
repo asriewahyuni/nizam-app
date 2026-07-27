@@ -15,6 +15,7 @@ interface MembersAdminPageProps {
     levelFilter?: string
     courseFilter?: string
     sortBy?: string
+    page?: string
   }>
 }
 
@@ -29,12 +30,16 @@ export default async function MembersAdminPage({ searchParams }: MembersAdminPag
   const levelFilter = params.levelFilter || 'ALL'
   const courseFilter = params.courseFilter || 'ALL'
   const sortBy = params.sortBy || 'level_desc'
+  const page = Math.max(1, Number(params.page) || 1)
+  const pageSize = 25
 
-  const { members, settings, totalCount } = await getLmsAdminMembers(
+  const { members, settings, totalCount, totalPages } = await getLmsAdminMembers(
     search,
     levelFilter,
     courseFilter,
-    sortBy
+    sortBy,
+    page,
+    pageSize
   )
 
   return (
@@ -42,6 +47,9 @@ export default async function MembersAdminPage({ searchParams }: MembersAdminPag
       initialMembers={members}
       initialSettings={settings}
       totalCount={totalCount}
+      page={page}
+      pageSize={pageSize}
+      totalPages={totalPages}
     />
   )
 }

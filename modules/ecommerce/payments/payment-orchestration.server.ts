@@ -12,6 +12,7 @@ import { releaseConsultingOrderHolds } from '@/modules/consulting/lib/consulting
 type PaymentOrderRow = {
   id: string
   org_id: string
+  store_id: string | null
   order_number: string
   customer_name: string
   customer_email: string | null
@@ -35,6 +36,7 @@ export async function createCommercePaymentIntent(input: {
     `SELECT
        id::text,
        org_id::text,
+       store_id::text,
        order_number,
        customer_name,
        customer_email,
@@ -111,7 +113,7 @@ export async function createCommercePaymentIntent(input: {
     ],
   )
   const intentId = intentResult.rows[0].id
-  const provider = getPaymentProvider(providerCode)
+  const provider = await getPaymentProvider(providerCode, { orgId: order.org_id, storeId: order.store_id })
 
   try {
     const created = await provider.createPayment({
@@ -253,7 +255,7 @@ export async function processPaymentWebhook(input: {
   headers: Headers
   fields?: URLSearchParams
 }) {
-  const provider = getPaymentProvider(input.providerCode)
+  const provider = await getPaymentProvider(input.providerCode)
   const validated = await provider.validateWebhook({
     rawBody: input.rawBody,
     headers: input.headers,

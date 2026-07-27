@@ -123,7 +123,7 @@ export async function requestCommerceRefund(input: {
     return { refundId: refund.id, status: 'SUCCEEDED' as const, alreadyProcessed: true }
   }
 
-  const provider = getPaymentProvider(order.provider_code)
+  const provider = await getPaymentProvider(order.provider_code)
   const providerResult = await provider.refund({
     providerReference: order.provider_reference,
     orderNumber: order.order_number,
