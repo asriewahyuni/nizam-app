@@ -59,7 +59,9 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
   const callbackPath = isCustomDomain ? '/dashboard' : (basePath || '/')
   const navigation = [
     { href: portalPath('/dashboard', ''), label: 'Beranda', icon: LayoutDashboard },
-    { href: portalPath('/courses', '/katalog'), label: 'Katalog', icon: BookOpen },
+    ...(tenant.slug !== 'core-isec' ? [
+      { href: portalPath('/courses', '/katalog'), label: 'Katalog', icon: BookOpen }
+    ] : []),
     ...(member ? [
       { href: portalPath('/my-courses', '/kelas'), label: 'Kelas Saya', icon: GraduationCap },
       { href: portalPath('/consulting', '/konsultasi'), label: 'Consulting 360', icon: BriefcaseBusiness },

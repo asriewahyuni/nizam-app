@@ -86,12 +86,14 @@ export default async function MemberDashboardPage({
                 Lanjutkan belajar
                 <ArrowRight aria-hidden="true" size={17} />
               </Link>
-              <Link
-                href={`${basePath}/katalog`}
-                className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-xl border border-emerald-200/30 bg-white/10 px-5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-white/15 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 motion-reduce:transition-none"
-              >
-                Lihat katalog
-              </Link>
+              {tenant.slug !== 'core-isec' && (
+                <Link
+                  href={`${basePath}/katalog`}
+                  className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-xl border border-emerald-200/30 bg-white/10 px-5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-white/15 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 motion-reduce:transition-none"
+                >
+                  Lihat katalog
+                </Link>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -134,12 +136,14 @@ export default async function MemberDashboardPage({
               <p className="mx-auto mt-1.5 max-w-xs text-xs leading-5 text-slate-600">
                 Kelas yang dibeli, diberikan admin, atau termasuk paket membership akan tampil di sini.
               </p>
-              <Link
-                href={`${basePath}/katalog`}
-                className="mt-4 inline-flex min-h-10 cursor-pointer items-center rounded-xl bg-emerald-700 px-4 text-xs font-semibold text-white hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
-              >
-                Jelajahi katalog
-              </Link>
+              {tenant.slug !== 'core-isec' && (
+                <Link
+                  href={`${basePath}/katalog`}
+                  className="mt-4 inline-flex min-h-10 cursor-pointer items-center rounded-xl bg-emerald-700 px-4 text-xs font-semibold text-white hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                >
+                  Jelajahi katalog
+                </Link>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-4">
