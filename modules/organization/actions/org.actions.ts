@@ -1070,7 +1070,14 @@ async function createOrganizationRecord(
 
 export async function createOrganization(formData: FormData) {
   const result = await createOrganizationRecord(formData)
-  if ('error' in result) return result
+  if ('error' in result) {
+    // Sesi tidak valid/expired: jangan kembalikan error mentah ke form onboarding,
+    // arahkan ke login agar user tidak terjebak mengulang submit tanpa jalan keluar.
+    if (result.error === 'Tidak terautentikasi') {
+      redirect('/login')
+    }
+    return result
+  }
 
   revalidatePath('/dashboard')
   return redirect('/dashboard')
