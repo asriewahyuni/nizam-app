@@ -52,7 +52,7 @@ export interface LmsGamificationSettings {
 }
 
 const DEFAULT_GAMIFICATION_SETTINGS: LmsGamificationSettings = {
-  levelNames: ['Novice', 'Explorer', 'Practitioner', 'Specialist'],
+  levelNames: ['Level 0', 'Level 1', 'Level 2', 'Level 3'],
   milestoneBadges: [
     {
       id: 'pioneer',
@@ -277,7 +277,7 @@ export async function getLmsAdminMembers(
     else if (completed >= 3) levelIndex = 2
     else if (completed >= 1) levelIndex = 1
 
-    const levelName = settings.levelNames[levelIndex] || settings.levelNames[0] || 'Novice'
+    const levelName = settings.levelNames[levelIndex] || settings.levelNames[0] || 'Level 0'
 
     // Gather badges (awarded + milestones)
     const userBadges = [...(badgesByUser.get(row.user_id) || [])]

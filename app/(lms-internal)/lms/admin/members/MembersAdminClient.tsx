@@ -337,7 +337,7 @@ export function MembersAdminClient({
                     setLevelNames(newNames)
                   }}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-semibold text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                  placeholder="e.g. Novice"
+                  placeholder="e.g. Level 0"
                 />
               </div>
 
@@ -355,7 +355,7 @@ export function MembersAdminClient({
                     setLevelNames(newNames)
                   }}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-semibold text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                  placeholder="e.g. Explorer"
+                  placeholder="e.g. Level 1"
                 />
               </div>
 
@@ -373,7 +373,7 @@ export function MembersAdminClient({
                     setLevelNames(newNames)
                   }}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-semibold text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                  placeholder="e.g. Practitioner"
+                  placeholder="e.g. Level 2"
                 />
               </div>
 
@@ -391,7 +391,7 @@ export function MembersAdminClient({
                     setLevelNames(newNames)
                   }}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-semibold text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                  placeholder="e.g. Specialist"
+                  placeholder="e.g. Level 3"
                 />
               </div>
 
