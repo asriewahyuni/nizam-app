@@ -60,6 +60,23 @@ ${FOOTER_WA}`,
     },
   },
   {
+    key: 'ORDER_CANCELLED',
+    email: {
+      subject: 'Order {{order_number}} dibatalkan',
+      body: `<p>Assalamu'alaikum, kak {{name}}</p><p>Kami mohon maaf, karena order <strong>{{order_number}}</strong> ({{product_name}}) belum ada konfirmasi pembayaran lanjutan, maka dengan berat hati kami batalkan.</p><p>Jika masih berminat, silakan lakukan pemesanan kembali dari awal ya.</p><p>Terima kasih.</p>`,
+    },
+    whatsapp: {
+      body: `Assalamu'alaikum, kak {{name}}
+
+Kami mohon maaf, karena pesanan #{{order_number}} ({{product_name}}) belum ada konfirmasi lanjutan soal pembayarannya, maka dengan berat hati kami batalkan ya kak.
+
+Jika masih berminat, silakan diproses kembali lagi dari awal ya.
+
+Terima kasih.
+Admin coreisec.id`,
+    },
+  },
+  {
     key: 'ENROLLMENT_CREATED',
     email: {
       subject: 'Akses kelas {{course_title}} sudah aktif',

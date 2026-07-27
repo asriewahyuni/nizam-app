@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import {
+  cancelOrderManualAction,
   markOrderPaidManualAction,
   resendOrderAccessEmailAction,
 } from '@/modules/edu/actions/lms-sales-admin.actions'
@@ -70,6 +71,21 @@ export function LmsSalesListClient({
       } else {
         setFeedback({ type: 'success', text: 'Status transaksi berhasil diubah menjadi LUNAS.' })
         setSales((prev) => prev.map((s) => s.id === orderId ? { ...s, paymentStatus: 'PAID' } : s))
+      }
+    })
+  }
+
+  const handleCancelOrder = (orderId: string) => {
+    const reason = prompt('Alasan pembatalan (opsional):') || undefined
+    if (!confirm('Batalkan order ini? Customer akan diberi tahu lewat WhatsApp/Email.')) return
+    setFeedback(null)
+    startTransition(async () => {
+      const res = await cancelOrderManualAction(orderId, reason)
+      if (res.error) {
+        setFeedback({ type: 'error', text: res.error })
+      } else {
+        setFeedback({ type: 'success', text: 'Order berhasil dibatalkan.' })
+        setSales((prev) => prev.map((s) => s.id === orderId ? { ...s, paymentStatus: 'CANCELLED' } : s))
       }
     })
   }
@@ -293,6 +309,18 @@ export function LmsSalesListClient({
                           title="Tandai Lunas Manual"
                         >
                           <UserCheck size={15} />
+                        </button>
+                      )}
+
+                      {sale.source === 'native' && isPendingState && (
+                        <button
+                          type="button"
+                          onClick={() => handleCancelOrder(sale.id)}
+                          disabled={isPending}
+                          className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+                          title="Batalkan Order"
+                        >
+                          <XCircle size={15} />
                         </button>
                       )}
                     </td>

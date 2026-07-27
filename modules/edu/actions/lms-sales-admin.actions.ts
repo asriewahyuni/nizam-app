@@ -1,10 +1,23 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { queryPostgres } from '@/lib/db/postgres'
+import { connectPostgresClient, queryPostgres } from '@/lib/db/postgres'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { finalizePaidCommerceOrder } from '@/modules/ecommerce/payments/commerce-payment.service'
 import { sendSystemEmail } from '@/lib/email/sender'
+import { enqueueNotification } from '@/modules/notifications/outbox.server'
+
+const CANCELLABLE_ORDER_STATUSES = [
+  'DRAFT',
+  'AWAITING_PAYMENT',
+  'PAYMENT_UNDER_REVIEW',
+  'PAYMENT_REJECTED',
+  'PAYMENT_EXCEPTION',
+]
+
+function formatRupiah(amount: number) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)
+}
 
 export async function resendOrderAccessEmailAction(orderId: string) {
   const orgData = await getActiveOrg()
@@ -110,5 +123,110 @@ export async function markOrderPaidManualAction(orderId: string) {
     return {
       error: error instanceof Error ? error.message : 'Gagal melunaskan order.',
     }
+  }
+}
+
+export async function cancelOrderManualAction(orderId: string, reason?: string) {
+  const orgData = await getActiveOrg()
+  if (!orgData?.org?.id) return { error: 'Organisasi tidak ditemukan.' }
+
+  const role = String(orgData.role || '').toLowerCase()
+  if (!['owner', 'admin', 'manager'].includes(role)) {
+    return { error: 'Hanya owner/admin yang dapat membatalkan order.' }
+  }
+
+  const client = await connectPostgresClient()
+  try {
+    await client.query('BEGIN')
+
+    const orderResult = await client.query<{
+      id: string
+      order_number: string
+      status: string
+      customer_name: string
+      customer_email: string | null
+      customer_phone: string
+      grand_total: number
+      user_id: string | null
+    }>(
+      `SELECT id::text, order_number, status::text, customer_name, customer_email,
+              customer_phone, grand_total::float8, user_id::text
+       FROM public.ecommerce_orders
+       WHERE id = $1::uuid AND org_id = $2::uuid
+       LIMIT 1
+       FOR UPDATE`,
+      [orderId, orgData.org.id],
+    )
+    const order = orderResult.rows[0]
+    if (!order) throw new Error('Order tidak ditemukan.')
+    if (order.status === 'CANCELLED') {
+      await client.query('COMMIT')
+      return { success: true, alreadyCancelled: true }
+    }
+    if (!CANCELLABLE_ORDER_STATUSES.includes(order.status)) {
+      throw new Error(
+        'Order yang sudah lunas/selesai tidak bisa dibatalkan langsung. Gunakan proses refund.',
+      )
+    }
+
+    await client.query(
+      `UPDATE public.ecommerce_orders
+       SET status = 'CANCELLED', updated_at = NOW()
+       WHERE id = $1::uuid AND org_id = $2::uuid`,
+      [orderId, orgData.org.id],
+    )
+    await client.query(
+      `UPDATE public.commerce_payment_intents
+       SET status = 'CANCELLED', updated_at = NOW()
+       WHERE order_id = $1::uuid AND org_id = $2::uuid AND status = 'PENDING'`,
+      [orderId, orgData.org.id],
+    )
+    await client.query(
+      `INSERT INTO public.ecommerce_order_events (
+         org_id, order_id, actor_label, event_type, message, payload
+       ) VALUES (
+         $1::uuid, $2::uuid, 'ADMIN', 'ORDER_CANCELLED',
+         'Order dibatalkan oleh admin karena belum ada konfirmasi pembayaran.', $3::jsonb
+       )`,
+      [orgData.org.id, orderId, JSON.stringify({ reason: reason || null })],
+    )
+
+    const itemsResult = await client.query<{ product_name: string }>(
+      `SELECT DISTINCT product_name FROM public.ecommerce_order_items WHERE org_id = $1::uuid AND order_id = $2::uuid`,
+      [orgData.org.id, orderId],
+    )
+    const variables: Record<string, string | number | null> = {
+      name: order.customer_name || 'Member',
+      order_number: order.order_number,
+      product_name: itemsResult.rows.map((row) => row.product_name).join(', ') || 'pesanan Anda',
+      amount: formatRupiah(order.grand_total),
+    }
+    const recipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
+    if (order.customer_email) recipients.push({ channel: 'EMAIL', value: order.customer_email })
+    if (order.customer_phone) recipients.push({ channel: 'WHATSAPP', value: order.customer_phone })
+    for (const recipient of recipients) {
+      await enqueueNotification({
+        orgId: orgData.org.id,
+        userId: order.user_id,
+        eventType: 'ORDER_CANCELLED',
+        channel: recipient.channel,
+        recipient: recipient.value,
+        templateKey: 'ORDER_CANCELLED',
+        variables,
+        idempotencyKey: `order-cancelled:${orderId}:${recipient.channel}`,
+        payload: { orderId, orderNumber: order.order_number },
+      }, client)
+    }
+
+    await client.query('COMMIT')
+    revalidatePath('/lms/admin/penjualan/transaksi')
+    return { success: true }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    return {
+      error: error instanceof Error ? error.message : 'Gagal membatalkan order.',
+    }
+  } finally {
+    client.release()
   }
 }
