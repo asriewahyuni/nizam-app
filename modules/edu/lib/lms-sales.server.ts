@@ -156,11 +156,18 @@ export async function getLmsAdminSalesList(
        orders.subtotal_amount::float8,
        orders.discount_amount::float8,
        orders.status,
-       orders.payment_gateway,
+       payment.payment_gateway,
        affiliate_profile.referral_code,
        auth_user.display_name AS affiliate_name,
        commission.commission_amount::float8 AS commission_amount
      FROM public.ecommerce_orders orders
+     LEFT JOIN LATERAL (
+       SELECT COALESCE(op.provider_code, op.method) AS payment_gateway
+       FROM public.ecommerce_order_payments op
+       WHERE op.order_id = orders.id AND op.org_id = orders.org_id
+       ORDER BY (op.status = 'VALIDATED') DESC, op.created_at DESC
+       LIMIT 1
+     ) payment ON TRUE
      LEFT JOIN public.commerce_affiliate_commissions commission
        ON commission.order_id = orders.id AND commission.org_id = orders.org_id
      LEFT JOIN public.commerce_affiliate_profiles affiliate_profile
