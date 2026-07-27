@@ -370,6 +370,9 @@ async function main() {
   }
 
   const client = await connectPostgresClient()
+  client.on('error', (error) => {
+    console.error(`[coreisec:import] koneksi database terputus: ${error instanceof Error ? error.message : String(error)}`)
+  })
   const counts = emptyCounts()
   const aggregateChecksums = new Map<CoreisecEntityType, ReturnType<typeof createHash>>()
   let runId = ''

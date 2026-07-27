@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -16,17 +16,23 @@ import {
   BadgeCheck,
   UsersRound,
   CalendarClock,
-  DatabaseZap
+  DatabaseZap,
+  type LucideIcon,
 } from 'lucide-react'
 
 type NavItem = {
   href: string
   label: string
-  icon: React.ComponentType<any>
+  icon: LucideIcon
 }
 
+type MemberNavigationContext = {
+  isAdmin: boolean
+  isTutor: boolean
+} | null
+
 type Props = {
-  member: any
+  member: MemberNavigationContext
   tenantSlug: string
   isCustomDomain: boolean
   basePath: string
