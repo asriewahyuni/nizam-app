@@ -111,7 +111,11 @@ export async function GET(request: NextRequest) {
           contentDisposition: attachmentDisposition,
         })
 
-        const downloadUrl = new URL(buildPrivateStorageObjectPath(storageKey), request.url)
+        // Baca Host header, bukan request.url — di belakang reverse proxy Railway,
+        // request.url mencerminkan alamat bind internal (0.0.0.0:8080), bukan domain publik.
+        const host = request.headers.get('host') || 'localhost:3000'
+        const protocol = request.headers.get('x-forwarded-proto') || 'https'
+        const downloadUrl = new URL(buildPrivateStorageObjectPath(storageKey), `${protocol}://${host}`)
         return NextResponse.redirect(downloadUrl, {
           status: 307,
           headers: {
