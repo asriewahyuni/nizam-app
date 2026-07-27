@@ -17,7 +17,7 @@ const customRules = {
         message: "🚨 SILO ALERT: Dilarang memodifikasi bank_transactions secara manual. Gunakan fungsi standar di modul cash/bank atau ERPBridge."
       },
       {
-        selector: "CallExpression[callee.name='queryPostgres'] > TemplateLiteral[quasis.0.value.raw=/(?i)insert\\s+into\\s+public\\.journal_entries/]",
+        selector: "CallExpression[callee.name='queryPostgres'] > TemplateLiteral[quasis.0.value.raw=/[Ii][Nn][Ss][Ee][Rr][Tt]\\s+[Ii][Nn][Tt][Oo]\\s+public\\.journal_entries/]",
         message: "🚨 SILO ALERT: Dilarang menggunakan raw query untuk insert ke journal_entries. Gunakan ERPBridge."
       }
     ]

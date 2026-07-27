@@ -128,7 +128,6 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
           tenantSlug={tenant.slug}
           isCustomDomain={isCustomDomain}
           basePath={basePath}
-          portalPath={portalPath}
         />
       </div>
     </div>

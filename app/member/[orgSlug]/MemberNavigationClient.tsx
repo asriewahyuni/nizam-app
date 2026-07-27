@@ -30,7 +30,6 @@ type Props = {
   tenantSlug: string
   isCustomDomain: boolean
   basePath: string
-  portalPath: (path: string, legacy: string) => string
 }
 
 export default function MemberNavigationClient({
@@ -38,10 +37,12 @@ export default function MemberNavigationClient({
   tenantSlug,
   isCustomDomain,
   basePath,
-  portalPath,
 }: Props) {
   const pathname = usePathname()
   const [isMoreOpen, setIsMoreOpen] = useState(false)
+  const portalPath = (cleanPath: string, legacyPath: string) => (
+    isCustomDomain ? cleanPath : `${basePath}${legacyPath}`
+  )
 
   // Build full list of menu items
   const allItems: NavItem[] = [
