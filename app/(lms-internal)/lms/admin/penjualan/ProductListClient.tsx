@@ -20,6 +20,7 @@ type ProductListClientProps = {
   orgSlug: string
   storeSlug: string
   returnTo: string
+  primaryLmsHostname?: string | null
 }
 
 export default function ProductListClient({
@@ -28,6 +29,7 @@ export default function ProductListClient({
   orgSlug,
   storeSlug,
   returnTo,
+  primaryLmsHostname,
 }: ProductListClientProps) {
   const router = useRouter()
   const [copiedId, setCopiedId] = useState('')
@@ -39,7 +41,11 @@ export default function ProductListClient({
 
   async function copyCheckout(product: AdminStoreProductView) {
     const path = `/store/${orgSlug}/${storeSlug}/product/${product.publicSlug}`
-    await navigator.clipboard.writeText(`${window.location.origin}${path}`)
+    // Use custom domain when verified, otherwise fall back to window.location.origin
+    const baseUrl = primaryLmsHostname
+      ? `https://${primaryLmsHostname}`
+      : window.location.origin
+    await navigator.clipboard.writeText(`${baseUrl}${path}`)
     setCopiedId(product.id)
     window.setTimeout(() => {
       setCopiedId((current) => current === product.id ? '' : current)

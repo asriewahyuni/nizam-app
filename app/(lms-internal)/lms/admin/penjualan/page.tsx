@@ -153,6 +153,7 @@ export default async function LmsProductSalesPage({
           orgSlug={data.org.slug}
           storeSlug={data.stores[0]?.slug || ''}
           returnTo={returnTo}
+          primaryLmsHostname={data.primaryLmsHostname}
         />
       )}
 
