@@ -17,6 +17,9 @@ export type LmsSaleItem = {
   subtotalAmount: number
   discountAmount: number
   paymentStatus: 'PAID' | 'PENDING' | 'EXPIRED' | 'CANCELLED'
+  /** Status mentah ecommerce_orders (native only) — dipakai untuk gating aksi ubah status. */
+  rawStatus: string
+  hasPhysicalItems: boolean
   paymentGateway: string | null
   items: Array<{
     id: string
@@ -109,6 +112,18 @@ export async function getLmsAdminSalesList(
           WHEN orders.status = 'PAYMENT_EXCEPTION' THEN 'EXPIRED'
           ELSE 'PENDING'
         END AS payment_status,
+        orders.status::text AS raw_status,
+        EXISTS (
+          SELECT 1
+          FROM public.ecommerce_order_items item
+          JOIN public.store_products store_product
+            ON store_product.org_id = item.org_id
+           AND store_product.store_id = item.store_id
+           AND store_product.product_id = item.product_id
+          WHERE item.org_id = orders.org_id
+            AND item.order_id = orders.id
+            AND store_product.product_type = 'PHYSICAL'
+        ) AS has_physical_items,
         payment.payment_gateway AS payment_gateway,
         affiliate_profile.referral_code AS referral_code,
         auth_user.display_name AS affiliate_name,
@@ -147,6 +162,8 @@ export async function getLmsAdminSalesList(
           WHEN arc.status = 'cancelled' THEN 'CANCELLED'
           ELSE 'PENDING'
         END AS payment_status,
+        'LEGACY'::text AS raw_status,
+        FALSE AS has_physical_items,
         NULL::text AS payment_gateway,
         NULL::text AS referral_code,
         NULL::text AS affiliate_name,
@@ -209,6 +226,8 @@ export async function getLmsAdminSalesList(
     subtotal_amount: number
     discount_amount: number
     payment_status: 'PAID' | 'PENDING' | 'EXPIRED' | 'CANCELLED'
+    raw_status: string
+    has_physical_items: boolean
     payment_gateway: string | null
     referral_code: string | null
     affiliate_name: string | null
@@ -316,6 +335,8 @@ export async function getLmsAdminSalesList(
       subtotalAmount: Number(row.subtotal_amount || 0),
       discountAmount: Number(row.discount_amount || 0),
       paymentStatus: row.payment_status,
+      rawStatus: row.raw_status,
+      hasPhysicalItems: row.has_physical_items,
       paymentGateway: row.payment_gateway,
       items: itemsByOrderId[row.id] || [],
       affiliate,

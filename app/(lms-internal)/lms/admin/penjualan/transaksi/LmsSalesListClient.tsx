@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   CheckCircle2,
   Clock,
@@ -8,23 +9,44 @@ import {
   Eye,
   Filter,
   HandCoins,
-  Mail,
-  RefreshCw,
   Search,
   ShoppingCart,
-  UserCheck,
   XCircle,
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
-import {
-  cancelOrderManualAction,
-  markOrderPaidManualAction,
-  resendOrderAccessEmailAction,
-} from '@/modules/edu/actions/lms-sales-admin.actions'
+import { updateOrderStatusAction } from '@/modules/edu/actions/lms-sales-admin.actions'
 import type {
   LmsSaleItem,
   LmsSalesSummaryMetrics,
 } from '@/modules/edu/lib/lms-sales.server'
+
+type StatusActionValue =
+  | 'on-hold'
+  | 'payment-confirm'
+  | 'in-progress'
+  | 'shipping'
+  | 'completed'
+  | 'refunded'
+  | 'cancelled'
+  | 'resend'
+
+const STATUS_ACTIONS: Array<{ value: StatusActionValue; label: string; physicalOnly?: boolean; allowedFrom: string[] }> = [
+  { value: 'on-hold', label: 'Menunggu pembayaran', allowedFrom: ['PAYMENT_UNDER_REVIEW', 'PAYMENT_REJECTED', 'PAYMENT_EXCEPTION'] },
+  { value: 'payment-confirm', label: 'Pembayaran dikonfirmasi', allowedFrom: ['AWAITING_PAYMENT', 'PAYMENT_UNDER_REVIEW', 'PAYMENT_REJECTED', 'PAYMENT_EXCEPTION'] },
+  { value: 'in-progress', label: 'Pesanan diproses', physicalOnly: true, allowedFrom: ['READY_TO_FULFILL'] },
+  { value: 'shipping', label: 'Proses pengiriman', physicalOnly: true, allowedFrom: ['READY_TO_FULFILL', 'FULFILLING'] },
+  { value: 'completed', label: 'Selesai', allowedFrom: ['PAID', 'READY_TO_FULFILL', 'FULFILLING', 'SHIPPED'] },
+  { value: 'refunded', label: 'Refund', allowedFrom: ['PAID', 'READY_TO_FULFILL', 'FULFILLING', 'SHIPPED', 'COMPLETED'] },
+  { value: 'cancelled', label: 'Batal', allowedFrom: ['DRAFT', 'AWAITING_PAYMENT', 'PAYMENT_UNDER_REVIEW', 'PAYMENT_REJECTED', 'PAYMENT_EXCEPTION'] },
+  { value: 'resend', label: 'Kirim ulang notifikasi', allowedFrom: ['PAID', 'READY_TO_FULFILL', 'FULFILLING', 'SHIPPED', 'COMPLETED'] },
+]
+
+function getAvailableActions(sale: LmsSaleItem) {
+  return STATUS_ACTIONS.filter((action) => {
+    if (action.physicalOnly && !sale.hasPhysicalItems) return false
+    return action.allowedFrom.includes(sale.rawStatus)
+  })
+}
 
 export function LmsSalesListClient({
   metrics,
@@ -33,7 +55,8 @@ export function LmsSalesListClient({
   metrics: LmsSalesSummaryMetrics
   initialSales: LmsSaleItem[]
 }) {
-  const [sales, setSales] = useState<LmsSaleItem[]>(initialSales)
+  const router = useRouter()
+  const sales = initialSales
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [selectedSale, setSelectedSale] = useState<LmsSaleItem | null>(null)
@@ -49,43 +72,40 @@ export function LmsSalesListClient({
     return matchStatus && matchQuery
   })
 
-  const handleResendEmail = (orderId: string) => {
-    setFeedback(null)
-    startTransition(async () => {
-      const res = await resendOrderAccessEmailAction(orderId)
-      if (res.error) {
-        setFeedback({ type: 'error', text: res.error })
-      } else {
-        setFeedback({ type: 'success', text: 'Email bukti bayar dan akses kelas berhasil dikirim ulang!' })
-      }
-    })
+  const CONFIRM_MESSAGES: Partial<Record<StatusActionValue, string>> = {
+    'payment-confirm': 'Tandai order ini LUNAS secara manual? Akses kelas akan otomatis terbuka untuk pembeli.',
+    'in-progress': 'Ubah status order ini menjadi diproses?',
+    shipping: 'Ubah status order ini menjadi dikirim?',
+    completed: 'Tandai order ini SELESAI?',
+    cancelled: 'Batalkan order ini? Customer akan diberi tahu lewat WhatsApp/Email.',
+    'on-hold': 'Kembalikan order ini ke status menunggu pembayaran?',
   }
 
-  const handleManualSettle = (orderId: string) => {
-    if (!confirm('Apakah Anda yakin ingin menandai transaksi ini LUNAS secara manual? Akses kelas akan otomatis terbuka untuk pembeli.')) return
-    setFeedback(null)
-    startTransition(async () => {
-      const res = await markOrderPaidManualAction(orderId)
-      if (res.error) {
-        setFeedback({ type: 'error', text: res.error })
-      } else {
-        setFeedback({ type: 'success', text: 'Status transaksi berhasil diubah menjadi LUNAS.' })
-        setSales((prev) => prev.map((s) => s.id === orderId ? { ...s, paymentStatus: 'PAID' } : s))
-      }
-    })
-  }
+  const handleStatusAction = (orderId: string, action: StatusActionValue) => {
+    let reason: string | undefined
 
-  const handleCancelOrder = (orderId: string) => {
-    const reason = prompt('Alasan pembatalan (opsional):') || undefined
-    if (!confirm('Batalkan order ini? Customer akan diberi tahu lewat WhatsApp/Email.')) return
+    if (action === 'refunded') {
+      reason = prompt('Alasan refund (wajib diisi):') || ''
+      if (!reason.trim()) {
+        setFeedback({ type: 'error', text: 'Alasan refund wajib diisi.' })
+        return
+      }
+      if (!confirm('Proses refund order ini? Jurnal, kas, dan akses akan dibalik otomatis.')) return
+    } else if (action === 'cancelled') {
+      reason = prompt('Alasan pembatalan (opsional):') || undefined
+      if (!confirm(CONFIRM_MESSAGES.cancelled!)) return
+    } else if (CONFIRM_MESSAGES[action]) {
+      if (!confirm(CONFIRM_MESSAGES[action]!)) return
+    }
+
     setFeedback(null)
     startTransition(async () => {
-      const res = await cancelOrderManualAction(orderId, reason)
+      const res = await updateOrderStatusAction(orderId, action, reason)
       if (res.error) {
         setFeedback({ type: 'error', text: res.error })
       } else {
-        setFeedback({ type: 'success', text: 'Order berhasil dibatalkan.' })
-        setSales((prev) => prev.map((s) => s.id === orderId ? { ...s, paymentStatus: 'CANCELLED' } : s))
+        setFeedback({ type: 'success', text: 'Status order berhasil diperbarui.' })
+        router.refresh()
       }
     })
   }
@@ -278,51 +298,35 @@ export function LmsSalesListClient({
                       )}
                     </td>
 
-                    <td className="py-4 px-5 text-right space-x-1 whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSale(sale)}
-                        className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-                        title="Lihat Detail"
-                      >
-                        <Eye size={15} />
-                      </button>
-
-                      {sale.source === 'native' && isPaid && (
+                    <td className="py-4 px-5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
-                          onClick={() => handleResendEmail(sale.id)}
-                          disabled={isPending}
-                          className="p-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
-                          title="Kirim Ulang Email Akses"
+                          onClick={() => setSelectedSale(sale)}
+                          className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                          title="Lihat Detail"
                         >
-                          <Mail size={15} />
+                          <Eye size={15} />
                         </button>
-                      )}
 
-                      {sale.source === 'native' && isPendingState && (
-                        <button
-                          type="button"
-                          onClick={() => handleManualSettle(sale.id)}
-                          disabled={isPending}
-                          className="p-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
-                          title="Tandai Lunas Manual"
-                        >
-                          <UserCheck size={15} />
-                        </button>
-                      )}
-
-                      {sale.source === 'native' && isPendingState && (
-                        <button
-                          type="button"
-                          onClick={() => handleCancelOrder(sale.id)}
-                          disabled={isPending}
-                          className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition cursor-pointer"
-                          title="Batalkan Order"
-                        >
-                          <XCircle size={15} />
-                        </button>
-                      )}
+                        {sale.source === 'native' && (
+                          <select
+                            value=""
+                            disabled={isPending}
+                            onChange={(e) => {
+                              const action = e.target.value as StatusActionValue
+                              e.target.value = ''
+                              if (action) handleStatusAction(sale.id, action)
+                            }}
+                            className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <option value="">Pilihan aksi</option>
+                            {getAvailableActions(sale).map((action) => (
+                              <option key={action.value} value={action.value}>{action.label}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
