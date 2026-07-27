@@ -1,21 +1,10 @@
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
-import { resolveLmsTenantDomain } from '@/modules/ecommerce/domains/lms-domain.server'
+import { resolveAuthTenantBranding } from '../tenant-branding.server'
 import LoginFormClient from './LoginFormClient'
 
 export default async function LoginPage() {
-  const requestHeaders = await headers()
-  const hostname = String(
-    requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '',
-  ).split(',')[0].trim()
-
-  let tenant = null
-  try {
-    tenant = await resolveLmsTenantDomain(hostname)
-  } catch {
-    // Migrasi domain bisa belum terpasang pada environment pengembangan.
-  }
+  const tenant = await resolveAuthTenantBranding()
 
   if (tenant && await getInternalAuthSession()) {
     redirect('/dashboard')
@@ -26,8 +15,8 @@ export default async function LoginPage() {
       orgContext={null}
       tenantContext={tenant ? {
         id: tenant.orgId,
-        name: tenant.orgName,
-        logo_url: null,
+        name: tenant.name,
+        logo_url: tenant.logoUrl,
         slug: tenant.orgSlug,
       } : null}
     />
