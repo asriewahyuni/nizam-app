@@ -4,7 +4,6 @@ import {
   getLmsAdminSalesList,
   getLmsSalesSummaryMetrics,
 } from '@/modules/edu/lib/lms-sales.server'
-import SalesSectionNav from '../SalesSectionNav'
 import { LmsSalesListClient } from './LmsSalesListClient'
 
 export const metadata = {
@@ -32,12 +31,7 @@ export default async function LmsAdminSalesPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-        <SalesSectionNav />
-        <div className="min-w-0">
-          <LmsSalesListClient metrics={metrics} initialSales={sales} />
-        </div>
-      </div>
+      <LmsSalesListClient metrics={metrics} initialSales={sales} />
     </div>
   )
 }
