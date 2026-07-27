@@ -21,6 +21,7 @@ export interface MemberSummary {
   userId: string
   name: string
   email: string
+  phone: string | null
   role: string
   isActive: boolean
   joinedAt: string
@@ -191,6 +192,7 @@ export async function getLmsAdminMembers(
       m.is_active,
       m.joined_at::text AS joined_at,
       COALESCE(iu.login_email, au.email, 'unknown@example.com') AS email,
+      iu.phone AS phone,
       COALESCE(
         au.raw_user_meta_data->>'full_name',
         au.raw_user_meta_data->>'name',
@@ -213,6 +215,7 @@ export async function getLmsAdminMembers(
     LEFT JOIN auth.users au
       ON au.id = m.user_id
     WHERE m.org_id = $1::uuid
+      AND COALESCE(iu.login_email, au.email, '') NOT LIKE 'legacy-deleted+%@invalid.coreisec.id'
   `
 
   const { rows: memberRows } = await queryPostgres<{
@@ -221,6 +224,7 @@ export async function getLmsAdminMembers(
     is_active: boolean
     joined_at: string
     email: string
+    phone: string | null
     name: string
     enrolled_count: number
     completed_count: number
@@ -271,10 +275,12 @@ export async function getLmsAdminMembers(
     const completed = Number(row.completed_count || 0)
     const enrolled = Number(row.enrolled_count || 0)
 
-    // Legacy-imported enrollments (e.g. Sejoli/WordPress migration) never carry a
-    // completed_at/status signal, so completed_count is always 0 for those members.
-    // Fall back to enrolled_count so active legacy members still rank above idle ones.
-    const engagementScore = completed > 0 ? completed : enrolled
+    // Most legacy-imported enrollments (Sejoli/WordPress) never carry a completed_at
+    // signal, so enrolled_count is the baseline engagement score. Real completions
+    // (now backfilled from Sejoli's native lesson-completion data) add extra weight
+    // on top instead of replacing the baseline, so finishing a course never makes a
+    // member's level drop below what plain enrollment already earned them.
+    const engagementScore = enrolled + completed * 2
 
     // Calculate level index
     let levelIndex = 0
@@ -334,6 +340,7 @@ export async function getLmsAdminMembers(
       userId: row.user_id,
       name: row.name || 'Member',
       email: row.email || '-',
+      phone: row.phone || null,
       role: row.role || 'staff',
       isActive: row.is_active !== false,
       joinedAt: row.joined_at,
@@ -351,7 +358,8 @@ export async function getLmsAdminMembers(
     members = members.filter(
       (m) =>
         m.name.toLowerCase().includes(q) ||
-        m.email.toLowerCase().includes(q)
+        m.email.toLowerCase().includes(q) ||
+        (m.phone || '').toLowerCase().includes(q)
     )
   }
 

@@ -14,6 +14,7 @@ import {
   Shield,
   Loader2,
   Calendar,
+  Phone,
 } from 'lucide-react'
 import {
   MemberSummary,
@@ -113,6 +114,12 @@ export function MemberTimelineModal({ isOpen, onClose, member }: MemberTimelineM
                     <Mail className="h-3.5 w-3.5 text-slate-400" />
                     {member.email}
                   </span>
+                  {member.phone && (
+                    <span className="inline-flex items-center gap-1">
+                      <Phone className="h-3.5 w-3.5 text-slate-400" />
+                      {member.phone}
+                    </span>
+                  )}
                   <span className="inline-flex items-center gap-1 uppercase">
                     <Shield className="h-3.5 w-3.5 text-slate-400" />
                     {member.role}

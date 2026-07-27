@@ -5,6 +5,7 @@
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import type { CoreisecEntityType, MigrationEnvelope } from './migration-types'
+import { isRecord } from './migration-types'
 import {
   sanitizeLearningHtml,
   sanitizeQuizOptionHtml,
@@ -193,6 +194,7 @@ async function importUser(context: ImportContext, envelope: MigrationEnvelope): 
   const sourceDeleted = booleanValue(payload.sourceDeleted)
   const loginDisabled = booleanValue(payload.loginDisabled)
   const shouldBeActive = !sourceDeleted && !loginDisabled
+  const phone = isRecord(payload.profile) ? stringValue(payload.profile.phone, 'profile.phone') : null
 
   const existing = await context.client.query<{
     id: string
@@ -228,11 +230,11 @@ async function importUser(context: ImportContext, envelope: MigrationEnvelope): 
     await context.client.query(
       `INSERT INTO public.internal_auth_users (
          id, legacy_user_id, login_email, password_hash, display_name, user_type,
-         is_active, created_at, updated_at
+         is_active, phone, created_at, updated_at
        )
        VALUES (
          $1::uuid, $2::uuid, $3, '[WORDPRESS_PENDING_UPGRADE]', $4, $5,
-         $6, COALESCE($7::timestamptz, NOW()), NOW()
+         $6, $7, COALESCE($8::timestamptz, NOW()), NOW()
        )`,
       [
         internalUserId,
@@ -241,6 +243,7 @@ async function importUser(context: ImportContext, envelope: MigrationEnvelope): 
         displayName,
         isAdmin ? 'admin' : 'member',
         shouldBeActive,
+        phone,
         dateValue(payload.registeredAt),
       ],
     )
@@ -254,9 +257,10 @@ async function importUser(context: ImportContext, envelope: MigrationEnvelope): 
            ELSE $3
          END,
          is_active = $4,
+         phone = COALESCE(NULLIF(phone, ''), $5),
          updated_at = NOW()
        WHERE id = $1::uuid`,
-      [internalUserId, displayName, isAdmin ? 'admin' : 'member', shouldBeActive],
+      [internalUserId, displayName, isAdmin ? 'admin' : 'member', shouldBeActive, phone],
     )
   }
 
@@ -887,6 +891,18 @@ async function importProgress(context: ImportContext, envelope: MigrationEnvelop
       JSON.stringify(payload),
     ],
   )
+  if (status === 'COMPLETED') {
+    // Sejoli/LearnPress never rolled lesson-level completion up to the enrollment
+    // itself, so learning_enrollments.completed_at would stay NULL forever even
+    // when there's real evidence the member finished at least one lesson.
+    await context.client.query(
+      `UPDATE public.learning_enrollments
+       SET completed_at = COALESCE(completed_at, COALESCE($3::timestamptz, NOW()))
+       WHERE id = $1::uuid AND org_id = $2::uuid`,
+      [enrollmentId, context.orgId, dateValue(payload.completedAt)],
+    )
+  }
+
   return { targetTable: 'learning_lesson_progress', targetId: result.rows[0].id }
 }
 

@@ -169,7 +169,7 @@ foreach (get_users(array('fields' => 'all')) as $user) {
         'profile' => array(
             'firstName' => (string) get_user_meta($user->ID, 'first_name', true),
             'lastName' => (string) get_user_meta($user->ID, 'last_name', true),
-            'phone' => (string) get_user_meta($user->ID, 'phone', true),
+            'phone' => (string) get_user_meta($user->ID, '_phone', true),
             'sourceEmail' => $source_email,
         ),
         'loginDisabled' => $login_disabled,

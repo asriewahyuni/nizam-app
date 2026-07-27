@@ -214,7 +214,14 @@ export function LmsSalesListClient({
                 return (
                   <tr key={sale.id} className="hover:bg-slate-50/80 transition">
                     <td className="py-4 px-5">
-                      <div className="font-bold text-indigo-600">{sale.orderNumber}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-indigo-600">{sale.orderNumber}</span>
+                        {sale.source === 'legacy' && (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                            Legacy
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-slate-400">
                         {new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(sale.createdAt))}
                       </div>
@@ -265,7 +272,7 @@ export function LmsSalesListClient({
                         <Eye size={15} />
                       </button>
 
-                      {isPaid && (
+                      {sale.source === 'native' && isPaid && (
                         <button
                           type="button"
                           onClick={() => handleResendEmail(sale.id)}
@@ -277,7 +284,7 @@ export function LmsSalesListClient({
                         </button>
                       )}
 
-                      {isPendingState && (
+                      {sale.source === 'native' && isPendingState && (
                         <button
                           type="button"
                           onClick={() => handleManualSettle(sale.id)}

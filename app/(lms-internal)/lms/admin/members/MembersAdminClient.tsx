@@ -19,6 +19,7 @@ import {
   Loader2,
   Shield,
   History,
+  Phone,
 } from 'lucide-react'
 import {
   MemberSummary,
@@ -135,7 +136,7 @@ export function MembersAdminClient({
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search members by name or email..."
+              placeholder="Search members by name, email, or phone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-2 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
@@ -229,6 +230,12 @@ export function MembersAdminClient({
                           {member.name}
                         </div>
                         <div className="text-[11px] text-slate-400">{member.email}</div>
+                        {member.phone && (
+                          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400">
+                            <Phone className="h-3 w-3" />
+                            {member.phone}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
