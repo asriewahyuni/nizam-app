@@ -45,7 +45,7 @@ export function MembersAdminClient({
   const currentSearch = searchParams.get('search') || ''
   const currentLevelFilter = searchParams.get('levelFilter') || 'ALL'
   const currentCourseFilter = searchParams.get('courseFilter') || 'ALL'
-  const currentSortBy = searchParams.get('sortBy') || 'joined_desc'
+  const currentSortBy = searchParams.get('sortBy') || 'level_desc'
 
   const [search, setSearch] = useState(currentSearch)
   const [selectedMember, setSelectedMember] = useState<MemberSummary | null>(null)
@@ -178,12 +178,12 @@ export function MembersAdminClient({
               onChange={(e) => handleFilterChange('sortBy', e.target.value)}
               className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
             >
+              <option value="level_desc">Highest Gamification Level</option>
               <option value="joined_desc">Newest Members First</option>
               <option value="joined_asc">Oldest Members First</option>
               <option value="name_asc">Name (A – Z)</option>
               <option value="name_desc">Name (Z – A)</option>
               <option value="courses_desc">Most Courses Enrolled</option>
-              <option value="level_desc">Highest Gamification Level</option>
             </select>
           </div>
 

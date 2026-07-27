@@ -177,7 +177,7 @@ export async function getLmsAdminMembers(
   search = '',
   levelFilter = 'ALL',
   courseFilter = 'ALL',
-  sortBy = 'joined_desc'
+  sortBy = 'level_desc'
 ): Promise<{ members: MemberSummary[]; settings: LmsGamificationSettings; totalCount: number }> {
   const orgData = await assertOrgAdmin()
   const orgId = orgData.org.id
@@ -376,11 +376,12 @@ export async function getLmsAdminMembers(
         return b.name.localeCompare(a.name)
       case 'courses_desc':
         return b.enrolledCount - a.enrolledCount
-      case 'level_desc':
-        return b.levelIndex - a.levelIndex
       case 'joined_desc':
-      default:
         return new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime()
+      case 'level_desc':
+      default:
+        // Primary: highest level first; tiebreaker: newest member first
+        return b.levelIndex - a.levelIndex || new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime()
     }
   })
 

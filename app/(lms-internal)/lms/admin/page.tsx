@@ -17,13 +17,25 @@ export default async function CatalogAdminPage() {
   
   // Get lesson counts
   const { rows: lessonCounts } = await queryPostgres(`
-    SELECT course_id, COUNT(*) as count 
-    FROM learning_lessons 
-    WHERE org_id = $1 
+    SELECT course_id, COUNT(*) as count
+    FROM learning_lessons
+    WHERE org_id = $1
     GROUP BY course_id
   `, [orgData.org.id])
-  
+
   const lessonMap = new Map<string, number>(lessonCounts.map((r: any) => [r.course_id, Number(r.count)]))
+
+  // Participant counts: learning_enrollments is the actual source of truth for who's
+  // enrolled (covers both direct/imported enrollments and batch-based ones), unlike
+  // lms_registrations which only tracks the commercial batch/angkatan flow.
+  const { rows: enrollmentCounts } = await queryPostgres(`
+    SELECT course_id, COUNT(*) as count
+    FROM learning_enrollments
+    WHERE org_id = $1
+    GROUP BY course_id
+  `, [orgData.org.id])
+
+  const enrollmentMap = new Map<string, number>(enrollmentCounts.map((r: any) => [r.course_id, Number(r.count)]))
 
   const activeCoursesCount = courses.filter((c: any) => c.is_active).length
 
@@ -66,7 +78,7 @@ export default async function CatalogAdminPage() {
           <tbody className="divide-y divide-slate-200">
             {courses.map((c: any) => {
               const courseBatches = allBatches.filter((b: any) => b.course_id === c.id)
-              const enrolled = courseBatches.reduce((a: number, b: any) => a + (Number(b.enrolled_count) || 0), 0)
+              const enrolled = enrollmentMap.get(c.id) || 0
               const relatedProducts = courseBatches.map((b: any) => b.name).join(', ') || '-'
               const lessonCount = lessonMap.get(c.id) || 0
               

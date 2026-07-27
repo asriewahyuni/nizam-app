@@ -28,7 +28,7 @@ export default async function MembersAdminPage({ searchParams }: MembersAdminPag
   const search = params.search || ''
   const levelFilter = params.levelFilter || 'ALL'
   const courseFilter = params.courseFilter || 'ALL'
-  const sortBy = params.sortBy || 'joined_desc'
+  const sortBy = params.sortBy || 'level_desc'
 
   const { members, settings, totalCount } = await getLmsAdminMembers(
     search,
