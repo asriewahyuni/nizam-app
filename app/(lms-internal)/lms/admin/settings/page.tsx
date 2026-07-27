@@ -1,5 +1,8 @@
 import Link from 'next/link'
 import { Mail, ArrowRight } from 'lucide-react'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { redirect } from 'next/navigation'
+import LmsSettingsForm from './LmsSettingsForm'
 
 export const metadata = {
   title: 'Pengaturan LMS — Nizam LMS Admin',
