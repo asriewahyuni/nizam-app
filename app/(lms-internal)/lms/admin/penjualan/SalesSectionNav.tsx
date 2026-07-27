@@ -10,12 +10,20 @@ import {
   BriefcaseBusiness,
   ChartNoAxesCombined,
   Layers3,
+  ReceiptText,
   Store,
   TicketPercent,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ITEMS = [
+  {
+    href: '/lms/admin/penjualan/transaksi',
+    label: 'Riwayat Transaksi',
+    description: 'Daftar penjualan LMS',
+    icon: ReceiptText,
+    matches: (pathname: string) => pathname.startsWith('/lms/admin/penjualan/transaksi'),
+  },
   {
     href: '/lms/admin/penjualan',
     label: 'Produk',
