@@ -289,6 +289,80 @@ async function reopenOrderForPaymentAction(orderId: string) {
   }
 }
 
+/**
+ * Kirim notifikasi untuk event yang TIDAK punya template default org
+ * (in_progress/shipping/completed) — hanya terkirim kalau produk terkait
+ * punya override konten sendiri. Gagal diam-diam supaya transisi status
+ * order tidak ikut gagal hanya karena belum ada teks notifikasi disiapkan.
+ */
+async function sendOverrideOnlyStatusNotification(
+  orgId: string,
+  orderId: string,
+  overrideEventKey: 'in_progress' | 'shipping' | 'completed',
+) {
+  try {
+    const result = await queryPostgres<{
+      order_number: string
+      customer_name: string
+      customer_email: string | null
+      customer_phone: string
+      grand_total: number
+      user_id: string | null
+      store_product_id: string | null
+    }>(
+      `SELECT
+         orders.order_number, orders.customer_name, orders.customer_email,
+         orders.customer_phone, orders.grand_total::float8, orders.user_id::text,
+         (
+           SELECT store_product.id::text
+           FROM public.ecommerce_order_items item
+           JOIN public.store_products store_product
+             ON store_product.org_id = item.org_id
+            AND store_product.store_id = item.store_id
+            AND store_product.product_id = item.product_id
+           WHERE item.org_id = orders.org_id AND item.order_id = orders.id
+           ORDER BY item.created_at
+           LIMIT 1
+         ) AS store_product_id
+       FROM public.ecommerce_orders orders
+       WHERE orders.id = $1::uuid AND orders.org_id = $2::uuid
+       LIMIT 1`,
+      [orderId, orgId],
+    )
+    const order = result.rows[0]
+    if (!order || !order.store_product_id) return
+
+    const variables: Record<string, string | number | null> = {
+      name: order.customer_name || 'Member',
+      order_number: order.order_number,
+      amount: formatRupiah(order.grand_total),
+    }
+    const recipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
+    if (order.customer_email) recipients.push({ channel: 'EMAIL', value: order.customer_email })
+    if (order.customer_phone) recipients.push({ channel: 'WHATSAPP', value: order.customer_phone })
+    for (const recipient of recipients) {
+      try {
+        await enqueueNotification({
+          orgId,
+          userId: order.user_id,
+          eventType: `ORDER_${overrideEventKey.toUpperCase()}`,
+          channel: recipient.channel,
+          recipient: recipient.value,
+          variables,
+          idempotencyKey: `order-${overrideEventKey}:${orderId}:${recipient.channel}`,
+          payload: { orderId, orderNumber: order.order_number },
+          storeProductId: order.store_product_id,
+          overrideEventKey,
+        })
+      } catch {
+        // Tidak ada override konten untuk event ini di produk terkait — lewati diam-diam.
+      }
+    }
+  } catch {
+    // Notifikasi opsional; jangan sampai menggagalkan transisi status order.
+  }
+}
+
 const FULFILLMENT_STAGE_REQUIRES: Record<'FULFILLING' | 'SHIPPED', string[]> = {
   FULFILLING: ['READY_TO_FULFILL'],
   SHIPPED: ['READY_TO_FULFILL', 'FULFILLING'],
@@ -326,6 +400,11 @@ async function setOrderFulfillmentStageAction(orderId: string, targetStatus: 'FU
       `INSERT INTO public.ecommerce_order_events (org_id, order_id, actor_label, event_type, message)
        VALUES ($1::uuid, $2::uuid, 'ADMIN', 'ORDER_STATUS_CHANGED', $3)`,
       [orgData.org.id, orderId, `Status order diubah ke ${targetStatus} oleh admin.`],
+    )
+    await sendOverrideOnlyStatusNotification(
+      orgData.org.id,
+      orderId,
+      targetStatus === 'FULFILLING' ? 'in_progress' : 'shipping',
     )
     revalidatePath('/lms/admin/penjualan/transaksi')
     return { success: true }
@@ -374,6 +453,7 @@ async function completeOrderManualAction(orderId: string) {
         [orgData.org.id, orderId, orgData.user.id],
       )
     }
+    await sendOverrideOnlyStatusNotification(orgData.org.id, orderId, 'completed')
     revalidatePath('/lms/admin/penjualan/transaksi')
     return { success: true }
   } catch (error) {

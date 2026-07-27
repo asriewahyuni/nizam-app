@@ -5,6 +5,7 @@ import {
   resolvePublicStoreCanonicalTarget,
 } from '@/modules/ecommerce/lib/ecommerce.server'
 import { resolveCurrentLmsTenantDomain } from '@/modules/ecommerce/domains/lms-domain.server'
+import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import StorefrontClient from '../StorefrontClient'
 
 type CollectionPageProps = {
@@ -41,13 +42,26 @@ export default async function CollectionPage({ params, searchParams }: Collectio
   })
 
   if (!payload) notFound()
-  const tenant = await resolveCurrentLmsTenantDomain()
+  const [tenant, session] = await Promise.all([
+    resolveCurrentLmsTenantDomain(),
+    getInternalAuthSession(),
+  ])
+
+  const viewerUser = session?.user
+    ? {
+        name: String(session.user.user_metadata?.full_name || '') || null,
+        email: session.user.email || null,
+        phone: String(session.user.user_metadata?.login_nik || '') || null,
+      }
+    : null
 
   return (
     <StorefrontClient
       payload={payload}
       pageMode="collection"
       routeMode={tenant?.orgSlug === orgSlug ? 'custom-domain' : 'standard'}
+      viewerAuthenticated={Boolean(session)}
+      viewerUser={viewerUser}
     />
   )
 }

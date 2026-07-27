@@ -323,6 +323,43 @@ export type StoreAdminSummary = {
   allowGuestCheckout: boolean
 }
 
+export type ProductNotificationOverrides = {
+  enabled: boolean
+  onHold: string
+  paymentConfirm: string
+  inProgress: string
+  shipping: string
+  completed: string
+  cancelled: string
+  refunded: string
+}
+
+export const DEFAULT_PRODUCT_NOTIFICATION_OVERRIDES: ProductNotificationOverrides = {
+  enabled: false,
+  onHold: '',
+  paymentConfirm: '',
+  inProgress: '',
+  shipping: '',
+  completed: '',
+  cancelled: '',
+  refunded: '',
+}
+
+export function normalizeProductNotificationOverrides(value: unknown): ProductNotificationOverrides {
+  const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const text = (key: string, maxLength = 2000) => String(raw[key] || '').trim().slice(0, maxLength)
+  return {
+    enabled: raw.enabled === true,
+    onHold: text('onHold'),
+    paymentConfirm: text('paymentConfirm'),
+    inProgress: text('inProgress'),
+    shipping: text('shipping'),
+    completed: text('completed'),
+    cancelled: text('cancelled'),
+    refunded: text('refunded'),
+  }
+}
+
 export type AdminCatalogProductView = {
   id: string
   name: string
@@ -352,6 +389,7 @@ export type AdminStoreProductView = {
   imageUrl: string
   pageConfig: StorefrontProductPageConfig
   offeringType: 'STANDARD' | 'CONSULTING_1_ON_1'
+  notificationOverrides: ProductNotificationOverrides
   subscriptionPlan?: {
     id: string
     name: string

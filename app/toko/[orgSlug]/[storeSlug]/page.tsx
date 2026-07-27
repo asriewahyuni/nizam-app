@@ -48,12 +48,21 @@ export default async function StorefrontPage({ params, searchParams }: Storefron
     getInternalAuthSession(),
   ])
 
+  const viewerUser = session?.user
+    ? {
+        name: String(session.user.user_metadata?.full_name || '') || null,
+        email: session.user.email || null,
+        phone: String(session.user.user_metadata?.login_nik || '') || null,
+      }
+    : null
+
   return (
     <StorefrontClient
       payload={payload}
       pageMode="home"
       routeMode={tenant?.orgSlug === orgSlug ? 'custom-domain' : 'standard'}
       viewerAuthenticated={Boolean(session)}
+      viewerUser={viewerUser}
     />
   )
 }

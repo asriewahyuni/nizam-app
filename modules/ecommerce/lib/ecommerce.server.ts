@@ -42,6 +42,7 @@ import {
   normalizeShippingMatcher,
   normalizeShippingRuleList,
   normalizeStoreCheckoutBranding,
+  normalizeProductNotificationOverrides,
   normalizeStorefrontProductPageConfig,
   normalizeStorefrontThemeVersion,
   normalizeStoreSlug,
@@ -86,6 +87,7 @@ type PublicStoreContext = {
   branchId: string
   warehouseId: string
   bankAccountId: string
+  lmsBranding?: Record<string, unknown> | null
 }
 
 const ECOMMERCE_THEME_ASSET_PREFIX = 'ecommerce/theme-assets/'
@@ -611,6 +613,7 @@ async function getPublicStoreContext(orgSlug: string, storeSlug: string): Promis
     branch_id: string
     warehouse_id: string
     bank_account_id: string
+    lms_branding?: Record<string, unknown> | null
   }>(
     `
       SELECT
@@ -620,7 +623,8 @@ async function getPublicStoreContext(orgSlug: string, storeSlug: string): Promis
         s.slug AS store_slug,
         s.branch_id,
         s.warehouse_id,
-        s.bank_account_id
+        s.bank_account_id,
+        o.settings->'lms_branding' AS lms_branding
       FROM public.stores s
       JOIN public.organizations o ON o.id = s.org_id
       WHERE o.slug = $1
@@ -654,6 +658,7 @@ async function getPublicStoreContext(orgSlug: string, storeSlug: string): Promis
     branchId: row.branch_id,
     warehouseId: row.warehouse_id,
     bankAccountId: row.bank_account_id,
+    lmsBranding: (row.lms_branding || null) as Record<string, unknown> | null,
   }
 }
 
@@ -1309,6 +1314,39 @@ export async function getPublicStorefrontPayload(
     getStoreThemeVersion(admin, context.storeId, options?.previewToken || null),
   ])
 
+  const brandingRecord = (
+    context.lmsBranding && typeof context.lmsBranding === 'object'
+      ? context.lmsBranding
+      : context.orgSlug === 'coreisec'
+        ? {
+            name: 'CORe ISEC',
+            logo_url: 'https://coreisec.id/wp-content/uploads/2022/07/CI-Class-h.png',
+            primary_color: '#004da4',
+            accent_color: '#c69232',
+            accent_color_hover: '#b0802c',
+          }
+        : null
+  ) as Record<string, unknown> | null
+
+  if (brandingRecord) {
+    const primaryColor = String(brandingRecord.primary_color || '').trim()
+    const accentColor = String(brandingRecord.accent_color || '').trim()
+    const logoUrl = String(brandingRecord.logo_url || '').trim()
+    const brandName = String(brandingRecord.name || '').trim()
+
+    if (primaryColor) {
+      theme.tokens.accent = primaryColor
+      theme.tokens.accentStrong = accentColor || primaryColor
+      theme.tokens.accentSoft = `${primaryColor}14`
+    }
+    if (logoUrl) {
+      store.logoUrl = logoUrl
+    }
+    if (brandName) {
+      store.brandName = brandName
+    }
+  }
+
   return {
     store,
     theme,
@@ -1853,6 +1891,7 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
     offeringType: String(row.offering_type || 'STANDARD') === 'CONSULTING_1_ON_1'
       ? 'CONSULTING_1_ON_1'
       : 'STANDARD',
+    notificationOverrides: normalizeProductNotificationOverrides(row.notification_overrides),
     subscriptionPlan: subscriptionPlanByStoreProductId.get(String(row.id || '')),
   }))
 

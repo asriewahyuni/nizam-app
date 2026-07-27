@@ -43,6 +43,11 @@ type StorefrontClientProps = {
   embedded?: boolean
   routeMode?: 'standard' | 'custom-domain'
   viewerAuthenticated?: boolean
+  viewerUser?: {
+    name?: string | null
+    email?: string | null
+    phone?: string | null
+  } | null
 }
 
 type CartEntry = {
@@ -338,6 +343,7 @@ export default function StorefrontClient({
   embedded = false,
   routeMode = 'standard',
   viewerAuthenticated = false,
+  viewerUser = null,
 }: StorefrontClientProps) {
   const [cart, setCart] = useState<CartEntry[]>([])
   const [selectedVariantByProductId, setSelectedVariantByProductId] = useState<Record<string, string>>({})
@@ -443,6 +449,18 @@ export default function StorefrontClient({
     setSelectedVariantByProductId(initialSelection)
     setSelectedMediaByProductId(initialMedia)
   }, [payload.products])
+
+  useEffect(() => {
+    if (viewerUser) {
+      setCheckoutForm((current) => ({
+        ...current,
+        customerName: current.customerName || viewerUser.name || '',
+        customerEmail: current.customerEmail || viewerUser.email || '',
+        customerPhone: current.customerPhone || viewerUser.phone || '',
+        recipientName: current.recipientName || viewerUser.name || '',
+      }))
+    }
+  }, [viewerUser])
 
   const visibleProducts = payload.products.filter((product) => {
     const needle = search.trim().toLowerCase()
@@ -1745,6 +1763,67 @@ export default function StorefrontClient({
                   </div>
 
                   <div className="p-5 space-y-4 sm:p-6">
+                    {/* Member Session / Login Banner */}
+                    {viewerAuthenticated || viewerUser ? (
+                      <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 rounded-full bg-emerald-600 p-1 text-white">
+                            <CheckCircle2 size={16} />
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-emerald-950">
+                              Login sebagai Member: {viewerUser?.name || viewerUser?.email || 'Akun Anda'}
+                            </div>
+                            <p className="mt-0.5 text-xs font-medium text-emerald-800">
+                              Pesanan ini otomatis terhubung ke akun Anda. Akses produk digital dapat dibuka di Dashboard setelah pembayaran diverifikasi.
+                            </p>
+                          </div>
+                        </div>
+                        <Link
+                          href="/dashboard"
+                          className="shrink-0 rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
+                        >
+                          Dashboard
+                        </Link>
+                      </div>
+                    ) : (
+                      <div
+                        className="flex items-start justify-between gap-3 rounded-xl border p-4"
+                        style={{
+                          borderColor: `${payload.theme.tokens.accent}33`,
+                          backgroundColor: payload.theme.tokens.accentSoft || '#eef2ff',
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="mt-0.5 rounded-full p-1 text-white"
+                            style={{ backgroundColor: payload.theme.tokens.accent }}
+                          >
+                            <Sparkles size={16} />
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-slate-900">
+                              Sudah punya akun member?
+                            </div>
+                            <p className="mt-0.5 text-xs font-medium text-slate-600">
+                              Masuk ke akun Anda agar form terisi otomatis dan pesanan langsung terhubung ke Dashboard. Anda juga tetap bisa memesan tanpa login.
+                            </p>
+                          </div>
+                        </div>
+                        <Link
+                          href={`/login?redirectTo=${encodeURIComponent(
+                            typeof window !== 'undefined'
+                              ? window.location.pathname + window.location.search
+                              : '/dashboard'
+                          )}`}
+                          className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold text-white transition hover:opacity-90 shadow-sm"
+                          style={{ backgroundColor: payload.theme.tokens.accent }}
+                        >
+                          Masuk Akun
+                        </Link>
+                      </div>
+                    )}
+
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-slate-700">

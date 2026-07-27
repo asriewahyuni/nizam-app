@@ -82,6 +82,17 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
       },
     }
     
+    const notificationOverrides = (() => {
+      const raw = formData.get('notification_overrides')?.toString() || ''
+      if (!raw) return {}
+      try {
+        const parsed = JSON.parse(raw)
+        return parsed && typeof parsed === 'object' ? parsed : {}
+      } catch {
+        return {}
+      }
+    })()
+
     // Subscription setting
     const isSubscription = formData.get('is_subscription') === 'true'
     const billingInterval = (formData.get('billing_interval')?.toString() || 'YEAR').toUpperCase()
@@ -157,11 +168,11 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
            org_id, store_id, product_id, public_name, public_slug,
            price_override, compare_price, short_description, public_description,
            seo_title, seo_description, badge_text, is_featured, is_published,
-           analytics_config, product_type, quantity_enabled
+           analytics_config, product_type, quantity_enabled, notification_overrides
          )
          VALUES (
            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-           $15::jsonb, 'DIGITAL', false
+           $15::jsonb, 'DIGITAL', false, $16::jsonb
          )
          ON CONFLICT (store_id, product_id)
          DO UPDATE SET
@@ -179,7 +190,8 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
            analytics_config = COALESCE(store_products.analytics_config, '{}'::jsonb)
              || EXCLUDED.analytics_config,
            product_type = 'DIGITAL',
-           quantity_enabled = false
+           quantity_enabled = false,
+           notification_overrides = EXCLUDED.notification_overrides
          RETURNING id`,
         [
           orgId,
@@ -197,6 +209,7 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
           isFeatured,
           isPublished,
           JSON.stringify(productPageConfig),
+          JSON.stringify(notificationOverrides),
         ]
       )
       

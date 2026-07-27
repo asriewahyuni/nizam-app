@@ -9,6 +9,7 @@ import {
   resolveCurrentLmsTenantDomain,
   resolveLmsTenantDomain,
 } from '@/modules/ecommerce/domains/lms-domain.server'
+import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import StorefrontClient from '../../StorefrontClient'
 
 type ProductPageProps = {
@@ -76,7 +77,18 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
 
   const product = payload.products.find((item) => item.slug === productSlug)
   if (!product) notFound()
-  const currentTenant = await resolveCurrentLmsTenantDomain()
+  const [currentTenant, session] = await Promise.all([
+    resolveCurrentLmsTenantDomain(),
+    getInternalAuthSession(),
+  ])
+
+  const viewerUser = session?.user
+    ? {
+        name: String(session.user.user_metadata?.full_name || '') || null,
+        email: session.user.email || null,
+        phone: String(session.user.user_metadata?.login_nik || '') || null,
+      }
+    : null
 
   return (
     <StorefrontClient
@@ -84,6 +96,8 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
       pageMode="product"
       initialProductSlug={productSlug}
       routeMode={currentTenant?.orgSlug === orgSlug ? 'custom-domain' : 'standard'}
+      viewerAuthenticated={Boolean(session)}
+      viewerUser={viewerUser}
     />
   )
 }

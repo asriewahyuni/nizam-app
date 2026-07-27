@@ -491,6 +491,19 @@ export async function finalizeCommerceRefund(input: {
       order_number: refund.order_number,
       amount: formatRupiah(refund.amount),
     }
+    const refundPrimaryItem = await client.query<{ store_product_id: string | null }>(
+      `SELECT store_product.id::text AS store_product_id
+       FROM public.ecommerce_order_items item
+       JOIN public.store_products store_product
+         ON store_product.org_id = item.org_id
+        AND store_product.store_id = item.store_id
+        AND store_product.product_id = item.product_id
+       WHERE item.org_id = $1::uuid AND item.order_id = $2::uuid
+       ORDER BY item.created_at
+       LIMIT 1`,
+      [input.orgId, refund.order_id],
+    )
+    const refundStoreProductId = refundPrimaryItem.rows[0]?.store_product_id || null
     const refundRecipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
     if (refund.customer_email) refundRecipients.push({ channel: 'EMAIL', value: refund.customer_email })
     if (refund.customer_phone) refundRecipients.push({ channel: 'WHATSAPP', value: refund.customer_phone })
@@ -505,6 +518,8 @@ export async function finalizeCommerceRefund(input: {
         variables: refundVariables,
         idempotencyKey: `order-refunded:${refund.id}:${recipient.channel}`,
         payload: { refundId: refund.id, orderId: refund.order_id },
+        storeProductId: refundStoreProductId,
+        overrideEventKey: 'refunded',
       }, client)
     }
 

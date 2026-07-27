@@ -14,16 +14,19 @@ import {
   ImageIcon,
   Layers3,
   LoaderCircle,
+  MessageCircle,
   Save,
   ShoppingBag,
 } from 'lucide-react'
 import { cn, formatRupiah, generateSlug } from '@/lib/utils'
-import type {
-  AdminAccessPackageView,
-  AdminLearningCourseView,
-  AdminProductEntitlementView,
-  AdminStoreProductView,
-  StoreAdminSummary,
+import {
+  DEFAULT_PRODUCT_NOTIFICATION_OVERRIDES,
+  type AdminAccessPackageView,
+  type AdminLearningCourseView,
+  type AdminProductEntitlementView,
+  type AdminStoreProductView,
+  type ProductNotificationOverrides,
+  type StoreAdminSummary,
 } from '@/modules/ecommerce/lib/ecommerce'
 import { saveLmsSimpleProductAction } from '@/modules/edu/actions/lms-sales.actions'
 
@@ -69,6 +72,7 @@ type Draft = {
   showDescription: boolean
   showBuyerNote: boolean
   showTrustSignals: boolean
+  notificationOverrides: ProductNotificationOverrides
 }
 
 const STEPS = [
@@ -76,6 +80,21 @@ const STEPS = [
   { href: '#harga', label: 'Harga / Langganan', icon: BadgeDollarSign },
   { href: '#manfaat', label: 'Manfaat LMS', icon: BookOpen },
   { href: '#publikasi', label: 'Publikasi', icon: Eye },
+  { href: '#notifikasi', label: 'Notifikasi', icon: MessageCircle },
+]
+
+const NOTIFICATION_OVERRIDE_FIELDS: Array<{
+  key: keyof Omit<ProductNotificationOverrides, 'enabled'>
+  label: string
+  placeholder: string
+}> = [
+  { key: 'onHold', label: 'Menunggu Pembayaran', placeholder: 'Assalamu\'alaikum kak {{name}}, selesaikan pembayaran order {{order_number}}...' },
+  { key: 'paymentConfirm', label: 'Pembayaran Dikonfirmasi', placeholder: 'Alhamdulillah kak {{name}}, pembayaran order {{order_number}} sudah kami terima...' },
+  { key: 'inProgress', label: 'Pesanan Diproses', placeholder: 'Pesanan {{order_number}} kak {{name}} sedang kami siapkan...' },
+  { key: 'shipping', label: 'Proses Pengiriman', placeholder: 'Pesanan {{order_number}} kak {{name}} sudah dikirim...' },
+  { key: 'completed', label: 'Order Selesai', placeholder: 'Alhamdulillah, order {{order_number}} kak {{name}} sudah selesai...' },
+  { key: 'cancelled', label: 'Pembatalan Invoice', placeholder: 'Mohon maaf kak {{name}}, order {{order_number}} kami batalkan...' },
+  { key: 'refunded', label: 'Refund', placeholder: 'Order {{order_number}} kak {{name}} sudah kami refund...' },
 ]
 
 function initialDraft(
@@ -118,6 +137,7 @@ function initialDraft(
     showDescription: product?.pageConfig.showDescription ?? true,
     showBuyerNote: product?.pageConfig.showBuyerNote ?? true,
     showTrustSignals: product?.pageConfig.showTrustSignals ?? true,
+    notificationOverrides: product?.notificationOverrides || { ...DEFAULT_PRODUCT_NOTIFICATION_OVERRIDES },
   }
 }
 
@@ -170,6 +190,13 @@ export default function ProductEditor({
   function update<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
     setDirty(true)
+  }
+
+  function updateNotificationOverride<K extends keyof ProductNotificationOverrides>(
+    key: K,
+    value: ProductNotificationOverrides[K],
+  ) {
+    update('notificationOverrides', { ...draft.notificationOverrides, [key]: value })
   }
 
   function validateField(name: 'name' | 'price' | 'publicSlug') {
@@ -240,6 +267,7 @@ export default function ProductEditor({
     formData.set('show_description', String(draft.showDescription))
     formData.set('show_buyer_note', String(draft.showBuyerNote))
     formData.set('show_trust_signals', String(draft.showTrustSignals))
+    formData.set('notification_overrides', JSON.stringify(draft.notificationOverrides))
 
     setMessage(null)
     startTransition(async () => {
@@ -677,6 +705,46 @@ export default function ProductEditor({
           <p className="mt-1 text-sm text-slate-300">
             {formatRupiah(Number(draft.price) || 0)} · {resolvedBenefits.courses.length} course · {draft.isSubscription ? 'Langganan' : 'Sekali bayar'}
           </p>
+        </div>
+      </section>
+
+      <section id="notifikasi" className="scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <h3 className="flex items-center gap-2 text-lg font-bold text-slate-950">
+          <MessageCircle aria-hidden="true" size={19} className="text-indigo-700" />
+          5. Notifikasi Khusus Produk Ini
+        </h3>
+        <p className="mt-1 text-sm font-medium text-slate-500">
+          Override pesan WhatsApp per status order khusus untuk produk ini. Kosongkan kalau ingin memakai pesan default organisasi.
+          Gunakan variabel <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">{'{{name}}'}</code>, <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">{'{{order_number}}'}</code>, <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">{'{{amount}}'}</code>.
+        </p>
+
+        <label className="mt-5 flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4 transition-colors hover:border-indigo-200">
+          <input
+            type="checkbox"
+            checked={draft.notificationOverrides.enabled}
+            onChange={(event) => updateNotificationOverride('enabled', event.target.checked)}
+            className="size-5 accent-indigo-700"
+          />
+          <span>
+            <span className="block text-sm font-bold text-slate-950">Aktifkan notifikasi khusus produk ini</span>
+            <span className="block text-xs font-medium text-slate-500">Kalau tidak diaktifkan, semua isian di bawah diabaikan dan pesan default organisasi yang dipakai.</span>
+          </span>
+        </label>
+
+        <div className={cn('mt-5 grid gap-4 sm:grid-cols-2', !draft.notificationOverrides.enabled && 'pointer-events-none opacity-50')}>
+          {NOTIFICATION_OVERRIDE_FIELDS.map((field) => (
+            <label key={field.key} className="text-sm font-bold text-slate-700">
+              {field.label}
+              <textarea
+                value={draft.notificationOverrides[field.key]}
+                onChange={(event) => updateNotificationOverride(field.key, event.target.value)}
+                placeholder={field.placeholder}
+                rows={4}
+                maxLength={2000}
+                className={cn(fieldClass, 'resize-y font-normal leading-relaxed')}
+              />
+            </label>
+          ))}
         </div>
       </section>
 
