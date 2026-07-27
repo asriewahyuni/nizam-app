@@ -64,46 +64,46 @@ export default async function MemberDashboardPage({
   ]
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+    <div className="px-4 py-6 space-y-6">
       <section className="overflow-hidden rounded-3xl bg-emerald-950 text-white shadow-sm">
-        <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.45fr_0.55fr] lg:p-10">
+        <div className="flex flex-col gap-6 p-5">
           <div>
-            <div className="mb-5 inline-flex min-h-9 items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-800/60 px-3 text-sm font-semibold text-emerald-50">
-              <ShieldCheck aria-hidden="true" size={17} />
+            <div className="mb-4 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-emerald-300/30 bg-emerald-800/60 px-3 text-xs font-semibold text-emerald-50">
+              <ShieldCheck aria-hidden="true" size={15} />
               Akun dan akses Anda terverifikasi
             </div>
-            <h1 className="max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl">
+            <h1 className="text-2xl font-bold tracking-tight">
               Selamat datang, {member.displayName}
             </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-emerald-100/85">
+            <p className="mt-3 text-sm leading-6 text-emerald-100/85">
               Lanjutkan kelas, cek jadwal, pantau transaksi, dan unduh sertifikat dari satu tempat.
             </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-5 flex flex-col gap-2">
               <Link
                 href={`${basePath}/kelas`}
-                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 font-semibold text-white transition-colors duration-200 hover:bg-orange-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-300 motion-reduce:transition-none"
+                className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-orange-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-300 motion-reduce:transition-none"
               >
                 Lanjutkan belajar
-                <ArrowRight aria-hidden="true" size={18} />
+                <ArrowRight aria-hidden="true" size={17} />
               </Link>
               <Link
                 href={`${basePath}/katalog`}
-                className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-emerald-200/30 bg-white/10 px-5 font-semibold text-white transition-colors duration-200 hover:bg-white/15 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 motion-reduce:transition-none"
+                className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-xl border border-emerald-200/30 bg-white/10 px-5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-white/15 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 motion-reduce:transition-none"
               >
                 Lihat katalog
               </Link>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 self-end">
+          <div className="grid grid-cols-2 gap-3">
             {summaryCards.map((card) => {
               const Icon = card.icon
               return (
-                <div key={card.label} className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-                  <span className={`flex size-10 items-center justify-center rounded-xl ${card.tone}`}>
-                    <Icon aria-hidden="true" size={20} />
+                <div key={card.label} className="rounded-2xl border border-white/10 bg-white/10 p-3.5 backdrop-blur">
+                  <span className={`flex size-9 items-center justify-center rounded-xl ${card.tone}`}>
+                    <Icon aria-hidden="true" size={18} />
                   </span>
-                  <p className="mt-4 text-2xl font-bold">{card.value}</p>
-                  <p className="mt-1 text-sm text-emerald-100/80">{card.label}</p>
+                  <p className="mt-3 text-xl font-bold">{card.value}</p>
+                  <p className="mt-0.5 text-xs text-emerald-100/80">{card.label}</p>
                 </div>
               )
             })}
@@ -111,53 +111,53 @@ export default async function MemberDashboardPage({
         </div>
       </section>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_22rem]">
+      <div className="flex flex-col gap-6">
         <section aria-labelledby="kelas-aktif-title">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-emerald-700">Perjalanan belajar</p>
-              <h2 id="kelas-aktif-title" className="mt-1 text-2xl font-bold tracking-tight">Kelas aktif</h2>
+              <p className="text-xs font-semibold text-emerald-700">Perjalanan belajar</p>
+              <h2 id="kelas-aktif-title" className="mt-0.5 text-xl font-bold tracking-tight">Kelas aktif</h2>
             </div>
             <Link
               href={`${basePath}/kelas`}
-              className="flex min-h-11 cursor-pointer items-center gap-1 rounded-lg px-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+              className="flex min-h-9 cursor-pointer items-center gap-1 rounded-lg px-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
             >
               Semua kelas
-              <ArrowRight aria-hidden="true" size={16} />
+              <ArrowRight aria-hidden="true" size={14} />
             </Link>
           </div>
 
           {dashboard.courses.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-emerald-300 bg-white p-8 text-center">
-              <BookOpenCheck aria-hidden="true" className="mx-auto text-emerald-700" size={38} />
-              <h3 className="mt-4 font-semibold">Belum ada kelas aktif</h3>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
+            <div className="rounded-2xl border border-dashed border-emerald-300 bg-white p-6 text-center">
+              <BookOpenCheck aria-hidden="true" className="mx-auto text-emerald-700" size={32} />
+              <h3 className="mt-3 text-sm font-semibold">Belum ada kelas aktif</h3>
+              <p className="mx-auto mt-1.5 max-w-xs text-xs leading-5 text-slate-600">
                 Kelas yang dibeli, diberikan admin, atau termasuk paket membership akan tampil di sini.
               </p>
               <Link
                 href={`${basePath}/katalog`}
-                className="mt-5 inline-flex min-h-11 cursor-pointer items-center rounded-xl bg-emerald-700 px-5 font-semibold text-white hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                className="mt-4 inline-flex min-h-10 cursor-pointer items-center rounded-xl bg-emerald-700 px-4 text-xs font-semibold text-white hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
               >
                 Jelajahi katalog
               </Link>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex flex-col gap-4">
               {dashboard.courses.map((course) => (
-                <article key={course.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <article key={course.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-4">
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
-                      <BookOpenCheck aria-hidden="true" size={21} />
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
+                      <BookOpenCheck aria-hidden="true" size={19} />
                     </span>
                     {course.expiresAt && (
-                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">
+                      <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold text-amber-900">
                         Akses terbatas
                       </span>
                     )}
                   </div>
-                  <h3 className="mt-5 line-clamp-2 text-lg font-bold">{course.title}</h3>
-                  <div className="mt-5">
-                    <div className="mb-2 flex justify-between text-sm">
+                  <h3 className="mt-4 line-clamp-2 text-base font-bold">{course.title}</h3>
+                  <div className="mt-4">
+                    <div className="mb-1.5 flex justify-between text-xs">
                       <span className="font-medium text-slate-600">
                         {course.completedLessons}/{course.totalLessons} materi
                       </span>
@@ -166,7 +166,7 @@ export default async function MemberDashboardPage({
                       </span>
                     </div>
                     <div
-                      className="h-2 overflow-hidden rounded-full bg-slate-100"
+                      className="h-1.5 overflow-hidden rounded-full bg-slate-100"
                       role="progressbar"
                       aria-label={`Progres ${course.title}`}
                       aria-valuenow={Math.round(course.progressPercent)}
@@ -181,10 +181,10 @@ export default async function MemberDashboardPage({
                   </div>
                   <Link
                     href={`/lms/${tenant.slug}/course/${course.slug}`}
-                    className="mt-5 inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-emerald-200 font-semibold text-emerald-800 transition-colors duration-200 hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                    className="mt-4 inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-emerald-200 text-xs font-semibold text-emerald-800 transition-colors duration-200 hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
                   >
                     Buka kelas
-                    <ArrowRight aria-hidden="true" size={17} />
+                    <ArrowRight aria-hidden="true" size={15} />
                   </Link>
                 </article>
               ))}

@@ -196,30 +196,54 @@ async function main() {
       )
     }
 
-    const storeResult = await client.query<StoreRow>(
-      `INSERT INTO public.stores (
-         org_id, branch_id, warehouse_id, bank_account_id,
-         name, slug, brand_name, line_name, support_email,
-         headline, subheadline, currency, is_active, is_published, created_by
-       )
-       VALUES (
-         $1::uuid, $2::uuid, $3::uuid, $4::uuid,
-         'Coreisec Learning Store', 'coreisec', 'Coreisec',
-         'Pendidikan dan Ekonomi Islam', 'support@coreisec.id',
-         'Belajar, bertumbuh, dan kelola akses Anda',
-         'Kelas, membership, pesanan, dan sertifikat dalam satu portal.',
-         'IDR', TRUE, TRUE, $5::uuid
-       )
-       ON CONFLICT (org_id, slug) DO UPDATE SET
-         branch_id = EXCLUDED.branch_id,
-         warehouse_id = EXCLUDED.warehouse_id,
-         bank_account_id = EXCLUDED.bank_account_id,
-         is_active = TRUE,
-         is_published = TRUE,
-         updated_at = NOW()
-       RETURNING id::text, name, slug`,
-      [target.id, mainBranch.id, warehouse.id, bankAccount.id, owners.rows[0].user_id],
+    const existingStoreResult = await client.query<StoreRow>(
+      `SELECT id::text, name, slug
+       FROM public.stores
+       WHERE org_id = $1::uuid
+       ORDER BY created_at ASC
+       LIMIT 1
+       FOR UPDATE`,
+      [target.id],
     )
+    const existingStore = existingStoreResult.rows[0]
+
+    const storeResult = existingStore
+      ? await client.query<StoreRow>(
+        `UPDATE public.stores SET
+           branch_id = $2::uuid,
+           warehouse_id = $3::uuid,
+           bank_account_id = $4::uuid,
+           is_active = TRUE,
+           is_published = TRUE,
+           updated_at = NOW()
+         WHERE id = $1::uuid
+         RETURNING id::text, name, slug`,
+        [existingStore.id, mainBranch.id, warehouse.id, bankAccount.id],
+      )
+      : await client.query<StoreRow>(
+        `INSERT INTO public.stores (
+           org_id, branch_id, warehouse_id, bank_account_id,
+           name, slug, brand_name, line_name, support_email,
+           headline, subheadline, currency, is_active, is_published, created_by
+         )
+         VALUES (
+           $1::uuid, $2::uuid, $3::uuid, $4::uuid,
+           'Coreisec Learning Store', 'coreisec', 'Coreisec',
+           'Pendidikan dan Ekonomi Islam', 'support@coreisec.id',
+           'Belajar, bertumbuh, dan kelola akses Anda',
+           'Kelas, membership, pesanan, dan sertifikat dalam satu portal.',
+           'IDR', TRUE, TRUE, $5::uuid
+         )
+         ON CONFLICT (org_id, slug) DO UPDATE SET
+           branch_id = EXCLUDED.branch_id,
+           warehouse_id = EXCLUDED.warehouse_id,
+           bank_account_id = EXCLUDED.bank_account_id,
+           is_active = TRUE,
+           is_published = TRUE,
+           updated_at = NOW()
+         RETURNING id::text, name, slug`,
+        [target.id, mainBranch.id, warehouse.id, bankAccount.id, owners.rows[0].user_id],
+      )
     const store = storeResult.rows[0]
 
     await client.query(

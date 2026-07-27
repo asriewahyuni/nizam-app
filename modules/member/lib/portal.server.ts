@@ -48,9 +48,9 @@ export async function getPortalTenant(orgSlug: string): Promise<PortalTenant | n
          SELECT domain.hostname
          FROM public.organization_domains domain
          WHERE domain.org_id = organization.id
-           AND domain.purpose = 'MEMBER_PORTAL'
+           AND domain.purpose IN ('MEMBER_PORTAL', 'LMS')
            AND domain.status = 'VERIFIED'
-         ORDER BY domain.is_primary DESC, domain.created_at
+         ORDER BY (domain.purpose = 'LMS') DESC, domain.is_primary DESC, domain.created_at
          LIMIT 1
        ) AS primary_hostname
      FROM public.organizations organization

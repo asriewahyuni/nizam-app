@@ -20,25 +20,25 @@ export default async function MemberCertificatesPage({
   const certificates = await getPortalCertificates(tenant, member)
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
-      <p className="text-sm font-semibold text-emerald-700">Bukti kelulusan</p>
-      <h1 className="mt-2 text-3xl font-bold tracking-tight">Sertifikat</h1>
-      <p className="mt-3 text-slate-600">Setiap sertifikat memiliki nomor dan tautan verifikasi publik.</p>
+    <div className="px-4 py-6">
+      <p className="text-xs font-semibold text-emerald-700">Bukti kelulusan</p>
+      <h1 className="mt-1 text-2xl font-bold tracking-tight">Sertifikat</h1>
+      <p className="mt-2 text-xs text-slate-600">Setiap sertifikat memiliki nomor dan tautan verifikasi publik.</p>
 
       {certificates.length === 0 ? (
-        <div className="mt-8 rounded-2xl border border-dashed border-emerald-300 bg-white p-10 text-center">
-          <Award aria-hidden="true" className="mx-auto text-emerald-700" size={42} />
-          <h2 className="mt-4 text-lg font-semibold">Belum ada sertifikat</h2>
+        <div className="mt-6 rounded-2xl border border-dashed border-emerald-300 bg-white p-6 text-center">
+          <Award aria-hidden="true" className="mx-auto text-emerald-700" size={36} />
+          <h2 className="mt-3 text-sm font-semibold">Belum ada sertifikat</h2>
         </div>
       ) : (
-        <div className="mt-8 grid gap-5 md:grid-cols-2">
+        <div className="mt-6 flex flex-col gap-4">
           {certificates.map((certificate) => (
-            <article key={certificate.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <article key={certificate.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-4">
-                <span className="flex size-11 items-center justify-center rounded-xl bg-amber-100 text-amber-900">
-                  <Award aria-hidden="true" size={22} />
+                <span className="flex size-10 items-center justify-center rounded-xl bg-amber-100 text-amber-900">
+                  <Award aria-hidden="true" size={19} />
                 </span>
-                <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                   certificate.status === 'ACTIVE'
                     ? 'bg-emerald-50 text-emerald-800'
                     : 'bg-red-50 text-red-800'
@@ -46,27 +46,27 @@ export default async function MemberCertificatesPage({
                   {certificate.status}
                 </span>
               </div>
-              <h2 className="mt-5 text-lg font-bold">{certificate.courseTitle}</h2>
-              <p className="mt-2 font-mono text-sm text-slate-600">{certificate.certificateNumber}</p>
-              <p className="mt-3 text-sm text-slate-600">
+              <h2 className="mt-4 text-base font-bold">{certificate.courseTitle}</h2>
+              <p className="mt-1.5 font-mono text-xs text-slate-600">{certificate.certificateNumber}</p>
+              <p className="mt-2 text-xs text-slate-600">
                 Terbit {new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date(certificate.issueDate))}
               </p>
-              <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+              <div className="mt-4 flex flex-col gap-2">
                 {certificate.verificationToken && (
                   <Link
                     href={`/member/${tenant.slug}/sertifikat/verifikasi/${certificate.verificationToken}`}
-                    className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-emerald-200 px-4 font-semibold text-emerald-800 hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                    className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-emerald-200 px-4 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
                   >
-                    <QrCode aria-hidden="true" size={18} />
+                    <QrCode aria-hidden="true" size={15} />
                     Verifikasi
                   </Link>
                 )}
                 {certificate.canDownload && (
                   <a
                     href={`/api/lms/certificates/${certificate.id}/download`}
-                    className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 font-semibold text-white hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                    className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-4 text-xs font-semibold text-white hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
                   >
-                    <Download aria-hidden="true" size={18} />
+                    <Download aria-hidden="true" size={15} />
                     Unduh PDF
                   </a>
                 )}

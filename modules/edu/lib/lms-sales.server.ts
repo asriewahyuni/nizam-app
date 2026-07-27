@@ -52,7 +52,7 @@ export async function getLmsSalesSummaryMetrics(
     queryPostgres<{ count: number }>(
       `SELECT COUNT(*)::int AS count
        FROM public.ecommerce_orders
-       WHERE org_id = $1::uuid AND status IN ('PENDING', 'AWAITING_PAYMENT')`,
+       WHERE org_id = $1::uuid AND status IN ('AWAITING_PAYMENT', 'PAYMENT_UNDER_REVIEW')`,
       [orgId],
     ),
     queryPostgres<{ total: number }>(
