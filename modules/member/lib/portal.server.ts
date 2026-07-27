@@ -510,12 +510,22 @@ export async function getPortalCertificates(
   }))
 }
 
+import {
+  getEligibleAffiliateCourses,
+  getAffiliateLeaderboard,
+  type EligibleAffiliateCourse,
+  type LeaderboardEntry,
+} from '@/modules/ecommerce/lib/affiliate.server'
+
 export type PortalAffiliateDashboard = {
+  isActivated: boolean
   referralCode: string
   pendingAmount: number
   payableAmount: number
   paidAmount: number
   conversionCount: number
+  eligibleCourses: EligibleAffiliateCourse[]
+  leaderboard: LeaderboardEntry[]
   commissions: Array<{
     id: string
     orderNumber: string | null
@@ -528,7 +538,12 @@ export type PortalAffiliateDashboard = {
 export async function getPortalAffiliateDashboard(
   tenant: PortalTenant,
   member: PortalMemberContext,
-): Promise<PortalAffiliateDashboard | null> {
+): Promise<PortalAffiliateDashboard> {
+  const [eligibleCourses, leaderboard] = await Promise.all([
+    getEligibleAffiliateCourses(tenant.id),
+    getAffiliateLeaderboard(tenant.id, 10),
+  ])
+
   const profileResult = await queryPostgres<{ id: string; referral_code: string }>(
     `SELECT id::text, referral_code
      FROM public.commerce_affiliate_profiles
@@ -539,7 +554,19 @@ export async function getPortalAffiliateDashboard(
     [tenant.id, member.userId],
   )
   const profile = profileResult.rows[0]
-  if (!profile) return null
+  if (!profile) {
+    return {
+      isActivated: false,
+      referralCode: '',
+      pendingAmount: 0,
+      payableAmount: 0,
+      paidAmount: 0,
+      conversionCount: 0,
+      eligibleCourses,
+      leaderboard,
+      commissions: [],
+    }
+  }
 
   const result = await queryPostgres<{
     id: string
@@ -564,15 +591,20 @@ export async function getPortalAffiliateDashboard(
      LIMIT 100`,
     [tenant.id, profile.id],
   )
+
   const totalByStatus = (statuses: string[]) => result.rows
     .filter((commission) => statuses.includes(commission.status))
     .reduce((total, commission) => total + Number(commission.amount || 0), 0)
+
   return {
+    isActivated: true,
     referralCode: profile.referral_code,
     pendingAmount: totalByStatus(['PENDING', 'APPROVED']),
     payableAmount: totalByStatus(['PAYABLE']),
     paidAmount: totalByStatus(['PAID']),
     conversionCount: result.rows.filter((commission) => commission.status !== 'CANCELLED').length,
+    eligibleCourses,
+    leaderboard,
     commissions: result.rows.map((commission) => ({
       id: commission.id,
       orderNumber: commission.order_number,

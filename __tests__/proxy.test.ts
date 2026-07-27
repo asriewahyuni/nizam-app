@@ -3,13 +3,36 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const mocks = vi.hoisted(() => ({
   updateSession: vi.fn(),
+  queryPostgres: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/middleware', () => ({
   updateSession: mocks.updateSession,
 }))
 
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
+}))
+
 import { proxy } from '@/proxy'
+
+function mockTenantRow(row: {
+  orgSlug: string
+  storeSlug?: string | null
+  rootBehavior: 'STOREFRONT' | 'LOGIN'
+}) {
+  mocks.queryPostgres.mockResolvedValueOnce({
+    rows: [{
+      org_slug: row.orgSlug,
+      store_slug: row.storeSlug ?? null,
+      root_behavior: row.rootBehavior,
+    }],
+  })
+}
+
+function mockNoTenant() {
+  mocks.queryPostgres.mockResolvedValueOnce({ rows: [] })
+}
 
 describe('Next proxy', () => {
   afterEach(() => {
@@ -33,9 +56,7 @@ describe('Next proxy', () => {
   })
 
   it('delegates normal requests to updateSession', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ data: null }), { status: 404 })
-    )
+    mockNoTenant()
     mocks.updateSession.mockResolvedValue(
       new NextResponse(null, {
         status: 200,
@@ -55,19 +76,11 @@ describe('Next proxy', () => {
   })
 
   it('mengalihkan URL member lama ke URL custom domain yang bersih', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({
-        data: {
-          orgSlug: 'core-islamic-economics',
-          storeSlug: 'store-fyrigc',
-          rootBehavior: 'STOREFRONT',
-          purpose: 'LMS',
-        },
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    mockTenantRow({
+      orgSlug: 'core-islamic-economics',
+      storeSlug: 'store-fyrigc',
+      rootBehavior: 'STOREFRONT',
+    })
 
     const request = new NextRequest('https://member.coreisec.id/kelas', {
       headers: { host: 'member.coreisec.id' },
@@ -82,19 +95,11 @@ describe('Next proxy', () => {
   })
 
   it('menulis ulang halaman produk custom domain ke storefront yang sama', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({
-        data: {
-          orgSlug: 'core-islamic-economics',
-          storeSlug: 'store-fyrigc',
-          rootBehavior: 'STOREFRONT',
-          purpose: 'LMS',
-        },
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    mockTenantRow({
+      orgSlug: 'core-islamic-economics',
+      storeSlug: 'store-fyrigc',
+      rootBehavior: 'STOREFRONT',
+    })
     const response = await proxy(new NextRequest(
       'https://kelas.coreisec.id/product/ams-paket-1-tahun?ref=affiliate-1',
       { headers: { host: 'kelas.coreisec.id' } },
@@ -107,16 +112,11 @@ describe('Next proxy', () => {
   })
 
   it('mode Login mengarahkan tamu ke login tenant', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({
-        data: {
-          orgSlug: 'core-islamic-economics',
-          storeSlug: 'store-fyrigc',
-          rootBehavior: 'LOGIN',
-          purpose: 'LMS',
-        },
-      }), { status: 200, headers: { 'content-type': 'application/json' } }),
-    )
+    mockTenantRow({
+      orgSlug: 'core-islamic-economics',
+      storeSlug: 'store-fyrigc',
+      rootBehavior: 'LOGIN',
+    })
     const response = await proxy(new NextRequest(
       'https://member.coreisec.id/',
       { headers: { host: 'member.coreisec.id' } },
@@ -129,16 +129,11 @@ describe('Next proxy', () => {
   })
 
   it('menolak area ERP melalui custom domain', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({
-        data: {
-          orgSlug: 'core-islamic-economics',
-          storeSlug: 'store-fyrigc',
-          rootBehavior: 'STOREFRONT',
-          purpose: 'LMS',
-        },
-      }), { status: 200, headers: { 'content-type': 'application/json' } }),
-    )
+    mockTenantRow({
+      orgSlug: 'core-islamic-economics',
+      storeSlug: 'store-fyrigc',
+      rootBehavior: 'STOREFRONT',
+    })
     const response = await proxy(new NextRequest(
       'https://kelas.coreisec.id/lms/admin',
       { headers: { host: 'kelas.coreisec.id' } },
@@ -148,16 +143,11 @@ describe('Next proxy', () => {
   })
 
   it('menulis ulang verifikasi sertifikat ke organisasi pemilik domain', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({
-        data: {
-          orgSlug: 'core-islamic-economics',
-          storeSlug: 'store-fyrigc',
-          rootBehavior: 'STOREFRONT',
-          purpose: 'LMS',
-        },
-      }), { status: 200, headers: { 'content-type': 'application/json' } }),
-    )
+    mockTenantRow({
+      orgSlug: 'core-islamic-economics',
+      storeSlug: 'store-fyrigc',
+      rootBehavior: 'STOREFRONT',
+    })
     const response = await proxy(new NextRequest(
       'https://kelas.coreisec.id/certificate/verify/token-valid',
       { headers: { host: 'kelas.coreisec.id' } },
@@ -169,9 +159,7 @@ describe('Next proxy', () => {
   })
 
   it('mengalihkan URL toko lama ke URL store berbahasa Inggris', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ data: null }), { status: 404 }),
-    )
+    mockNoTenant()
     const response = await proxy(new NextRequest(
       'http://localhost:3000/toko/core-islamic-economics/store-fyrigc/produk/ams-paket?ref=abc',
       { headers: { host: 'localhost:3000' } },
@@ -184,9 +172,7 @@ describe('Next proxy', () => {
   })
 
   it('menulis ulang URL store Inggris ke route internal storefront', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ data: null }), { status: 404 }),
-    )
+    mockNoTenant()
     const response = await proxy(new NextRequest(
       'http://localhost:3000/store/core-islamic-economics/store-fyrigc/product/ams-paket',
       { headers: { host: 'localhost:3000' } },

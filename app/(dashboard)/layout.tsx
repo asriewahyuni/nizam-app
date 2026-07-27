@@ -1,10 +1,12 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
+import { headers, cookies } from 'next/headers'
 import { unstable_noStore as noStore } from 'next/cache'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { getAdminImpersonationState } from '@/modules/auth/actions/auth.actions'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
 import { canAccessAllBranchesForOrg } from '@/modules/organization/lib/branch-access.server'
+import { queryPostgres } from '@/lib/db/postgres'
 import { isDemoSession } from '@/modules/demo/actions/demo.actions'
 import { saasModuleMatches } from '@/lib/saas/module-catalog'
 import { AppSidebar } from '@/components/shared/AppSidebar'
@@ -52,8 +54,22 @@ export default async function DashboardLayout({
   // Akun anggota koperasi HANYA boleh mengakses Portal Anggota, bukan area ERP staf ini.
   const session = await getInternalAuthSession()
   const loginType = String(session?.user.user_metadata?.login_type || '').toLowerCase()
-  if (loginType === 'anggota' || loginType === 'member') {
+  if (loginType === 'anggota') {
     redirect('/anggota/login')
+  }
+
+  // Member LMS tidak punya baris org_members, jadi getActiveOrg() di bawah akan
+  // gagal untuknya — arahkan langsung ke portal member, bukan ke /anggota/login
+  // (itu portal koperasi yang tidak terkait) atau /onboarding.
+  if (loginType === 'member') {
+    const activeOrgId = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value
+    const orgSlug = activeOrgId
+      ? (await queryPostgres<{ slug: string }>(
+          'SELECT slug FROM public.organizations WHERE id = $1::uuid AND is_active = TRUE LIMIT 1',
+          [activeOrgId],
+        )).rows[0]?.slug
+      : null
+    redirect(orgSlug ? `/member/${orgSlug}` : '/login')
   }
 
   const orgData = await getActiveOrg()

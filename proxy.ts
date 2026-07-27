@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { queryPostgres } from '@/lib/db/postgres'
+import { normalizeLmsHostname } from '@/modules/ecommerce/lib/lms-domain'
 
 const NEXT_ACTION_HEADER = 'next-action'
 const INTERNAL_SESSION_COOKIE = 'nizam_internal_session'
@@ -27,6 +29,39 @@ type ResolvedLmsTenant = {
   orgSlug: string
   storeSlug: string | null
   rootBehavior: 'STOREFRONT' | 'LOGIN'
+}
+
+/**
+ * Resolusi tenant langsung ke Postgres (bukan self-fetch HTTP ke /api/lms/resolve-domain).
+ * Proxy berjalan di Node.js runtime secara default (bukan Edge), jadi query DB langsung
+ * di sini aman — dan menghindari round-trip HTTP proxy memanggil dirinya sendiri lewat
+ * domain publiknya sendiri, yang rapuh khusus untuk custom domain (DNS/SSL/CDN).
+ */
+async function resolveLmsTenant(host: string): Promise<ResolvedLmsTenant | null> {
+  const hostname = normalizeLmsHostname(host)
+  if (!hostname) return null
+
+  try {
+    const { rows } = await queryPostgres<{
+      org_slug: string
+      store_slug: string | null
+      root_behavior: 'STOREFRONT' | 'LOGIN'
+    }>(
+      'SELECT org_slug, store_slug, root_behavior FROM public.resolve_lms_tenant_domain($1)',
+      [hostname],
+    )
+    const row = rows[0]
+    const orgSlug = String(row?.org_slug || '').trim()
+    if (!orgSlug) return null
+
+    return {
+      orgSlug,
+      storeSlug: String(row?.store_slug || '').trim() || null,
+      rootBehavior: row?.root_behavior === 'STOREFRONT' ? 'STOREFRONT' : 'LOGIN',
+    }
+  } catch {
+    return null
+  }
 }
 
 function rewriteStandardStorePath(
@@ -281,49 +316,41 @@ export async function proxy(request: NextRequest) {
 
   if (shouldResolveLmsTenant) {
     try {
-      const resolveUrl = new URL('/api/lms/resolve-domain', request.url)
-      resolveUrl.searchParams.set('host', normalizedHost)
-      const response = await fetch(resolveUrl, { cache: 'no-store' })
-      if (response.ok) {
-        const payload = await response.json()
-        const orgSlug = String(payload?.data?.orgSlug || '').trim()
-        const storeSlug = String(payload?.data?.storeSlug || '').trim() || null
-        const rootBehavior = payload?.data?.rootBehavior === 'STOREFRONT'
-          ? 'STOREFRONT'
-          : 'LOGIN'
+      const tenant = await resolveLmsTenant(normalizedHost)
 
-        if (orgSlug) {
-          if (ERP_ONLY_PREFIXES.some((prefix) => (
-            pathname === prefix || pathname.startsWith(`${prefix}/`)
-          ))) {
-            return new NextResponse('Halaman tidak ditemukan.', { status: 404 })
-          }
+      if (tenant) {
+        const { orgSlug, storeSlug, rootBehavior } = tenant
 
-          if (pathname === '/' && rootBehavior === 'LOGIN') {
-            const target = request.cookies.has(INTERNAL_SESSION_COOKIE)
-              ? '/dashboard'
-              : '/login?redirectTo=%2Fdashboard'
-            if (serverActionRequest) {
-              return createServerActionRedirectResponse(target)
-            }
-            return NextResponse.redirect(new URL(target, request.url))
-          }
+        if (ERP_ONLY_PREFIXES.some((prefix) => (
+          pathname === prefix || pathname.startsWith(`${prefix}/`)
+        ))) {
+          return new NextResponse('Halaman tidak ditemukan.', { status: 404 })
+        }
 
-          const route = rewriteTenantPath(pathname, {
-            orgSlug,
-            storeSlug,
-            rootBehavior,
-          })
-          if (route?.kind === 'redirect') {
-            const redirectUrl = request.nextUrl.clone()
-            redirectUrl.pathname = route.pathname
-            return NextResponse.redirect(redirectUrl, 308)
+        if (pathname === '/' && rootBehavior === 'LOGIN') {
+          const target = request.cookies.has(INTERNAL_SESSION_COOKIE)
+            ? '/dashboard'
+            : '/login?redirectTo=%2Fdashboard'
+          if (serverActionRequest) {
+            return createServerActionRedirectResponse(target)
           }
-          if (route?.kind === 'rewrite') {
-            const rewriteUrl = request.nextUrl.clone()
-            rewriteUrl.pathname = route.pathname
-            return NextResponse.rewrite(rewriteUrl)
-          }
+          return NextResponse.redirect(new URL(target, request.url))
+        }
+
+        const route = rewriteTenantPath(pathname, {
+          orgSlug,
+          storeSlug,
+          rootBehavior,
+        })
+        if (route?.kind === 'redirect') {
+          const redirectUrl = request.nextUrl.clone()
+          redirectUrl.pathname = route.pathname
+          return NextResponse.redirect(redirectUrl, 308)
+        }
+        if (route?.kind === 'rewrite') {
+          const rewriteUrl = request.nextUrl.clone()
+          rewriteUrl.pathname = route.pathname
+          return NextResponse.rewrite(rewriteUrl)
         }
       }
     } catch {
@@ -347,7 +374,19 @@ export async function proxy(request: NextRequest) {
   const previewRedirect = handlePreviewAutoLogin(request)
   if (previewRedirect) return previewRedirect
 
-  return updateSession(request)
+  const response = await updateSession(request)
+
+  const refParam = request.nextUrl.searchParams.get('ref')
+  if (refParam && typeof refParam === 'string' && refParam.trim()) {
+    response.cookies.set('nizam_aff_ref', refParam.trim(), {
+      maxAge: 30 * 24 * 60 * 60, // 30 days
+      path: '/',
+      httpOnly: false, // Accessible on client & server
+      sameSite: 'lax',
+    })
+  }
+
+  return response
 }
 
 export const config = {
