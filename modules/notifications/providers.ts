@@ -92,24 +92,23 @@ export class FonnteNotificationProvider implements NotificationProvider {
 
 export class DripsenderNotificationProvider implements NotificationProvider {
   readonly code = 'DRIPSENDER'
+  private static readonly ENDPOINT = 'https://api.dripsender.id/send'
 
   async send(input: NotificationDeliveryInput) {
-    const endpoint = requiredEnv('DRIPSENDER_API_URL')
-    const token = requiredEnv('DRIPSENDER_API_TOKEN')
-    const response = await fetch(endpoint, {
+    const apiKey = requiredEnv('DRIPSENDER_API_KEY')
+    // dripsender.id's API takes the key in the JSON body, not an auth header,
+    // and expects the message under `text` (not `message`).
+    const response = await fetch(DripsenderNotificationProvider.ENDPOINT, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Idempotency-Key': input.idempotencyKey,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        phone: input.recipient,
-        message: input.body,
+        api_key: apiKey,
+        phone: input.recipient.replace(/^\+/, ''),
+        text: input.body,
       }),
     })
     const payload = await responsePayload(response)
-    if (!response.ok || payload.success === false) {
+    if (!response.ok || payload.success === false || payload.status === false) {
       throw new Error(String(payload.message || `Dripsender HTTP ${response.status}`))
     }
     return {

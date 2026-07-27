@@ -8,6 +8,11 @@ import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { queryPostgres } from '@/lib/db/postgres'
 import { ERPBridge } from '@/lib/erp-bridge/finances'
+import { enqueueNotification } from '@/modules/notifications/outbox.server'
+
+function formatRupiah(amount: number) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)
+}
 
 export type AffiliateProfile = {
   id: string
@@ -468,6 +473,40 @@ export async function requestAffiliatePayout(params: {
     }
   } catch (erpErr) {
     console.warn('ERP Bridge payout recording skipped:', erpErr)
+  }
+
+  const contactResult = await queryPostgres<{
+    name: string | null
+    email: string | null
+    phone: string | null
+  }>(
+    `SELECT display_name AS name, login_email AS email, phone
+     FROM public.internal_auth_users
+     WHERE legacy_user_id = $1::uuid OR id = $1::uuid
+     ORDER BY CASE WHEN id = $1::uuid THEN 0 ELSE 1 END
+     LIMIT 1`,
+    [params.userId],
+  )
+  const contact = contactResult.rows[0]
+  const variables: Record<string, string | number | null> = {
+    affiliate_name: contact?.name || 'Mitra Afiliasi',
+    commission_amount: formatRupiah(params.amount),
+  }
+  const recipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
+  if (contact?.email) recipients.push({ channel: 'EMAIL', value: contact.email })
+  if (contact?.phone) recipients.push({ channel: 'WHATSAPP', value: contact.phone })
+  for (const recipient of recipients) {
+    await enqueueNotification({
+      orgId: params.orgId,
+      userId: params.userId,
+      eventType: 'AFFILIATE_COMMISSION_PAID',
+      channel: recipient.channel,
+      recipient: recipient.value,
+      templateKey: 'AFFILIATE_COMMISSION_PAID',
+      variables,
+      idempotencyKey: `affiliate-commission-paid:${payoutId}:${recipient.channel}`,
+      payload: { payoutId, payoutNumber, amount: params.amount },
+    })
   }
 
   return { payoutId, payoutNumber, amount: params.amount }

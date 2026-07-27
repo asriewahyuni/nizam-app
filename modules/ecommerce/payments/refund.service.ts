@@ -12,6 +12,11 @@ import {
   revokeSubscriptionEntitlements,
 } from './entitlement.service'
 import { cancelConsultingOrderForRefund } from '@/modules/consulting/lib/consulting.server'
+import { enqueueNotification } from '@/modules/notifications/outbox.server'
+
+function formatRupiah(amount: number) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)
+}
 
 export async function requestCommerceRefund(input: {
   orgId: string
@@ -211,6 +216,9 @@ export async function finalizeCommerceRefund(input: {
       bank_account_id: string
       user_id: string | null
       reason: string
+      customer_name: string
+      customer_email: string | null
+      customer_phone: string
     }>(
       `SELECT
          refund.id::text,
@@ -225,7 +233,10 @@ export async function finalizeCommerceRefund(input: {
          ecommerce_order.status::text AS order_status,
          settings.bank_account_id::text,
          ecommerce_order.user_id::text,
-         refund.reason
+         refund.reason,
+         ecommerce_order.customer_name,
+         ecommerce_order.customer_email,
+         ecommerce_order.customer_phone
        FROM public.commerce_refunds refund
        JOIN public.ecommerce_orders ecommerce_order
          ON ecommerce_order.id = refund.order_id
@@ -475,6 +486,28 @@ export async function finalizeCommerceRefund(input: {
         JSON.stringify({ refundId: refund.id, reversalJournalId }),
       ],
     )
+    const refundVariables: Record<string, string | number | null> = {
+      name: refund.customer_name || 'Member',
+      order_number: refund.order_number,
+      amount: formatRupiah(refund.amount),
+    }
+    const refundRecipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
+    if (refund.customer_email) refundRecipients.push({ channel: 'EMAIL', value: refund.customer_email })
+    if (refund.customer_phone) refundRecipients.push({ channel: 'WHATSAPP', value: refund.customer_phone })
+    for (const recipient of refundRecipients) {
+      await enqueueNotification({
+        orgId: input.orgId,
+        userId: refund.user_id,
+        eventType: 'ORDER_REFUNDED',
+        channel: recipient.channel,
+        recipient: recipient.value,
+        templateKey: 'ORDER_REFUNDED',
+        variables: refundVariables,
+        idempotencyKey: `order-refunded:${refund.id}:${recipient.channel}`,
+        payload: { refundId: refund.id, orderId: refund.order_id },
+      }, client)
+    }
+
     const result = {
       refundId: refund.id,
       orderId: refund.order_id,

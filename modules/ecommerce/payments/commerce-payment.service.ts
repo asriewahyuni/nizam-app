@@ -9,6 +9,16 @@ import { connectPostgresClient } from '@/lib/db/postgres'
 import { activateOrderSubscriptions } from './subscription.service'
 import { provisionOrderEntitlements } from './entitlement.service'
 import { activateConsultingOrder } from '@/modules/consulting/lib/consulting.server'
+import { enqueueNotification } from '@/modules/notifications/outbox.server'
+
+function formatRupiah(amount: number) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)
+}
+
+function memberPortalUrl(orgSlug: string, path: 'kelas' | 'afiliasi' = 'kelas') {
+  const base = String(process.env.NEXT_PUBLIC_APP_URL || 'https://member.coreisec.id').replace(/\/+$/, '')
+  return `${base}/member/${orgSlug}/${path}`
+}
 
 type PaidOrderRow = {
   id: string
@@ -734,6 +744,60 @@ async function createAffiliateCommissions(client: PoolClient, order: PaidOrderRo
     )
     commissionIds.push(result.rows[0].id)
   }
+
+  if (commissionIds.length > 0) {
+    const totalAmount = commissionResult.rows.reduce((sum, row) => {
+      const amount = row.commission_type === 'PERCENT'
+        ? row.base_amount * row.commission_value / 100
+        : row.commission_value
+      return sum + Math.round(Math.max(0, amount))
+    }, 0)
+    const affiliateContact = await client.query<{
+      user_id: string
+      name: string | null
+      email: string | null
+      phone: string | null
+      org_slug: string | null
+    }>(
+      `SELECT
+         auth_user.id::text AS user_id,
+         auth_user.display_name AS name,
+         auth_user.login_email AS email,
+         auth_user.phone AS phone,
+         org.slug AS org_slug
+       FROM public.internal_auth_users auth_user
+       LEFT JOIN public.organizations org ON org.id = $2::uuid
+       WHERE auth_user.legacy_user_id = $1::uuid OR auth_user.id = $1::uuid
+       ORDER BY CASE WHEN auth_user.id = $1::uuid THEN 0 ELSE 1 END
+       LIMIT 1`,
+      [profile.user_id, order.org_id],
+    )
+    const contact = affiliateContact.rows[0]
+    const variables: Record<string, string | number | null> = {
+      affiliate_name: contact?.name || 'Mitra Afiliasi',
+      buyer_name: order.customer_name || 'Member',
+      order_number: order.order_number,
+      commission_amount: formatRupiah(totalAmount),
+      portal_url: contact?.org_slug ? memberPortalUrl(contact.org_slug, 'afiliasi') : '',
+    }
+    const recipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
+    if (contact?.email) recipients.push({ channel: 'EMAIL', value: contact.email })
+    if (contact?.phone) recipients.push({ channel: 'WHATSAPP', value: contact.phone })
+    for (const recipient of recipients) {
+      await enqueueNotification({
+        orgId: order.org_id,
+        userId: profile.user_id,
+        eventType: 'AFFILIATE_COMMISSION_EARNED',
+        channel: recipient.channel,
+        recipient: recipient.value,
+        templateKey: 'AFFILIATE_COMMISSION_EARNED',
+        variables,
+        idempotencyKey: `affiliate-commission-earned:${order.id}:${profile.id}:${recipient.channel}`,
+        payload: { orderId: order.id, orderNumber: order.order_number, commissionIds },
+      }, client)
+    }
+  }
+
   return commissionIds
 }
 
@@ -742,50 +806,50 @@ async function enqueuePaidNotifications(
   order: PaidOrderRow,
   grantCount: number,
 ) {
+  const eventType = grantCount > 0 ? 'ENROLLMENT_CREATED' : 'ORDER_PAID'
+  const variables: Record<string, string | number | null> = {
+    name: order.customer_name || 'Member',
+    order_number: order.order_number,
+    amount: formatRupiah(order.grand_total),
+  }
+
+  if (grantCount > 0) {
+    const context = await client.query<{ org_slug: string; course_titles: string | null }>(
+      `SELECT
+         org.slug AS org_slug,
+         string_agg(DISTINCT course.title, ', ') AS course_titles
+       FROM public.organizations org
+       LEFT JOIN public.learning_access_grants grant_row
+         ON grant_row.org_id = org.id
+        AND grant_row.source_type = 'ORDER'
+        AND grant_row.source_id = $2::uuid
+       LEFT JOIN public.learning_courses course
+         ON course.id = grant_row.course_id AND course.org_id = org.id
+       WHERE org.id = $1::uuid
+       GROUP BY org.slug`,
+      [order.org_id, order.id],
+    )
+    const row = context.rows[0]
+    variables.course_title = row?.course_titles || 'kelas Anda'
+    variables.portal_url = row?.org_slug ? memberPortalUrl(row.org_slug) : ''
+  }
+
   const recipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
   if (order.customer_email) recipients.push({ channel: 'EMAIL', value: order.customer_email })
   if (order.customer_phone) recipients.push({ channel: 'WHATSAPP', value: order.customer_phone })
 
   for (const recipient of recipients) {
-    await client.query(
-      `INSERT INTO public.notification_outbox (
-         org_id,
-         user_id,
-         event_type,
-         channel,
-         provider_code,
-         recipient,
-         subject,
-         body,
-         payload,
-         idempotency_key
-       )
-       VALUES (
-         $1::uuid,
-         $2::uuid,
-         'ORDER_PAID',
-         $3,
-         CASE WHEN $3 = 'EMAIL' THEN 'MAILKETING' ELSE 'FONNTE' END,
-         $4,
-         $5,
-         $6,
-         $7::jsonb,
-         $8
-       )
-       ON CONFLICT (org_id, idempotency_key) DO NOTHING`,
-      [
-        order.org_id,
-        order.user_id,
-        recipient.channel,
-        recipient.value,
-        `Pembayaran ${order.order_number} berhasil`,
-        grantCount > 0
-          ? 'Pembayaran berhasil dan akses kelas Anda sudah aktif.'
-          : 'Pembayaran berhasil kami terima.',
-        JSON.stringify({ orderId: order.id, orderNumber: order.order_number, grantCount }),
-        `order-paid:${order.id}:${recipient.channel}`,
-      ],
-    )
+    await enqueueNotification({
+      orgId: order.org_id,
+      userId: order.user_id,
+      eventType,
+      channel: recipient.channel,
+      recipient: recipient.value,
+      templateKey: eventType,
+      variables,
+      idempotencyKey: `${eventType.toLowerCase()}:${order.id}:${recipient.channel}`,
+      payload: { orderId: order.id, orderNumber: order.order_number, grantCount },
+    }, client)
   }
 }
 

@@ -27,6 +27,11 @@ import {
   type CommerceCouponQuote,
 } from '@/modules/ecommerce/lib/coupon.service'
 import { finalizeFreeCommerceOrder } from '@/modules/ecommerce/payments/commerce-payment.service'
+import { enqueueNotification } from '@/modules/notifications/outbox.server'
+
+function formatRupiahAmount(amount: number) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)
+}
 import {
   attachConsultingHoldsToOrder,
   getPublicConsultingOfferings,
@@ -3724,6 +3729,31 @@ export async function createCheckoutOrder(input: unknown) {
            )`,
           [context.orgId, order.id, `payment-shell:${order.id}`],
         )
+
+        const pendingVariables: Record<string, string | number | null> = {
+          name: payload.customerName || 'Member',
+          order_number: order.order_number,
+          product_name: [...new Set(items.map((item) => item.product.name))].join(', '),
+          amount: formatRupiahAmount(grandTotal),
+          payment_due: '24 jam ke depan',
+        }
+        const pendingRecipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
+        const normalizedNotifyEmail = normalizeCheckoutEmail(payload.customerEmail || '')
+        if (normalizedNotifyEmail) pendingRecipients.push({ channel: 'EMAIL', value: normalizedNotifyEmail })
+        if (payload.customerPhone) pendingRecipients.push({ channel: 'WHATSAPP', value: payload.customerPhone })
+        for (const recipient of pendingRecipients) {
+          await enqueueNotification({
+            orgId: context.orgId,
+            userId: checkoutIdentity?.userId || null,
+            eventType: 'ORDER_PENDING_PAYMENT',
+            channel: recipient.channel,
+            recipient: recipient.value,
+            templateKey: 'ORDER_PENDING_PAYMENT',
+            variables: pendingVariables,
+            idempotencyKey: `order-pending:${order.id}:${recipient.channel}`,
+            payload: { orderId: order.id, orderNumber: order.order_number },
+          }, client)
+        }
       }
 
       await client.query(

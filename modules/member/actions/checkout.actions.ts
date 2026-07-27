@@ -16,6 +16,11 @@ import {
   normalizeCheckoutEmail,
   normalizeCheckoutPhone,
 } from '@/modules/ecommerce/lib/checkout-identity.server'
+import { enqueueNotification } from '@/modules/notifications/outbox.server'
+
+function formatRupiah(amount: number) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)
+}
 import {
   snapshotOrderEntitlements,
 } from '@/modules/ecommerce/payments/entitlement.service'
@@ -769,6 +774,30 @@ export async function createMemberCheckout(
            )`,
           [offering.org_id, orderId, providerCode, `payment-shell:${orderId}`],
         )
+
+        const pendingVariables: Record<string, string | number | null> = {
+          name: checkoutUser.name || 'Member',
+          order_number: order.rows[0].order_number,
+          product_name: offering.public_name,
+          amount: formatRupiah(total),
+          payment_due: '24 jam ke depan',
+        }
+        const pendingRecipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
+        if (checkoutUser.email) pendingRecipients.push({ channel: 'EMAIL', value: checkoutUser.email })
+        if (checkoutUser.phone) pendingRecipients.push({ channel: 'WHATSAPP', value: checkoutUser.phone })
+        for (const recipient of pendingRecipients) {
+          await enqueueNotification({
+            orgId: offering.org_id,
+            userId: checkoutUser.userId,
+            eventType: 'ORDER_PENDING_PAYMENT',
+            channel: recipient.channel,
+            recipient: recipient.value,
+            templateKey: 'ORDER_PENDING_PAYMENT',
+            variables: pendingVariables,
+            idempotencyKey: `order-pending:${orderId}:${recipient.channel}`,
+            payload: { orderId, orderNumber: order.rows[0].order_number },
+          }, client)
+        }
       }
       await enqueueCheckoutAccountClaim(client, {
         orgId: offering.org_id,

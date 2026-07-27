@@ -2,6 +2,7 @@
  * Enqueue dan worker outbox notifikasi. Worker memakai SKIP LOCKED agar aman
  * dijalankan oleh beberapa proses tanpa mengirim pesan yang sama bersamaan.
  */
+import type { PoolClient } from 'pg'
 import { connectPostgresClient, queryPostgres } from '@/lib/db/postgres'
 import { getNotificationProvider } from './providers'
 
@@ -26,23 +27,32 @@ function interpolate(template: string, values: Record<string, string | number | 
   })
 }
 
-export async function enqueueNotification(input: {
-  orgId: string
-  userId?: string | null
-  eventType: string
-  channel: 'EMAIL' | 'WHATSAPP' | 'SMS' | 'IN_APP'
-  recipient: string
-  templateKey?: string
-  variables?: Record<string, string | number | null>
-  subject?: string | null
-  body?: string
-  providerCode?: string | null
-  idempotencyKey: string
-  payload?: Record<string, unknown>
-}) {
+export async function enqueueNotification(
+  input: {
+    orgId: string
+    userId?: string | null
+    eventType: string
+    channel: 'EMAIL' | 'WHATSAPP' | 'SMS' | 'IN_APP'
+    recipient: string
+    templateKey?: string
+    variables?: Record<string, string | number | null>
+    subject?: string | null
+    body?: string
+    providerCode?: string | null
+    idempotencyKey: string
+    payload?: Record<string, unknown>
+  },
+  client?: PoolClient,
+) {
+  // Accepts an optional transaction client so callers already inside a
+  // BEGIN/COMMIT block (e.g. order finalization) can enqueue atomically with
+  // the business change instead of on a separate pooled connection.
+  const exec = client
+    ? client.query.bind(client)
+    : queryPostgres
   const variables = input.variables || {}
   const template = input.templateKey
-    ? await queryPostgres<{
+    ? await exec<{
         id: string
         subject_template: string | null
         body_template: string
@@ -63,7 +73,7 @@ export async function enqueueNotification(input: {
   const body = interpolate(input.body || selected?.body_template || '', variables)
   if (!body) throw new Error('Isi notifikasi tidak boleh kosong.')
 
-  const result = await queryPostgres<{ id: string }>(
+  const result = await exec<{ id: string }>(
     `INSERT INTO public.notification_outbox (
        org_id, user_id, template_id, event_type, channel, provider_code,
        recipient, subject, body, payload, idempotency_key
