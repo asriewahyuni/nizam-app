@@ -4,9 +4,9 @@
  */
 import 'server-only'
 
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { queryPostgres } from '@/lib/db/postgres'
 import { sendSystemEmail } from '@/lib/email/sender'
+import { decryptSecret, encryptSecret } from './secret-crypto.server'
 
 export type TenantEmailConfig = {
   provider: 'MAILKETING' | 'SMTP'
@@ -28,34 +28,6 @@ export type TenantEmailConfig = {
     accountClaim: boolean
     certificateIssued: boolean
     affiliatePayout: boolean
-  }
-}
-
-const ENCRYPTION_SECRET = process.env.INTERNAL_AUTH_SESSION_SECRET || 'nizam-smtp-encryption-secret-32-chars!'
-const KEY = Buffer.from(createCipheriv('aes-256-cbc', ENCRYPTION_SECRET.slice(0, 32).padEnd(32, '0'), Buffer.alloc(16)).initializationVector ? ENCRYPTION_SECRET.slice(0, 32).padEnd(32, '0') : ENCRYPTION_SECRET.slice(0, 32).padEnd(32, '0'))
-const IV = Buffer.from('1234567890123456') // 16-byte fixed IV for deterministic config decryption
-
-function encryptSecret(text: string): string {
-  if (!text) return ''
-  try {
-    const cipher = createCipheriv('aes-256-cbc', KEY, IV)
-    let encrypted = cipher.update(text, 'utf8', 'hex')
-    encrypted += cipher.final('hex')
-    return encrypted
-  } catch {
-    return text
-  }
-}
-
-function decryptSecret(encryptedHex: string): string {
-  if (!encryptedHex) return ''
-  try {
-    const decipher = createDecipheriv('aes-256-cbc', KEY, IV)
-    let decrypted = decipher.update(encryptedHex, 'hex', 'utf8')
-    decrypted += decipher.final('utf8')
-    return decrypted
-  } catch {
-    return encryptedHex
   }
 }
 

@@ -4,6 +4,7 @@
  */
 import { sendSystemEmail } from '@/lib/email/sender'
 import { queryPostgres } from '@/lib/db/postgres'
+import { getTenantWhatsappSettings } from './whatsapp-settings.server'
 import type {
   NotificationDeliveryInput,
   NotificationProvider,
@@ -95,7 +96,16 @@ export class DripsenderNotificationProvider implements NotificationProvider {
   private static readonly ENDPOINT = 'https://api.dripsender.id/send'
 
   async send(input: NotificationDeliveryInput) {
-    const apiKey = requiredEnv('DRIPSENDER_API_KEY')
+    // API key Dripsender bersifat per-organisasi (tiap tenant punya akun sendiri),
+    // bukan env var global — dikonfigurasi lewat /lms/admin/settings/whatsapp.
+    const settings = await getTenantWhatsappSettings(input.orgId)
+    if (!settings.enabled) {
+      throw new Error('Notifikasi WhatsApp untuk organisasi ini sedang dinonaktifkan di pengaturan.')
+    }
+    if (!settings.dripsenderApiKey) {
+      throw new Error('API key Dripsender organisasi ini belum dikonfigurasi.')
+    }
+    const apiKey = settings.dripsenderApiKey
     // dripsender.id's API takes the key in the JSON body, not an auth header,
     // and expects the message under `text` (not `message`).
     const response = await fetch(DripsenderNotificationProvider.ENDPOINT, {

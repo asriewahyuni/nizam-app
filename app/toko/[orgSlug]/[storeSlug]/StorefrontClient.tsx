@@ -1494,10 +1494,35 @@ export default function StorefrontClient({
         </header>
       )}
 
+      {/* Checkout Sticky Header — product mode only */}
+      {pageMode === 'product' && (
+        <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/90 backdrop-blur-md">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6">
+            <div className="flex items-center gap-2.5">
+              {storeLogo ? (
+                <img src={storeLogo} alt={storeName} className="h-8 w-auto max-w-[90px] shrink-0 object-contain" />
+              ) : (
+                <div
+                  className="grid h-8 w-8 place-items-center rounded-xl text-sm font-extrabold text-white"
+                  style={{ backgroundColor: payload.theme.tokens.accent }}
+                >
+                  {storeInitials}
+                </div>
+              )}
+              <span className="text-base font-extrabold tracking-tight text-slate-900">
+                {payload.store.brandName || payload.store.name}
+              </span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
+              <ShieldCheck size={13} className="text-emerald-500" />
+              Checkout Aman
+            </div>
+          </div>
+        </header>
+      )}
+
       <main className={pageMode === 'product'
-        ? `relative mx-auto px-4 pb-20 pt-6 sm:px-6 sm:pt-8 ${
-          productPageConfig?.layout === 'TWO_COLUMNS' ? 'max-w-6xl' : 'max-w-xl'
-        }`
+        ? 'relative mx-auto max-w-6xl px-4 pb-20 pt-6 sm:px-6 sm:pt-8'
         : 'relative mx-auto max-w-7xl space-y-10 px-4 pb-20 sm:px-6 lg:space-y-12 lg:px-8'}>
         {pageMode === 'collection' && (
           <section className="grid gap-4 rounded-[32px] border bg-white p-6 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] lg:grid-cols-[1fr_auto]" style={{ borderColor: payload.theme.tokens.border }}>
@@ -1516,485 +1541,480 @@ export default function StorefrontClient({
         )}
 
         {pageMode === 'product' && selectedProduct && (
-          <div className={`mx-auto ${
-            productPageConfig?.layout === 'TWO_COLUMNS'
-              ? 'max-w-6xl space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0'
-              : 'max-w-xl space-y-5'
-          }`}>
-            {/* Header / Brand Info terintegrasi dengan konten (Mobile-First) */}
-            <div className={`flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white px-5 py-4 shadow-xs ${
-              productPageConfig?.layout === 'TWO_COLUMNS' ? 'lg:col-span-2' : ''
-            }`}>
-              <div className="flex min-w-0 items-center gap-3.5">
-                {storeLogo ? (
-                  <img src={storeLogo} alt={storeName} className="h-11 w-auto max-w-[100px] shrink-0 object-contain" />
-                ) : (
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center text-sm font-bold text-white shadow-xs" style={{ backgroundColor: payload.theme.tokens.accent, borderRadius: buttonRadius }}>
-                    {storeInitials}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <div className="truncate text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: payload.theme.tokens.muted }}>
-                    {payload.store.brandName || 'Official Store'}
-                  </div>
-                  <div className="truncate text-base font-extrabold text-slate-900">{payload.store.name}</div>
-                </div>
-              </div>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/60 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">
-                <ShieldCheck size={14} className="text-emerald-600" />
-                <span className="hidden sm:inline">Checkout </span>Aman
-              </div>
-            </div>
+          <div className="space-y-6">
 
-            {/* Optional Deskripsi Produk Ala Sejoli */}
+            {/* Optional Product Description */}
             {productPageConfig?.showDescription && selectedProduct.description && (
-              <div className={`rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs ${
-                productPageConfig.layout === 'TWO_COLUMNS' ? 'lg:col-span-2' : ''
-              }`}>
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
                 <div className="text-sm font-medium leading-relaxed text-slate-700 sm:text-base whitespace-pre-line">
                   {selectedProduct.description}
                 </div>
               </div>
             )}
 
-            {/* Kotak 1: DETAIL PESANAN (Produk, Varian, Qty, Total Bayar) */}
-            <div id="produk-dibeli" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
-              <div className="border-b border-slate-200/80 bg-slate-50/70 px-6 py-4">
-                <h2 className="text-base font-bold text-slate-900 sm:text-lg">1. Detail Pesanan</h2>
-              </div>
-
-              <div className="p-6">
-                <div className="flex items-start gap-4">
-                  {(getProductGallery(selectedProduct)[0] || selectedMediaByProductId[selectedProduct.id]) && (
+            {/* 3-Step Progress Bar */}
+            <div className="hidden items-center justify-center gap-3 text-xs font-semibold text-slate-500 sm:flex">
+              {[
+                { num: 1, label: 'Detail Pesanan' },
+                { num: 2, label: productPageConfig?.customerSectionTitle || 'Informasi Pribadi' },
+                { num: 3, label: productPageConfig?.paymentSectionTitle || 'Pembayaran' },
+              ].map((step, idx) => (
+                <>
+                  {idx > 0 && <div key={`div-${step.num}`} className="h-px w-10 bg-slate-300" />}
+                  <div key={step.num} className="flex items-center gap-2">
                     <div
-                      className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 bg-cover bg-center sm:h-20 sm:w-20"
-                      style={{
-                        backgroundImage: `url(${selectedMediaByProductId[selectedProduct.id] || getProductGallery(selectedProduct)[0]})`,
-                      }}
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-base font-extrabold text-slate-900 sm:text-lg">{selectedProduct.name}</div>
-                    {activeSingleVariant?.name && (
-                      <div className="mt-1 inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-                        Varian: {activeSingleVariant.name}
-                      </div>
-                    )}
-                    <div className="mt-1.5 text-sm font-bold text-slate-700">
-                      {formatRupiah(singleUnitPrice)}
+                      className="grid h-6 w-6 place-items-center rounded-full text-[11px] font-extrabold text-white"
+                      style={{ backgroundColor: payload.theme.tokens.accent }}
+                    >
+                      {step.num}
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      {isUnlimitedProduct(selectedProduct) ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
-                          <CheckCircle2 aria-hidden="true" size={14} />
-                          Akses Instan
-                        </span>
-                      ) : (
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${getProductStock(selectedProduct) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                          {getProductStock(selectedProduct) > 0 ? `Stok Tersedia: ${getProductStock(selectedProduct)}` : 'Stok Habis'}
-                        </span>
+                    <span className="text-slate-800">{step.label}</span>
+                  </div>
+                </>
+              ))}
+            </div>
+
+            {/* 2-Column checkout layout: left=forms, right=sticky order summary */}
+            <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:items-start">
+
+              {/* ── LEFT: Informasi Pribadi + Payment ── */}
+              <div className="space-y-5">
+                <section id="informasi-pribadi" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                  <div className="flex items-center gap-3 border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
+                    <div
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-extrabold text-white"
+                      style={{ backgroundColor: payload.theme.tokens.accent }}
+                    >
+                      2
+                    </div>
+                    <h2 className="text-base font-bold text-slate-900 sm:text-lg">
+                      {productPageConfig?.customerSectionTitle || 'Informasi Pribadi'}
+                    </h2>
+                  </div>
+
+                  <div className="p-5 space-y-4 sm:p-6">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                          Nama Lengkap <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          value={checkoutForm.customerName}
+                          onChange={(event) =>
+                            setCheckoutForm((current) => ({
+                              ...current,
+                              customerName: event.target.value,
+                              recipientName: current.recipientName || event.target.value,
+                            }))
+                          }
+                          placeholder="Nama sesuai identitas"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                          Alamat Email <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="email"
+                          value={checkoutForm.customerEmail}
+                          onChange={(event) => setCheckoutForm((current) => ({ ...current, customerEmail: event.target.value }))}
+                          placeholder="nama@contoh.com"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                          Nomor WhatsApp <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          value={checkoutForm.customerPhone}
+                          onChange={(event) =>
+                            setCheckoutForm((current) => ({
+                              ...current,
+                              customerPhone: event.target.value,
+                              addressPhone: current.addressPhone || event.target.value,
+                            }))
+                          }
+                          placeholder="08xxxxxxxxxx"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                        />
+                      </div>
+                      {productPageConfig?.showBuyerNote && (
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                            Catatan Tambahan
+                          </label>
+                          <input
+                            value={checkoutForm.notes}
+                            onChange={(event) => setCheckoutForm((current) => ({ ...current, notes: event.target.value }))}
+                            placeholder="Opsional"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                          />
+                        </div>
                       )}
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-base font-extrabold text-slate-900 sm:text-lg">{formatRupiah(singleSubtotal)}</div>
-                    <div className="mt-0.5 text-[11px] font-medium text-slate-400">subtotal</div>
-                  </div>
-                </div>
 
-                {selectedProduct.variants.length > 0 && (
-                  <div className="mt-5 space-y-2 border-t border-slate-100 pt-4">
-                    <div className="text-xs font-semibold text-slate-600">Pilih Varian:</div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {selectedProduct.variants.map((variant) => {
-                        const active = selectedVariantByProductId[selectedProduct.id] === variant.id
-                        return (
-                          <button
-                            type="button"
-                            key={variant.id}
-                            onClick={() => {
-                              setSelectedVariantByProductId((current) => ({ ...current, [selectedProduct.id]: variant.id }))
-                              if (variant.imageUrl) {
-                                setSelectedMediaByProductId((current) => ({ ...current, [selectedProduct.id]: variant.imageUrl }))
-                              }
-                            }}
-                            className="rounded-xl border px-3.5 py-2.5 text-left transition"
-                            style={{
-                              borderColor: active ? payload.theme.tokens.accent : '#E2E8F0',
-                              backgroundColor: active ? payload.theme.tokens.accentSoft : '#FFFFFF',
-                            }}
-                          >
-                            <div className="font-bold text-slate-900">{variant.name}</div>
-                            <div className="mt-0.5 text-xs text-slate-500">
-                              {variant.choices.map((choice) => `${choice.attributeName}: ${choice.attributeValue}`).join(' • ')}
+                    {!isDigitalOnlyStore && (
+                      <div className="space-y-4 border-t border-slate-100 pt-4">
+                        <div className="text-xs font-semibold text-slate-700">Alamat Pengiriman Fisik</div>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                              Zona Ongkir <span className="text-rose-500">*</span>
+                            </label>
+                            <select
+                              value={checkoutForm.shippingRateId}
+                              onChange={(event) => setCheckoutForm((current) => ({ ...current, shippingRateId: event.target.value }))}
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                            >
+                              {payload.shippingRates.map((rate) => (
+                                <option key={rate.id} value={rate.id}>
+                                  {rate.name} - {formatRupiah(rate.amount)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                              Alamat Lengkap <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                              value={checkoutForm.line1}
+                              onChange={(event) => setCheckoutForm((current) => ({ ...current, line1: event.target.value }))}
+                              placeholder="Nama jalan, nomor rumah, RT/RW..."
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-4">
+                          {[
+                            { key: 'district' as const, label: 'Kecamatan', placeholder: 'Kecamatan' },
+                            { key: 'city' as const, label: 'Kota/Kab', placeholder: 'Kota/Kabupaten' },
+                            { key: 'province' as const, label: 'Provinsi', placeholder: 'Provinsi' },
+                            { key: 'postalCode' as const, label: 'Kode Pos', placeholder: 'Kode Pos' },
+                          ].map(({ key, label, placeholder }) => (
+                            <div key={key}>
+                              <label className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</label>
+                              <input
+                                value={checkoutForm[key]}
+                                onChange={(event) => setCheckoutForm((current) => ({ ...current, [key]: event.target.value }))}
+                                placeholder={placeholder}
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                              />
                             </div>
-                            <div className="mt-1 text-sm font-bold text-slate-900">{formatRupiah(variant.price)}</div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {allowQuantityIncrement ? (
-                  <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-                    <span className="text-sm font-semibold text-slate-700">Jumlah Pesanan</span>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setSingleCheckoutQty((c) => Math.max(1, c - 1))}
-                        className="rounded-full border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:bg-slate-100"
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <div className="w-8 text-center text-sm font-extrabold text-slate-900">{singleCheckoutQty}</div>
-                      <button
-                        type="button"
-                        onClick={() => setSingleCheckoutQty((c) => Math.min(99, c + 1))}
-                        className="rounded-full border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:bg-slate-100"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-                    <span className="text-xs font-semibold text-slate-500">Jenis Layanan</span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">
-                      <CheckCircle2 aria-hidden="true" size={14} />
-                      Akses Digital • Sekali Bayar
-                    </span>
-                  </div>
-                )}
-
-                {(selectedProduct.courseBenefits?.length || selectedProduct.consulting) ? (
-                  <div className="mt-5 rounded-xl border border-teal-200 bg-teal-50 p-4">
-                    <div className="text-sm font-black text-teal-950">
-                      {productPageConfig?.benefitTitle || 'Anda mendapatkan'}
-                    </div>
-                    <div className="mt-3 space-y-2 text-sm font-semibold text-teal-900">
-                      {selectedProduct.consulting ? (
-                        <div className="flex items-start gap-2">
-                          <CheckCircle2 aria-hidden="true" size={17} className="mt-0.5 shrink-0" />
-                          <span>
-                            {selectedProduct.consulting.sessionCount} sesi privat bersama konsultan pilihan
-                          </span>
-                        </div>
-                      ) : null}
-                      {(selectedProduct.courseBenefits || []).map((course) => (
-                        <div key={course.id} className="flex items-start gap-2">
-                          <CheckCircle2 aria-hidden="true" size={17} className="mt-0.5 shrink-0" />
-                          <span>Bonus course: {course.title}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="mt-5 border-t border-slate-100 pt-4">
-                  {renderCouponField()}
-                </div>
-
-                <div className="-mx-6 -mb-6 mt-6 border-t border-slate-200/80 bg-slate-50/60 px-6 py-4 space-y-2 text-sm">
-                  <div className="flex justify-between text-slate-600 font-medium">
-                    <span>Subtotal {allowQuantityIncrement ? `(${singleCheckoutQty} item)` : ''}</span>
-                    <span className="font-semibold text-slate-900">{formatRupiah(singleSubtotal)}</span>
-                  </div>
-                  {!isDigitalOnlyStore && (
-                    <div className="flex justify-between text-slate-600 font-medium">
-                      <span>Ongkos Kirim</span>
-                      <span className="font-semibold text-slate-900">{formatRupiah(selectedShippingRate?.amount || 0)}</span>
-                    </div>
-                  )}
-                  {checkoutDiscountAmount > 0 && (
-                    <div className="flex justify-between font-semibold text-emerald-700">
-                      <span>Kode diskon {activeCouponQuote?.code}</span>
-                      <span>-{formatRupiah(checkoutDiscountAmount)}</span>
-                    </div>
-                  )}
-                  <div className="border-t border-slate-200/80 pt-3 flex items-center justify-between">
-                    <span className="text-base font-bold text-slate-900">Total Bayar</span>
-                    <span className="text-xl font-extrabold text-emerald-700">{formatRupiah(singleGrandTotal)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {selectedProduct.consulting ? (
-              <div className={productPageConfig?.layout === 'TWO_COLUMNS' ? 'lg:col-span-2' : ''}>
-                <ConsultingBookingSelector
-                  orgSlug={payload.store.orgSlug}
-                  storeSlug={payload.store.slug}
-                  storeProductId={selectedProduct.storeProductId}
-                  offering={selectedProduct.consulting}
-                  onHoldChange={(hold) => handleConsultingHoldChange(
-                    selectedProduct.storeProductId,
-                    hold,
-                  )}
-                />
-              </div>
-            ) : null}
-
-            {/* Kotak 2: INFORMASI PRIBADI */}
-            <div id="informasi-pribadi" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
-              <div className="border-b border-slate-200/80 bg-slate-50/70 px-6 py-4">
-                <h2 className="text-base font-bold text-slate-900 sm:text-lg">
-                  2. {productPageConfig?.customerSectionTitle || 'Informasi Pribadi'}
-                </h2>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                    Nama Lengkap <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    value={checkoutForm.customerName}
-                    onChange={(event) =>
-                      setCheckoutForm((current) => ({
-                        ...current,
-                        customerName: event.target.value,
-                        recipientName: current.recipientName || event.target.value,
-                      }))
-                    }
-                    placeholder="Contoh: Abdullah Nizam"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                  />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                      Alamat Email <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={checkoutForm.customerEmail}
-                      onChange={(event) => setCheckoutForm((current) => ({ ...current, customerEmail: event.target.value }))}
-                      placeholder="email@contoh.com"
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                      Nomor WhatsApp <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      value={checkoutForm.customerPhone}
-                      onChange={(event) =>
-                        setCheckoutForm((current) => ({
-                          ...current,
-                          customerPhone: event.target.value,
-                          addressPhone: current.addressPhone || event.target.value,
-                        }))
-                      }
-                      placeholder="08xxxxxxxxxx"
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                    />
-                  </div>
-                </div>
-
-                {!isDigitalOnlyStore && (
-                  <div className="space-y-4 border-t border-slate-100 pt-4">
-                    <div className="text-xs font-semibold text-slate-700">Alamat Pengiriman Fisik</div>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                          Zona Ongkir <span className="text-rose-500">*</span>
-                        </label>
-                        <select
-                          value={checkoutForm.shippingRateId}
-                          onChange={(event) => setCheckoutForm((current) => ({ ...current, shippingRateId: event.target.value }))}
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                        >
-                          {payload.shippingRates.map((rate) => (
-                            <option key={rate.id} value={rate.id}>
-                              {rate.name} - {formatRupiah(rate.amount)}
-                            </option>
                           ))}
-                        </select>
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                          Alamat Lengkap <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          value={checkoutForm.line1}
-                          onChange={(event) => setCheckoutForm((current) => ({ ...current, line1: event.target.value }))}
-                          placeholder="Nama jalan, nomor rumah, RT/RW..."
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-4">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">Kecamatan</label>
-                        <input
-                          value={checkoutForm.district}
-                          onChange={(event) => setCheckoutForm((current) => ({ ...current, district: event.target.value }))}
-                          placeholder="Kecamatan"
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">Kota/Kab</label>
-                        <input
-                          value={checkoutForm.city}
-                          onChange={(event) => setCheckoutForm((current) => ({ ...current, city: event.target.value }))}
-                          placeholder="Kota/Kabupaten"
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">Provinsi</label>
-                        <input
-                          value={checkoutForm.province}
-                          onChange={(event) => setCheckoutForm((current) => ({ ...current, province: event.target.value }))}
-                          placeholder="Provinsi"
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">Kode Pos</label>
-                        <input
-                          value={checkoutForm.postalCode}
-                          onChange={(event) => setCheckoutForm((current) => ({ ...current, postalCode: event.target.value }))}
-                          placeholder="Kode Pos"
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {productPageConfig?.showBuyerNote && (
-                  <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                      Catatan Tambahan (Opsional)
-                    </label>
-                    <textarea
-                      value={checkoutForm.notes}
-                      onChange={(event) => setCheckoutForm((current) => ({ ...current, notes: event.target.value }))}
-                      placeholder="Catatan pesanan, instruksi khusus, atau informasi lainnya..."
-                      rows={2}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Kotak 3: PILIH METODE PEMBAYARAN & TOMBOL BELI SEKARANG */}
-            <div id="metode-pembayaran" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs">
-              <div className="border-b border-slate-200/80 bg-slate-50/70 px-6 py-4">
-                <h2 className="text-base font-bold text-slate-900 sm:text-lg">
-                  3. {productPageConfig?.paymentSectionTitle || 'Metode Pembayaran & Konfirmasi'}
-                </h2>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div className="flex items-center gap-3.5 rounded-xl border-2 border-emerald-600 bg-emerald-50/40 p-4">
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-emerald-600 bg-emerald-600">
-                    <div className="h-2 w-2 rounded-full bg-white" />
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-slate-900">
-                      {productPageConfig?.paymentMethodLabel || 'Transfer Bank / Virtual Account / E-Wallet'}
-                    </div>
-                    <div className="text-xs text-slate-600">Verifikasi otomatis 24 jam melalui payment gateway.</div>
-                  </div>
-                </div>
-
-                {renderBankAccountBox()}
-
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (selectedProduct) {
-                        void submitCheckout()
-                      }
-                    }}
-                    disabled={checkoutLoading || getProductStock(selectedProduct) <= 0}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-base font-bold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-                    style={{ backgroundColor: payload.theme.tokens.accent }}
-                  >
-                    {checkoutLoading ? (
-                      <span className="inline-flex items-center gap-2">
-                        <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                        Memproses Pesanan...
-                      </span>
-                    ) : getProductStock(selectedProduct) > 0 ? (
-                      `${productPageConfig?.checkoutButtonLabel || 'Beli Sekarang'} • ${formatRupiah(singleGrandTotal)}`
-                    ) : (
-                      'Stok Sedang Habis'
-                    )}
-                  </button>
-                </div>
-
-                {productPageConfig?.showTrustSignals && (
-                  <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center text-xs font-semibold text-slate-500">
-                  <span className="inline-flex items-center gap-1.5">
-                    <ShieldCheck aria-hidden="true" size={14} />
-                    Transaksi Aman & Terenkripsi
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <CheckCircle2 aria-hidden="true" size={14} />
-                    Akses & Konfirmasi Otomatis
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Store aria-hidden="true" size={14} />
-                    Bantuan Admin 24/7
-                  </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Success state inline */}
-            {checkoutResult && (
-              <div id="checkout-result-card" className={`overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/90 shadow-xs ${
-                productPageConfig?.layout === 'TWO_COLUMNS' ? 'lg:col-span-2' : ''
-              }`}>
-                <div className="p-6 sm:p-8 flex items-start gap-4">
-                  <div className="rounded-full bg-emerald-600 p-3 text-white shadow-xs">
-                    <CheckCircle2 size={24} />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-emerald-950">
-                      Pesanan Berhasil Dibuat! (#{checkoutResult.orderNumber})
-                    </h3>
-                    <p className="text-sm font-medium text-emerald-800">
-                      Silakan lanjutkan ke halaman instruksi pembayaran untuk menyelesaikannya.
-                    </p>
-                    {checkoutResult.transferInstructions && (
-                      <div className="mt-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm font-medium text-slate-700">
-                        {checkoutResult.transferInstructions}
+                        </div>
                       </div>
                     )}
-                    <div className="pt-3">
-                      <Link
-                        href={checkoutResult.orderAccessUrl}
-                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-6 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-800"
+                  </div>
+                </section>
+
+                {/* Consulting selector if applicable */}
+                {selectedProduct.consulting && (
+                  <ConsultingBookingSelector
+                    orgSlug={payload.store.orgSlug}
+                    storeSlug={payload.store.slug}
+                    storeProductId={selectedProduct.storeProductId}
+                    offering={selectedProduct.consulting}
+                    onHoldChange={(hold) => handleConsultingHoldChange(selectedProduct.storeProductId, hold)}
+                  />
+                )}
+
+                {/* Section 3: Payment method */}
+                <section id="metode-pembayaran" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                  <div className="flex items-center gap-3 border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
+                    <div
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-extrabold text-white"
+                      style={{ backgroundColor: payload.theme.tokens.accent }}
+                    >
+                      3
+                    </div>
+                    <h2 className="text-base font-bold text-slate-900 sm:text-lg">
+                      {productPageConfig?.paymentSectionTitle || 'Metode Pembayaran'}
+                    </h2>
+                  </div>
+
+                  <div className="p-5 space-y-4 sm:p-6">
+                    {/* Payment method radio */}
+                    <div
+                      className="flex cursor-default items-start gap-3 rounded-xl border-2 p-4"
+                      style={{ borderColor: payload.theme.tokens.accent, backgroundColor: `${payload.theme.tokens.accent}0d` }}
+                    >
+                      <div
+                        className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2"
+                        style={{ borderColor: payload.theme.tokens.accent, backgroundColor: payload.theme.tokens.accent }}
                       >
-                        Buka Instruksi & Bukti Bayar Sekarang
-                        <ArrowRight size={16} />
-                      </Link>
+                        <div className="h-2 w-2 rounded-full bg-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold text-slate-900">
+                          {productPageConfig?.paymentMethodLabel || 'Transfer Bank / Virtual Account / E-Wallet'}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Verifikasi otomatis dalam 24 jam melalui payment gateway.
+                        </p>
+                      </div>
+                    </div>
+
+                    {renderBankAccountBox()}
+                  </div>
+                </section>
+
+                {/* Success result card */}
+                {checkoutResult && (
+                  <div id="checkout-result-card" className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/90 shadow-sm">
+                    <div className="flex items-start gap-4 p-6 sm:p-8">
+                      <div className="rounded-full bg-emerald-600 p-3 text-white">
+                        <CheckCircle2 size={24} />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-bold text-emerald-950">
+                          Pesanan Berhasil Dibuat! (#{checkoutResult.orderNumber})
+                        </h3>
+                        <p className="text-sm font-medium text-emerald-800">
+                          Silakan lanjutkan ke halaman instruksi pembayaran untuk menyelesaikannya.
+                        </p>
+                        {checkoutResult.transferInstructions && (
+                          <div className="mt-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm font-medium text-slate-700">
+                            {checkoutResult.transferInstructions}
+                          </div>
+                        )}
+                        <div className="pt-3">
+                          <Link
+                            href={checkoutResult.orderAccessUrl}
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-6 py-3.5 text-sm font-bold text-white hover:bg-emerald-800"
+                          >
+                            Buka Instruksi & Bukti Bayar Sekarang
+                            <ArrowRight size={16} />
+                          </Link>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
-            )}
+              {/* END LEFT */}
 
-            {/* Minimal Sejoli Secure Footer */}
-            <footer className="mx-auto max-w-3xl border-t border-slate-200/80 pt-8 pb-4 text-center text-xs font-semibold text-slate-400">
-              <p>© {new Date().getFullYear()} {payload.store.brandName || payload.store.name}. Secure 100% Single-Page Checkout.</p>
+              {/* ── RIGHT: Sticky Order Summary ── */}
+              <aside className="lg:sticky lg:top-24 lg:self-start">
+                <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                  <div className="flex items-center gap-3 border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
+                    <div
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-extrabold text-white"
+                      style={{ backgroundColor: payload.theme.tokens.accent }}
+                    >
+                      1
+                    </div>
+                    <h2 className="text-base font-bold text-slate-900 sm:text-lg">Detail Pesanan</h2>
+                  </div>
+
+                  <div className="p-5 space-y-4 sm:p-6">
+                    {/* Product card */}
+                    <div className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                      {(getProductGallery(selectedProduct)[0] || selectedMediaByProductId[selectedProduct.id]) ? (
+                        <div
+                          className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 bg-cover bg-center"
+                          style={{
+                            backgroundImage: `url(${selectedMediaByProductId[selectedProduct.id] || getProductGallery(selectedProduct)[0]})`,
+                          }}
+                        />
+                      ) : (
+                        <div
+                          className="grid h-16 w-16 shrink-0 place-items-center rounded-xl text-white"
+                          style={{ backgroundColor: payload.theme.tokens.accent }}
+                        >
+                          <PackageCheck size={22} />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold leading-tight text-slate-900">{selectedProduct.name}</div>
+                        {activeSingleVariant?.name && (
+                          <div className="mt-1 inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                            Varian: {activeSingleVariant.name}
+                          </div>
+                        )}
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          {isUnlimitedProduct(selectedProduct) ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                              <CheckCircle2 size={12} />
+                              Akses Instan
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${getProductStock(selectedProduct) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                              {getProductStock(selectedProduct) > 0 ? `Stok: ${getProductStock(selectedProduct)}` : 'Stok Habis'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1.5 text-sm font-bold text-slate-800">{formatRupiah(singleUnitPrice)}</div>
+                      </div>
+                    </div>
+
+                    {/* Variants */}
+                    {selectedProduct.variants.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold text-slate-600">Pilih Varian:</div>
+                        <div className="grid gap-2">
+                          {selectedProduct.variants.map((variant) => {
+                            const active = selectedVariantByProductId[selectedProduct.id] === variant.id
+                            return (
+                              <button
+                                type="button"
+                                key={variant.id}
+                                onClick={() => {
+                                  setSelectedVariantByProductId((current) => ({ ...current, [selectedProduct.id]: variant.id }))
+                                  if (variant.imageUrl) {
+                                    setSelectedMediaByProductId((current) => ({ ...current, [selectedProduct.id]: variant.imageUrl }))
+                                  }
+                                }}
+                                className="rounded-xl border px-3.5 py-2.5 text-left text-xs transition"
+                                style={{
+                                  borderColor: active ? payload.theme.tokens.accent : '#E2E8F0',
+                                  backgroundColor: active ? payload.theme.tokens.accentSoft : '#FFFFFF',
+                                }}
+                              >
+                                <div className="font-bold text-slate-900">{variant.name}</div>
+                                <div className="mt-0.5 text-slate-500">
+                                  {variant.choices.map((c) => `${c.attributeName}: ${c.attributeValue}`).join(' • ')}
+                                </div>
+                                <div className="mt-1 font-bold text-slate-900">{formatRupiah(variant.price)}</div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Qty stepper */}
+                    {allowQuantityIncrement && (
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                        <span className="text-xs font-semibold text-slate-600">Jumlah</span>
+                        <div className="flex items-center gap-3">
+                          <button type="button" onClick={() => setSingleCheckoutQty((c) => Math.max(1, c - 1))} className="rounded-full border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:bg-slate-100">
+                            <Minus size={13} />
+                          </button>
+                          <span className="w-6 text-center text-sm font-extrabold text-slate-900">{singleCheckoutQty}</span>
+                          <button type="button" onClick={() => setSingleCheckoutQty((c) => Math.min(99, c + 1))} className="rounded-full border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:bg-slate-100">
+                            <Plus size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Service type */}
+                    {!allowQuantityIncrement && (
+                      <dl className="text-xs">
+                        <div className="flex justify-between text-slate-500">
+                          <dt>Jenis Layanan</dt>
+                          <dd className="font-semibold text-slate-700">Akses Digital • Sekali Bayar</dd>
+                        </div>
+                      </dl>
+                    )}
+
+                    {/* Course benefits / bonus */}
+                    {(selectedProduct.courseBenefits?.length || selectedProduct.consulting) ? (
+                      <div className="flex items-start gap-2 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/60 p-3">
+                        <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+                        <div className="min-w-0 text-xs">
+                          <div className="font-semibold text-slate-800">{productPageConfig?.benefitTitle || 'Bonus Termasuk'}</div>
+                          <div className="mt-1 space-y-0.5 text-slate-500">
+                            {selectedProduct.consulting && (
+                              <div>{selectedProduct.consulting.sessionCount} sesi privat bersama konsultan pilihan</div>
+                            )}
+                            {(selectedProduct.courseBenefits || []).map((course) => (
+                              <div key={course.id}>{course.title}</div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Coupon */}
+                    <div>
+                      {renderCouponField()}
+                    </div>
+
+                    {/* Totals */}
+                    <div className="space-y-2 border-t border-slate-200/80 pt-4 text-sm">
+                      <div className="flex justify-between text-slate-500">
+                        <span>Subtotal{allowQuantityIncrement ? ` (${singleCheckoutQty} item)` : ''}</span>
+                        <span className="tabular-nums font-medium text-slate-800">{formatRupiah(singleSubtotal)}</span>
+                      </div>
+                      {!isDigitalOnlyStore && (
+                        <div className="flex justify-between text-slate-500">
+                          <span>Ongkos Kirim</span>
+                          <span className="tabular-nums font-medium text-slate-800">{formatRupiah(selectedShippingRate?.amount || 0)}</span>
+                        </div>
+                      )}
+                      {checkoutDiscountAmount > 0 && (
+                        <div className="flex justify-between font-semibold text-emerald-700">
+                          <span>Diskon {activeCouponQuote?.code}</span>
+                          <span>-{formatRupiah(checkoutDiscountAmount)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-baseline justify-between border-t border-slate-200/80 pt-3">
+                        <span className="text-sm font-semibold text-slate-800">Total Bayar</span>
+                        <span className="text-xl font-extrabold tabular-nums text-slate-900">{formatRupiah(singleGrandTotal)}</span>
+                      </div>
+                    </div>
+
+                    {/* CTA Button */}
+                    <button
+                      type="button"
+                      onClick={() => { if (selectedProduct) { void submitCheckout() } }}
+                      disabled={checkoutLoading || getProductStock(selectedProduct) <= 0}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{
+                        background: `linear-gradient(135deg, ${payload.theme.tokens.accent}, ${payload.theme.tokens.accent}cc)`,
+                        boxShadow: `0 10px 30px -8px ${payload.theme.tokens.accent}80`,
+                      }}
+                    >
+                      {checkoutLoading ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                          Memproses Pesanan...
+                        </span>
+                      ) : getProductStock(selectedProduct) > 0 ? (
+                        <>
+                          <ShieldCheck size={15} />
+                          {productPageConfig?.checkoutButtonLabel || 'Beli Sekarang'} • {formatRupiah(singleGrandTotal)}
+                        </>
+                      ) : (
+                        'Stok Sedang Habis'
+                      )}
+                    </button>
+
+                    {/* Trust badges grid */}
+                    {productPageConfig?.showTrustSignals && (
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        {[
+                          { icon: <ShieldCheck size={14} className="text-emerald-500" />, label: 'Terenkripsi' },
+                          { icon: <CheckCircle2 size={14} className="text-emerald-500" />, label: 'Otomatis' },
+                          { icon: <Store size={14} className="text-emerald-500" />, label: '24/7' },
+                        ].map(({ icon, label }) => (
+                          <div key={label} className="flex flex-col items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/60 py-2.5">
+                            {icon}
+                            <span className="text-[10px] font-semibold text-slate-500">{label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </aside>
+              {/* END RIGHT */}
+
+            </div>
+            {/* END 2-col grid */}
+
+            {/* Checkout footer */}
+            <footer className="border-t border-slate-200/80 pt-8 pb-4 text-center text-xs font-semibold text-slate-400">
+              © {new Date().getFullYear()} {payload.store.brandName || payload.store.name} · Secure Single-Page Checkout
             </footer>
+
           </div>
         )}
+
 
         {pageMode !== 'product' && pageBlocks.map((block) => renderBlock(block))}
 
