@@ -308,7 +308,7 @@ export async function getPortalDashboard(
          AND access_grant.user_id = $2::uuid
          AND access_grant.status = 'ACTIVE'
          AND session.start_time >= NOW()
-       ORDER BY session.start_time
+       ORDER BY session.start_time::text
        LIMIT 5`,
       [tenant.id, member.userId],
     ),
