@@ -86,7 +86,7 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
     <div className="min-h-screen bg-slate-100 text-slate-950 antialiased">
       <a
         href="#konten-utama"
-        className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-transform focus:translate-y-0 focus:outline-none focus:ring-4 focus:ring-emerald-300"
+        className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-lg bg-[var(--color-primary,theme(colors.emerald.800))] px-4 py-3 text-sm font-semibold text-white shadow-lg transition-transform focus:translate-y-0 focus:outline-none focus:ring-4 focus:ring-[var(--color-primary,theme(colors.emerald.300))]"
       >
         Lewati ke konten
       </a>
@@ -99,7 +99,7 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
           '--color-accent-hover': tenant.accentColorHover || tenant.accentColor || tenant.primaryColor,
         } as React.CSSProperties : undefined}
       >
-        <header className="sticky top-0 z-50 border-b border-emerald-950/10 border-[var(--color-primary)]/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+        <header className="sticky top-0 z-50 border-b border-[var(--color-primary,theme(colors.emerald.950))]/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
           <div className="flex min-h-16 items-center gap-3 px-4 justify-between">
             <Link
               href={basePath || '/'}
@@ -113,12 +113,12 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
                 />
               ) : (
                 <>
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-700 bg-[var(--color-primary)] text-white shadow-sm transition-colors duration-200 group-hover:bg-emerald-800">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-primary,theme(colors.emerald.700))] text-white shadow-sm transition-colors duration-200 group-hover:bg-[var(--color-primary,theme(colors.emerald.800))]">
                     <BookOpen aria-hidden="true" size={19} />
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold tracking-tight">{tenant.portalName}</span>
-                    <span className="block text-[10px] font-medium text-emerald-800 text-[var(--color-accent)]">Portal member</span>
+                    <span className="block text-[10px] font-medium text-[var(--color-accent,theme(colors.emerald.800))]">Portal member</span>
                   </span>
                 </>
               )}
@@ -127,7 +127,7 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
             {member ? (
               <Link
                 href={portalPath('/profile', '/profil')}
-                className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors duration-200 hover:border-emerald-300 hover:border-[var(--color-accent)] hover:bg-emerald-50 hover:bg-[var(--color-primary)]/5 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary,theme(colors.emerald.200))]"
+                className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition-colors duration-200 hover:border-[var(--color-accent,theme(colors.emerald.300))] hover:bg-[var(--color-primary,theme(colors.emerald.700))]/5 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary,theme(colors.emerald.200))]"
                 aria-label={`Buka profil ${member.displayName}`}
               >
                 <UserRound aria-hidden="true" size={16} />
@@ -136,7 +136,7 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
             ) : (
               <Link
                 href={`/login?redirectTo=${encodeURIComponent(callbackPath)}`}
-                className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl bg-orange-600 bg-[var(--color-accent)] hover:bg-orange-700 hover:bg-[var(--color-accent-hover)] px-3.5 text-xs font-semibold text-white transition-colors duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-accent,theme(colors.orange.200))]"
+                className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl bg-[var(--color-accent,theme(colors.orange.600))] hover:bg-[var(--color-accent-hover,theme(colors.orange.700))] px-3.5 text-xs font-semibold text-white transition-colors duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-accent,theme(colors.orange.200))]"
               >
                 <LogIn aria-hidden="true" size={16} />
                 Masuk
@@ -154,7 +154,7 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
                 <Link
                   key={item.label}
                   href={item.href}
-                  className="flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-600 transition-colors duration-200 hover:bg-emerald-50 hover:bg-[var(--color-primary)]/5 hover:text-emerald-900 hover:text-[var(--color-primary)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary,theme(colors.emerald.200))]"
+                  className="flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-600 transition-colors duration-200 hover:bg-[var(--color-primary,theme(colors.emerald.700))]/5 hover:text-[var(--color-primary,theme(colors.emerald.900))] focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary,theme(colors.emerald.200))]"
                 >
                   <Icon aria-hidden="true" size={15} />
                   {item.label}
@@ -171,11 +171,11 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
           {children}
         </main>
 
-        <footer className="border-t border-emerald-950/10 border-[var(--color-primary)]/10 bg-emerald-950 bg-[var(--color-primary)] text-emerald-50">
+        <footer className="border-t border-[var(--color-primary,theme(colors.emerald.950))]/10 bg-[var(--color-primary,theme(colors.emerald.950))] text-slate-100">
           <div className="flex flex-col gap-3 px-4 py-6">
             <div>
               <p className="text-sm font-semibold">{tenant.portalName}</p>
-              <p className="mt-1 text-xs text-emerald-100/75">Pembelajaran dan transaksi dilindungi Nizam ERP.</p>
+              <p className="mt-1 text-xs text-slate-300/80">Pembelajaran dan transaksi dilindungi Nizam ERP.</p>
             </div>
           </div>
         </footer>
