@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { queryPostgres } from '@/lib/db/postgres'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { settleCommercePayment } from '@/modules/ecommerce/payments/commerce-payment.service'
+import { finalizePaidCommerceOrder } from '@/modules/ecommerce/payments/commerce-payment.service'
 import { sendSystemEmail } from '@/lib/email/sender'
 
 export async function resendOrderAccessEmailAction(orderId: string) {
@@ -74,13 +74,35 @@ export async function markOrderPaidManualAction(orderId: string) {
   }
 
   try {
-    await settleCommercePayment({
+    const orderResult = await queryPostgres<{ grand_total: number }>(
+      `SELECT grand_total::float8 FROM public.ecommerce_orders WHERE id = $1::uuid AND org_id = $2::uuid LIMIT 1`,
+      [orderId, orgData.org.id],
+    )
+    const order = orderResult.rows[0]
+    if (!order) return { error: 'Order tidak ditemukan.' }
+
+    const idempotencyKey = `manual-settlement:${orderId}`
+    const intentResult = await queryPostgres<{ id: string }>(
+      `INSERT INTO public.commerce_payment_intents (
+         org_id, order_id, provider_code, provider_reference, amount, idempotency_key
+       )
+       VALUES ($1::uuid, $2::uuid, 'MANUAL_BANK_TRANSFER', $3, $4, $3)
+       ON CONFLICT (org_id, idempotency_key) DO UPDATE SET updated_at = NOW()
+       RETURNING id::text`,
+      [orgData.org.id, orderId, idempotencyKey, order.grand_total],
+    )
+    const paymentIntentId = intentResult.rows[0].id
+
+    await finalizePaidCommerceOrder({
       orgId: orgData.org.id,
       orderId,
-      gatewayCode: 'MANUAL_BANK_TRANSFER',
-      settlementAmount: 0,
-      feeAmount: 0,
-      referenceNumber: `MANUAL-${Date.now()}`,
+      paymentIntentId,
+      providerCode: 'MANUAL_BANK_TRANSFER',
+      providerReference: idempotencyKey,
+      providerEventId: `${idempotencyKey}:${Date.now()}`,
+      paidAmount: order.grand_total,
+      gatewayFeeAmount: 0,
+      idempotencyKey: `finalize:${idempotencyKey}`,
     })
     revalidatePath('/lms/admin/penjualan/transaksi')
     return { success: true }

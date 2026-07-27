@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import {
   getTenantEmailSettings,
   saveTenantEmailSettings,
+  sendTenantTestEmailAction,
   type TenantEmailConfig,
 } from '@/modules/notifications/email-settings.server'
 import { LmsEmailSettingsForm } from './LmsEmailSettingsForm'
@@ -21,6 +22,11 @@ async function handleSaveAction(orgId: string, config: TenantEmailConfig) {
       error: error instanceof Error ? error.message : 'Gagal menyimpan pengaturan email.',
     }
   }
+}
+
+async function handleSendTestEmailAction(orgId: string, targetEmail: string) {
+  'use server'
+  return sendTenantTestEmailAction(orgId, targetEmail)
 }
 
 export default async function LmsAdminEmailSettingsPage() {
@@ -45,6 +51,7 @@ export default async function LmsAdminEmailSettingsPage() {
         orgId={orgData.org.id}
         initialConfig={initialConfig}
         onSaveAction={handleSaveAction}
+        onSendTestEmailAction={handleSendTestEmailAction}
       />
     </div>
   )

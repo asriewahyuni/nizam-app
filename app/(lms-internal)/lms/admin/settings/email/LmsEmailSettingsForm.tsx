@@ -11,17 +11,18 @@ import {
   Sparkles,
   Sliders,
 } from 'lucide-react'
-import { sendTenantTestEmailAction } from '@/modules/notifications/email-settings.server'
 import type { TenantEmailConfig } from '@/modules/notifications/email-settings.server'
 
 export function LmsEmailSettingsForm({
   orgId,
   initialConfig,
   onSaveAction,
+  onSendTestEmailAction,
 }: {
   orgId: string
   initialConfig: TenantEmailConfig
   onSaveAction: (orgId: string, config: TenantEmailConfig) => Promise<{ success?: boolean; error?: string }>
+  onSendTestEmailAction: (orgId: string, targetEmail: string) => Promise<{ success?: boolean; error?: string }>
 }) {
   const [config, setConfig] = useState<TenantEmailConfig>(initialConfig)
   const [testEmail, setTestEmail] = useState('')
@@ -46,7 +47,7 @@ export function LmsEmailSettingsForm({
     e.preventDefault()
     setTestMessage(null)
     startTransition(async () => {
-      const res = await sendTenantTestEmailAction(orgId, testEmail)
+      const res = await onSendTestEmailAction(orgId, testEmail)
       if (res.error) {
         setTestMessage({ type: 'error', text: res.error })
       } else {
