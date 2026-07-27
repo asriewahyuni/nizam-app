@@ -23,15 +23,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const isConsolidated = isParentOrg && params.consolidated === 'true'
   const reportBranchId = isConsolidated ? null : (canAccessAllBranches ? null : (activeBranch?.id ?? null))
 
-  // Neraca adalah snapshot saldo per tanggal — startDate/endDate dipakai sebagai
-  // dua titik pembanding (Neraca Komparatif), bukan filter rentang transaksi.
+  // Neraca adalah snapshot saldo per tanggal akhir periode (endDate), bukan filter rentang transaksi.
   const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
-  const resolvedStartDate = startDate || `${todayInJakarta.slice(0, 7)}-01`
   const resolvedEndDate = endDate || todayInJakarta
 
-  const [balanceSheet, balanceSheetStart, profitLoss, cashFlow, cogsTrend] = await Promise.all([
+  const [balanceSheet, profitLoss, cashFlow, cogsTrend] = await Promise.all([
     getBalanceSheet(orgData.org.id, resolvedEndDate, reportBranchId, isConsolidated),
-    getBalanceSheet(orgData.org.id, resolvedStartDate, reportBranchId, isConsolidated),
     getProfitLoss(orgData.org.id, startDate, endDate, reportBranchId, isConsolidated),
     getCashFlow(orgData.org.id, reportBranchId, isConsolidated, { startDate, endDate }),
     getCogsRevenueTrend(orgData.org.id, reportBranchId),
@@ -43,7 +40,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       orgName={orgData.org.name}
       branchId={reportBranchId}
       balanceSheet={balanceSheet}
-      balanceSheetStart={balanceSheetStart}
       profitLoss={profitLoss}
       cashFlow={cashFlow}
       cogsTrend={cogsTrend}
