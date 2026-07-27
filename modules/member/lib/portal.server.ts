@@ -14,6 +14,9 @@ export type PortalTenant = {
   logoUrl: string | null
   portalName: string
   portalLogoUrl: string | null
+  primaryColor: string | null
+  accentColor: string | null
+  accentColorHover: string | null
   primaryHostname: string | null
 }
 
@@ -73,6 +76,9 @@ export async function getPortalTenant(orgSlug: string): Promise<PortalTenant | n
     logoUrl: row.logo_url,
     portalName: String(brandingRecord.name || row.name),
     portalLogoUrl: String(brandingRecord.logo_url || row.logo_url || '') || null,
+    primaryColor: String(brandingRecord.primary_color || '') || null,
+    accentColor: String(brandingRecord.accent_color || '') || null,
+    accentColorHover: String(brandingRecord.accent_color_hover || '') || null,
     primaryHostname: row.primary_hostname,
   }
 }

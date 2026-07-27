@@ -65,10 +65,10 @@ export default async function MemberDashboardPage({
 
   return (
     <div className="px-4 py-6 space-y-6">
-      <section className="overflow-hidden rounded-3xl bg-emerald-950 text-white shadow-sm">
+      <section className="overflow-hidden rounded-3xl bg-[var(--color-primary,theme(colors.emerald.950))] text-white shadow-sm">
         <div className="flex flex-col gap-6 p-5">
           <div>
-            <div className="mb-4 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-emerald-300/30 bg-emerald-800/60 px-3 text-xs font-semibold text-emerald-50">
+            <div className="mb-4 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[var(--color-primary-light,rgba(52,211,153,0.3))] bg-[var(--color-primary-light,rgba(4,120,87,0.6))] px-3 text-xs font-semibold text-emerald-50">
               <ShieldCheck aria-hidden="true" size={15} />
               Akun dan akses Anda terverifikasi
             </div>
@@ -81,7 +81,7 @@ export default async function MemberDashboardPage({
             <div className="mt-5 flex flex-col gap-2">
               <Link
                 href={`${basePath}/kelas`}
-                className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-orange-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-300 motion-reduce:transition-none"
+                className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--color-accent,theme(colors.orange.600))] px-5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[var(--color-accent-hover,theme(colors.orange.500))] focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-accent,theme(colors.orange.300))] motion-reduce:transition-none"
               >
                 Lanjutkan belajar
                 <ArrowRight aria-hidden="true" size={17} />
@@ -117,12 +117,12 @@ export default async function MemberDashboardPage({
         <section aria-labelledby="kelas-aktif-title">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold text-emerald-700">Perjalanan belajar</p>
+              <p className="text-xs font-semibold text-[var(--color-primary,theme(colors.emerald.700))]">Perjalanan belajar</p>
               <h2 id="kelas-aktif-title" className="mt-0.5 text-xl font-bold tracking-tight">Kelas aktif</h2>
             </div>
             <Link
               href={`${basePath}/kelas`}
-              className="flex min-h-9 cursor-pointer items-center gap-1 rounded-lg px-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+              className="flex min-h-9 cursor-pointer items-center gap-1 rounded-lg px-2 text-xs font-semibold text-[var(--color-primary,theme(colors.emerald.800))] hover:bg-[var(--color-primary-light,theme(colors.emerald.50))] focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary,theme(colors.emerald.200))]"
             >
               Semua kelas
               <ArrowRight aria-hidden="true" size={14} />
@@ -130,8 +130,8 @@ export default async function MemberDashboardPage({
           </div>
 
           {dashboard.courses.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-emerald-300 bg-white p-6 text-center">
-              <BookOpenCheck aria-hidden="true" className="mx-auto text-emerald-700" size={32} />
+            <div className="rounded-2xl border border-dashed border-[var(--color-primary-light,theme(colors.emerald.300))] bg-white p-6 text-center">
+              <BookOpenCheck aria-hidden="true" className="mx-auto text-[var(--color-primary,theme(colors.emerald.700))]" size={32} />
               <h3 className="mt-3 text-sm font-semibold">Belum ada kelas aktif</h3>
               <p className="mx-auto mt-1.5 max-w-xs text-xs leading-5 text-slate-600">
                 Kelas yang dibeli, diberikan admin, atau termasuk paket membership akan tampil di sini.
@@ -150,7 +150,7 @@ export default async function MemberDashboardPage({
               {dashboard.courses.map((course) => (
                 <article key={course.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-4">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-primary-light,theme(colors.emerald.100))] text-[var(--color-primary,theme(colors.emerald.800))]">
                       <BookOpenCheck aria-hidden="true" size={19} />
                     </span>
                     {course.expiresAt && (
