@@ -796,6 +796,8 @@ export async function createMemberCheckout(
             variables: pendingVariables,
             idempotencyKey: `order-pending:${orderId}:${recipient.channel}`,
             payload: { orderId, orderNumber: order.rows[0].order_number },
+            storeProductId,
+            overrideEventKey: 'on_hold',
           }, client)
         }
       }

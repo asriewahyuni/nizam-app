@@ -27,6 +27,20 @@ function interpolate(template: string, values: Record<string, string | number | 
   })
 }
 
+/**
+ * Kunci event override per-produk (store_products.notification_overrides),
+ * meniru "Notifikasi per produk" di Sejoli (on-hold/payment-confirm/
+ * in-progress/shipping/completed/cancelled/refunded).
+ */
+export type ProductNotificationEventKey =
+  | 'on_hold'
+  | 'payment_confirm'
+  | 'in_progress'
+  | 'shipping'
+  | 'completed'
+  | 'cancelled'
+  | 'refunded'
+
 export async function enqueueNotification(
   input: {
     orgId: string
@@ -41,6 +55,9 @@ export async function enqueueNotification(
     providerCode?: string | null
     idempotencyKey: string
     payload?: Record<string, unknown>
+    /** Kalau diisi, coba pakai override konten dari produk ini dulu sebelum jatuh ke template org. */
+    storeProductId?: string | null
+    overrideEventKey?: ProductNotificationEventKey
   },
   client?: PoolClient,
 ) {
@@ -51,7 +68,34 @@ export async function enqueueNotification(
     ? client.query.bind(client)
     : queryPostgres
   const variables = input.variables || {}
-  const template = input.templateKey
+
+  let overrideSubject: string | null = null
+  let overrideBody: string | null = null
+  if (input.storeProductId && input.overrideEventKey) {
+    const channelKey = input.channel === 'EMAIL' ? 'email' : 'whatsapp'
+    const overrideResult = await exec<{ notification_overrides: Record<string, unknown> }>(
+      `SELECT notification_overrides
+       FROM public.store_products
+       WHERE id = $1::uuid AND org_id = $2::uuid
+       LIMIT 1`,
+      [input.storeProductId, input.orgId],
+    )
+    const overrides = overrideResult.rows[0]?.notification_overrides
+    if (overrides && overrides.enabled === true) {
+      const eventOverride = overrides[input.overrideEventKey] as Record<string, unknown> | undefined
+      const channelOverride = eventOverride?.[channelKey] as Record<string, unknown> | string | undefined
+      const rawBody = typeof channelOverride === 'string' ? channelOverride : String((channelOverride as Record<string, unknown>)?.body || '')
+      const rawSubject = typeof channelOverride === 'object' && channelOverride
+        ? String((channelOverride as Record<string, unknown>).subject || '')
+        : ''
+      if (rawBody.trim()) {
+        overrideBody = rawBody
+        overrideSubject = rawSubject || null
+      }
+    }
+  }
+
+  const template = !overrideBody && input.templateKey
     ? await exec<{
         id: string
         subject_template: string | null
@@ -69,8 +113,8 @@ export async function enqueueNotification(
       )
     : null
   const selected = template?.rows[0]
-  const subject = interpolate(input.subject || selected?.subject_template || '', variables) || null
-  const body = interpolate(input.body || selected?.body_template || '', variables)
+  const subject = interpolate(overrideSubject || input.subject || selected?.subject_template || '', variables) || null
+  const body = interpolate(overrideBody || input.body || selected?.body_template || '', variables)
   if (!body) throw new Error('Isi notifikasi tidak boleh kosong.')
 
   const result = await exec<{ id: string }>(

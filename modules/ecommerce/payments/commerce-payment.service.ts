@@ -834,6 +834,20 @@ async function enqueuePaidNotifications(
     variables.portal_url = row?.org_slug ? memberPortalUrl(row.org_slug) : ''
   }
 
+  const primaryItem = await client.query<{ store_product_id: string | null }>(
+    `SELECT store_product.id::text AS store_product_id
+     FROM public.ecommerce_order_items item
+     JOIN public.store_products store_product
+       ON store_product.org_id = item.org_id
+      AND store_product.store_id = item.store_id
+      AND store_product.product_id = item.product_id
+     WHERE item.org_id = $1::uuid AND item.order_id = $2::uuid
+     ORDER BY item.created_at
+     LIMIT 1`,
+    [order.org_id, order.id],
+  )
+  const storeProductId = primaryItem.rows[0]?.store_product_id || null
+
   const recipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
   if (order.customer_email) recipients.push({ channel: 'EMAIL', value: order.customer_email })
   if (order.customer_phone) recipients.push({ channel: 'WHATSAPP', value: order.customer_phone })
@@ -849,6 +863,8 @@ async function enqueuePaidNotifications(
       variables,
       idempotencyKey: `${eventType.toLowerCase()}:${order.id}:${recipient.channel}`,
       payload: { orderId: order.id, orderNumber: order.order_number, grantCount },
+      storeProductId,
+      overrideEventKey: 'payment_confirm',
     }, client)
   }
 }

@@ -1552,6 +1552,157 @@ export default function StorefrontClient({
               </div>
             )}
 
+            {/* ── STEP 1: DETAIL PESANAN — full width at top ── */}
+            <section id="produk-dibeli" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+              <div className="flex items-center gap-3 border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
+                <div
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-extrabold text-white"
+                  style={{ backgroundColor: payload.theme.tokens.accent }}
+                >
+                  1
+                </div>
+                <h2 className="text-base font-bold text-slate-900 sm:text-lg">Detail Pesanan</h2>
+              </div>
+
+              <div className="p-5 sm:p-6">
+                {/* Product card row */}
+                <div className="flex gap-4">
+                  {(getProductGallery(selectedProduct)[0] || selectedMediaByProductId[selectedProduct.id]) ? (
+                    <div
+                      className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 bg-cover bg-center sm:h-20 sm:w-20"
+                      style={{
+                        backgroundImage: `url(${selectedMediaByProductId[selectedProduct.id] || getProductGallery(selectedProduct)[0]})`,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className="grid h-16 w-16 shrink-0 place-items-center rounded-xl text-white sm:h-20 sm:w-20"
+                      style={{ backgroundColor: payload.theme.tokens.accent }}
+                    >
+                      <PackageCheck size={24} />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-base font-extrabold leading-tight text-slate-900 sm:text-lg">
+                      {selectedProduct.name}
+                    </div>
+                    {activeSingleVariant?.name && (
+                      <div className="mt-1 inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                        Varian: {activeSingleVariant.name}
+                      </div>
+                    )}
+                    <div className="mt-1.5 text-sm font-bold text-slate-700">{formatRupiah(singleUnitPrice)}</div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {isUnlimitedProduct(selectedProduct) ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                          <CheckCircle2 size={13} />
+                          Akses Instan
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${getProductStock(selectedProduct) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                          {getProductStock(selectedProduct) > 0 ? `Stok Tersedia: ${getProductStock(selectedProduct)}` : 'Stok Habis'}
+                        </span>
+                      )}
+                      {!allowQuantityIncrement && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
+                          Akses Digital · Sekali Bayar
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="text-base font-extrabold text-slate-900 sm:text-lg">{formatRupiah(singleSubtotal)}</div>
+                    <div className="mt-0.5 text-[11px] font-medium text-slate-400">subtotal</div>
+                  </div>
+                </div>
+
+                {/* Variant picker */}
+                {selectedProduct.variants.length > 0 && (
+                  <div className="mt-5 space-y-2 border-t border-slate-100 pt-4">
+                    <div className="text-xs font-semibold text-slate-600">Pilih Varian:</div>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {selectedProduct.variants.map((variant) => {
+                        const active = selectedVariantByProductId[selectedProduct.id] === variant.id
+                        return (
+                          <button
+                            type="button"
+                            key={variant.id}
+                            onClick={() => {
+                              setSelectedVariantByProductId((current) => ({ ...current, [selectedProduct.id]: variant.id }))
+                              if (variant.imageUrl) {
+                                setSelectedMediaByProductId((current) => ({ ...current, [selectedProduct.id]: variant.imageUrl }))
+                              }
+                            }}
+                            className="rounded-xl border px-3.5 py-2.5 text-left transition"
+                            style={{
+                              borderColor: active ? payload.theme.tokens.accent : '#E2E8F0',
+                              backgroundColor: active ? payload.theme.tokens.accentSoft : '#FFFFFF',
+                            }}
+                          >
+                            <div className="font-bold text-slate-900">{variant.name}</div>
+                            <div className="mt-0.5 text-xs text-slate-500">
+                              {variant.choices.map((c) => `${c.attributeName}: ${c.attributeValue}`).join(' • ')}
+                            </div>
+                            <div className="mt-1 text-sm font-bold text-slate-900">{formatRupiah(variant.price)}</div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Qty stepper */}
+                {allowQuantityIncrement && (
+                  <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+                    <span className="text-sm font-semibold text-slate-700">Jumlah Pesanan</span>
+                    <div className="flex items-center gap-3">
+                      <button type="button" onClick={() => setSingleCheckoutQty((c) => Math.max(1, c - 1))} className="rounded-full border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:bg-slate-100">
+                        <Minus size={14} />
+                      </button>
+                      <div className="w-8 text-center text-sm font-extrabold text-slate-900">{singleCheckoutQty}</div>
+                      <button type="button" onClick={() => setSingleCheckoutQty((c) => Math.min(99, c + 1))} className="rounded-full border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:bg-slate-100">
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Course / consulting benefits */}
+                {(selectedProduct.courseBenefits?.length || selectedProduct.consulting) ? (
+                  <div className="mt-5 rounded-xl border border-teal-200 bg-teal-50 p-4">
+                    <div className="text-sm font-black text-teal-950">
+                      {productPageConfig?.benefitTitle || 'Anda mendapatkan'}
+                    </div>
+                    <div className="mt-3 space-y-2 text-sm font-semibold text-teal-900">
+                      {selectedProduct.consulting && (
+                        <div className="flex items-start gap-2">
+                          <CheckCircle2 aria-hidden="true" size={17} className="mt-0.5 shrink-0" />
+                          <span>{selectedProduct.consulting.sessionCount} sesi privat bersama konsultan pilihan</span>
+                        </div>
+                      )}
+                      {(selectedProduct.courseBenefits || []).map((course) => (
+                        <div key={course.id} className="flex items-start gap-2">
+                          <CheckCircle2 aria-hidden="true" size={17} className="mt-0.5 shrink-0" />
+                          <span>Bonus course: {course.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </section>
+
+            {/* Consulting selector */}
+            {selectedProduct.consulting && (
+              <ConsultingBookingSelector
+                orgSlug={payload.store.orgSlug}
+                storeSlug={payload.store.slug}
+                storeProductId={selectedProduct.storeProductId}
+                offering={selectedProduct.consulting}
+                onHoldChange={(hold) => handleConsultingHoldChange(selectedProduct.storeProductId, hold)}
+              />
+            )}
+
             {/* 3-Step Progress Bar */}
             <div className="hidden items-center justify-center gap-3 text-xs font-semibold text-slate-500 sm:flex">
               {[
@@ -1574,11 +1725,12 @@ export default function StorefrontClient({
               ))}
             </div>
 
-            {/* 2-Column checkout layout: left=forms, right=sticky order summary */}
-            <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:items-start">
+            {/* 2-Column: left=forms, right=sticky totals+CTA */}
+            <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
 
-              {/* ── LEFT: Informasi Pribadi + Payment ── */}
+              {/* ── LEFT: Forms ── */}
               <div className="space-y-5">
+                {/* Section 2: Informasi Pribadi */}
                 <section id="informasi-pribadi" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
                   <div className="flex items-center gap-3 border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
                     <div
@@ -1710,18 +1862,7 @@ export default function StorefrontClient({
                   </div>
                 </section>
 
-                {/* Consulting selector if applicable */}
-                {selectedProduct.consulting && (
-                  <ConsultingBookingSelector
-                    orgSlug={payload.store.orgSlug}
-                    storeSlug={payload.store.slug}
-                    storeProductId={selectedProduct.storeProductId}
-                    offering={selectedProduct.consulting}
-                    onHoldChange={(hold) => handleConsultingHoldChange(selectedProduct.storeProductId, hold)}
-                  />
-                )}
-
-                {/* Section 3: Payment method */}
+                {/* Section 3: Metode Pembayaran */}
                 <section id="metode-pembayaran" className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
                   <div className="flex items-center gap-3 border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
                     <div
@@ -1736,7 +1877,6 @@ export default function StorefrontClient({
                   </div>
 
                   <div className="p-5 space-y-4 sm:p-6">
-                    {/* Payment method radio */}
                     <div
                       className="flex cursor-default items-start gap-3 rounded-xl border-2 p-4"
                       style={{ borderColor: payload.theme.tokens.accent, backgroundColor: `${payload.theme.tokens.accent}0d` }}
@@ -1796,143 +1936,22 @@ export default function StorefrontClient({
               </div>
               {/* END LEFT */}
 
-              {/* ── RIGHT: Sticky Order Summary ── */}
+              {/* ── RIGHT: Sticky ringkasan total + CTA ── */}
               <aside className="lg:sticky lg:top-24 lg:self-start">
                 <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-                  <div className="flex items-center gap-3 border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
-                    <div
-                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-extrabold text-white"
-                      style={{ backgroundColor: payload.theme.tokens.accent }}
-                    >
-                      1
-                    </div>
-                    <h2 className="text-base font-bold text-slate-900 sm:text-lg">Detail Pesanan</h2>
+                  <div className="border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
+                    <h2 className="text-sm font-bold text-slate-700">Ringkasan Pembayaran</h2>
                   </div>
 
                   <div className="p-5 space-y-4 sm:p-6">
-                    {/* Product card */}
-                    <div className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-                      {(getProductGallery(selectedProduct)[0] || selectedMediaByProductId[selectedProduct.id]) ? (
-                        <div
-                          className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 bg-cover bg-center"
-                          style={{
-                            backgroundImage: `url(${selectedMediaByProductId[selectedProduct.id] || getProductGallery(selectedProduct)[0]})`,
-                          }}
-                        />
-                      ) : (
-                        <div
-                          className="grid h-16 w-16 shrink-0 place-items-center rounded-xl text-white"
-                          style={{ backgroundColor: payload.theme.tokens.accent }}
-                        >
-                          <PackageCheck size={22} />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-bold leading-tight text-slate-900">{selectedProduct.name}</div>
-                        {activeSingleVariant?.name && (
-                          <div className="mt-1 inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-                            Varian: {activeSingleVariant.name}
-                          </div>
-                        )}
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          {isUnlimitedProduct(selectedProduct) ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                              <CheckCircle2 size={12} />
-                              Akses Instan
-                            </span>
-                          ) : (
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${getProductStock(selectedProduct) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                              {getProductStock(selectedProduct) > 0 ? `Stok: ${getProductStock(selectedProduct)}` : 'Stok Habis'}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1.5 text-sm font-bold text-slate-800">{formatRupiah(singleUnitPrice)}</div>
-                      </div>
+                    {/* Product mini summary */}
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="min-w-0 truncate font-semibold text-slate-700">{selectedProduct.name}</span>
+                      <span className="shrink-0 font-bold text-slate-900">{formatRupiah(singleUnitPrice)}</span>
                     </div>
-
-                    {/* Variants */}
-                    {selectedProduct.variants.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold text-slate-600">Pilih Varian:</div>
-                        <div className="grid gap-2">
-                          {selectedProduct.variants.map((variant) => {
-                            const active = selectedVariantByProductId[selectedProduct.id] === variant.id
-                            return (
-                              <button
-                                type="button"
-                                key={variant.id}
-                                onClick={() => {
-                                  setSelectedVariantByProductId((current) => ({ ...current, [selectedProduct.id]: variant.id }))
-                                  if (variant.imageUrl) {
-                                    setSelectedMediaByProductId((current) => ({ ...current, [selectedProduct.id]: variant.imageUrl }))
-                                  }
-                                }}
-                                className="rounded-xl border px-3.5 py-2.5 text-left text-xs transition"
-                                style={{
-                                  borderColor: active ? payload.theme.tokens.accent : '#E2E8F0',
-                                  backgroundColor: active ? payload.theme.tokens.accentSoft : '#FFFFFF',
-                                }}
-                              >
-                                <div className="font-bold text-slate-900">{variant.name}</div>
-                                <div className="mt-0.5 text-slate-500">
-                                  {variant.choices.map((c) => `${c.attributeName}: ${c.attributeValue}`).join(' • ')}
-                                </div>
-                                <div className="mt-1 font-bold text-slate-900">{formatRupiah(variant.price)}</div>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Qty stepper */}
-                    {allowQuantityIncrement && (
-                      <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                        <span className="text-xs font-semibold text-slate-600">Jumlah</span>
-                        <div className="flex items-center gap-3">
-                          <button type="button" onClick={() => setSingleCheckoutQty((c) => Math.max(1, c - 1))} className="rounded-full border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:bg-slate-100">
-                            <Minus size={13} />
-                          </button>
-                          <span className="w-6 text-center text-sm font-extrabold text-slate-900">{singleCheckoutQty}</span>
-                          <button type="button" onClick={() => setSingleCheckoutQty((c) => Math.min(99, c + 1))} className="rounded-full border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:bg-slate-100">
-                            <Plus size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Service type */}
-                    {!allowQuantityIncrement && (
-                      <dl className="text-xs">
-                        <div className="flex justify-between text-slate-500">
-                          <dt>Jenis Layanan</dt>
-                          <dd className="font-semibold text-slate-700">Akses Digital • Sekali Bayar</dd>
-                        </div>
-                      </dl>
-                    )}
-
-                    {/* Course benefits / bonus */}
-                    {(selectedProduct.courseBenefits?.length || selectedProduct.consulting) ? (
-                      <div className="flex items-start gap-2 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/60 p-3">
-                        <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
-                        <div className="min-w-0 text-xs">
-                          <div className="font-semibold text-slate-800">{productPageConfig?.benefitTitle || 'Bonus Termasuk'}</div>
-                          <div className="mt-1 space-y-0.5 text-slate-500">
-                            {selectedProduct.consulting && (
-                              <div>{selectedProduct.consulting.sessionCount} sesi privat bersama konsultan pilihan</div>
-                            )}
-                            {(selectedProduct.courseBenefits || []).map((course) => (
-                              <div key={course.id}>{course.title}</div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
 
                     {/* Coupon */}
-                    <div>
-                      {renderCouponField()}
-                    </div>
+                    {renderCouponField()}
 
                     {/* Totals */}
                     <div className="space-y-2 border-t border-slate-200/80 pt-4 text-sm">
@@ -1963,7 +1982,7 @@ export default function StorefrontClient({
                       type="button"
                       onClick={() => { if (selectedProduct) { void submitCheckout() } }}
                       disabled={checkoutLoading || getProductStock(selectedProduct) <= 0}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                       style={{
                         background: `linear-gradient(135deg, ${payload.theme.tokens.accent}, ${payload.theme.tokens.accent}cc)`,
                         boxShadow: `0 10px 30px -8px ${payload.theme.tokens.accent}80`,
@@ -1977,14 +1996,14 @@ export default function StorefrontClient({
                       ) : getProductStock(selectedProduct) > 0 ? (
                         <>
                           <ShieldCheck size={15} />
-                          {productPageConfig?.checkoutButtonLabel || 'Beli Sekarang'} • {formatRupiah(singleGrandTotal)}
+                          {productPageConfig?.checkoutButtonLabel || 'Beli Sekarang'} · {formatRupiah(singleGrandTotal)}
                         </>
                       ) : (
                         'Stok Sedang Habis'
                       )}
                     </button>
 
-                    {/* Trust badges grid */}
+                    {/* Trust badges */}
                     {productPageConfig?.showTrustSignals && (
                       <div className="grid grid-cols-3 gap-2 text-center">
                         {[
@@ -2016,7 +2035,10 @@ export default function StorefrontClient({
         )}
 
 
+
+
         {pageMode !== 'product' && pageBlocks.map((block) => renderBlock(block))}
+
 
         {pageMode === 'cart' && (
           <section className="space-y-6">

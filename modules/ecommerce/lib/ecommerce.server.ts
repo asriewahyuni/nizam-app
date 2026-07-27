@@ -3752,6 +3752,8 @@ export async function createCheckoutOrder(input: unknown) {
             variables: pendingVariables,
             idempotencyKey: `order-pending:${order.id}:${recipient.channel}`,
             payload: { orderId: order.id, orderNumber: order.order_number },
+            storeProductId: items[0]?.product.storeProductId || null,
+            overrideEventKey: 'on_hold',
           }, client)
         }
       }

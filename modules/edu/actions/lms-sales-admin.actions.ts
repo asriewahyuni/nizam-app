@@ -207,8 +207,14 @@ export async function cancelOrderManualAction(orderId: string, reason?: string) 
       [orgData.org.id, orderId, JSON.stringify({ reason: reason || null })],
     )
 
-    const itemsResult = await client.query<{ product_name: string }>(
-      `SELECT DISTINCT product_name FROM public.ecommerce_order_items WHERE org_id = $1::uuid AND order_id = $2::uuid`,
+    const itemsResult = await client.query<{ product_name: string; store_product_id: string | null }>(
+      `SELECT DISTINCT item.product_name, store_product.id::text AS store_product_id
+       FROM public.ecommerce_order_items item
+       LEFT JOIN public.store_products store_product
+         ON store_product.org_id = item.org_id
+        AND store_product.store_id = item.store_id
+        AND store_product.product_id = item.product_id
+       WHERE item.org_id = $1::uuid AND item.order_id = $2::uuid`,
       [orgData.org.id, orderId],
     )
     const variables: Record<string, string | number | null> = {
@@ -217,6 +223,7 @@ export async function cancelOrderManualAction(orderId: string, reason?: string) 
       product_name: itemsResult.rows.map((row) => row.product_name).join(', ') || 'pesanan Anda',
       amount: formatRupiah(order.grand_total),
     }
+    const primaryStoreProductId = itemsResult.rows[0]?.store_product_id || null
     const recipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
     if (order.customer_email) recipients.push({ channel: 'EMAIL', value: order.customer_email })
     if (order.customer_phone) recipients.push({ channel: 'WHATSAPP', value: order.customer_phone })
@@ -231,6 +238,8 @@ export async function cancelOrderManualAction(orderId: string, reason?: string) 
         variables,
         idempotencyKey: `order-cancelled:${orderId}:${recipient.channel}`,
         payload: { orderId, orderNumber: order.order_number },
+        storeProductId: primaryStoreProductId,
+        overrideEventKey: 'cancelled',
       }, client)
     }
 
