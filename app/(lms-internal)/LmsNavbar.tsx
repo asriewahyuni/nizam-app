@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   ArrowLeft,
   BookOpen,
+  HandCoins,
   LayoutDashboard,
   Settings,
   ShoppingCart,
@@ -17,6 +18,7 @@ const nav = [
   { to: '/lms/admin', label: 'Course Catalog', icon: BookOpen },
   { to: '/lms/admin/members', label: 'Member Directory', icon: Users },
   { to: '/lms/admin/penjualan', label: 'Sales & Access', icon: ShoppingCart },
+  { to: '/lms/admin/afiliasi', label: 'Afiliasi', icon: HandCoins },
   { to: '/lms/admin/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -25,12 +27,14 @@ function isNavItemActive(pathname: string, target: string) {
   if (target === '/lms/admin/members') return pathname.startsWith('/lms/admin/members')
   if (target === '/lms/admin/settings') return pathname.startsWith('/lms/admin/settings')
   if (target === '/lms/admin/penjualan') return pathname.startsWith('/lms/admin/penjualan')
+  if (target === '/lms/admin/afiliasi') return pathname.startsWith('/lms/admin/afiliasi')
   if (target === '/lms/admin') {
     return (
       pathname.startsWith('/lms/admin') &&
       !pathname.startsWith('/lms/admin/members') &&
       !pathname.startsWith('/lms/admin/settings') &&
-      !pathname.startsWith('/lms/admin/penjualan')
+      !pathname.startsWith('/lms/admin/penjualan') &&
+      !pathname.startsWith('/lms/admin/afiliasi')
     )
   }
   return pathname.startsWith(target)

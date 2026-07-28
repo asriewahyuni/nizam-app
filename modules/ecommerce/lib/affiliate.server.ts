@@ -672,8 +672,317 @@ export async function resolveOrderAffiliateCommission(params: {
   return rows[0] || null
 }
 
+export type AdminAffiliateView = {
+  id: string
+  userId: string
+  name: string
+  email: string
+  phone: string
+  referralCode: string
+  status: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REJECTED'
+  cookieDays: number
+  pendingAmount: number
+  payableAmount: number
+  paidAmount: number
+  conversionCount: number
+  createdAt: string
+}
+
 /**
- * Mengajukan pencairan komisi (Payout Request) & menghubungkannya dengan Akuntansi/Kas ERP Bridge.
+ * Daftar semua afiliasi dalam satu organisasi untuk kebutuhan admin
+ * (referensi Sejoli wp-admin/admin.php?page=sejoli-affiliates).
+ */
+export async function getAdminAffiliateList(orgId: string): Promise<AdminAffiliateView[]> {
+  const { rows } = await queryPostgres<{
+    id: string
+    user_id: string
+    name: string | null
+    email: string | null
+    phone: string | null
+    referral_code: string
+    status: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REJECTED'
+    cookie_days: number
+    pending_amount: number
+    payable_amount: number
+    paid_amount: number
+    conversion_count: number
+    created_at: string
+  }>(
+    `SELECT
+       profile.id::text,
+       profile.user_id::text,
+       contact.display_name AS name,
+       contact.login_email AS email,
+       contact.phone AS phone,
+       profile.referral_code,
+       profile.status,
+       COALESCE(profile.cookie_days, 30) AS cookie_days,
+       COALESCE(SUM(commission.commission_amount) FILTER (WHERE commission.status IN ('PENDING', 'APPROVED')), 0)::float8 AS pending_amount,
+       COALESCE(SUM(commission.commission_amount) FILTER (WHERE commission.status = 'PAYABLE'), 0)::float8 AS payable_amount,
+       COALESCE(SUM(commission.commission_amount) FILTER (WHERE commission.status = 'PAID'), 0)::float8 AS paid_amount,
+       COUNT(commission.id) FILTER (WHERE commission.status != 'CANCELLED')::int AS conversion_count,
+       profile.created_at::text
+     FROM public.commerce_affiliate_profiles profile
+     LEFT JOIN LATERAL (
+       SELECT display_name, login_email, phone
+       FROM public.internal_auth_users u
+       WHERE u.id = profile.user_id OR u.legacy_user_id = profile.user_id
+       ORDER BY (u.id = profile.user_id) DESC
+       LIMIT 1
+     ) contact ON TRUE
+     LEFT JOIN public.commerce_affiliate_commissions commission
+       ON commission.org_id = profile.org_id AND commission.affiliate_profile_id = profile.id
+     WHERE profile.org_id = $1::uuid
+     GROUP BY profile.id, contact.display_name, contact.login_email, contact.phone
+     ORDER BY profile.created_at DESC`,
+    [orgId],
+  )
+
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    name: row.name || 'Mitra Afiliasi',
+    email: row.email || '',
+    phone: row.phone || '',
+    referralCode: row.referral_code,
+    status: row.status,
+    cookieDays: Number(row.cookie_days || 30),
+    pendingAmount: Number(row.pending_amount || 0),
+    payableAmount: Number(row.payable_amount || 0),
+    paidAmount: Number(row.paid_amount || 0),
+    conversionCount: Number(row.conversion_count || 0),
+    createdAt: row.created_at,
+  }))
+}
+
+/**
+ * Admin mengubah status afiliasi (suspend / aktifkan kembali / tolak).
+ * Aktivasi awal tetap otomatis (self opt-in) — ini khusus untuk moderasi
+ * setelahnya, misal ada indikasi penyalahgunaan kode/kupon.
+ */
+export async function setAffiliateProfileStatus(
+  orgId: string,
+  affiliateProfileId: string,
+  status: 'ACTIVE' | 'SUSPENDED' | 'REJECTED',
+): Promise<void> {
+  const result = await queryPostgres(
+    `UPDATE public.commerce_affiliate_profiles
+     SET status = $3, updated_at = NOW()
+     WHERE id = $1::uuid AND org_id = $2::uuid`,
+    [affiliateProfileId, orgId, status],
+  )
+  if (result.rowCount === 0) {
+    throw new Error('Afiliasi tidak ditemukan.')
+  }
+}
+
+export type AdminAffiliatePayoutView = {
+  id: string
+  payoutNumber: string
+  affiliateProfileId: string
+  affiliateName: string
+  referralCode: string
+  amount: number
+  status: 'DRAFT' | 'APPROVED' | 'PAID' | 'CANCELLED'
+  bankName: string
+  accountNumber: string
+  accountName: string
+  createdAt: string
+  paidAt: string | null
+}
+
+/**
+ * Daftar pengajuan pencairan lintas afiliasi untuk satu organisasi.
+ */
+export async function getAdminAffiliatePayouts(orgId: string): Promise<AdminAffiliatePayoutView[]> {
+  const { rows } = await queryPostgres<{
+    id: string
+    payout_number: string
+    affiliate_profile_id: string
+    affiliate_name: string | null
+    referral_code: string
+    amount: number
+    status: 'DRAFT' | 'APPROVED' | 'PAID' | 'CANCELLED'
+    payout_details: Record<string, unknown> | null
+    created_at: string
+    paid_at: string | null
+  }>(
+    `SELECT
+       payout.id::text,
+       payout.payout_number,
+       payout.affiliate_profile_id::text,
+       contact.display_name AS affiliate_name,
+       profile.referral_code,
+       payout.amount::float8,
+       payout.status,
+       profile.payout_details,
+       payout.created_at::text,
+       payout.paid_at::text
+     FROM public.commerce_affiliate_payouts payout
+     JOIN public.commerce_affiliate_profiles profile ON profile.id = payout.affiliate_profile_id
+     LEFT JOIN LATERAL (
+       SELECT display_name, login_email, phone
+       FROM public.internal_auth_users u
+       WHERE u.id = profile.user_id OR u.legacy_user_id = profile.user_id
+       ORDER BY (u.id = profile.user_id) DESC
+       LIMIT 1
+     ) contact ON TRUE
+     WHERE payout.org_id = $1::uuid
+     ORDER BY (payout.status = 'DRAFT') DESC, payout.created_at DESC`,
+    [orgId],
+  )
+
+  return rows.map((row) => {
+    const details = (row.payout_details && typeof row.payout_details === 'object'
+      ? row.payout_details
+      : {}) as Record<string, unknown>
+    return {
+      id: row.id,
+      payoutNumber: row.payout_number,
+      affiliateProfileId: row.affiliate_profile_id,
+      affiliateName: row.affiliate_name || 'Mitra Afiliasi',
+      referralCode: row.referral_code,
+      amount: Number(row.amount || 0),
+      status: row.status,
+      bankName: String(details.bankName || ''),
+      accountNumber: String(details.accountNumber || ''),
+      accountName: String(details.accountName || ''),
+      createdAt: row.created_at,
+      paidAt: row.paid_at,
+    }
+  })
+}
+
+/**
+ * Admin menyetujui pengajuan pencairan (status DRAFT -> PAID): tandai komisi
+ * terkait PAID, catat ke jurnal akuntansi (Anti-Silo), lalu kirim notifikasi.
+ */
+export async function approveAffiliatePayout(orgId: string, payoutId: string): Promise<void> {
+  const payoutRes = await queryPostgres<{
+    id: string
+    affiliate_profile_id: string
+    amount: number
+    payout_number: string
+    status: string
+  }>(
+    `SELECT id::text, affiliate_profile_id::text, amount::float8, payout_number, status
+     FROM public.commerce_affiliate_payouts
+     WHERE id = $1::uuid AND org_id = $2::uuid
+     LIMIT 1`,
+    [payoutId, orgId],
+  )
+  const payout = payoutRes.rows[0]
+  if (!payout) throw new Error('Pengajuan pencairan tidak ditemukan.')
+  if (payout.status !== 'DRAFT') throw new Error('Pengajuan ini sudah diproses sebelumnya.')
+
+  await queryPostgres(
+    `UPDATE public.commerce_affiliate_payouts
+     SET status = 'PAID', paid_at = NOW(), updated_at = NOW()
+     WHERE id = $1::uuid`,
+    [payoutId],
+  )
+  await queryPostgres(
+    `UPDATE public.commerce_affiliate_commissions
+     SET status = 'PAID', updated_at = NOW()
+     WHERE payout_id = $1::uuid AND org_id = $2::uuid`,
+    [payoutId, orgId],
+  )
+
+  try {
+    const expenseAccount = await ERPBridge.getDefaultAccount(orgId, '6001') || await ERPBridge.getDefaultAccount(orgId, '5001')
+    const cashAccount = await ERPBridge.getDefaultAccount(orgId, '1101') || await ERPBridge.getDefaultAccount(orgId, '1001')
+
+    if (expenseAccount && cashAccount) {
+      await ERPBridge.recordExpense({
+        orgId,
+        amount: payout.amount,
+        date: new Date().toISOString().slice(0, 10),
+        description: `Pencairan Komisi Afiliasi ${payout.payout_number}`,
+        referenceType: 'AFFILIATE_PAYOUT',
+        referenceId: payoutId,
+        debitAccountId: expenseAccount,
+        creditAccountId: cashAccount,
+      })
+    }
+  } catch (erpErr) {
+    console.warn('ERP Bridge payout recording skipped:', erpErr)
+  }
+
+  const contactResult = await queryPostgres<{
+    user_id: string
+    name: string | null
+    email: string | null
+    phone: string | null
+  }>(
+    `SELECT profile.user_id::text, contact.display_name AS name, contact.login_email AS email, contact.phone
+     FROM public.commerce_affiliate_profiles profile
+     LEFT JOIN LATERAL (
+       SELECT display_name, login_email, phone
+       FROM public.internal_auth_users u
+       WHERE u.id = profile.user_id OR u.legacy_user_id = profile.user_id
+       ORDER BY (u.id = profile.user_id) DESC
+       LIMIT 1
+     ) contact ON TRUE
+     WHERE profile.id = $1::uuid
+     LIMIT 1`,
+    [payout.affiliate_profile_id],
+  )
+  const contact = contactResult.rows[0]
+  const variables: Record<string, string | number | null> = {
+    affiliate_name: contact?.name || 'Mitra Afiliasi',
+    commission_amount: formatRupiah(payout.amount),
+  }
+  const recipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
+  if (contact?.email) recipients.push({ channel: 'EMAIL', value: contact.email })
+  if (contact?.phone) recipients.push({ channel: 'WHATSAPP', value: contact.phone })
+  for (const recipient of recipients) {
+    await enqueueNotification({
+      orgId,
+      userId: contact?.user_id || null,
+      eventType: 'AFFILIATE_COMMISSION_PAID',
+      channel: recipient.channel,
+      recipient: recipient.value,
+      templateKey: 'AFFILIATE_COMMISSION_PAID',
+      variables,
+      idempotencyKey: `affiliate-commission-paid:${payoutId}:${recipient.channel}`,
+      payload: { payoutId, payoutNumber: payout.payout_number, amount: payout.amount },
+    })
+  }
+}
+
+/**
+ * Admin menolak pengajuan pencairan (status DRAFT -> CANCELLED): komisi
+ * terkait dikembalikan ke APPROVED supaya afiliasi bisa mengajukan ulang.
+ */
+export async function rejectAffiliatePayout(orgId: string, payoutId: string): Promise<void> {
+  const payoutRes = await queryPostgres<{ status: string }>(
+    `SELECT status FROM public.commerce_affiliate_payouts
+     WHERE id = $1::uuid AND org_id = $2::uuid
+     LIMIT 1`,
+    [payoutId, orgId],
+  )
+  const payout = payoutRes.rows[0]
+  if (!payout) throw new Error('Pengajuan pencairan tidak ditemukan.')
+  if (payout.status !== 'DRAFT') throw new Error('Pengajuan ini sudah diproses sebelumnya.')
+
+  await queryPostgres(
+    `UPDATE public.commerce_affiliate_commissions
+     SET status = 'APPROVED', payout_id = NULL, updated_at = NOW()
+     WHERE payout_id = $1::uuid AND org_id = $2::uuid`,
+    [payoutId, orgId],
+  )
+  await queryPostgres(
+    `UPDATE public.commerce_affiliate_payouts
+     SET status = 'CANCELLED', updated_at = NOW()
+     WHERE id = $1::uuid`,
+    [payoutId],
+  )
+}
+
+/**
+ * Mengajukan pencairan komisi (Payout Request) oleh afiliasi sendiri.
+ * Masuk status DRAFT dan menunggu approval admin (lihat approveAffiliatePayout)
+ * sebelum benar-benar dicatat ke jurnal akuntansi / ditandai PAID.
  */
 export async function requestAffiliatePayout(params: {
   orgId: string
@@ -707,11 +1016,19 @@ export async function requestAffiliatePayout(params: {
 
   const payoutNumber = `PO-${Date.now().toString(36).toUpperCase()}`
 
+  // Simpan info rekening tujuan pencairan di profil (dipakai admin saat approval).
+  await queryPostgres(
+    `UPDATE public.commerce_affiliate_profiles
+     SET payout_details = $2::jsonb, updated_at = NOW()
+     WHERE id = $1::uuid`,
+    [profile.id, JSON.stringify(params.bankInfo || {})],
+  )
+
   const payoutRes = await queryPostgres<{ id: string }>(
     `INSERT INTO public.commerce_affiliate_payouts (
-       org_id, affiliate_profile_id, payout_number, amount, status, paid_at
+       org_id, affiliate_profile_id, payout_number, amount, status
      ) VALUES (
-       $1::uuid, $2::uuid, $3, $4, 'PAID', NOW()
+       $1::uuid, $2::uuid, $3, $4, 'DRAFT'
      )
      RETURNING id::text`,
     [params.orgId, profile.id, payoutNumber, params.amount],
@@ -719,71 +1036,16 @@ export async function requestAffiliatePayout(params: {
 
   const payoutId = payoutRes.rows[0].id
 
-  // Tandai komisi sebagai PAID
+  // Tandai komisi sebagai PAYABLE (dikunci ke pengajuan ini), menunggu approval admin.
   await queryPostgres(
     `UPDATE public.commerce_affiliate_commissions
-     SET status = 'PAID', payout_id = $1::uuid, updated_at = NOW()
+     SET status = 'PAYABLE', payout_id = $1::uuid, updated_at = NOW()
      WHERE org_id = $2::uuid
        AND affiliate_profile_id = $3::uuid
        AND status = 'APPROVED'
        AND (payable_at IS NULL OR payable_at <= NOW())`,
     [payoutId, params.orgId, profile.id],
   )
-
-  // Integrasi ERP Bridge: Catat Beban Komisi Afiliasi ke General Ledger (Anti-Silo compliance)
-  try {
-    const expenseAccount = await ERPBridge.getDefaultAccount(params.orgId, '6001') || await ERPBridge.getDefaultAccount(params.orgId, '5001')
-    const cashAccount = await ERPBridge.getDefaultAccount(params.orgId, '1101') || await ERPBridge.getDefaultAccount(params.orgId, '1001')
-
-    if (expenseAccount && cashAccount) {
-      await ERPBridge.recordExpense({
-        orgId: params.orgId,
-        amount: params.amount,
-        date: new Date().toISOString().slice(0, 10),
-        description: `Pencairan Komisi Afiliasi ${payoutNumber} — ${profile.referralCode}`,
-        referenceType: 'AFFILIATE_PAYOUT',
-        referenceId: payoutId,
-        debitAccountId: expenseAccount,
-        creditAccountId: cashAccount,
-      })
-    }
-  } catch (erpErr) {
-    console.warn('ERP Bridge payout recording skipped:', erpErr)
-  }
-
-  const contactResult = await queryPostgres<{
-    name: string | null
-    email: string | null
-    phone: string | null
-  }>(
-    `SELECT display_name AS name, login_email AS email, phone
-     FROM public.internal_auth_users
-     WHERE legacy_user_id = $1::uuid OR id = $1::uuid
-     ORDER BY CASE WHEN id = $1::uuid THEN 0 ELSE 1 END
-     LIMIT 1`,
-    [params.userId],
-  )
-  const contact = contactResult.rows[0]
-  const variables: Record<string, string | number | null> = {
-    affiliate_name: contact?.name || 'Mitra Afiliasi',
-    commission_amount: formatRupiah(params.amount),
-  }
-  const recipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
-  if (contact?.email) recipients.push({ channel: 'EMAIL', value: contact.email })
-  if (contact?.phone) recipients.push({ channel: 'WHATSAPP', value: contact.phone })
-  for (const recipient of recipients) {
-    await enqueueNotification({
-      orgId: params.orgId,
-      userId: params.userId,
-      eventType: 'AFFILIATE_COMMISSION_PAID',
-      channel: recipient.channel,
-      recipient: recipient.value,
-      templateKey: 'AFFILIATE_COMMISSION_PAID',
-      variables,
-      idempotencyKey: `affiliate-commission-paid:${payoutId}:${recipient.channel}`,
-      payload: { payoutId, payoutNumber, amount: params.amount },
-    })
-  }
 
   return { payoutId, payoutNumber, amount: params.amount }
 }

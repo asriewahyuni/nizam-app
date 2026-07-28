@@ -672,7 +672,21 @@ $coupon_rows = $wpdb->get_results(
 );
 $coupon_code_seen = array();
 foreach ($coupon_rows as $coupon) {
-    $discount_raw = (string) $coupon['discount'];
+    // Sejoli menyimpan 'discount' sebagai PHP-serialized array
+    // (mis. a:4:{s:5:"value";d:25;s:4:"type";s:10:"percentage";...}),
+    // BUKAN string polos — wajib di-unserialize dulu, jangan diparse
+    // sebagai angka mentah (nizam_number() akan menggabungkan semua
+    // digit di string serialize-nya jadi angka raksasa yang salah).
+    $discount_data = maybe_unserialize($coupon['discount']);
+    if (is_array($discount_data)) {
+        $discount_value = nizam_number($discount_data['value'] ?? 0);
+        $discount_type = strtolower((string) ($discount_data['type'] ?? '')) === 'percentage'
+            ? 'PERCENT' : 'FIXED';
+    } else {
+        $discount_raw = (string) $coupon['discount'];
+        $discount_type = strpos($discount_raw, '%') !== false ? 'PERCENT' : 'FIXED';
+        $discount_value = nizam_number($discount_raw);
+    }
     $original_code = strtoupper(trim((string) $coupon['code']));
     $collision_index = ($coupon_code_seen[$original_code] ?? 0);
     $coupon_code_seen[$original_code] = $collision_index + 1;
@@ -691,8 +705,8 @@ foreach ($coupon_rows as $coupon) {
     }
     $entities['coupons'][] = array('coupon', (string) $coupon['ID'], $coupon['updated_at'], array(
         'code' => $migration_code,
-        'discountType' => strpos($discount_raw, '%') !== false ? 'PERCENT' : 'FIXED',
-        'discountValue' => nizam_number($discount_raw),
+        'discountType' => $discount_type,
+        'discountValue' => $discount_value,
         'minimumAmount' => 0, 'startsAt' => null,
         'expiresAt' => nizam_rfc3339($coupon['limit_date']),
         'usageLimit' => (int) $coupon['limit_use'] ?: null,
