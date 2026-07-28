@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { Volume2, VolumeX, Bell, CheckCircle2, ShoppingBag, X, ExternalLink } from 'lucide-react'
 import { checkLmsAdminOrderAlertsAction, type OrderAlertItem } from '@/modules/edu/actions/lms-order-alerts.actions'
-import { formatCurrency } from '@/lib/utils'
+import { formatRupiah } from '@/lib/utils'
 
 /**
  * Web Audio API Synth Chimes: Tidak membutuhkan file statis eksternal (.mp3/.wav),
@@ -275,7 +275,7 @@ export default function LmsAdminAudioNotifier({ orgId }: { orgId: string }) {
                 <div>
                   <div className="text-xs font-bold text-slate-900">{t.title}</div>
                   <div className="text-[11px] font-semibold text-slate-500">
-                    {t.orderNumber} &bull; <span className="text-slate-900">{formatCurrency(t.amount)}</span>
+                    {t.orderNumber} &bull; <span className="text-slate-900">{formatRupiah(t.amount)}</span>
                   </div>
                 </div>
               </div>

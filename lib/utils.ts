@@ -37,6 +37,8 @@ export function formatRupiah(amount: number, compact = false): string {
   }).format(safeAmount)
 }
 
+export { formatRupiah as formatCurrency }
+
 /**
  * Format ISO date to Indonesian locale.
  * Usage: formatDate('2024-03-15') → "15 Maret 2024"
