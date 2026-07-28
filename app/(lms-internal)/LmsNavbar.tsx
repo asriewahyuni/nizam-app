@@ -62,13 +62,16 @@ export default function LmsNavbar({ org }: { org: any }) {
                 className="h-8 w-auto rounded object-contain"
               />
             ) : (
+              <div>
               <div className="flex size-8 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white uppercase">
                 {brandName.substring(0, 1)}
               </div>
-            )}
+
             <span className="text-lg font-semibold tracking-tight">
               {brandName}
             </span>
+              </div>
+            )}
           </Link>
           <div className="hidden gap-1 md:flex">
             {nav.map((item) => {

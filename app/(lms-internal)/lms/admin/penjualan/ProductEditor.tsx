@@ -3,7 +3,7 @@
 /**
  * Editor khusus produk LMS dengan course langsung dan beberapa Paket Akses.
  */
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   BadgeDollarSign,
@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Save,
   ShoppingBag,
+  Upload,
 } from 'lucide-react'
 import { cn, formatRupiah, generateSlug } from '@/lib/utils'
 import {
@@ -29,6 +30,7 @@ import {
   type StoreAdminSummary,
 } from '@/modules/ecommerce/lib/ecommerce'
 import { saveLmsSimpleProductAction } from '@/modules/edu/actions/lms-sales.actions'
+import { uploadLmsMediaAction } from '@/modules/edu/actions/lms-commercial.actions'
 
 type ProductEditorProps = {
   orgSlug: string
@@ -164,6 +166,43 @@ export default function ProductEditor({
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ tone: 'error' | 'success'; text: string } | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      alert('File harus berupa gambar (JPG, PNG, WEBP, atau SVG).')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran gambar maksimal 5MB.')
+      return
+    }
+
+    setIsUploadingImage(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await uploadLmsMediaAction(null, formData)
+      if (res?.success && res.url) {
+        update('imageUrl', res.url)
+      } else {
+        alert(res?.error || 'Gagal mengunggah gambar produk.')
+      }
+    } catch {
+      alert('Terjadi kesalahan saat mengunggah gambar produk.')
+    } finally {
+      setIsUploadingImage(false)
+      if (imageInputRef.current) {
+        imageInputRef.current.value = ''
+      }
+    }
+  }
+
   const courseById = useMemo(() => new Map(courses.map((course) => [course.id, course])), [courses])
   const packageById = useMemo(() => new Map(packages.map((item) => [item.id, item])), [packages])
 
@@ -446,21 +485,66 @@ export default function ProductEditor({
               className={`${fieldClass} py-3`}
             />
           </label>
-          <label className="text-sm font-bold text-slate-700 sm:col-span-2">
-            URL gambar produk
-            <div className="mt-1.5 flex gap-3">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-                <ImageIcon aria-hidden="true" size={18} />
-              </span>
+          <div className="sm:col-span-2">
+            <label className="text-sm font-bold text-slate-700">
+              URL atau Upload Gambar Produk
+            </label>
+            <div className="mt-1.5 flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-1 gap-2.5">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                  <ImageIcon aria-hidden="true" size={18} />
+                </span>
+                <input
+                  type="url"
+                  value={draft.imageUrl}
+                  onChange={(event) => update('imageUrl', event.target.value)}
+                  className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                  placeholder="https://…"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={isUploadingImage}
+                onClick={() => imageInputRef.current?.click()}
+                className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUploadingImage ? (
+                  <>
+                    <LoaderCircle className="size-4 animate-spin text-indigo-600" />
+                    <span>Mengunggah...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="size-4 text-slate-500" />
+                    <span>Upload Gambar</span>
+                  </>
+                )}
+              </button>
               <input
-                type="url"
-                value={draft.imageUrl}
-                onChange={(event) => update('imageUrl', event.target.value)}
-                className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                placeholder="https://…"
+                type="file"
+                ref={imageInputRef}
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
               />
             </div>
-          </label>
+            {draft.imageUrl ? (
+              <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                <img
+                  src={draft.imageUrl}
+                  alt="Preview produk"
+                  className="size-14 rounded-lg object-cover border border-slate-200 bg-white"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-slate-700 truncate">{draft.imageUrl}</p>
+                  <p className="mt-0.5 text-[11px] font-medium text-emerald-700">Gambar siap ditampilkan di katalog produk dan checkout</p>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
 
