@@ -20,6 +20,7 @@ export type CommerceCouponQuote = {
   subtotal: number
   eligibleSubtotal: number
   totalAfterDiscount: number
+  affiliateProfileId: string | null
 }
 
 type CouponRow = {
@@ -31,6 +32,7 @@ type CouponRow = {
   usage_limit: number | null
   per_user_limit: number
   allowed_store_product_ids: string[]
+  affiliate_profile_id: string | null
   total_usage: number
   user_usage: number
 }
@@ -87,6 +89,7 @@ export async function quoteCommerceCoupon(
        coupon.usage_limit,
        coupon.per_user_limit,
        coupon.allowed_store_product_ids::text[],
+       coupon.affiliate_profile_id::text,
        (
          SELECT COUNT(*)::int
          FROM public.commerce_coupon_redemptions redemption
@@ -166,5 +169,6 @@ export async function quoteCommerceCoupon(
     subtotal,
     eligibleSubtotal,
     totalAfterDiscount: Math.max(0, roundMoney(subtotal - discountAmount)),
+    affiliateProfileId: coupon.affiliate_profile_id,
   }
 }

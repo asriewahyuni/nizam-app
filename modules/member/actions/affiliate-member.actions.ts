@@ -5,6 +5,7 @@ import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { getPortalTenant } from '@/modules/member/lib/portal.server'
 import {
   activateAffiliateProfile,
+  cloneAffiliateTemplateCoupon,
   requestAffiliatePayout,
 } from '@/modules/ecommerce/lib/affiliate.server'
 
@@ -27,6 +28,28 @@ export async function activateMemberAffiliateAction(orgSlug: string) {
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Gagal mengaktifkan akun afiliasi.',
+    }
+  }
+}
+
+export async function cloneAffiliateTemplateCouponAction(orgSlug: string, templateCouponId: string) {
+  const session = await getInternalAuthSession()
+  if (!session?.user) {
+    return { error: 'Anda harus login terlebih dahulu.' }
+  }
+
+  const tenant = await getPortalTenant(orgSlug)
+  if (!tenant) {
+    return { error: 'Tenant portal tidak ditemukan.' }
+  }
+
+  try {
+    const coupon = await cloneAffiliateTemplateCoupon(tenant.id, session.user.id, templateCouponId)
+    revalidatePath(`/member/${orgSlug}/afiliasi`)
+    return { success: true, coupon }
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Gagal menggunakan kupon template.',
     }
   }
 }

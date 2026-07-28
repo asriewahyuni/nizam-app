@@ -474,6 +474,7 @@ export async function saveLmsCouponAction(formData: FormData) {
   const perUserLimit = Math.max(1, Math.trunc(Number(formData.get('per_user_limit') || 1)))
   const allowedStoreProductIds = parseUuidList(formData.get('store_product_ids'))
   const isActive = formData.get('is_active') !== 'false'
+  const isAffiliateTemplate = formData.get('is_affiliate_template') === 'true'
 
   try {
     if (code.length < 3) {
@@ -528,6 +529,7 @@ export async function saveLmsCouponAction(formData: FormData) {
              per_user_limit = $10,
              allowed_store_product_ids = $11::uuid[],
              is_active = $12,
+             is_affiliate_template = $13,
              updated_at = NOW()
            WHERE id = $1::uuid
              AND org_id = $2::uuid
@@ -545,6 +547,7 @@ export async function saveLmsCouponAction(formData: FormData) {
             perUserLimit,
             allowedStoreProductIds,
             isActive,
+            isAffiliateTemplate,
           ],
         )
         if (!updated.rows[0]) throw new Error('Kode diskon tidak ditemukan.')
@@ -553,11 +556,11 @@ export async function saveLmsCouponAction(formData: FormData) {
           `INSERT INTO public.commerce_coupons (
              org_id, code, discount_type, discount_value, minimum_amount,
              starts_at, expires_at, usage_limit, per_user_limit,
-             allowed_store_product_ids, is_active
+             allowed_store_product_ids, is_active, is_affiliate_template
            ) VALUES (
              $1::uuid, $2, $3, $4, $5,
              $6::timestamptz, $7::timestamptz, $8, $9,
-             $10::uuid[], $11
+             $10::uuid[], $11, $12
            )`,
           [
             orgId,
@@ -571,6 +574,7 @@ export async function saveLmsCouponAction(formData: FormData) {
             perUserLimit,
             allowedStoreProductIds,
             isActive,
+            isAffiliateTemplate,
           ],
         )
       }

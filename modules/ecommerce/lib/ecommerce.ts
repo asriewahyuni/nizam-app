@@ -448,6 +448,8 @@ export type AdminCouponView = {
   perUserLimit: number
   allowedStoreProductIds: string[]
   isActive: boolean
+  isAffiliateTemplate: boolean
+  affiliateProfileId: string | null
   redemptionCount: number
   totalDiscountAmount: number
 }
@@ -589,6 +591,10 @@ export type PublicOrderStatusPayload = {
     address: PublicOrderAddressView | null
     items: PublicOrderStatusItemView[]
     payments: PublicOrderPaymentHistoryView[]
+    affiliate: {
+      referralCode: string
+      couponCode: string
+    } | null
   }
 }
 

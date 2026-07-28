@@ -6,9 +6,11 @@
 import 'server-only'
 
 import { createHash, randomBytes } from 'node:crypto'
-import { queryPostgres } from '@/lib/db/postgres'
+import type { PoolClient } from 'pg'
+import { connectPostgresClient, queryPostgres } from '@/lib/db/postgres'
 import { ERPBridge } from '@/lib/erp-bridge/finances'
 import { enqueueNotification } from '@/modules/notifications/outbox.server'
+import { getAffiliateSettings } from './affiliate-settings.server'
 
 function formatRupiah(amount: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount)
@@ -109,55 +111,18 @@ export async function getAffiliateProfile(
   }
 }
 
-/**
- * Mengaktifkan profil afiliasi bagi member (Opt-In / Explicit Activation).
- */
-export async function activateAffiliateProfile(
-  orgId: string,
-  userId: string,
-): Promise<AffiliateProfile> {
-  const existing = await getAffiliateProfile(orgId, userId)
-  if (existing) {
-    if (existing.status !== 'ACTIVE') {
-      await queryPostgres(
-        `UPDATE public.commerce_affiliate_profiles
-         SET status = 'ACTIVE', updated_at = NOW()
-         WHERE id = $1::uuid`,
-        [existing.id],
-      )
-      existing.status = 'ACTIVE'
-    }
-    return existing
-  }
+type AffiliateProfileRow = {
+  id: string
+  org_id: string
+  user_id: string
+  referral_code: string
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
+  payout_details: Record<string, unknown> | null
+  cookie_days: number
+  created_at: string
+}
 
-  // Generate kode referral unik (misal: REF-A8F2)
-  const randomSuffix = randomBytes(3).toString('hex').toUpperCase()
-  const referralCode = `REF-${randomSuffix}`
-
-  const { rows } = await queryPostgres<{
-    id: string
-    org_id: string
-    user_id: string
-    referral_code: string
-    status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
-    payout_details: Record<string, unknown> | null
-    cookie_days: number
-    created_at: string
-  }>(
-    `INSERT INTO public.commerce_affiliate_profiles (
-       org_id, user_id, referral_code, status, default_commission_type,
-       default_commission_value, cookie_days, approved_at
-     ) VALUES (
-       $1::uuid, $2::uuid, $3, 'ACTIVE', 'PERCENTAGE', 20.00, 30, NOW()
-     )
-     ON CONFLICT (org_id, user_id) DO UPDATE
-     SET status = 'ACTIVE', updated_at = NOW()
-     RETURNING id::text, org_id::text, user_id::text, referral_code, status,
-               payout_details, cookie_days, created_at::text`,
-    [orgId, userId, referralCode],
-  )
-
-  const row = rows[0]
+function mapAffiliateProfileRow(row: AffiliateProfileRow): AffiliateProfile {
   return {
     id: row.id,
     orgId: row.org_id,
@@ -168,6 +133,317 @@ export async function activateAffiliateProfile(
     cookieDays: Number(row.cookie_days || 30),
     createdAt: row.created_at,
   }
+}
+
+/**
+ * Memastikan afiliasi punya kupon diskon personal (kode = kode referral mereka).
+ * Idempotent — tidak membuat duplikat kalau kupon personalnya sudah ada.
+ * Kupon "personal" dibedakan dari hasil clone template lewat source_coupon_id IS NULL.
+ */
+async function ensurePersonalCoupon(
+  client: PoolClient,
+  params: { orgId: string; affiliateProfileId: string; referralCode: string },
+) {
+  const existing = await client.query<{ id: string }>(
+    `SELECT id::text FROM public.commerce_coupons
+     WHERE org_id = $1::uuid AND affiliate_profile_id = $2::uuid AND source_coupon_id IS NULL
+     LIMIT 1`,
+    [params.orgId, params.affiliateProfileId],
+  )
+  if (existing.rows[0]) return
+
+  const settings = await getAffiliateSettings(params.orgId)
+
+  await client.query(
+    `INSERT INTO public.commerce_coupons (
+       org_id, code, discount_type, discount_value, affiliate_profile_id, is_active
+     ) VALUES ($1::uuid, $2, $3, $4, $5::uuid, TRUE)
+     ON CONFLICT (org_id, upper(code)) DO NOTHING`,
+    [
+      params.orgId,
+      params.referralCode,
+      settings.defaultCouponDiscountType,
+      settings.defaultCouponDiscountValue,
+      params.affiliateProfileId,
+    ],
+  )
+}
+
+/**
+ * Get-or-create profil afiliasi (langsung ACTIVE, tanpa approval admin) berikut
+ * kupon personalnya, dalam transaksi milik caller. Dipakai baik oleh aktivasi
+ * eksplisit (activateAffiliateProfile) maupun alur otomatis di halaman thank-you.
+ */
+export async function ensureAffiliateProfileForUser(
+  client: PoolClient,
+  params: { orgId: string; userId: string },
+): Promise<AffiliateProfile> {
+  const existingRes = await client.query<AffiliateProfileRow>(
+    `SELECT id::text, org_id::text, user_id::text, referral_code, status,
+            payout_details, COALESCE(cookie_days, 30) AS cookie_days, created_at::text
+     FROM public.commerce_affiliate_profiles
+     WHERE org_id = $1::uuid AND user_id = $2::uuid
+     LIMIT 1`,
+    [params.orgId, params.userId],
+  )
+
+  let row = existingRes.rows[0]
+
+  if (row && row.status !== 'ACTIVE') {
+    const updated = await client.query<AffiliateProfileRow>(
+      `UPDATE public.commerce_affiliate_profiles
+       SET status = 'ACTIVE', approved_at = COALESCE(approved_at, NOW()), updated_at = NOW()
+       WHERE id = $1::uuid
+       RETURNING id::text, org_id::text, user_id::text, referral_code, status,
+                 payout_details, COALESCE(cookie_days, 30) AS cookie_days, created_at::text`,
+      [row.id],
+    )
+    row = updated.rows[0]
+  }
+
+  if (!row) {
+    // Generate kode referral unik (misal: REF-A8F2)
+    const randomSuffix = randomBytes(3).toString('hex').toUpperCase()
+    const referralCode = `REF-${randomSuffix}`
+
+    const inserted = await client.query<AffiliateProfileRow>(
+      `INSERT INTO public.commerce_affiliate_profiles (
+         org_id, user_id, referral_code, status, default_commission_type,
+         default_commission_value, cookie_days, approved_at
+       ) VALUES (
+         $1::uuid, $2::uuid, $3, 'ACTIVE', 'PERCENTAGE', 20.00, 30, NOW()
+       )
+       ON CONFLICT (org_id, user_id) DO UPDATE
+       SET status = 'ACTIVE', updated_at = NOW()
+       RETURNING id::text, org_id::text, user_id::text, referral_code, status,
+                 payout_details, COALESCE(cookie_days, 30) AS cookie_days, created_at::text`,
+      [params.orgId, params.userId, referralCode],
+    )
+    row = inserted.rows[0]
+  }
+
+  await ensurePersonalCoupon(client, {
+    orgId: params.orgId,
+    affiliateProfileId: row.id,
+    referralCode: row.referral_code,
+  })
+
+  return mapAffiliateProfileRow(row)
+}
+
+/**
+ * Mengaktifkan profil afiliasi bagi member (Opt-In / Explicit Activation).
+ */
+export async function activateAffiliateProfile(
+  orgId: string,
+  userId: string,
+): Promise<AffiliateProfile> {
+  const client = await connectPostgresClient()
+  try {
+    await client.query('BEGIN')
+    const profile = await ensureAffiliateProfileForUser(client, { orgId, userId })
+    await client.query('COMMIT')
+    return profile
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export type AffiliateCouponView = {
+  id: string
+  code: string
+  discountType: 'FIXED' | 'PERCENT'
+  discountValue: number
+  isActive: boolean
+  isPersonal: boolean
+}
+
+export type AffiliateCouponTemplateView = {
+  id: string
+  code: string
+  discountType: 'FIXED' | 'PERCENT'
+  discountValue: number
+  minimumAmount: number
+}
+
+/**
+ * Mengambil semua kupon milik seorang afiliasi (personal + hasil clone template).
+ */
+export async function getAffiliateCoupons(
+  orgId: string,
+  affiliateProfileId: string,
+): Promise<AffiliateCouponView[]> {
+  const { rows } = await queryPostgres<{
+    id: string
+    code: string
+    discount_type: 'FIXED' | 'PERCENT'
+    discount_value: number
+    is_active: boolean
+    source_coupon_id: string | null
+  }>(
+    `SELECT id::text, code, discount_type, discount_value::float8, is_active, source_coupon_id::text
+     FROM public.commerce_coupons
+     WHERE org_id = $1::uuid AND affiliate_profile_id = $2::uuid
+     ORDER BY source_coupon_id NULLS FIRST, created_at DESC`,
+    [orgId, affiliateProfileId],
+  )
+
+  return rows.map((row) => ({
+    id: row.id,
+    code: row.code,
+    discountType: row.discount_type,
+    discountValue: Number(row.discount_value || 0),
+    isActive: row.is_active,
+    isPersonal: !row.source_coupon_id,
+  }))
+}
+
+/**
+ * Mengambil kupon template admin (is_affiliate_template = true) yang belum
+ * di-"sub" (clone) oleh afiliasi ini.
+ */
+export async function getAvailableAffiliateCouponTemplates(
+  orgId: string,
+  affiliateProfileId: string,
+): Promise<AffiliateCouponTemplateView[]> {
+  const { rows } = await queryPostgres<{
+    id: string
+    code: string
+    discount_type: 'FIXED' | 'PERCENT'
+    discount_value: number
+    minimum_amount: number
+  }>(
+    `SELECT template.id::text, template.code, template.discount_type,
+            template.discount_value::float8, template.minimum_amount::float8
+     FROM public.commerce_coupons template
+     WHERE template.org_id = $1::uuid
+       AND template.is_affiliate_template = TRUE
+       AND template.affiliate_profile_id IS NULL
+       AND template.is_active = TRUE
+       AND NOT EXISTS (
+         SELECT 1 FROM public.commerce_coupons clone
+         WHERE clone.org_id = template.org_id
+           AND clone.source_coupon_id = template.id
+           AND clone.affiliate_profile_id = $2::uuid
+       )
+     ORDER BY template.created_at DESC`,
+    [orgId, affiliateProfileId],
+  )
+
+  return rows.map((row) => ({
+    id: row.id,
+    code: row.code,
+    discountType: row.discount_type,
+    discountValue: Number(row.discount_value || 0),
+    minimumAmount: Number(row.minimum_amount || 0),
+  }))
+}
+
+/**
+ * Afiliasi "sub" (clone) kupon template admin menjadi kupon miliknya sendiri —
+ * kode unik, aturan diskon disalin persis, tetap terlacak individual per afiliasi.
+ */
+export async function cloneAffiliateTemplateCoupon(
+  orgId: string,
+  userId: string,
+  templateCouponId: string,
+): Promise<AffiliateCouponView> {
+  const profile = await getAffiliateProfile(orgId, userId)
+  if (!profile || profile.status !== 'ACTIVE') {
+    throw new Error('Akun afiliasi tidak aktif atau belum terdaftar.')
+  }
+
+  const templateRes = await queryPostgres<{
+    id: string
+    code: string
+    discount_type: 'FIXED' | 'PERCENT'
+    discount_value: number
+    minimum_amount: number
+    starts_at: string | null
+    expires_at: string | null
+    usage_limit: number | null
+    per_user_limit: number
+    allowed_store_product_ids: string[]
+  }>(
+    `SELECT id::text, code, discount_type, discount_value::float8, minimum_amount::float8,
+            starts_at::text, expires_at::text, usage_limit, per_user_limit, allowed_store_product_ids
+     FROM public.commerce_coupons
+     WHERE id = $1::uuid AND org_id = $2::uuid
+       AND is_affiliate_template = TRUE AND affiliate_profile_id IS NULL
+     LIMIT 1`,
+    [templateCouponId, orgId],
+  )
+  const template = templateRes.rows[0]
+  if (!template) {
+    throw new Error('Kupon template tidak ditemukan atau sudah tidak tersedia.')
+  }
+
+  const existingRes = await queryPostgres<{ id: string; code: string }>(
+    `SELECT id::text, code FROM public.commerce_coupons
+     WHERE org_id = $1::uuid AND source_coupon_id = $2::uuid AND affiliate_profile_id = $3::uuid
+     LIMIT 1`,
+    [orgId, template.id, profile.id],
+  )
+  if (existingRes.rows[0]) {
+    return {
+      id: existingRes.rows[0].id,
+      code: existingRes.rows[0].code,
+      discountType: template.discount_type,
+      discountValue: Number(template.discount_value || 0),
+      isActive: true,
+      isPersonal: false,
+    }
+  }
+
+  const suffix = profile.referralCode.replace(/^REF-/, '').slice(0, 4)
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidateCode = attempt === 0
+      ? `${template.code}-${suffix}`
+      : `${template.code}-${suffix}${attempt}`
+
+    const inserted = await queryPostgres<{ id: string; code: string }>(
+      `INSERT INTO public.commerce_coupons (
+         org_id, code, discount_type, discount_value, minimum_amount,
+         starts_at, expires_at, usage_limit, per_user_limit,
+         allowed_store_product_ids, is_active, affiliate_profile_id, source_coupon_id
+       ) VALUES (
+         $1::uuid, $2, $3, $4, $5,
+         $6::timestamptz, $7::timestamptz, $8, $9,
+         $10::uuid[], TRUE, $11::uuid, $12::uuid
+       )
+       ON CONFLICT (org_id, upper(code)) DO NOTHING
+       RETURNING id::text, code`,
+      [
+        orgId,
+        candidateCode,
+        template.discount_type,
+        template.discount_value,
+        template.minimum_amount,
+        template.starts_at,
+        template.expires_at,
+        template.usage_limit,
+        template.per_user_limit,
+        template.allowed_store_product_ids || [],
+        profile.id,
+        template.id,
+      ],
+    )
+    if (inserted.rows[0]) {
+      return {
+        id: inserted.rows[0].id,
+        code: inserted.rows[0].code,
+        discountType: template.discount_type,
+        discountValue: Number(template.discount_value || 0),
+        isActive: true,
+        isPersonal: false,
+      }
+    }
+  }
+
+  throw new Error('Gagal membuat kode kupon unik, coba lagi.')
 }
 
 /**

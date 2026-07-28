@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import {
   ArrowRight,
   ChevronRight,
@@ -511,6 +512,19 @@ export default function StorefrontClient({
   const activeCouponQuote = couponQuote && couponAppliedSignature === couponCurrentSignature
     ? couponQuote
     : null
+
+  const searchParams = useSearchParams()
+  const autoAppliedCouponRef = useRef(false)
+  useEffect(() => {
+    if (autoAppliedCouponRef.current) return
+    const codeFromUrl = searchParams.get('coupon')?.trim()
+    if (!codeFromUrl || couponRequestItems.length === 0) return
+    autoAppliedCouponRef.current = true
+    setCouponCode(codeFromUrl.toUpperCase())
+    void applyCoupon(codeFromUrl)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, couponRequestItems.length])
+
   const checkoutProducts = couponRequestItems
     .map((item) => payload.products.find((product) => product.id === item.productId))
     .filter((product): product is StorefrontProductView => Boolean(product))
@@ -614,8 +628,8 @@ export default function StorefrontClient({
       .filter((item) => item.quantity > 0))
   }
 
-  async function applyCoupon() {
-    const normalizedCode = couponCode.trim().toUpperCase()
+  async function applyCoupon(codeOverride?: string) {
+    const normalizedCode = (codeOverride ?? couponCode).trim().toUpperCase()
     if (!normalizedCode) {
       setCouponError('Masukkan kode diskon terlebih dahulu.')
       return

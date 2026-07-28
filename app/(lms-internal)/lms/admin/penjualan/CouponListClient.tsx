@@ -73,7 +73,14 @@ export default function CouponListClient({
                 .filter(Boolean)
               return (
                 <tr key={coupon.id} className="hover:bg-slate-50/80">
-                  <td className="px-4 py-4"><p className="font-mono text-sm font-bold tracking-wide text-slate-950">{coupon.code}</p><p className="mt-1 text-xs font-medium text-slate-500">Min. {formatRupiah(coupon.minimumAmount)}</p></td>
+                  <td className="px-4 py-4">
+                    <p className="flex items-center gap-1.5 font-mono text-sm font-bold tracking-wide text-slate-950">
+                      {coupon.code}
+                      {coupon.affiliateProfileId && <span className="rounded-full bg-amber-50 px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-wide text-amber-700">Afiliasi</span>}
+                      {coupon.isAffiliateTemplate && <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-wide text-indigo-700">Template</span>}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">Min. {formatRupiah(coupon.minimumAmount)}</p>
+                  </td>
                   <td className="px-4 py-4 text-sm font-bold text-indigo-700">{coupon.discountType === 'PERCENT' ? `${coupon.discountValue}%` : formatRupiah(coupon.discountValue)}</td>
                   <td className="px-4 py-4 text-sm font-semibold text-slate-700">{formatPeriod(coupon)}</td>
                   <td className="px-4 py-4"><p className="text-sm font-bold text-slate-900">{coupon.redemptionCount}{coupon.usageLimit ? ` / ${coupon.usageLimit}` : ''}</p><p className="mt-1 text-xs font-medium text-slate-500">Maks. {coupon.perUserLimit}/member</p></td>

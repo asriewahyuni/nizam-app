@@ -316,6 +316,9 @@ Setiap kali diminta membuat atau meredesain UI (halaman checkout, toko, status p
    - Setiap elemen yang disalin harus memberikan umpan balik visual instan (misal: tombol *"Salin"* menjadi *"Tersalin"* dengan ikon centang hijau).
    - Gunakan selebrasi proporsional (animasi denyut/ping pada ikon sukses atau efek *Confetti*) saat konfirmasi atau transaksi selesai.
 
+6. **Kondisi Produk Digital vs Fisik (Zero-Clutter for Digital Goods):**
+   - **Sembunyikan Alamat Pengiriman untuk Produk Digital:** Untuk pesanan produk digital/kelas online (tanpa ongkir fisik, atau dengan alamat berpenanda `'Alamat Digital'` / `'Digital'`), **DILARANG** menampilkan section "Alamat Pengiriman" pada halaman status pesanan, faktur, maupun *Thank You Page*. Section alamat pengiriman hanya boleh diradikal/ditampilkan jika pesanan memerlukan pengiriman barang fisik nyata.
+
 ---
 
 ## Aturan Wajib Integrasi ERP Core (ANTI-SILO)

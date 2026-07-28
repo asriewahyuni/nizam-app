@@ -574,6 +574,7 @@ export async function createMemberCheckout(
 
       let discountAmount = 0
       let couponId: string | null = null
+      let couponAffiliateProfileId: string | null = null
       if (couponCode) {
         const couponResult = await client.query<{
           id: string
@@ -585,6 +586,7 @@ export async function createMemberCheckout(
           allowed: boolean
           total_usage: number
           user_usage: number
+          affiliate_profile_id: string | null
         }>(
           `SELECT
              coupon.id::text,
@@ -593,6 +595,7 @@ export async function createMemberCheckout(
              coupon.minimum_amount::float8,
              coupon.usage_limit,
              coupon.per_user_limit,
+             coupon.affiliate_profile_id::text,
              (
                CARDINALITY(coupon.allowed_store_product_ids) = 0
                OR $3::uuid = ANY(coupon.allowed_store_product_ids)
@@ -643,13 +646,18 @@ export async function createMemberCheckout(
           throw new Error('Batas penggunaan kupon untuk akun ini sudah tercapai.')
         }
         couponId = coupon.id
+        couponAffiliateProfileId = coupon.affiliate_profile_id
         discountAmount = coupon.discount_type === 'PERCENT'
           ? Math.min(offering.unit_price, offering.unit_price * Number(coupon.discount_value) / 100)
           : Math.min(offering.unit_price, Number(coupon.discount_value))
       }
 
+      // Afiliasi yang benar-benar terpakai (kupon menang atas kode referral yang
+      // diketik manual, karena kupon adalah sinyal atribusi paling eksplisit).
       let affiliateProfileId: string | null = null
-      if (referralCode) {
+      if (couponAffiliateProfileId) {
+        affiliateProfileId = couponAffiliateProfileId
+      } else if (referralCode) {
         const affiliate = await client.query<{ id: string; user_id: string }>(
           `SELECT id::text, user_id::text
            FROM public.commerce_affiliate_profiles

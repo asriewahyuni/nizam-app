@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Mail, MessageCircle, ArrowRight } from 'lucide-react'
+import { Mail, MessageCircle, ArrowRight, TicketPercent } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
 import LmsSettingsForm from './LmsSettingsForm'
@@ -53,6 +53,22 @@ export default async function LmsSettingsPage() {
           <div>
             <h2 className="font-bold text-slate-900 text-sm">Notifikasi WhatsApp &amp; Dripsender</h2>
             <p className="text-xs text-slate-500">Atur API key Dripsender dan uji coba pengiriman notifikasi WhatsApp otomatis.</p>
+          </div>
+        </div>
+        <ArrowRight size={18} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition" />
+      </Link>
+
+      <Link
+        href="/lms/admin/settings/afiliasi"
+        className="group flex items-center justify-between p-5 rounded-2xl border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md transition cursor-pointer"
+      >
+        <div className="flex items-center gap-3.5">
+          <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition">
+            <TicketPercent size={20} />
+          </div>
+          <div>
+            <h2 className="font-bold text-slate-900 text-sm">Kupon Afiliasi</h2>
+            <p className="text-xs text-slate-500">Atur nilai diskon default kupon personal yang otomatis dibuatkan saat afiliasi aktivasi.</p>
           </div>
         </div>
         <ArrowRight size={18} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition" />

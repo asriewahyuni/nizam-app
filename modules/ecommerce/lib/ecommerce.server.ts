@@ -11,6 +11,10 @@ import {
 } from '@/lib/storage/object-storage.server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
+  ensureAffiliateProfileForUser,
+  getAffiliateCoupons,
+} from '@/modules/ecommerce/lib/affiliate.server'
+import {
   snapshotOrderEntitlements,
   syncActivePackageMemberships,
 } from '@/modules/ecommerce/payments/entitlement.service'
@@ -1734,6 +1738,8 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
       per_user_limit: number
       allowed_store_product_ids: string[]
       is_active: boolean
+      is_affiliate_template: boolean
+      affiliate_profile_id: string | null
       redemption_count: number
       total_discount_amount: number
     }>(
@@ -1749,6 +1755,8 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
          coupon.per_user_limit,
          coupon.allowed_store_product_ids::text[],
          coupon.is_active,
+         coupon.is_affiliate_template,
+         coupon.affiliate_profile_id::text,
          COUNT(redemption.id)::int AS redemption_count,
          COALESCE(SUM(redemption.discount_amount), 0)::float8 AS total_discount_amount
        FROM public.commerce_coupons coupon
@@ -2031,6 +2039,8 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
     perUserLimit: Number(row.per_user_limit || 1),
     allowedStoreProductIds: row.allowed_store_product_ids || [],
     isActive: row.is_active,
+    isAffiliateTemplate: Boolean(row.is_affiliate_template),
+    affiliateProfileId: row.affiliate_profile_id,
     redemptionCount: Number(row.redemption_count || 0),
     totalDiscountAmount: Number(row.total_discount_amount || 0),
   }))
@@ -3636,6 +3646,7 @@ export async function createCheckoutOrder(input: unknown) {
           JSON.stringify({
             source: 'STOREFRONT',
             couponCode: couponQuote?.code || null,
+            affiliateProfileId: couponQuote?.affiliateProfileId || null,
           }),
           couponQuote?.couponId || null,
           paymentDueAt,
@@ -3908,6 +3919,7 @@ async function getPublicOrderRow(input: {
     public_access_token: string | null
     public_access_token_expires_at: string | null
     erp_sale_id: string | null
+    user_id: string | null
   }>(
     `
       SELECT *
@@ -4060,6 +4072,29 @@ export async function getPublicOrderStatusPayload(input: {
     accessToken
   )
 
+  let affiliate: { referralCode: string; couponCode: string } | null = null
+  if (order.user_id) {
+    const affiliateClient = await connectPostgresClient()
+    try {
+      await affiliateClient.query('BEGIN')
+      const profile = await ensureAffiliateProfileForUser(affiliateClient, {
+        orgId: order.org_id,
+        userId: order.user_id,
+      })
+      await affiliateClient.query('COMMIT')
+      const coupons = await getAffiliateCoupons(order.org_id, profile.id)
+      const personalCoupon = coupons.find((coupon) => coupon.isPersonal) || coupons[0] || null
+      affiliate = {
+        referralCode: profile.referralCode,
+        couponCode: personalCoupon?.code || profile.referralCode,
+      }
+    } catch {
+      await affiliateClient.query('ROLLBACK')
+    } finally {
+      affiliateClient.release()
+    }
+  }
+
   return {
     store,
     theme,
@@ -4116,6 +4151,7 @@ export async function getPublicOrderStatusPayload(input: {
         reviewNote: cleanLongText(payment.review_note, 240),
         createdAt: String(payment.created_at || ''),
       })),
+      affiliate,
     },
   }
 }

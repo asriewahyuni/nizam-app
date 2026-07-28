@@ -114,6 +114,20 @@ export default function OrderStatusClient({
   const secondaryColor = payload.theme.tokens.accentStrong || '#c69232'
   const softColor = payload.theme.tokens.accentSoft || '#eef4fc'
 
+  // Check if order requires physical shipping (hide shipping address section for digital orders)
+  const isPhysicalShipping = Boolean(
+    payload.order.address &&
+    payload.order.address.line1 &&
+    payload.order.address.line1 !== 'Alamat Digital' &&
+    payload.order.address.line1 !== 'Digital' &&
+    payload.order.address.city !== 'Digital' &&
+    payload.order.address.postalCode !== '00000' &&
+    (payload.order.shippingAmount > 0 ||
+      (payload.order.shippingLabel &&
+       payload.order.shippingLabel !== 'Digital' &&
+       !payload.order.shippingLabel.toLowerCase().includes('tanpa ongkir')))
+  )
+
   // WhatsApp Support URL
   const whatsappNumber = payload.store.whatsappPhone || payload.store.supportPhone || ''
   const cleanWa = whatsappNumber.replace(/\D/g, '')
@@ -202,31 +216,33 @@ export default function OrderStatusClient({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="inline-flex items-center rounded-full border border-slate-200/80 bg-slate-100/90 p-1 text-xs font-semibold shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setActiveTab('status')}
-                className={`rounded-full px-3 py-1.5 transition ${
-                  activeTab === 'status'
-                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Instruksi & Status
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('thankyou')}
-                className={`rounded-full px-3 py-1.5 transition flex items-center gap-1.5 ${
-                  activeTab === 'thankyou'
-                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Sparkles size={13} style={{ color: primaryColor }} />
-                <span>Terima Kasih</span>
-              </button>
-            </div>
+            {isPaid && (
+              <div className="inline-flex items-center rounded-full border border-slate-200/80 bg-slate-100/90 p-1 text-xs font-semibold shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('status')}
+                  className={`rounded-full px-3 py-1.5 transition ${
+                    activeTab === 'status'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Instruksi & Status
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('thankyou')}
+                  className={`rounded-full px-3 py-1.5 transition flex items-center gap-1.5 ${
+                    activeTab === 'thankyou'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Sparkles size={13} style={{ color: primaryColor }} />
+                  <span>Terima Kasih</span>
+                </button>
+              </div>
+            )}
             <div
               className="hidden sm:flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-2xs"
               style={{
@@ -252,9 +268,10 @@ export default function OrderStatusClient({
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-        {activeTab === 'thankyou' ? (
+        {isPaid && activeTab === 'thankyou' ? (
           <ThankYouPageSection
             payload={payload}
+            orgSlug={orgSlug}
             primaryColor={primaryColor}
             softColor={softColor}
             copyOrderLink={copyOrderLink}
@@ -605,8 +622,8 @@ export default function OrderStatusClient({
               </div>
             </section>
 
-            {/* 4. Alamat Pengiriman (jika ada) */}
-            {payload.order.address && (
+            {/* 4. Alamat Pengiriman (jika bukan pesanan digital murni / memiliki ongkir fisik) */}
+            {isPhysicalShipping && payload.order.address && (
               <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
                 <h2 className="text-base font-bold tracking-tight text-slate-900">Alamat Pengiriman</h2>
                 <div className="mt-4 flex gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-4">
@@ -924,6 +941,7 @@ export default function OrderStatusClient({
 
 type ThankYouPageSectionProps = {
   payload: PublicOrderStatusPayload
+  orgSlug: string
   primaryColor: string
   softColor: string
   copyOrderLink: () => void
@@ -936,6 +954,7 @@ type ThankYouPageSectionProps = {
 
 function ThankYouPageSection({
   payload,
+  orgSlug,
   primaryColor,
   softColor,
   copyOrderLink,
@@ -948,8 +967,8 @@ function ThankYouPageSection({
   const customerName = payload.order.customerName || 'Pelanggan'
   const customerEmail = payload.order.customerEmail || 'email terdaftar'
   const firstName = customerName.split(' ')[0] || customerName
-  const defaultReferralCode = `${firstName.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 6) || 'MEMBER'}50`
   const firstItem = payload.order.items[0]
+  const affiliate = payload.order.affiliate
 
   return (
     <div className="relative z-10 space-y-6">
@@ -1219,40 +1238,48 @@ function ThankYouPageSection({
         </aside>
       </div>
 
-      {/* Referral */}
-      <section
-        className="overflow-hidden rounded-2xl border border-slate-200/80 p-6 text-white shadow-lg sm:p-8"
-        style={{
-          background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`,
-        }}
-      >
-        <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="max-w-lg">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider">
-              Bonus Referral
-            </span>
-            <h3 className="mt-3 text-xl font-extrabold sm:text-2xl">Ajak teman, dapat Rp 50.000</h3>
-            <p className="mt-1 text-sm text-white/90 leading-relaxed">
-              Bagikan kode kamu — mereka hemat, kamu dapat saldo atau keuntungan untuk kelas berikutnya.
-            </p>
-          </div>
-          <div className="w-full sm:w-auto">
-            <div className="flex items-center gap-2 rounded-xl bg-white/10 p-1.5 ring-1 ring-white/20 backdrop-blur">
-              <code className="flex-1 rounded-lg bg-white/15 px-4 py-2.5 font-mono text-sm font-bold tracking-widest text-white">
-                {defaultReferralCode}
-              </code>
-              <button
-                type="button"
-                onClick={() => copyReferralCode(defaultReferralCode)}
-                className="rounded-lg bg-white px-4 py-2.5 text-xs font-bold transition hover:bg-slate-100 shadow-sm"
-                style={{ color: primaryColor }}
+      {/* Afiliasi — kode & kupon asli, bukan simulasi */}
+      {affiliate && (
+        <section
+          className="overflow-hidden rounded-2xl border border-slate-200/80 p-6 text-white shadow-lg sm:p-8"
+          style={{
+            background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`,
+          }}
+        >
+          <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-lg">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider">
+                Program Afiliasi
+              </span>
+              <h3 className="mt-3 text-xl font-extrabold sm:text-2xl">Bagikan kupon Anda, dapat komisi</h3>
+              <p className="mt-1 text-sm text-white/90 leading-relaxed">
+                Kode ini sudah aktif atas nama Anda. Setiap kali ada pembeli lain pakai kupon ini saat checkout, Anda otomatis dapat komisi.
+              </p>
+              <a
+                href={`/member/${orgSlug}/afiliasi`}
+                className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-white underline underline-offset-2 hover:text-white/80"
               >
-                {copiedReferral ? 'Tersalin' : 'Salin'}
-              </button>
+                Kelola Program Afiliasi Saya &rarr;
+              </a>
+            </div>
+            <div className="w-full sm:w-auto">
+              <div className="flex items-center gap-2 rounded-xl bg-white/10 p-1.5 ring-1 ring-white/20 backdrop-blur">
+                <code className="flex-1 rounded-lg bg-white/15 px-4 py-2.5 font-mono text-sm font-bold tracking-widest text-white">
+                  {affiliate.couponCode}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => copyReferralCode(affiliate.couponCode)}
+                  className="rounded-lg bg-white px-4 py-2.5 text-xs font-bold transition hover:bg-slate-100 shadow-sm"
+                  style={{ color: primaryColor }}
+                >
+                  {copiedReferral ? 'Tersalin' : 'Salin'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   )
 }

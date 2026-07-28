@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Award,
   Check,
@@ -15,6 +16,7 @@ import {
   MousePointerClick,
   Share2,
   Sparkles,
+  TicketPercent,
   Trophy,
   Users,
   Wallet,
@@ -22,6 +24,7 @@ import {
 import { formatRupiah } from '@/lib/utils'
 import {
   activateMemberAffiliateAction,
+  cloneAffiliateTemplateCouponAction,
   requestMemberPayoutAction,
 } from '@/modules/member/actions/affiliate-member.actions'
 import type { PortalAffiliateDashboard } from '@/modules/member/lib/portal.server'
@@ -37,9 +40,12 @@ export function MemberAffiliatePageClient({
   referralHost: string
   dashboard: PortalAffiliateDashboard
 }) {
-  const [activeTab, setActiveTab] = useState<'courses' | 'leaderboard' | 'commissions'>('courses')
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState<'courses' | 'coupons' | 'leaderboard' | 'commissions'>('courses')
   const [copiedCode, setCopiedCode] = useState(false)
   const [copiedCourseId, setCopiedCourseId] = useState<string | null>(null)
+  const [copiedCouponId, setCopiedCouponId] = useState<string | null>(null)
+  const [cloningTemplateId, setCloningTemplateId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -73,6 +79,27 @@ export function MemberAffiliatePageClient({
         setMessage({ type: 'error', text: res.error })
       } else {
         setMessage({ type: 'success', text: `Selamat! Akun Afiliasi Anda berhasil diaktifkan dengan kode ${res.referralCode}.` })
+      }
+    })
+  }
+
+  const handleCopyCoupon = (code: string, couponId: string) => {
+    navigator.clipboard.writeText(code)
+    setCopiedCouponId(couponId)
+    setTimeout(() => setCopiedCouponId(null), 2000)
+  }
+
+  const handleCloneTemplate = (templateId: string) => {
+    setMessage(null)
+    setCloningTemplateId(templateId)
+    startTransition(async () => {
+      const res = await cloneAffiliateTemplateCouponAction(orgSlug, templateId)
+      setCloningTemplateId(null)
+      if (res.error) {
+        setMessage({ type: 'error', text: res.error })
+      } else {
+        setMessage({ type: 'success', text: `Kupon ${res.coupon?.code} berhasil dibuat untuk Anda!` })
+        router.refresh()
       }
     })
   }
@@ -243,6 +270,15 @@ export function MemberAffiliatePageClient({
 
         <button
           type="button"
+          onClick={() => setActiveTab('coupons')}
+          className={`pb-2.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'coupons' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
+        >
+          <TicketPercent size={14} />
+          <span>Kupon Saya ({dashboard.coupons.length})</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('leaderboard')}
           className={`pb-2.5 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activeTab === 'leaderboard' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
         >
@@ -324,6 +360,87 @@ export function MemberAffiliatePageClient({
           </div>
         </div>
       )}
+      {/* Tab Content: Kupon Afiliasi (personal + hasil clone template admin) */}
+      {activeTab === 'coupons' && (
+        <div className="mt-5 space-y-6">
+          <div>
+            <h3 className="font-bold text-slate-900 text-sm mb-1">Kupon Milik Saya</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Bagikan kode ini langsung ke calon pembeli. Setiap kali dipakai saat checkout, Anda otomatis mendapat komisi dan pembeli mendapat diskon.
+            </p>
+            {!dashboard.isActivated ? (
+              <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-xs text-slate-500">
+                Aktifkan akun afiliasi Anda terlebih dahulu untuk mendapatkan kupon personal.
+              </p>
+            ) : dashboard.coupons.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-xs text-slate-500">
+                Kupon personal Anda sedang disiapkan sistem, muat ulang halaman beberapa saat lagi.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {dashboard.coupons.map((coupon) => (
+                  <div key={coupon.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <code className="font-mono text-sm font-bold text-slate-900">{coupon.code}</code>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${coupon.isPersonal ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                          {coupon.isPersonal ? 'Personal' : 'Dari Template'}
+                        </span>
+                        {!coupon.isActive && (
+                          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Nonaktif</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Diskon {coupon.discountType === 'PERCENT' ? `${coupon.discountValue}%` : formatRupiah(coupon.discountValue)} untuk pembeli
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyCoupon(coupon.code, coupon.id)}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                    >
+                      {copiedCouponId === coupon.id ? <Check size={14} /> : <Copy size={14} />}
+                      <span>{copiedCouponId === coupon.id ? 'Tersalin' : 'Salin'}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {dashboard.isActivated && dashboard.availableCouponTemplates.length > 0 && (
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm mb-1">Kupon Admin Tersedia</h3>
+              <p className="text-xs text-slate-500 mb-4">
+                Admin sudah menyiapkan kupon ini. Klik "Gunakan Kupon Ini" untuk mendapatkan versi kupon ini yang khusus terlacak atas nama Anda.
+              </p>
+              <div className="flex flex-col gap-3">
+                {dashboard.availableCouponTemplates.map((template) => (
+                  <div key={template.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="min-w-0">
+                      <code className="font-mono text-sm font-bold text-slate-900">{template.code}</code>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Diskon {template.discountType === 'PERCENT' ? `${template.discountValue}%` : formatRupiah(template.discountValue)}
+                        {template.minimumAmount > 0 ? ` · Min. belanja ${formatRupiah(template.minimumAmount)}` : ''}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isPending && cloningTemplateId === template.id}
+                      onClick={() => handleCloneTemplate(template.id)}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition cursor-pointer disabled:opacity-50"
+                    >
+                      <TicketPercent size={14} />
+                      <span>{isPending && cloningTemplateId === template.id ? 'Memproses...' : 'Gunakan Kupon Ini'}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Tab Content 2: Leaderboard Afiliasi */}
       {activeTab === 'leaderboard' && (
         <div className="mt-5">

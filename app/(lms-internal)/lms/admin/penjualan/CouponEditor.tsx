@@ -41,6 +41,8 @@ export default function CouponEditor({
   const [expiresAt, setExpiresAt] = useState(toDateTimeLocal(initialCoupon?.expiresAt || null))
   const [productIds, setProductIds] = useState<string[]>(initialCoupon?.allowedStoreProductIds || [])
   const [isActive, setIsActive] = useState(initialCoupon?.isActive ?? true)
+  const [isAffiliateTemplate, setIsAffiliateTemplate] = useState(initialCoupon?.isAffiliateTemplate ?? false)
+  const isOwnedByAffiliate = Boolean(initialCoupon?.affiliateProfileId)
   const [dirty, setDirty] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
@@ -80,6 +82,7 @@ export default function CouponEditor({
     formData.set('expires_at', expiresAt)
     formData.set('store_product_ids', JSON.stringify(productIds))
     formData.set('is_active', String(isActive))
+    formData.set('is_affiliate_template', String(isAffiliateTemplate))
     startTransition(async () => {
       const result = await saveLmsCouponAction(formData)
       if (!result.success) {
@@ -123,6 +126,17 @@ export default function CouponEditor({
           <input type="checkbox" checked={isActive} onChange={(event) => { setIsActive(event.target.checked); setDirty(true) }} className="size-5 accent-indigo-700" />
           <span><span className="block text-sm font-bold text-slate-950">Kode aktif</span><span className="block text-xs font-medium text-slate-500">Checkout akan menerima kode selama aturan lain terpenuhi.</span></span>
         </label>
+
+        {isOwnedByAffiliate ? (
+          <div className="mt-3 flex min-h-14 items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <span><span className="block text-sm font-bold text-amber-900">Kupon milik afiliasi</span><span className="block text-xs font-medium text-amber-700">Kode ini sudah terhubung ke satu afiliasi (personal atau hasil clone), sehingga tidak bisa dijadikan template afiliasi.</span></span>
+          </div>
+        ) : (
+          <label className="mt-3 flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4">
+            <input type="checkbox" checked={isAffiliateTemplate} onChange={(event) => { setIsAffiliateTemplate(event.target.checked); setDirty(true) }} className="size-5 accent-indigo-700" />
+            <span><span className="block text-sm font-bold text-slate-950">Tersedia untuk digunakan afiliasi</span><span className="block text-xs font-medium text-slate-500">Afiliasi bisa "menggunakan" kode ini dari dashboard mereka — sistem akan membuatkan kupon baru khusus milik afiliasi tsb dengan aturan diskon yang sama.</span></span>
+          </label>
+        )}
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">

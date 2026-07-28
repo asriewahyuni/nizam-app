@@ -519,8 +519,12 @@ export async function getPortalCertificates(
 import {
   getEligibleAffiliateCourses,
   getAffiliateLeaderboard,
+  getAffiliateCoupons,
+  getAvailableAffiliateCouponTemplates,
   type EligibleAffiliateCourse,
   type LeaderboardEntry,
+  type AffiliateCouponView,
+  type AffiliateCouponTemplateView,
 } from '@/modules/ecommerce/lib/affiliate.server'
 
 export type PortalAffiliateDashboard = {
@@ -532,6 +536,8 @@ export type PortalAffiliateDashboard = {
   conversionCount: number
   eligibleCourses: EligibleAffiliateCourse[]
   leaderboard: LeaderboardEntry[]
+  coupons: AffiliateCouponView[]
+  availableCouponTemplates: AffiliateCouponTemplateView[]
   commissions: Array<{
     id: string
     orderNumber: string | null
@@ -570,9 +576,16 @@ export async function getPortalAffiliateDashboard(
       conversionCount: 0,
       eligibleCourses,
       leaderboard,
+      coupons: [],
+      availableCouponTemplates: [],
       commissions: [],
     }
   }
+
+  const [coupons, availableCouponTemplates] = await Promise.all([
+    getAffiliateCoupons(tenant.id, profile.id),
+    getAvailableAffiliateCouponTemplates(tenant.id, profile.id),
+  ])
 
   const result = await queryPostgres<{
     id: string
@@ -611,6 +624,8 @@ export async function getPortalAffiliateDashboard(
     conversionCount: result.rows.filter((commission) => commission.status !== 'CANCELLED').length,
     eligibleCourses,
     leaderboard,
+    coupons,
+    availableCouponTemplates,
     commissions: result.rows.map((commission) => ({
       id: commission.id,
       orderNumber: commission.order_number,
