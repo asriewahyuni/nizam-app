@@ -149,7 +149,7 @@ export function MemberAffiliatePageClient({
               <span>Program Afiliasi Resmi {tenantName}</span>
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight leading-tight">
-              Promosikan Kelas &amp; Dapatkan Komisi Hingga <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">20%+</span>
+              Promosikan kelas dan dapatkan komisi setiap bulannya
             </h1>
             <p className="text-slate-300 text-xs leading-relaxed">
               Bagikan tautan edukasi berkualitas kepada komunitas Anda. Dapatkan komisi transparan setiap kali ada pendaftar baru lewat rekomendasi Anda.
