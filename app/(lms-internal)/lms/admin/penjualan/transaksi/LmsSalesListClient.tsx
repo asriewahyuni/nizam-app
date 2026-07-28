@@ -222,8 +222,8 @@ export function LmsSalesListClient({
       </div>
 
       {/* Sales Data Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm border-collapse">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full min-w-[950px] text-left text-sm border-collapse">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider">
               <th className="py-3.5 px-5">No. Order &amp; Waktu</th>
@@ -232,7 +232,7 @@ export function LmsSalesListClient({
               <th className="py-3.5 px-5">Total Pembayaran</th>
               <th className="py-3.5 px-5 text-center">Status</th>
               <th className="py-3.5 px-5">Afiliasi</th>
-              <th className="py-3.5 px-5 text-right">Aksi</th>
+              <th className="py-3.5 px-5 text-right sticky right-0 bg-slate-50 shadow-[-6px_0_12px_rgba(0,0,0,0.04)] z-10">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -248,7 +248,7 @@ export function LmsSalesListClient({
                 const isPendingState = sale.paymentStatus === 'PENDING'
 
                 return (
-                  <tr key={sale.id} className="hover:bg-slate-50/80 transition">
+                  <tr key={sale.id} className="group hover:bg-slate-50 transition">
                     <td className="py-4 px-5">
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-indigo-600">{sale.orderNumber}</span>
@@ -298,7 +298,7 @@ export function LmsSalesListClient({
                       )}
                     </td>
 
-                    <td className="py-4 px-5 text-right whitespace-nowrap">
+                    <td className="py-4 px-5 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-slate-50 transition shadow-[-6px_0_12px_rgba(0,0,0,0.04)] z-10">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
