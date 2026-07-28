@@ -289,6 +289,35 @@ Berikut aturan minimum yang SELALU diterapkan pada setiap pekerjaan UI:
 
 ---
 
+## Standar Design Language: Modern Clean Fintech / SaaS UI (Card-Based Minimalism)
+
+Setiap kali diminta membuat atau meredesain UI (halaman checkout, toko, status pesanan, thank you page, maupun dashboard), asisten AI **WAJIB** menerapkan gaya desain **Modern Clean Fintech / SaaS UI (Card-Based Minimalism)** dengan pedoman berikut:
+
+1. **Card-Based Surface & Elevation:**
+   - Gunakan wadah kartu berwarna putih bersih (`bg-white`) dengan sudut melengkung modern (`rounded-2xl`), batas beresolusi tinggi yang lembut (`border border-slate-200/80`), dan bayangan halus (`shadow-sm` atau `shadow-2xs`).
+   - Latar belakang halaman harus terang dan bersih (`bg-slate-50` / `#F8FAFC`).
+
+2. **Action-First Hierarchy (Fokus Pembayaran / Tindakan Utama):**
+   - Elemen yang membutuhkan tindakan instan (misal: Instruksi Transfer, Nomor Rekening, VA, QRIS, Nominal Tagihan, atau Tombol Aksi Utama) **WAJIB ditaruh di urutan paling atas (#1)** tanpa terhalang oleh banner dekoratif atau timeline yang tidak mendesak.
+   - Semangat utama: *"User checkout langsung bayar"* — meminimalisir gesekan (*zero-friction*).
+
+3. **Dynamic Brand Color & Kredibilitas Warna (Wajib Adaptif):**
+   - **Dilarang Hardcode Warna Statis untuk Semua Toko:** UI wajib mengambil warna utama dari konfigurasi toko atau organisasi secara dinamis (`store.brandColor` atau `org.brandColor`).
+   - **Khusus CORe ISEC:** Untuk organisasi/toko CORe ISEC (`coreisec`), warna brand resmi adalah **`#004da4`** (Primary Royal Blue) dan **`#c69232`** (Accent Gold).
+   - **Penerapan Primary Color:** Gunakan warna brand utama (`primaryColor`) pada tombol aksi utama (CTA utama seperti "Bayar", "Salin Link Order"), teks aksen penting, dan indikator aktif.
+   - **Soft Brand Tint (Background Badges):** Untuk lencana pesanan, chip info, atau background kartu highlight, gunakan *soft tint* dari brand color (misal: opacity 8–15% atau kombinasi hex `${primaryColor}15`) dengan teks berwarna `primaryColor`.
+   - **Soft Status Chips Universal:** Untuk status transaksi, gunakan warna universal yang intuitif (`bg-emerald-50 text-emerald-800` / `#dcfce7` untuk Lunas/Sukses, `#fef3c7 text-amber-800` untuk Menunggu Pembayaran, `#ffe4e6 text-rose-800` untuk Gagal/Batal).
+
+4. **Typography & Tabular Numbers:**
+   - Gunakan font geometric-humanist modern (seperti **Plus Jakarta Sans**, **Inter**, atau **Outfit**).
+   - Angka mata uang (Rp) dan nominal tagihan wajib menggunakan kelas `tabular-nums font-bold` / `font-extrabold` agar rata dan mudah dibaca hingga digit terakhir.
+
+5. **Micro-Delight & Umpan Balik Instan:**
+   - Setiap elemen yang disalin harus memberikan umpan balik visual instan (misal: tombol *"Salin"* menjadi *"Tersalin"* dengan ikon centang hijau).
+   - Gunakan selebrasi proporsional (animasi denyut/ping pada ikon sukses atau efek *Confetti*) saat konfirmasi atau transaksi selesai.
+
+---
+
 ## Aturan Wajib Integrasi ERP Core (ANTI-SILO)
 
 Nizam App adalah sebuah **Enterprise Resource Planning (ERP)**. Sistem ini memiliki modul-modul inti yang saling terkait (Akuntansi, Kas & Bank, Inventori, Penjualan, HRIS).
