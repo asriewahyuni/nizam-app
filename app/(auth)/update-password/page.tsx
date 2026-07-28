@@ -1,12 +1,10 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Lock, AlertCircle, CheckCircle2 } from 'lucide-react'
-import Link from 'next/link'
+import { Lock, ShieldCheck, CheckCircle2 } from 'lucide-react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Suspense } from 'react'
 import { resetPasswordWithToken } from '@/modules/auth/actions/auth.actions'
 
 function UpdatePasswordContent() {
@@ -34,7 +32,7 @@ function UpdatePasswordContent() {
     e.preventDefault()
     setLoading(true)
     setErrorMsg('')
-    
+
     const formData = new FormData(e.currentTarget)
     const password = formData.get('password') as string
     const confirmChoice = formData.get('confirm_password') as string
@@ -69,117 +67,103 @@ function UpdatePasswordContent() {
       setTimeout(() => {
         router.push('/dashboard')
       }, 3000)
-    } catch (err: any) {
-      setErrorMsg("Gagal menghubungi server.")
+    } catch {
+      setErrorMsg('Gagal menghubungi server.')
       setLoading(false)
     }
   }
 
+  if (success) {
+    return (
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="text-center space-y-5 py-4"
+      >
+        <div className="flex size-16 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mx-auto">
+          <CheckCircle2 size={32} />
+        </div>
+        <div>
+          <h2 className="text-xl font-black text-white tracking-tight">Password Diperbarui</h2>
+          <p className="mt-2 text-sm text-slate-400 font-medium leading-relaxed max-w-xs mx-auto">
+            Anda berhasil mengganti password. Mengarahkan ke dashboard dalam beberapa detik...
+          </p>
+        </div>
+      </motion.div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 px-6 lg:px-8 relative overflow-hidden font-sans">
-      <div className="max-w-md w-full mx-auto relative z-10 flex flex-col items-center">
-        {/* LOGO */}
-        <div className="mb-10 text-center flex flex-col items-center">
-           <Link href="/" className="inline-block p-4 bg-white shadow-xl shadow-blue-500/10 rounded-3xl border border-slate-100 mb-6 hover:-translate-y-1 transition-transform">
-              <img src="/logo.png" className="h-10 w-10 object-contain mx-auto" alt="NIZAM" />
-           </Link>
-           <h2 className="text-3xl font-black text-[#004AB8] uppercase tracking-tighter italic">BUAT PASSWORD BARU</h2>
-           <p className="mt-2 text-sm text-slate-500 font-medium">Amankan kembali akun organisasi Anda</p>
+    <div>
+      <div className="mb-8">
+        <h2 className="text-2xl font-black text-white tracking-tight">Buat Password Baru</h2>
+        <p className="text-slate-400 text-sm mt-1 font-medium">Amankan kembali akun Anda.</p>
+      </div>
+
+      <AnimatePresence>
+        {errorMsg && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+            <div role="alert" className="mb-6 px-4 py-3 rounded-xl text-sm font-medium leading-relaxed bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-start gap-2.5">
+              <ShieldCheck size={15} className="mt-0.5 shrink-0 text-rose-400" />
+              {errorMsg}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        <div className="space-y-1.5">
+          <label htmlFor="password" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Password Baru
+          </label>
+          <div className="relative">
+            <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              autoFocus
+              autoComplete="new-password"
+              placeholder="••••••••"
+              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-white/10 text-sm font-semibold text-white bg-slate-900/50 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all shadow-inner"
+            />
+          </div>
         </div>
 
-        {/* Modal/Card */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-[40px] shadow-2xl shadow-slate-200/50 p-8 md:p-10 w-full border border-slate-100"
+        <div className="space-y-1.5">
+          <label htmlFor="confirm_password" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Konfirmasi Password
+          </label>
+          <div className="relative">
+            <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              id="confirm_password"
+              name="confirm_password"
+              type="password"
+              required
+              autoComplete="new-password"
+              placeholder="••••••••"
+              className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-white/10 text-sm font-semibold text-white bg-slate-900/50 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all shadow-inner"
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full mt-2 py-3.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all bg-gradient-to-r from-emerald-500 to-teal-500 shadow-[0_4px_14px_rgba(16,185,129,0.4)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {success ? (
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }} 
-              className="text-center space-y-6 py-6"
-            >
-              <div className="w-20 h-20 bg-emerald-50 rounded-[24px] flex items-center justify-center mx-auto text-emerald-500 border border-emerald-100 mb-2">
-                <CheckCircle2 size={40} />
-              </div>
-              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">PASSWORD DIPERBARUI!</h3>
-              <p className="text-slate-500 text-sm font-medium leading-relaxed max-w-xs mx-auto">
-                Anda telah berhasil mengganti password. Mengarahkan Anda ke dashboard dalam beberapa detik...
-              </p>
-            </motion.div>
-          ) : (
-            <>
-              <AnimatePresence>
-                 {errorMsg && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                       <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-2xl flex items-start gap-3 border border-red-100">
-                         <AlertCircle size={20} className="shrink-0 mt-0.5" />
-                         <span className="text-xs font-bold uppercase leading-relaxed tracking-wider">{errorMsg}</span>
-                       </div>
-                    </motion.div>
-                 )}
-              </AnimatePresence>
-
-              <form className="space-y-6" onSubmit={handleSubmit}>
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">PASSWORD BARU</label>
-                  <div className="relative group">
-                    <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#004AB8] transition-colors" />
-                    <input
-                      name="password"
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      className="block w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:bg-white focus:border-[#004AB8] focus:ring-4 focus:ring-blue-50 transition-all text-slate-900 font-black tracking-widest"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">KONFIRMASI PASSWORD</label>
-                  <div className="relative group">
-                    <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#004AB8] transition-colors" />
-                    <input
-                      name="confirm_password"
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      className="block w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:bg-white focus:border-[#004AB8] focus:ring-4 focus:ring-blue-50 transition-all text-slate-900 font-black tracking-widest"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-black rounded-2xl text-white bg-emerald-500 hover:bg-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-100 transition-all uppercase tracking-[0.3em] overflow-hidden shadow-xl shadow-emerald-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                    <span className="relative flex items-center gap-2">
-                       {loading ? 'MENYIMPAN...' : 'SIMPAN PASSWORD'}
-                    </span>
-                  </button>
-                </div>
-              </form>
-            </>
-          )}
-        </motion.div>
-      </div>
+          {loading ? 'Menyimpan...' : 'Simpan Password'}
+        </button>
+      </form>
     </div>
   )
 }
 
 export default function UpdatePasswordPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#F8FAFC] flex justify-center items-center">
-        <div className="animate-pulse flex flex-col items-center">
-           <div className="w-10 h-10 bg-slate-200 rounded-full mb-4"></div>
-           <div className="h-4 bg-slate-200 rounded w-24"></div>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<div className="py-8 text-center text-sm font-medium text-slate-500 animate-pulse">Memuat...</div>}>
       <UpdatePasswordContent />
     </Suspense>
   )
