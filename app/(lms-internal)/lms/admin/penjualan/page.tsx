@@ -2,7 +2,7 @@
  * Daftar produk LMS. Consulting 360 dikelola pada bagian tersendiri.
  */
 import Link from 'next/link'
-import { Boxes, Plus, Search } from 'lucide-react'
+import { Boxes, FileSpreadsheet, Plus, Search } from 'lucide-react'
 import { getLmsProductSalesData } from '@/modules/ecommerce/lib/lms-sales.server'
 import { LmsCommerceSetupButton } from './LmsCommerceSetupButton'
 import ProductListClient from './ProductListClient'
@@ -77,13 +77,22 @@ export default async function LmsProductSalesPage({
             {filteredProducts.length} produk ditemukan. Consulting 360 berada di bagian tersendiri.
           </p>
         </div>
-        <Link
-          href={`/lms/admin/penjualan/produk/baru?returnTo=${encodeURIComponent(returnTo)}`}
-          className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
-        >
-          <Plus aria-hidden="true" size={17} />
-          Tambah Produk
-        </Link>
+        <div className="flex gap-2">
+          <a
+            href="/api/lms/export?type=products"
+            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
+          >
+            <FileSpreadsheet aria-hidden="true" size={17} />
+            Export XLSX
+          </a>
+          <Link
+            href={`/lms/admin/penjualan/produk/baru?returnTo=${encodeURIComponent(returnTo)}`}
+            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
+          >
+            <Plus aria-hidden="true" size={17} />
+            Tambah Produk
+          </Link>
+        </div>
       </div>
 
       <form

@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock,
+  FileSpreadsheet,
   HandCoins,
   Landmark,
   RotateCcw,
@@ -132,6 +133,7 @@ export default function AdminAffiliateClient({
         </div>
       )}
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm w-fit">
         <button
           type="button"
@@ -158,6 +160,15 @@ export default function AdminAffiliateClient({
             <span className="ml-1 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{draftPayoutCount}</span>
           )}
         </button>
+      </div>
+
+        <a
+          href={`/api/lms/export?type=${activeTab === 'payouts' ? 'payouts' : 'affiliates'}`}
+          className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+        >
+          <FileSpreadsheet size={16} />
+          Export XLSX
+        </a>
       </div>
 
       {activeTab === 'affiliates' ? (

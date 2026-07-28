@@ -12,6 +12,7 @@ import {
   BookOpen,
   Users,
   FileText,
+  FileSpreadsheet,
   ChevronRight,
   ArrowUp,
   ArrowDown,
@@ -110,6 +111,13 @@ export function CatalogAdminClient({ courses, totalCount, activeCount }: Catalog
           </p>
         </div>
         <div className="flex gap-3">
+          <a
+            href="/api/lms/export?type=courses"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Export XLSX
+          </a>
           <Link
             href="/lms/admin/course/new"
             className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-indigo-700"

@@ -21,6 +21,7 @@ import {
   Shield,
   History,
   Phone,
+  FileSpreadsheet,
 } from 'lucide-react'
 import {
   MemberSummary,
@@ -133,6 +134,13 @@ export function MembersAdminClient({
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <a
+            href={`/api/lms/export?type=members&search=${encodeURIComponent(currentSearch)}&levelFilter=${encodeURIComponent(currentLevelFilter)}&courseFilter=${encodeURIComponent(currentCourseFilter)}&sortBy=${encodeURIComponent(currentSortBy)}`}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-slate-500" />
+            Export XLSX
+          </a>
           <button
             onClick={() => {
               setLevelNames([...initialSettings.levelNames])
