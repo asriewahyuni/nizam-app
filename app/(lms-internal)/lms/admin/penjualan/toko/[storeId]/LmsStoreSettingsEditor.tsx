@@ -15,7 +15,7 @@ import {
   ExternalLink,
   Globe2,
   LoaderCircle,
-  MonitorSmartphone,
+  // MonitorSmartphone,
   RefreshCw,
   Save,
   ShieldCheck,
@@ -60,7 +60,8 @@ const TABS: Array<{
   icon: typeof Store
 }> = [
   { id: 'identitas', label: 'Identitas', description: 'Brand, kontak, dan slug', icon: Store },
-  { id: 'halaman', label: 'Halaman', description: 'Builder dan publikasi', icon: MonitorSmartphone },
+  // Disembunyikan sementara
+  // { id: 'halaman', label: 'Halaman', description: 'Builder dan publikasi', icon: MonitorSmartphone },
   { id: 'pembayaran', label: 'Pembayaran', description: 'Rekening dan instruksi', icon: CreditCard },
   { id: 'domain', label: 'Domain', description: 'DNS, SSL, dan homepage', icon: Globe2 },
 ]
