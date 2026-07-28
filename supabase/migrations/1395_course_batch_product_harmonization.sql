@@ -11,13 +11,24 @@ ALTER TABLE public.commerce_order_entitlements
   ADD COLUMN IF NOT EXISTS batch_id UUID REFERENCES public.lms_course_batches(id) ON DELETE SET NULL;
 -- Snapshot batch di order-time supaya edit batch nanti tidak mengubah riwayat pembeli yang sudah bayar
 
-ALTER TABLE public.learning_access_grants
-  ADD CONSTRAINT learning_access_grants_batch_id_fkey
-  FOREIGN KEY (batch_id) REFERENCES public.lms_course_batches(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'learning_access_grants_batch_id_fkey'
+  ) THEN
+    ALTER TABLE public.learning_access_grants
+      ADD CONSTRAINT learning_access_grants_batch_id_fkey
+      FOREIGN KEY (batch_id) REFERENCES public.lms_course_batches(id) ON DELETE SET NULL;
+  END IF;
 
-ALTER TABLE public.learning_enrollments
-  ADD CONSTRAINT learning_enrollments_batch_id_fkey
-  FOREIGN KEY (batch_id) REFERENCES public.lms_course_batches(id) ON DELETE SET NULL;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'learning_enrollments_batch_id_fkey'
+  ) THEN
+    ALTER TABLE public.learning_enrollments
+      ADD CONSTRAINT learning_enrollments_batch_id_fkey
+      FOREIGN KEY (batch_id) REFERENCES public.lms_course_batches(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 ALTER TABLE public.learning_access_grants
   ADD COLUMN IF NOT EXISTS is_overbooked BOOLEAN NOT NULL DEFAULT FALSE;
