@@ -59,6 +59,21 @@ export default function OrderStatusClient({
   const [copiedOrderLink, setCopiedOrderLink] = useState(false)
   const [copiedNominal, setCopiedNominal] = useState(false)
 
+  const isPaid = ['PAID', 'VERIFYING', 'APPROVED', 'LUNAS'].includes(payload.order.paymentStatus.toUpperCase()) ||
+                 ['PROCESSING', 'COMPLETED', 'SELESAI'].includes(payload.order.status.toUpperCase())
+  const isCompleted = ['COMPLETED', 'SELESAI', 'ACTIVE'].includes(payload.order.status.toUpperCase())
+
+  const [activeTab, setActiveTab] = useState<'status' | 'thankyou'>(isPaid ? 'thankyou' : 'status')
+  const [copiedReferral, setCopiedReferral] = useState(false)
+
+  function copyReferralCode(code: string) {
+    if (!code) return
+    navigator.clipboard?.writeText(code).then(() => {
+      setCopiedReferral(true)
+      window.setTimeout(() => setCopiedReferral(false), 2000)
+    }).catch(() => {})
+  }
+
   function copyNominal(amount: number) {
     if (!amount && amount !== 0) return
     navigator.clipboard?.writeText(String(amount)).then(() => {
@@ -152,11 +167,6 @@ export default function OrderStatusClient({
     }
   }
 
-  // Timeline step helper
-  const isPaid = ['PAID', 'VERIFYING', 'APPROVED', 'LUNAS'].includes(payload.order.paymentStatus.toUpperCase()) ||
-                 ['PROCESSING', 'COMPLETED', 'SELESAI'].includes(payload.order.status.toUpperCase())
-  const isCompleted = ['COMPLETED', 'SELESAI', 'ACTIVE'].includes(payload.order.status.toUpperCase())
-
   return (
     <div
       className="min-h-screen bg-slate-50/70 text-slate-900 antialiased"
@@ -191,31 +201,72 @@ export default function OrderStatusClient({
               </div>
             </div>
           </div>
-          <div
-            className="hidden sm:flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-2xs"
-            style={{
-              borderColor: `${primaryColor}33`,
-              backgroundColor: softColor,
-              color: primaryColor,
-            }}
-          >
-            <span className="relative flex h-2 w-2">
-              <span
-                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60"
-                style={{ backgroundColor: primaryColor }}
-              />
-              <span
-                className="relative inline-flex h-2 w-2 rounded-full"
-                style={{ backgroundColor: primaryColor }}
-              />
-            </span>
-            Terhubung Aman
+          <div className="flex items-center gap-2">
+            <div className="inline-flex items-center rounded-full border border-slate-200/80 bg-slate-100/90 p-1 text-xs font-semibold shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setActiveTab('status')}
+                className={`rounded-full px-3 py-1.5 transition ${
+                  activeTab === 'status'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Instruksi & Status
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('thankyou')}
+                className={`rounded-full px-3 py-1.5 transition flex items-center gap-1.5 ${
+                  activeTab === 'thankyou'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Sparkles size={13} style={{ color: primaryColor }} />
+                <span>Terima Kasih</span>
+              </button>
+            </div>
+            <div
+              className="hidden sm:flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-2xs"
+              style={{
+                borderColor: `${primaryColor}33`,
+                backgroundColor: softColor,
+                color: primaryColor,
+              }}
+            >
+              <span className="relative flex h-2 w-2">
+                <span
+                  className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60"
+                  style={{ backgroundColor: primaryColor }}
+                />
+                <span
+                  className="relative inline-flex h-2 w-2 rounded-full"
+                  style={{ backgroundColor: primaryColor }}
+                />
+              </span>
+              Terhubung Aman
+            </div>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-        {/* Order Banner */}
+        {activeTab === 'thankyou' ? (
+          <ThankYouPageSection
+            payload={payload}
+            primaryColor={primaryColor}
+            softColor={softColor}
+            copyOrderLink={copyOrderLink}
+            copiedOrderLink={copiedOrderLink}
+            copyReferralCode={copyReferralCode}
+            copiedReferral={copiedReferral}
+            onSwitchToStatus={() => setActiveTab('status')}
+            waHref={waHref}
+          />
+        ) : (
+          <div className="space-y-6">
+            {/* Order Banner */}
         <section
           className="mb-6 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7"
           style={{
@@ -835,12 +886,349 @@ export default function OrderStatusClient({
             </section>
           </aside>
         </div>
+        </div>
+        )}
       </main>
 
       {/* Footer */}
       <footer className="border-t border-slate-200/80 py-6 text-center text-xs text-slate-500 font-medium">
         © 2026 {payload.store.brandName || payload.store.name} · Halaman Status Order Publik
       </footer>
+    </div>
+  )
+}
+
+type ThankYouPageSectionProps = {
+  payload: PublicOrderStatusPayload
+  primaryColor: string
+  softColor: string
+  copyOrderLink: () => void
+  copiedOrderLink: boolean
+  copyReferralCode: (code: string) => void
+  copiedReferral: boolean
+  onSwitchToStatus: () => void
+  waHref: string
+}
+
+function ThankYouPageSection({
+  payload,
+  primaryColor,
+  softColor,
+  copyOrderLink,
+  copiedOrderLink,
+  copyReferralCode,
+  copiedReferral,
+  onSwitchToStatus,
+  waHref,
+}: ThankYouPageSectionProps) {
+  const customerName = payload.order.customerName || 'Pelanggan'
+  const customerEmail = payload.order.customerEmail || 'email terdaftar'
+  const firstName = customerName.split(' ')[0] || customerName
+  const defaultReferralCode = `${firstName.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 6) || 'MEMBER'}50`
+  const firstItem = payload.order.items[0]
+
+  return (
+    <div className="relative z-10 space-y-6">
+      <style>{`
+        @keyframes fallConfetti {
+          0%   { transform: translateY(-30px) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(520px) rotate(720deg); opacity: 0; }
+        }
+        .confetti-piece {
+          position: absolute; width: 8px; height: 14px; border-radius: 2px; opacity: 0;
+          animation: fallConfetti 4.5s linear forwards;
+        }
+      `}</style>
+
+      {/* Confetti container */}
+      <div className="pointer-events-none absolute inset-x-0 -top-6 z-0 mx-auto h-[520px] max-w-3xl overflow-hidden">
+        {[
+          '#0F766E', '#134E4A', '#CCFBF1', '#FDE68A', '#F472B6', '#60A5FA', primaryColor, '#34D399', '#FBBF24', '#818CF8'
+        ].flatMap((color, idx) =>
+          Array.from({ length: 4 }).map((_, subIdx) => {
+            const left = (idx * 10 + subIdx * 2.5) % 100
+            const duration = 2.5 + (idx % 3) * 0.7
+            const delay = (subIdx * 0.2) + (idx % 2) * 0.3
+            return (
+              <span
+                key={`${idx}-${subIdx}`}
+                className="confetti-piece"
+                style={{
+                  left: `${left}%`,
+                  backgroundColor: color,
+                  animationDuration: `${duration}s`,
+                  animationDelay: `${delay}s`,
+                }}
+              />
+            )
+          })
+        )}
+      </div>
+
+      {/* Hero success */}
+      <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-emerald-50/30 to-white p-6 text-center shadow-lg sm:p-10">
+        <div className="relative mx-auto grid h-24 w-24 place-items-center">
+          <span className="absolute inline-flex h-24 w-24 animate-ping rounded-full opacity-25" style={{ backgroundColor: primaryColor }} />
+          <div
+            className="relative grid h-20 w-20 place-items-center rounded-full text-white shadow-lg"
+            style={{ backgroundColor: primaryColor }}
+          >
+            <Check size={38} strokeWidth={3} />
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider"
+            style={{ backgroundColor: softColor, color: primaryColor }}
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: primaryColor }} />
+            Pembayaran Berhasil
+          </span>
+        </div>
+
+        <h1 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-4xl text-slate-900">
+          Terima Kasih, <span style={{ color: primaryColor }}>{firstName}!</span>
+        </h1>
+        <p className="mx-auto mt-3 max-w-lg text-sm text-slate-600 sm:text-base leading-relaxed">
+          Pesananmu sudah kami terima dan aksesnya aktif. Detail konfirmasi juga dikirim ke email <b className="text-slate-900">{customerEmail}</b>.
+        </p>
+
+        {/* Order chips */}
+        <div className="mx-auto mt-6 flex max-w-md flex-wrap items-center justify-center gap-2.5">
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3.5 py-1.5 text-xs font-semibold shadow-2xs">
+            <span className="text-slate-500">No. Order</span>
+            <span className="font-mono font-bold text-slate-900">{payload.order.orderNumber}</span>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3.5 py-1.5 text-xs font-semibold shadow-2xs">
+            <span className="text-slate-500">Total</span>
+            <span className="tabular-nums font-extrabold text-slate-900">{formatRupiah(payload.order.grandTotal)}</span>
+          </div>
+        </div>
+
+        <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+          <a
+            href={payload.order.accessUrl || `/store/${payload.store.orgSlug}/${payload.store.slug}`}
+            className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-110 active:scale-[0.99]"
+            style={{
+              background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`,
+            }}
+          >
+            <Sparkles size={16} />
+            Mulai Kelas / Buka Akses Sekarang
+          </a>
+          <button
+            type="button"
+            onClick={copyOrderLink}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-bold text-slate-800 transition hover:bg-slate-50 active:scale-[0.99] shadow-2xs"
+          >
+            {copiedOrderLink ? (
+              <>
+                <Check size={16} className="text-emerald-600" />
+                <span className="text-emerald-700 font-extrabold">Link Tersalin</span>
+              </>
+            ) : (
+              <>
+                <Share2 size={16} />
+                <span>Salin Link Order</span>
+              </>
+            )}
+          </button>
+        </div>
+      </section>
+
+      {/* Detail + Langkah Selanjutnya */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* Langkah selanjutnya */}
+        <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-extrabold tracking-tight text-slate-900">Langkah Selanjutnya</h2>
+              <p className="mt-1 text-xs text-slate-500">Tiga hal cepat agar kamu bisa langsung memulai.</p>
+            </div>
+            <button
+              type="button"
+              onClick={onSwitchToStatus}
+              className="text-xs font-bold underline transition hover:opacity-80"
+              style={{ color: primaryColor }}
+            >
+              Lihat Detail Instruksi & Status
+            </button>
+          </div>
+
+          <ol className="mt-6 space-y-5">
+            <li className="flex gap-3.5">
+              <div
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-sm font-black"
+                style={{ backgroundColor: softColor, color: primaryColor }}
+              >
+                1
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-slate-900">Cek email konfirmasi</div>
+                <p className="mt-0.5 text-xs text-slate-600 leading-relaxed">
+                  Kami kirim tautan akses & invoice ke inbox kamu. Tidak muncul? Cek folder Spam / Promosi.
+                </p>
+              </div>
+            </li>
+            <li className="flex gap-3.5">
+              <div
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-sm font-black"
+                style={{ backgroundColor: softColor, color: primaryColor }}
+              >
+                2
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-slate-900">Gabung grup peserta / Komunitas</div>
+                <p className="mt-0.5 text-xs text-slate-600 leading-relaxed">
+                  Diskusi materi, tanya mentor, dan info jadwal atau update terbaru diumumkan lewat grup komunitas.
+                </p>
+                <a
+                  href={waHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[11px] font-bold text-white transition hover:bg-slate-800 shadow-2xs"
+                >
+                  <MessageCircle size={13} />
+                  Gabung Grup / Hubungi Admin
+                </a>
+              </div>
+            </li>
+            <li className="flex gap-3.5">
+              <div
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-sm font-black"
+                style={{ backgroundColor: softColor, color: primaryColor }}
+              >
+                3
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-slate-900">Buka dashboard kelas / akses digital</div>
+                <p className="mt-0.5 text-xs text-slate-600 leading-relaxed">
+                  Materi, rekaman sesi, dan berkas digital tersimpan di dashboard — akses berlaku aktif.
+                </p>
+              </div>
+            </li>
+          </ol>
+        </section>
+
+        {/* Ringkasan pesanan & Bantuan */}
+        <aside className="space-y-4">
+          <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Ringkasan Pesanan</h2>
+            <div
+              className="mt-4 flex gap-3 rounded-xl border border-slate-200/60 p-3.5"
+              style={{ backgroundColor: softColor }}
+            >
+              <div
+                className="grid h-12 w-12 shrink-0 place-items-center rounded-lg text-white"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <ShoppingBag size={22} />
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-extrabold leading-tight text-slate-900 truncate">
+                  {firstItem?.productName || 'PESANAN DIGITAL'}
+                </div>
+                <div className="mt-1 text-xs text-slate-600 truncate">
+                  {firstItem?.variantName || 'Akses Digital · Lifetime'}
+                </div>
+              </div>
+            </div>
+            <dl className="mt-4 space-y-2 text-xs">
+              <div className="flex justify-between text-slate-600">
+                <dt>Subtotal</dt>
+                <dd className="tabular-nums font-semibold text-slate-900">{formatRupiah(payload.order.subtotalAmount)}</dd>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <dt>Ongkir</dt>
+                <dd className="tabular-nums font-semibold text-slate-900">{formatRupiah(payload.order.shippingAmount)}</dd>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <dt>Metode</dt>
+                <dd className="font-semibold text-slate-900">{payload.store.bankName || 'Transfer Bank / VA'}</dd>
+              </div>
+            </dl>
+            <div className="mt-3.5 flex items-baseline justify-between border-t border-slate-200 pt-3.5">
+              <span className="text-xs font-bold text-slate-700">Total Dibayar</span>
+              <span className="text-lg font-extrabold tabular-nums" style={{ color: primaryColor }}>
+                {formatRupiah(payload.order.grandTotal)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-800 transition hover:bg-slate-50 shadow-2xs"
+            >
+              <FileText size={14} />
+              Unduh Invoice (PDF)
+            </button>
+          </section>
+
+          <section
+            className="rounded-2xl border border-slate-200/80 p-5 shadow-sm"
+            style={{
+              backgroundImage: `linear-gradient(135deg, #ffffff 0%, ${softColor} 100%)`,
+            }}
+          >
+            <div className="flex items-center gap-2.5">
+              <div
+                className="grid h-8 w-8 place-items-center rounded-lg text-white"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <Headphones size={16} />
+              </div>
+              <div className="text-sm font-extrabold text-slate-900">Butuh bantuan?</div>
+            </div>
+            <p className="mt-2 text-xs text-slate-600 leading-relaxed">
+              Tim admin siap bantu setiap saat terkait akses kelas, invoice, atau materi.
+            </p>
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-slate-800 shadow-2xs"
+            >
+              <MessageCircle size={14} />
+              Chat Admin
+            </a>
+          </section>
+        </aside>
+      </div>
+
+      {/* Referral */}
+      <section
+        className="overflow-hidden rounded-2xl border border-slate-200/80 p-6 text-white shadow-lg sm:p-8"
+        style={{
+          background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`,
+        }}
+      >
+        <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-w-lg">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider">
+              Bonus Referral
+            </span>
+            <h3 className="mt-3 text-xl font-extrabold sm:text-2xl">Ajak teman, dapat Rp 50.000</h3>
+            <p className="mt-1 text-sm text-white/90 leading-relaxed">
+              Bagikan kode kamu — mereka hemat, kamu dapat saldo atau keuntungan untuk kelas berikutnya.
+            </p>
+          </div>
+          <div className="w-full sm:w-auto">
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 p-1.5 ring-1 ring-white/20 backdrop-blur">
+              <code className="flex-1 rounded-lg bg-white/15 px-4 py-2.5 font-mono text-sm font-bold tracking-widest text-white">
+                {defaultReferralCode}
+              </code>
+              <button
+                type="button"
+                onClick={() => copyReferralCode(defaultReferralCode)}
+                className="rounded-lg bg-white px-4 py-2.5 text-xs font-bold transition hover:bg-slate-100 shadow-sm"
+                style={{ color: primaryColor }}
+              >
+                {copiedReferral ? 'Tersalin' : 'Salin'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
