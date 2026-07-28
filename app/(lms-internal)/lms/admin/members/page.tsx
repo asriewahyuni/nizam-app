@@ -44,6 +44,7 @@ export default async function MembersAdminPage({ searchParams }: MembersAdminPag
 
   return (
     <MembersAdminClient
+      orgSlug={orgData.org.slug}
       initialMembers={members}
       initialSettings={settings}
       totalCount={totalCount}

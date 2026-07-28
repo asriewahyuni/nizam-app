@@ -11,6 +11,8 @@ import {
   getPortalMemberContext,
   getPortalTenant,
 } from '@/modules/member/lib/portal.server'
+import { getLmsMemberImpersonationState } from '@/modules/edu/actions/lms-member-impersonation.actions'
+import { LmsMemberImpersonationBanner } from '@/components/shared/LmsMemberImpersonationBanner'
 import MemberNavigationClient from './MemberNavigationClient'
 
 type LayoutProps = {
@@ -34,7 +36,10 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
   const tenant = await getPortalTenant(orgSlug)
   if (!tenant) notFound()
 
-  const member = await getPortalMemberContext(tenant)
+  const [member, impersonation] = await Promise.all([
+    getPortalMemberContext(tenant),
+    getLmsMemberImpersonationState(),
+  ])
   const requestHeaders = await headers()
   const currentHost = String(requestHeaders.get('host') || '').toLowerCase().split(':')[0]
   const isCustomDomain = Boolean(
@@ -64,6 +69,13 @@ export default async function MemberPortalLayout({ children, params }: LayoutPro
           '--color-accent-hover': tenant.accentColorHover || tenant.accentColor || tenant.primaryColor,
         } as React.CSSProperties : undefined}
       >
+        {impersonation && impersonation.orgId === tenant.id && (
+          <LmsMemberImpersonationBanner
+            adminEmail={impersonation.adminEmail}
+            memberName={member?.displayName}
+          />
+        )}
+
         <header className="sticky top-0 z-40 border-b border-[var(--color-primary,theme(colors.emerald.950))]/10 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/75 shadow-sm">
           <div className="flex min-h-16 items-center gap-3 px-4 justify-between">
             <Link

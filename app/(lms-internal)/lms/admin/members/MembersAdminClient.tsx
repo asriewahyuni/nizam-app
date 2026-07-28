@@ -22,15 +22,18 @@ import {
   History,
   Phone,
   FileSpreadsheet,
+  LogIn,
 } from 'lucide-react'
 import {
   MemberSummary,
   LmsGamificationSettings,
   updateLmsGamificationSettings,
 } from '@/modules/edu/actions/lms-members.actions'
+import { impersonateLmsMemberAction } from '@/modules/edu/actions/lms-member-impersonation.actions'
 import { MemberTimelineModal } from './MemberTimelineModal'
 
 interface MembersAdminClientProps {
+  orgSlug: string
   initialMembers: MemberSummary[]
   initialSettings: LmsGamificationSettings
   totalCount: number
@@ -40,6 +43,7 @@ interface MembersAdminClientProps {
 }
 
 export function MembersAdminClient({
+  orgSlug,
   initialMembers,
   initialSettings,
   totalCount,
@@ -66,6 +70,26 @@ export function MembersAdminClient({
   const [settingsMsg, setSettingsMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null
   )
+
+  // Impersonation ("Login sebagai Member")
+  const [impersonatingUserId, setImpersonatingUserId] = useState<string | null>(null)
+  const [impersonationError, setImpersonationError] = useState<string | null>(null)
+
+  const handleImpersonate = async (member: MemberSummary) => {
+    if (!window.confirm(
+      `Login sebagai ${member.name}? Anda akan melihat member portal persis seperti akun ini sampai kembali ke sesi admin.`,
+    )) {
+      return
+    }
+    setImpersonationError(null)
+    setImpersonatingUserId(member.userId)
+    const result = await impersonateLmsMemberAction(orgSlug, member.userId)
+    setImpersonatingUserId(null)
+    if (result?.error) {
+      setImpersonationError(result.error)
+    }
+    // Kalau sukses, action ini redirect() ke /member/{orgSlug} — tidak ada return.
+  }
 
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -120,6 +144,19 @@ export function MembersAdminClient({
 
   return (
     <div className="space-y-6">
+      {impersonationError && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+          <span>{impersonationError}</span>
+          <button
+            type="button"
+            onClick={() => setImpersonationError(null)}
+            className="cursor-pointer text-xs underline"
+          >
+            Tutup
+          </button>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
@@ -310,14 +347,29 @@ export function MembersAdminClient({
 
                   {/* Actions */}
                   <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => setSelectedMember(member)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-600 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50"
-                    >
-                      <History className="h-3.5 w-3.5" />
-                      Timeline
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleImpersonate(member)}
+                        disabled={impersonatingUserId === member.userId}
+                        title="Login sebagai member ini di member portal"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-600 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-50"
+                      >
+                        {impersonatingUserId === member.userId ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <LogIn className="h-3.5 w-3.5" />
+                        )}
+                        Login sebagai Member
+                      </button>
+                      <button
+                        onClick={() => setSelectedMember(member)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-600 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50"
+                      >
+                        <History className="h-3.5 w-3.5" />
+                        Timeline
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
