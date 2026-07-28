@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   Users,
 } from 'lucide-react'
+import LmsAdminAudioNotifier from './lms/admin/LmsAdminAudioNotifier'
 
 const nav = [
   { to: '/lms', label: 'Dashboard', icon: LayoutDashboard },
@@ -89,7 +90,8 @@ export default function LmsNavbar({ org }: { org: any }) {
             })}
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {org?.id && <LmsAdminAudioNotifier orgId={org.id} />}
           <Link
             href="/dashboard"
             className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-semibold text-slate-600 transition-colors duration-200 hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100"
