@@ -26,6 +26,7 @@ const EXPORT_PREFIX = 'exports/'
 const RECEIPT_PREFIX = 'receipts/'
 const AVATAR_PREFIX = 'avatars/'
 const LMS_MEDIA_PREFIX = 'lms-media/'
+const ACTIVITY_ARCHIVE_PREFIX = 'activity-archive/'
 const DEFAULT_SIGNED_URL_TTL_SECONDS = 60 * 60
 
 let cachedClient: S3Client | null = null
@@ -201,6 +202,16 @@ export function buildExportStorageKey(orgId: string, filename: string, dateFolde
   const [year = 'unknown', month = 'unknown'] = safeDateFolder.split('-')
   const safeName = sanitizeFileName(filename, 'export')
   return `${EXPORT_PREFIX}${orgId}/${year}/${month}/${safeName}`
+}
+
+/**
+ * Menyusun key file arsip log aktivitas per hari (format YYYY-MM-DD), dikelompokkan
+ * per tahun/bulan agar mudah ditelusuri di bucket.
+ */
+export function buildActivityArchiveStorageKey(dayKey: string): string {
+  const safeDayKey = sanitizeFolderName(dayKey)
+  const [year = 'unknown', month = 'unknown'] = safeDayKey.split('-')
+  return `${ACTIVITY_ARCHIVE_PREFIX}${year}/${month}/${safeDayKey}.json.gz`
 }
 
 /**

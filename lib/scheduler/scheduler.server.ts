@@ -6,6 +6,8 @@
 import { queryPostgres } from '@/lib/db/postgres'
 import { sendWeeklySystemUsageReport } from '@/lib/activity/weekly-usage-report.server'
 import { runDatabaseBackup } from '@/lib/backup/backup-db.server'
+import { archiveOldUserActivityLogs } from '@/lib/activity/user-activity-archive.server'
+import { pruneWebhookOutbox } from '@/lib/api/webhook-outbox-cleanup.server'
 
 type SchedulerRunOptions = {
   dryRun?: boolean
@@ -275,10 +277,77 @@ function getDailyDbBackupTask(): SchedulerTaskDefinition {
   }
 }
 
+function getActivityLogArchiveTask(): SchedulerTaskDefinition {
+  const timeZone = normalizeText(process.env.ACTIVITY_LOG_ARCHIVE_TIMEZONE) || 'Asia/Jakarta'
+  // ACTIVITY_LOG_ARCHIVE_CRON format: "0 4 * * *" → ambil hour & minute saja
+  const cronValue = normalizeText(process.env.ACTIVITY_LOG_ARCHIVE_CRON) || '0 4 * * *'
+  const cronParts = cronValue.split(' ')
+  const minute = Math.min(59, Math.max(0, normalizeInteger(cronParts[0], 0)))
+  const hour = Math.min(23, Math.max(0, normalizeInteger(cronParts[1], 4)))
+  const retentionDays = Math.max(1, normalizeInteger(process.env.ACTIVITY_LOG_ARCHIVE_RETENTION_DAYS, 30))
+
+  return {
+    name: 'activity-log-archive',
+    description: 'Arsip user_activity_logs lama ke S3 lalu hapus dari Postgres',
+    timezone: timeZone,
+    decision: (now) => createDailyTaskDecision(now, { timeZone, hour, minute }),
+    run: async ({ dryRun }) => {
+      const result = await archiveOldUserActivityLogs({ dryRun, retentionDays })
+      if (!result.ok) {
+        throw new Error(result.reason || 'Arsip log aktivitas gagal tanpa pesan error.')
+      }
+      return {
+        summary: dryRun
+          ? `DRY RUN — ${result.archivedDays} hari (${formatNumber(result.archivedRows)} baris) siap diarsipkan`
+          : `Sukses — ${result.archivedDays} hari (${formatNumber(result.archivedRows)} baris) diarsip ke S3 & dihapus dari DB`,
+        meta: {
+          dryRun,
+          retentionDays: result.retentionDays,
+          archivedDays: result.archivedDays,
+          archivedRows: result.archivedRows,
+          days: result.days,
+        },
+      }
+    },
+  }
+}
+
+function getWebhookOutboxCleanupTask(): SchedulerTaskDefinition {
+  const timeZone = normalizeText(process.env.WEBHOOK_OUTBOX_CLEANUP_TIMEZONE) || 'Asia/Jakarta'
+  // WEBHOOK_OUTBOX_CLEANUP_CRON format: "30 4 * * *" → ambil hour & minute saja
+  const cronValue = normalizeText(process.env.WEBHOOK_OUTBOX_CLEANUP_CRON) || '30 4 * * *'
+  const cronParts = cronValue.split(' ')
+  const minute = Math.min(59, Math.max(0, normalizeInteger(cronParts[0], 30)))
+  const hour = Math.min(23, Math.max(0, normalizeInteger(cronParts[1], 4)))
+  const retentionDays = Math.max(1, normalizeInteger(process.env.WEBHOOK_OUTBOX_CLEANUP_RETENTION_DAYS, 14))
+
+  return {
+    name: 'webhook-outbox-cleanup',
+    description: 'Hapus api_webhook_outbox yang sudah selesai (completed/failed) dan lewat masa retensi',
+    timezone: timeZone,
+    decision: (now) => createDailyTaskDecision(now, { timeZone, hour, minute }),
+    run: async ({ dryRun }) => {
+      const result = await pruneWebhookOutbox({ dryRun, retentionDays })
+      return {
+        summary: dryRun
+          ? `DRY RUN — ${formatNumber(result.prunedCount)} baris siap dihapus`
+          : `Sukses — ${formatNumber(result.prunedCount)} baris dihapus`,
+        meta: {
+          dryRun,
+          retentionDays: result.retentionDays,
+          prunedCount: result.prunedCount,
+        },
+      }
+    },
+  }
+}
+
 export function getScheduledTasks(): SchedulerTaskDefinition[] {
   return [
     getWeeklyUsageReportTask(),
     getDailyDbBackupTask(),
+    getActivityLogArchiveTask(),
+    getWebhookOutboxCleanupTask(),
   ]
 }
 
