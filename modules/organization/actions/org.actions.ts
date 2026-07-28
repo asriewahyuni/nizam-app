@@ -21,6 +21,7 @@ import { cache } from 'react'
 import { seedDemoData, type DemoBusinessType } from '@/modules/demo/actions/demo.actions'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { ensureShadowAuthUserForInternalUser } from '@/lib/auth/internal-auth-shadow.server'
+import { getSessionCookieDomain } from '@/lib/auth/internal-auth.shared'
 import {
   ACTIVE_BRANCH_COOKIE,
   ACTIVE_ORG_COOKIE,
@@ -97,6 +98,7 @@ function getActiveContextCookieOptions() {
     httpOnly: true,
     sameSite: 'lax' as const,
     secure: process.env.NODE_ENV === 'production',
+    domain: getSessionCookieDomain(),
   }
 }
 
@@ -1034,6 +1036,7 @@ async function createOrganizationRecord(
               httpOnly: true,
               sameSite: 'lax',
               secure: process.env.NODE_ENV === 'production',
+              domain: getSessionCookieDomain(),
             }
           : getActiveContextCookieOptions()
       )

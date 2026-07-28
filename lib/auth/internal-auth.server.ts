@@ -1,7 +1,7 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import { cookies, headers } from 'next/headers'
 import { queryPostgres } from '@/lib/db/postgres'
-import { INTERNAL_AUTH_SESSION_COOKIE, INTERNAL_AUTH_SESSION_MAX_AGE } from './internal-auth.shared'
+import { INTERNAL_AUTH_SESSION_COOKIE, INTERNAL_AUTH_SESSION_MAX_AGE, getSessionCookieDomain } from './internal-auth.shared'
 import { verifyWordPressPassword } from './wordpress-password'
 
 const SCRYPT_KEY_LENGTH = 64
@@ -441,6 +441,7 @@ async function createSession(userId: string) {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
+    domain: getSessionCookieDomain(),
   })
 
   return { sessionId, token }

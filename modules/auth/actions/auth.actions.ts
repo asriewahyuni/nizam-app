@@ -13,7 +13,7 @@ import {
   signInWithInternalAuth,
   signOutInternalAuth,
 } from '@/lib/auth/internal-auth.server'
-import { INTERNAL_AUTH_SESSION_COOKIE, INTERNAL_AUTH_SESSION_MAX_AGE } from '@/lib/auth/internal-auth.shared'
+import { INTERNAL_AUTH_SESSION_COOKIE, INTERNAL_AUTH_SESSION_MAX_AGE, getSessionCookieDomain } from '@/lib/auth/internal-auth.shared'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -150,6 +150,7 @@ function getActiveContextCookieOptions() {
     httpOnly: true,
     sameSite: 'lax' as const,
     secure: process.env.NODE_ENV === 'production',
+    domain: getSessionCookieDomain(),
   }
 }
 
@@ -1556,6 +1557,7 @@ export async function signInAsTenantHrisUser(orgId: string, targetUserId: string
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
+      domain: getSessionCookieDomain(),
     })
     cookieStore.delete(ACTIVE_BRANCH_COOKIE)
 
@@ -1606,6 +1608,7 @@ export async function signInAsTenantHrisUser(orgId: string, targetUserId: string
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
+    domain: getSessionCookieDomain(),
   })
   cookieStore.delete(ACTIVE_BRANCH_COOKIE)
 
@@ -1850,6 +1853,7 @@ export async function signInAsTenantOwner(orgId: string) {
         httpOnly: true,
         sameSite: 'lax',
         secure: process.env.NODE_ENV === 'production',
+        domain: getSessionCookieDomain(),
       }
     )
 
@@ -1866,6 +1870,7 @@ export async function signInAsTenantOwner(orgId: string) {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
+      domain: getSessionCookieDomain(),
     })
     cookieStore.delete(ACTIVE_BRANCH_COOKIE)
 
@@ -1946,6 +1951,7 @@ export async function signInAsTenantOwner(orgId: string) {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
+      domain: getSessionCookieDomain(),
     }
   )
 
@@ -1982,6 +1988,7 @@ export async function signInAsTenantOwner(orgId: string) {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
+    domain: getSessionCookieDomain(),
   })
   cookieStore.delete(ACTIVE_BRANCH_COOKIE)
 
@@ -2008,6 +2015,7 @@ export async function restorePlatformAdminSession() {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
+      domain: getSessionCookieDomain(),
     })
 
     const restoredSession = await getInternalAuthSession()
@@ -2026,6 +2034,7 @@ export async function restorePlatformAdminSession() {
         httpOnly: true,
         sameSite: 'lax',
         secure: process.env.NODE_ENV === 'production',
+        domain: getSessionCookieDomain(),
       })
     } else {
       cookieStore.delete(ACTIVE_ORG_COOKIE)
@@ -2059,6 +2068,7 @@ export async function restorePlatformAdminSession() {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
+      domain: getSessionCookieDomain(),
     })
   } else {
     cookieStore.delete(ACTIVE_ORG_COOKIE)
