@@ -266,203 +266,69 @@ export default function OrderStatusClient({
           />
         ) : (
           <div className="space-y-6">
-            {/* Order Banner */}
-        <section
-          className="mb-6 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7"
-          style={{
-            backgroundImage: `linear-gradient(135deg, #ffffff 0%, ${softColor} 100%)`,
-          }}
-        >
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
-                style={{
-                  backgroundColor: softColor,
-                  color: primaryColor,
-                }}
-              >
-                <CheckCircle2 size={13} />
-                Order Tercatat
-              </span>
-              <h1 className="mt-3 text-xl font-extrabold tracking-tight sm:text-2xl text-slate-900">
-                Nomor Order <span className="font-mono" style={{ color: primaryColor }}>{payload.order.orderNumber}</span>
-              </h1>
-              <p className="mt-1.5 max-w-xl text-sm text-slate-600">
-                Halaman ini bisa dibuka kapan saja selama link akses masih aktif. Simpan tautannya untuk cek status pembayaran.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <Link
-                href={`/store/${payload.store.orgSlug}/${payload.store.slug}`}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900"
-              >
-                <ArrowLeft size={14} />
-                Kembali ke Store
-              </Link>
-              <button
-                type="button"
-                onClick={copyOrderLink}
-                className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90"
-                style={{ backgroundColor: primaryColor }}
-              >
-                {copiedOrderLink ? (
-                  <>
-                    <Check size={14} />
-                    <span>Link Tersalin</span>
-                  </>
-                ) : (
-                  <>
-                    <Share2 size={14} />
-                    <span>Salin Link Order</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* 4-Column Status Grid */}
-          <div className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            <div className="rounded-xl border border-slate-200/70 bg-white/90 p-3.5 shadow-2xs">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status Order</div>
-              <div
-                className="mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold"
-                style={{ backgroundColor: softColor, color: primaryColor }}
-              >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: primaryColor }} />
-                {payload.order.status}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-200/70 bg-white/90 p-3.5 shadow-2xs">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pembayaran</div>
-              <div
-                className="mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold"
-                style={{
-                  backgroundColor: isPaid ? '#dcfce7' : '#fef3c7',
-                  color: isPaid ? '#166534' : '#92400e',
-                }}
-              >
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: isPaid ? '#166534' : '#d97706' }}
-                />
-                {payload.order.paymentStatus}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-200/70 bg-white/90 p-3.5 shadow-2xs">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Tanggal Order</div>
-              <div className="mt-1.5 text-sm font-bold text-slate-900">{formatDate(payload.order.createdAt)}</div>
-            </div>
-            <div className="rounded-xl border border-slate-200/70 bg-white/90 p-3.5 shadow-2xs">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Batas Bayar</div>
-              <div className="mt-1.5 text-sm font-bold" style={{ color: primaryColor }}>
-                {payload.order.paymentDueAt ? formatDate(payload.order.paymentDueAt) : 'Belum diatur'}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Progress Timeline Section */}
-        <section className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">Progres Pesanan</h2>
-          <ol className="mt-4 grid gap-4 sm:grid-cols-4">
-            <li className="relative">
-              <div className="flex items-center gap-2">
-                <div
-                  className="grid h-7 w-7 place-items-center rounded-full text-white shadow-sm"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  <CheckCircle2 size={14} />
-                </div>
-                <span className="text-sm font-bold text-slate-900">Order Dibuat</span>
-              </div>
-              <p className="mt-1 pl-9 text-xs text-slate-500">{formatDate(payload.order.createdAt)}</p>
-            </li>
-
-            <li className="relative">
-              <div className="flex items-center gap-2">
-                <div
-                  className="grid h-7 w-7 place-items-center rounded-full text-white shadow-sm"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  <Clock size={14} />
-                </div>
-                <span className="text-sm font-bold text-slate-900">Menunggu Pembayaran</span>
-              </div>
-              <p className="mt-1 pl-9 text-xs text-slate-500">Upload bukti transfer</p>
-            </li>
-
-            <li className={`relative ${!isPaid ? 'opacity-50' : ''}`}>
-              <div className="flex items-center gap-2">
-                <div
-                  className={`grid h-7 w-7 place-items-center rounded-full border-2 text-xs font-bold ${
-                    isPaid ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
-                  }`}
-                  style={{ backgroundColor: isPaid ? primaryColor : undefined }}
-                >
-                  {isPaid ? <Check size={14} /> : '3'}
-                </div>
-                <span className="text-sm font-semibold text-slate-900">Verifikasi</span>
-              </div>
-              <p className="mt-1 pl-9 text-xs text-slate-500">Maksimal 1x24 jam</p>
-            </li>
-
-            <li className={`relative ${!isCompleted ? 'opacity-50' : ''}`}>
-              <div className="flex items-center gap-2">
-                <div
-                  className={`grid h-7 w-7 place-items-center rounded-full border-2 text-xs font-bold ${
-                    isCompleted ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
-                  }`}
-                  style={{ backgroundColor: isCompleted ? primaryColor : undefined }}
-                >
-                  {isCompleted ? <Check size={14} /> : '4'}
-                </div>
-                <span className="text-sm font-semibold text-slate-900">Akses Aktif</span>
-              </div>
-              <p className="mt-1 pl-9 text-xs text-slate-500">Instan setelah verifikasi</p>
-            </li>
-          </ol>
-        </section>
-
-        {/* Main 2-Column Layout */}
-        <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
-          {/* LEFT COLUMN */}
-          <div className="space-y-6">
-            {/* 1. Instruksi Transfer & Pembayaran (PRIORITAS UTAMA - PALING ATAS) */}
-            <section
-              className="rounded-2xl border-2 bg-white p-5 shadow-md sm:p-7"
-              style={{
-                borderColor: `${primaryColor}50`,
-                backgroundImage: `linear-gradient(180deg, #ffffff 0%, ${softColor} 100%)`,
-              }}
-            >
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="grid h-8 w-8 place-items-center rounded-lg text-white text-sm font-black shadow-2xs"
-                    style={{ backgroundColor: primaryColor }}
-                  >
-                    1
-                  </div>
-                  <h2 className="text-lg font-extrabold tracking-tight text-slate-900">
-                    Instruksi Transfer & Pembayaran
-                  </h2>
-                </div>
-                <span
-                  className="rounded-full px-3 py-1 text-xs font-bold"
+            {/* Main 2-Column Layout - PALING ATAS (USER CHECKOUT LANGSUNG BAYAR) */}
+            <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
+              {/* LEFT COLUMN */}
+              <div className="space-y-6">
+                {/* 1. Instruksi Transfer & Pembayaran (PRIORITAS UTAMA - PALING ATAS) */}
+                <section
+                  className="rounded-2xl border-2 bg-white p-5 shadow-md sm:p-7"
                   style={{
-                    backgroundColor: `${primaryColor}1a`,
-                    color: primaryColor,
+                    borderColor: `${primaryColor}50`,
+                    backgroundImage: `linear-gradient(180deg, #ffffff 0%, ${softColor} 100%)`,
                   }}
                 >
-                  Prioritas Pembayaran
-                </span>
-              </div>
-              <p className="mb-5 pl-10 text-xs sm:text-sm font-medium text-slate-600">
-                Silakan lakukan transfer sesuai rekening/VA dan nominal tagihan di bawah ini.
-              </p>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="grid h-8 w-8 place-items-center rounded-lg text-white text-sm font-black shadow-2xs"
+                        style={{ backgroundColor: primaryColor }}
+                      >
+                        1
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-extrabold tracking-tight text-slate-900">
+                          Instruksi Transfer & Pembayaran
+                        </h2>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs font-mono font-bold text-slate-700">
+                            Order #{payload.order.orderNumber}
+                          </span>
+                          <span className="text-slate-300">•</span>
+                          <span
+                            className="text-xs font-bold uppercase"
+                            style={{ color: primaryColor }}
+                          >
+                            {payload.order.paymentStatus}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={copyOrderLink}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
+                      >
+                        {copiedOrderLink ? (
+                          <>
+                            <Check size={13} className="text-emerald-600" />
+                            <span className="text-emerald-700 font-bold">Link Tersalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 size={13} />
+                            <span>Salin Link Order</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mb-5 pl-10 text-xs sm:text-sm font-medium text-slate-600">
+                    Silakan lakukan transfer sesuai rekening/VA dan nominal tagihan di bawah ini.
+                  </p>
 
-              {payload.store.bankAccountNumber ? (
+                  {payload.store.bankAccountNumber ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {/* BOX A: REKENING / VA / QRIS */}
                   <div className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
@@ -886,6 +752,164 @@ export default function OrderStatusClient({
             </section>
           </aside>
         </div>
+
+        {/* Order Banner */}
+        <section
+          className="mb-6 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7"
+          style={{
+            backgroundImage: `linear-gradient(135deg, #ffffff 0%, ${softColor} 100%)`,
+          }}
+        >
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
+                style={{
+                  backgroundColor: softColor,
+                  color: primaryColor,
+                }}
+              >
+                <CheckCircle2 size={13} />
+                Order Tercatat
+              </span>
+              <h1 className="mt-3 text-xl font-extrabold tracking-tight sm:text-2xl text-slate-900">
+                Nomor Order <span className="font-mono" style={{ color: primaryColor }}>{payload.order.orderNumber}</span>
+              </h1>
+              <p className="mt-1.5 max-w-xl text-sm text-slate-600">
+                Halaman ini bisa dibuka kapan saja selama link akses masih aktif. Simpan tautannya untuk cek status pembayaran.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <Link
+                href={`/store/${payload.store.orgSlug}/${payload.store.slug}`}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900"
+              >
+                <ArrowLeft size={14} />
+                Kembali ke Store
+              </Link>
+              <button
+                type="button"
+                onClick={copyOrderLink}
+                className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90"
+                style={{ backgroundColor: primaryColor }}
+              >
+                {copiedOrderLink ? (
+                  <>
+                    <Check size={14} />
+                    <span>Link Tersalin</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 size={14} />
+                    <span>Salin Link Order</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* 4-Column Status Grid */}
+          <div className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <div className="rounded-xl border border-slate-200/70 bg-white/90 p-3.5 shadow-2xs">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status Order</div>
+              <div
+                className="mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold"
+                style={{ backgroundColor: softColor, color: primaryColor }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: primaryColor }} />
+                {payload.order.status}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200/70 bg-white/90 p-3.5 shadow-2xs">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pembayaran</div>
+              <div
+                className="mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold"
+                style={{
+                  backgroundColor: isPaid ? '#dcfce7' : '#fef3c7',
+                  color: isPaid ? '#166534' : '#92400e',
+                }}
+              >
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: isPaid ? '#166534' : '#d97706' }}
+                />
+                {payload.order.paymentStatus}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200/70 bg-white/90 p-3.5 shadow-2xs">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Tanggal Order</div>
+              <div className="mt-1.5 text-sm font-bold text-slate-900">{formatDate(payload.order.createdAt)}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200/70 bg-white/90 p-3.5 shadow-2xs">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Batas Bayar</div>
+              <div className="mt-1.5 text-sm font-bold" style={{ color: primaryColor }}>
+                {payload.order.paymentDueAt ? formatDate(payload.order.paymentDueAt) : 'Belum diatur'}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Progress Timeline Section */}
+        <section className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">Progres Pesanan</h2>
+          <ol className="mt-4 grid gap-4 sm:grid-cols-4">
+            <li className="relative">
+              <div className="flex items-center gap-2">
+                <div
+                  className="grid h-7 w-7 place-items-center rounded-full text-white shadow-sm"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <CheckCircle2 size={14} />
+                </div>
+                <span className="text-sm font-bold text-slate-900">Order Dibuat</span>
+              </div>
+              <p className="mt-1 pl-9 text-xs text-slate-500">{formatDate(payload.order.createdAt)}</p>
+            </li>
+
+            <li className="relative">
+              <div className="flex items-center gap-2">
+                <div
+                  className="grid h-7 w-7 place-items-center rounded-full text-white shadow-sm"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <Clock size={14} />
+                </div>
+                <span className="text-sm font-bold text-slate-900">Menunggu Pembayaran</span>
+              </div>
+              <p className="mt-1 pl-9 text-xs text-slate-500">Upload bukti transfer</p>
+            </li>
+
+            <li className={`relative ${!isPaid ? 'opacity-50' : ''}`}>
+              <div className="flex items-center gap-2">
+                <div
+                  className={`grid h-7 w-7 place-items-center rounded-full border-2 text-xs font-bold ${
+                    isPaid ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
+                  }`}
+                  style={{ backgroundColor: isPaid ? primaryColor : undefined }}
+                >
+                  {isPaid ? <Check size={14} /> : '3'}
+                </div>
+                <span className="text-sm font-semibold text-slate-900">Verifikasi</span>
+              </div>
+              <p className="mt-1 pl-9 text-xs text-slate-500">Maksimal 1x24 jam</p>
+            </li>
+
+            <li className={`relative ${!isCompleted ? 'opacity-50' : ''}`}>
+              <div className="flex items-center gap-2">
+                <div
+                  className={`grid h-7 w-7 place-items-center rounded-full border-2 text-xs font-bold ${
+                    isCompleted ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
+                  }`}
+                  style={{ backgroundColor: isCompleted ? primaryColor : undefined }}
+                >
+                  {isCompleted ? <Check size={14} /> : '4'}
+                </div>
+                <span className="text-sm font-semibold text-slate-900">Akses Aktif</span>
+              </div>
+              <p className="mt-1 pl-9 text-xs text-slate-500">Instan setelah verifikasi</p>
+            </li>
+          </ol>
+        </section>
         </div>
         )}
       </main>

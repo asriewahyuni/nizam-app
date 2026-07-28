@@ -40,12 +40,10 @@ export default function ProductListClient({
   )
 
   async function copyCheckout(product: AdminStoreProductView) {
-    const path = `/store/${orgSlug}/${storeSlug}/product/${product.publicSlug}`
-    // Use custom domain when verified, otherwise fall back to window.location.origin
-    const baseUrl = primaryLmsHostname
-      ? `https://${primaryLmsHostname}`
-      : window.location.origin
-    await navigator.clipboard.writeText(`${baseUrl}${path}`)
+    const fullUrl = primaryLmsHostname
+      ? `https://${primaryLmsHostname}/product/${product.publicSlug}`
+      : `${window.location.origin}/store/${orgSlug}/${storeSlug}/product/${product.publicSlug}`
+    await navigator.clipboard.writeText(fullUrl)
     setCopiedId(product.id)
     window.setTimeout(() => {
       setCopiedId((current) => current === product.id ? '' : current)
