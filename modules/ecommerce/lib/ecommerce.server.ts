@@ -3959,6 +3959,39 @@ export async function getPublicOrderStatusPayload(input: {
     getStoreThemeVersion(admin, context.storeId, null),
   ])
 
+  const brandingRecord = (
+    context.lmsBranding && typeof context.lmsBranding === 'object'
+      ? context.lmsBranding
+      : context.orgSlug === 'coreisec'
+        ? {
+            name: 'CORe ISEC',
+            logo_url: 'https://coreisec.id/wp-content/uploads/2022/07/CI-Class-h.png',
+            primary_color: '#004da4',
+            accent_color: '#c69232',
+            accent_color_hover: '#b0802c',
+          }
+        : null
+  ) as Record<string, unknown> | null
+
+  if (brandingRecord) {
+    const primaryColor = String(brandingRecord.primary_color || '').trim()
+    const accentColor = String(brandingRecord.accent_color || '').trim()
+    const logoUrl = String(brandingRecord.logo_url || '').trim()
+    const brandName = String(brandingRecord.name || '').trim()
+
+    if (primaryColor) {
+      theme.tokens.accent = primaryColor
+      theme.tokens.accentStrong = accentColor || primaryColor
+      theme.tokens.accentSoft = `${primaryColor}14`
+    }
+    if (logoUrl) {
+      store.logoUrl = logoUrl
+    }
+    if (brandName) {
+      store.brandName = brandName
+    }
+  }
+
   const [addressResult, itemResult, paymentResult] = await Promise.all([
     queryPostgres<{
       recipient_name: string
