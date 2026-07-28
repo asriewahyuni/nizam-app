@@ -81,12 +81,17 @@ export async function sendTenantTestWhatsappAction(
   }
 
   try {
+    const cleanPhone = phone.replace(/\D/g, '')
+    const normalizedPhone = cleanPhone.startsWith('08')
+      ? '62' + cleanPhone.slice(1)
+      : cleanPhone
+
     const response = await fetch('https://api.dripsender.id/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         api_key: config.dripsenderApiKey,
-        phone: phone.replace(/^\+/, ''),
+        phone: normalizedPhone,
         text: 'Uji coba notifikasi WhatsApp dari Nizam LMS. Jika Anda menerima pesan ini, integrasi Dripsender sudah aktif dan benar.',
       }),
     })

@@ -108,12 +108,17 @@ export class DripsenderNotificationProvider implements NotificationProvider {
     const apiKey = settings.dripsenderApiKey
     // dripsender.id's API takes the key in the JSON body, not an auth header,
     // and expects the message under `text` (not `message`).
+    const cleanPhone = input.recipient.replace(/\D/g, '')
+    const normalizedPhone = cleanPhone.startsWith('08')
+      ? '62' + cleanPhone.slice(1)
+      : cleanPhone
+
     const response = await fetch(DripsenderNotificationProvider.ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         api_key: apiKey,
-        phone: input.recipient.replace(/^\+/, ''),
+        phone: normalizedPhone,
         text: input.body,
       }),
     })
