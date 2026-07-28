@@ -414,6 +414,7 @@ export type AdminCourseEntitlementSelection = {
   courseId: string
   accessDurationValue: number | null
   accessDurationUnit: string | null
+  batchId: string | null
 }
 
 export type AdminAccessPackageView = {

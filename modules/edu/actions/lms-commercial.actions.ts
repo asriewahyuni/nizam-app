@@ -263,9 +263,22 @@ export async function getLmsBatchesByCourseId(
       [key: string]: unknown
     }>(
       `
-        select 
+        select
           b.*,
-          (select count(*) from public.lms_registrations r where r.batch_id = b.id and r.status = 'CONFIRMED') as enrolled_count
+          (select count(*) from public.lms_registrations r where r.batch_id = b.id and r.status = 'CONFIRMED') as enrolled_count,
+          (
+            select jsonb_agg(jsonb_build_object(
+              'storeProductId', store_product.id,
+              'name', store_product.public_name,
+              'price', coalesce(store_product.price_override, product.selling_price)
+            ))
+            from public.commerce_product_courses product_course
+            join public.store_products store_product
+              on store_product.id = product_course.store_product_id
+             and store_product.org_id = product_course.org_id
+            join public.products product on product.id = store_product.product_id
+            where product_course.org_id = b.org_id and product_course.batch_id = b.id
+          ) as linked_products
         from public.lms_course_batches b
         where b.org_id = $1::uuid and b.course_id = $2::uuid and b.deleted_at is null
         order by b.created_at desc

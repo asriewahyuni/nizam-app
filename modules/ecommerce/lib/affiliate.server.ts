@@ -522,11 +522,16 @@ export async function getEligibleAffiliateCourses(
        COALESCE(course.affiliate_commission_type, 'PERCENTAGE') AS affiliate_commission_type,
        COALESCE(course.affiliate_commission_value, 20.00)::float8 AS affiliate_commission_value,
        COALESCE((
-         SELECT product.price::float8
-         FROM public.store_products product
-         WHERE product.org_id = course.org_id
-           AND (product.metadata->>'course_id' = course.id::text OR product.slug = course.slug)
-           AND product.is_active = TRUE
+         SELECT COALESCE(store_product.price_override, product.selling_price)::float8
+         FROM public.commerce_product_courses product_course
+         JOIN public.store_products store_product
+           ON store_product.id = product_course.store_product_id
+          AND store_product.org_id = product_course.org_id
+         JOIN public.products product ON product.id = store_product.product_id
+         WHERE product_course.org_id = course.org_id
+           AND product_course.course_id = course.id
+           AND store_product.is_published = TRUE
+         ORDER BY store_product.created_at DESC
          LIMIT 1
        ), 150000)::float8 AS price
      FROM public.learning_courses course

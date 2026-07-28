@@ -21,6 +21,27 @@ function parseUuidList(value: FormDataEntryValue | null): string[] {
   }
 }
 
+function parseCourseBatchPairs(value: FormDataEntryValue | null): Array<{ courseId: string; batchId: string | null }> {
+  if (typeof value !== 'string' || !value.trim()) return []
+  const isUuid = (v: unknown) => /^[0-9a-f-]{36}$/i.test(String(v || ''))
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    const seen = new Set<string>()
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== 'object') return []
+      const record = item as Record<string, unknown>
+      const courseId = String(record.courseId || '').trim()
+      if (!isUuid(courseId) || seen.has(courseId)) return []
+      seen.add(courseId)
+      const batchId = String(record.batchId || '').trim()
+      return [{ courseId, batchId: isUuid(batchId) ? batchId : null }]
+    })
+  } catch {
+    return []
+  }
+}
+
 function parseOptionalDate(value: FormDataEntryValue | null): string | null {
   const raw = typeof value === 'string' ? value.trim() : ''
   if (!raw) return null
@@ -100,7 +121,8 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
     const trialDays = Number(formData.get('trial_days') || 0)
     const signupFee = Number(formData.get('signup_fee') || 0)
 
-    const courseIds = parseUuidList(formData.get('course_ids'))
+    const courseBatchPairs = parseCourseBatchPairs(formData.get('course_batches'))
+    const courseIds = courseBatchPairs.map((pair) => pair.courseId)
     const packageIds = parseUuidList(formData.get('package_ids'))
 
     if (!name) return { success: false, error: 'Nama produk wajib diisi.' }
@@ -247,6 +269,21 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
           throw new Error('Ada course yang tidak ditemukan dalam organisasi ini.')
         }
       }
+      const batchPairs = courseBatchPairs.filter((pair) => pair.batchId)
+      if (batchPairs.length > 0) {
+        const batchCheck = await client.query<{ id: string }>(
+          `SELECT id::text
+           FROM public.lms_course_batches
+           WHERE org_id = $1::uuid
+             AND id = ANY($2::uuid[])
+             AND course_id = ANY($3::uuid[])
+             AND deleted_at IS NULL`,
+          [orgId, batchPairs.map((pair) => pair.batchId), batchPairs.map((pair) => pair.courseId)],
+        )
+        if (batchCheck.rows.length !== batchPairs.length) {
+          throw new Error('Ada batch yang tidak ditemukan atau tidak sesuai course-nya.')
+        }
+      }
       if (packageIds.length > 0) {
         const packageCheck = await client.query<{ id: string }>(
           `SELECT id::text
@@ -325,12 +362,11 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
       )
 
       // Insert new entitlements
-      const uniqueCourseIds = Array.from(new Set(courseIds))
-      if (uniqueCourseIds.length > 0) {
-        const values = uniqueCourseIds.map((cid, i) => `($1, $2, $${i + 3})`).join(',')
-        const params = [orgId, storeProductId, ...uniqueCourseIds]
+      if (courseBatchPairs.length > 0) {
+        const values = courseBatchPairs.map((_, i) => `($1, $2, $${i * 2 + 3}, $${i * 2 + 4})`).join(',')
+        const params = [orgId, storeProductId, ...courseBatchPairs.flatMap((pair) => [pair.courseId, pair.batchId])]
         await client.query(
-          `INSERT INTO commerce_product_courses (org_id, store_product_id, course_id) VALUES ${values} ON CONFLICT (org_id, store_product_id, course_id) DO NOTHING`,
+          `INSERT INTO commerce_product_courses (org_id, store_product_id, course_id, batch_id) VALUES ${values} ON CONFLICT (org_id, store_product_id, course_id) DO UPDATE SET batch_id = EXCLUDED.batch_id`,
           params
         )
       }

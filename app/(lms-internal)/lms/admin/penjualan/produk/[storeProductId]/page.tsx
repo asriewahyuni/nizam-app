@@ -33,6 +33,7 @@ export default async function EditLmsProductPage({
       stores={data.stores}
       courses={data.learningCourses}
       packages={data.accessPackages}
+      batches={data.batches}
       initialProduct={product}
       initialEntitlement={
         data.productEntitlements.find((item) => item.storeProductId === product.id) || null

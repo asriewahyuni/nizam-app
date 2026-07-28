@@ -71,6 +71,8 @@ export async function getLMSCourses(orgSlug: string) {
              AND batch.course_id = course.id
              AND batch.status = 'OPEN'
              AND batch.deleted_at IS NULL
+             AND (batch.enrollment_opens_at IS NULL OR batch.enrollment_opens_at <= NOW())
+             AND (batch.enrollment_closes_at IS NULL OR batch.enrollment_closes_at > NOW())
          ) AS available_batch_count,
          (
            SELECT COUNT(*)::int
@@ -93,6 +95,8 @@ export async function getLMSCourses(orgSlug: string) {
                AND batch.course_id = course.id
                AND batch.status = 'OPEN'
                AND batch.deleted_at IS NULL
+               AND (batch.enrollment_opens_at IS NULL OR batch.enrollment_opens_at <= NOW())
+               AND (batch.enrollment_closes_at IS NULL OR batch.enrollment_closes_at > NOW())
              UNION ALL
              SELECT COALESCE(store_product.price_override, product.selling_price)
              FROM public.commerce_product_courses product_course
@@ -247,6 +251,8 @@ export async function getLMSCourseDetails(orgSlug: string, courseSlug: string) {
            AND batch.course_id = $2::uuid
            AND batch.status = 'OPEN'
            AND batch.deleted_at IS NULL
+           AND (batch.enrollment_opens_at IS NULL OR batch.enrollment_opens_at <= NOW())
+           AND (batch.enrollment_closes_at IS NULL OR batch.enrollment_closes_at > NOW())
          ORDER BY batch.start_date NULLS LAST, batch.created_at`,
         [orgId, course.id],
       ),

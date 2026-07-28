@@ -72,13 +72,18 @@ export async function enrollUser(
 
     let selectedBatch: BatchRow | null = null
     if (batchId) {
-      const batchResult = await client.query<BatchRow>(
+      const batchResult = await client.query<BatchRow & {
+        enrollment_opens_at: string | null
+        enrollment_closes_at: string | null
+      }>(
         `SELECT
            id::text,
            price::float8,
            quota,
            waitlist_enabled,
-           status
+           status,
+           enrollment_opens_at::text,
+           enrollment_closes_at::text
          FROM public.lms_course_batches
          WHERE id = $1::uuid
            AND org_id = $2::uuid
@@ -88,7 +93,11 @@ export async function enrollUser(
          FOR UPDATE`,
         [batchId, course.org_id, course.id],
       )
-      selectedBatch = batchResult.rows[0] || null
+      const batchRow = batchResult.rows[0] || null
+      const withinEnrollmentWindow = Boolean(batchRow)
+        && (!batchRow.enrollment_opens_at || new Date(batchRow.enrollment_opens_at) <= new Date())
+        && (!batchRow.enrollment_closes_at || new Date(batchRow.enrollment_closes_at) > new Date())
+      selectedBatch = withinEnrollmentWindow ? batchRow : null
       if (!selectedBatch || selectedBatch.status !== 'OPEN') {
         throw new Error('Angkatan tidak tersedia atau pendaftarannya sudah ditutup.')
       }
@@ -102,6 +111,8 @@ export async function enrollUser(
                AND batch.course_id = $2::uuid
                AND batch.status = 'OPEN'
                AND batch.deleted_at IS NULL
+               AND (batch.enrollment_opens_at IS NULL OR batch.enrollment_opens_at <= NOW())
+               AND (batch.enrollment_closes_at IS NULL OR batch.enrollment_closes_at > NOW())
            ) AS batch_count,
            (
              SELECT COUNT(*)::int
@@ -132,11 +143,28 @@ export async function enrollUser(
     }
 
     if (selectedBatch && selectedBatch.price > 0) {
+      // Kalau batch ini sudah terhubung ke Product (harmonisasi Course-Batch-Product),
+      // arahkan ke checkout member sungguhan, bukan lagi halaman pendaftaran lama.
+      const linkedProduct = await client.query<{ store_product_id: string }>(
+        `SELECT store_product.id::text AS store_product_id
+         FROM public.commerce_product_courses product_course
+         JOIN public.store_products store_product
+           ON store_product.id = product_course.store_product_id
+          AND store_product.org_id = product_course.org_id
+         WHERE product_course.org_id = $1::uuid
+           AND product_course.batch_id = $2::uuid
+           AND store_product.is_published = TRUE
+         LIMIT 1`,
+        [course.org_id, selectedBatch.id],
+      )
       await client.query('ROLLBACK')
+      const storeProductId = linkedProduct.rows[0]?.store_product_id
       return {
         data: {
           requiresCheckout: true,
-          checkoutUrl: `/lms/daftar/${selectedBatch.id}`,
+          checkoutUrl: storeProductId
+            ? `/member/${orgSlug}/checkout?product=${encodeURIComponent(storeProductId)}`
+            : `/lms/daftar/${selectedBatch.id}`,
           batchId: selectedBatch.id,
         },
       }

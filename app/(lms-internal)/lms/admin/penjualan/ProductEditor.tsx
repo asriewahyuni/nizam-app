@@ -32,12 +32,21 @@ import {
 import { saveLmsSimpleProductAction } from '@/modules/edu/actions/lms-sales.actions'
 import { uploadLmsMediaAction } from '@/modules/edu/actions/lms-commercial.actions'
 
+type ProductEditorBatch = {
+  id: string
+  courseId: string
+  name: string
+  status: string
+  quota: number | null
+}
+
 type ProductEditorProps = {
   orgSlug: string
   primaryLmsHostname: string | null
   stores: StoreAdminSummary[]
   courses: AdminLearningCourseView[]
   packages: AdminAccessPackageView[]
+  batches: ProductEditorBatch[]
   initialProduct: AdminStoreProductView | null
   initialEntitlement: AdminProductEntitlementView | null
   returnTo: string
@@ -61,7 +70,7 @@ type Draft = {
   billingIntervalCount: string
   trialDays: string
   signupFee: string
-  directCourseIds: string[]
+  directCourseBatches: Record<string, string | null>
   packageIds: string[]
   isPublished: boolean
   isFeatured: boolean
@@ -126,7 +135,9 @@ function initialDraft(
     billingIntervalCount: String(product?.subscriptionPlan?.billingIntervalCount || 1),
     trialDays: String(product?.subscriptionPlan?.trialDays || 0),
     signupFee: String(product?.subscriptionPlan?.signupFee || 0),
-    directCourseIds: entitlement?.directCourses.map((course) => course.courseId) || [],
+    directCourseBatches: Object.fromEntries(
+      (entitlement?.directCourses || []).map((course) => [course.courseId, course.batchId]),
+    ),
     packageIds: entitlement?.packageIds || [],
     isPublished: product?.isPublished ?? false,
     isFeatured: product?.isFeatured ?? false,
@@ -155,6 +166,7 @@ export default function ProductEditor({
   stores,
   courses,
   packages,
+  batches,
   initialProduct,
   initialEntitlement,
   returnTo,
@@ -205,17 +217,28 @@ export default function ProductEditor({
 
   const courseById = useMemo(() => new Map(courses.map((course) => [course.id, course])), [courses])
   const packageById = useMemo(() => new Map(packages.map((item) => [item.id, item])), [packages])
+  const openBatchesByCourseId = useMemo(() => {
+    const map = new Map<string, ProductEditorBatch[]>()
+    for (const batch of batches) {
+      if (batch.status !== 'OPEN') continue
+      const list = map.get(batch.courseId) || []
+      list.push(batch)
+      map.set(batch.courseId, list)
+    }
+    return map
+  }, [batches])
+  const directCourseIds = useMemo(() => Object.keys(draft.directCourseBatches), [draft.directCourseBatches])
 
   const resolvedBenefits = useMemo(() => {
     const rawIds = [
-      ...draft.directCourseIds,
+      ...directCourseIds,
       ...draft.packageIds.flatMap((id) => packageById.get(id)?.courses.map((course) => course.courseId) || []),
     ]
     return {
       courses: [...new Set(rawIds)].map((id) => courseById.get(id)).filter(Boolean),
       duplicateCount: rawIds.length - new Set(rawIds).size,
     }
-  }, [courseById, draft.directCourseIds, draft.packageIds, packageById])
+  }, [courseById, directCourseIds, draft.packageIds, packageById])
 
   useEffect(() => {
     if (!dirty) return
@@ -293,7 +316,9 @@ export default function ProductEditor({
     formData.set('billing_interval_count', draft.billingIntervalCount)
     formData.set('trial_days', draft.trialDays)
     formData.set('signup_fee', draft.signupFee)
-    formData.set('course_ids', JSON.stringify(draft.directCourseIds))
+    formData.set('course_batches', JSON.stringify(
+      Object.entries(draft.directCourseBatches).map(([courseId, batchId]) => ({ courseId, batchId })),
+    ))
     formData.set('package_ids', JSON.stringify(draft.packageIds))
     formData.set('is_published', String(draft.isPublished))
     formData.set('is_featured', String(draft.isFeatured))
@@ -631,17 +656,51 @@ export default function ProductEditor({
             <legend className="px-1 text-sm font-bold text-slate-900">Course langsung</legend>
             <p className="mb-3 text-xs font-medium text-slate-500">Dipakai khusus oleh produk ini.</p>
             <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-              {courses.map((course) => (
-                <label key={course.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 transition-colors hover:border-indigo-200 hover:bg-indigo-50/50">
-                  <input
-                    type="checkbox"
-                    checked={draft.directCourseIds.includes(course.id)}
-                    onChange={() => update('directCourseIds', toggle(draft.directCourseIds, course.id))}
-                    className="size-4 accent-indigo-700"
-                  />
-                  <span className="text-sm font-semibold text-slate-800">{course.title}</span>
-                </label>
-              ))}
+              {courses.map((course) => {
+                const isChecked = course.id in draft.directCourseBatches
+                const openBatches = openBatchesByCourseId.get(course.id) || []
+                return (
+                  <div key={course.id} className="rounded-xl border border-slate-200 px-3 py-2 transition-colors hover:border-indigo-200 hover:bg-indigo-50/50">
+                    <label className="flex min-h-11 cursor-pointer items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          setDraft((current) => {
+                            const next = { ...current.directCourseBatches }
+                            if (course.id in next) {
+                              delete next[course.id]
+                            } else {
+                              next[course.id] = null
+                            }
+                            return { ...current, directCourseBatches: next }
+                          })
+                          setDirty(true)
+                        }}
+                        className="size-4 accent-indigo-700"
+                      />
+                      <span className="text-sm font-semibold text-slate-800">{course.title}</span>
+                    </label>
+                    {isChecked && openBatches.length > 0 && (
+                      <select
+                        value={draft.directCourseBatches[course.id] || ''}
+                        onChange={(event) => {
+                          const value = event.target.value || null
+                          update('directCourseBatches', { ...draft.directCourseBatches, [course.id]: value })
+                        }}
+                        className="mt-1.5 w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
+                      >
+                        <option value="">Tanpa batch spesifik (akses umum)</option>
+                        {openBatches.map((batch) => (
+                          <option key={batch.id} value={batch.id}>
+                            {batch.name}{batch.quota ? ` · kuota ${batch.quota}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </fieldset>
           <fieldset className="rounded-xl border border-slate-200 p-4">

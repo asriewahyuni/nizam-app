@@ -58,6 +58,8 @@ export type MemberCheckoutState = {
   paymentUrl?: string | null
   paymentInstructions?: Record<string, unknown>
   accountClaimRequired?: boolean
+  waitlisted?: boolean
+  waitlistPosition?: number
 }
 
 function cleanText(value: FormDataEntryValue | null, max = 200) {
@@ -569,6 +571,67 @@ export async function createMemberCheckout(
         )
         if (Number(purchaseCount.rows[0]?.count || 0) >= offering.purchase_limit_per_user) {
           throw new Error('Batas pembelian paket ini sudah tercapai.')
+        }
+      }
+
+      // Kalau produk ini pin ke batch spesifik, tegakkan kuota batch sebelum lanjut checkout.
+      const batchLinkResult = await client.query<{
+        batch_id: string
+        quota: number | null
+        waitlist_enabled: boolean
+      }>(
+        `SELECT batch.id::text AS batch_id, batch.quota, COALESCE(batch.waitlist_enabled, FALSE) AS waitlist_enabled
+         FROM public.commerce_product_courses product_course
+         JOIN public.lms_course_batches batch
+           ON batch.id = product_course.batch_id
+          AND batch.org_id = product_course.org_id
+         WHERE product_course.org_id = $1::uuid
+           AND product_course.store_product_id = $2::uuid
+           AND product_course.batch_id IS NOT NULL
+         LIMIT 1
+         FOR UPDATE OF batch`,
+        [offering.org_id, storeProductId],
+      )
+      const batchLink = batchLinkResult.rows[0]
+      if (batchLink && batchLink.quota && batchLink.quota > 0) {
+        const committedResult = await client.query<{ count: number }>(
+          `SELECT (
+             (SELECT COUNT(*)::int FROM public.learning_access_grants grant_row
+              WHERE grant_row.org_id = $1::uuid AND grant_row.batch_id = $2::uuid AND grant_row.status = 'ACTIVE')
+             +
+             (SELECT COUNT(*)::int FROM public.lms_registrations reg
+              WHERE reg.org_id = $1::uuid AND reg.batch_id = $2::uuid AND reg.status = 'CONFIRMED')
+             +
+             (SELECT COUNT(*)::int FROM public.ecommerce_orders o
+              JOIN public.ecommerce_order_items item ON item.order_id = o.id AND item.org_id = o.org_id
+              WHERE o.org_id = $1::uuid
+                AND item.product_id = $3::uuid
+                AND o.status NOT IN ('CANCELLED', 'REFUNDED'))
+           ) AS count`,
+          [offering.org_id, batchLink.batch_id, offering.product_id],
+        )
+        const committed = Number(committedResult.rows[0]?.count || 0)
+        if (committed >= batchLink.quota) {
+          if (batchLink.waitlist_enabled) {
+            const waitlistResult = await client.query<{ id: string; position: number }>(
+              `INSERT INTO public.lms_waitlist_entries (org_id, batch_id, user_id, position, status)
+               VALUES (
+                 $1::uuid, $2::uuid, $3::uuid,
+                 (SELECT COALESCE(MAX(position), 0) + 1 FROM public.lms_waitlist_entries WHERE batch_id = $2::uuid),
+                 'WAITING'
+               )
+               ON CONFLICT (org_id, batch_id, user_id) DO UPDATE SET updated_at = NOW()
+               RETURNING id::text, position`,
+              [offering.org_id, batchLink.batch_id, checkoutUser.userId],
+            )
+            await client.query('COMMIT')
+            return {
+              success: true,
+              waitlisted: true,
+              waitlistPosition: waitlistResult.rows[0]?.position,
+            }
+          }
+          throw new Error('Kuota batch ini sudah penuh.')
         }
       }
 

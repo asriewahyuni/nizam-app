@@ -7,6 +7,7 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getConsultingAdminOverview } from '@/modules/consulting/lib/consulting.server'
 import { getEcommerceDashboardData } from '@/modules/ecommerce/lib/ecommerce.server'
 import { getLmsDomainAdminData } from '@/modules/ecommerce/domains/lms-domain.server'
+import { getLmsBatches } from '@/modules/edu/actions/lms-commercial.actions'
 
 const getLmsSalesWorkspace = cache(async () => {
   const orgData = await getActiveOrg()
@@ -39,6 +40,14 @@ export async function getLmsSalesHeaderData() {
 export async function getLmsProductSalesData() {
   const { org, dashboard } = await getLmsSalesWorkspace()
   const domainData = await getLmsDomainAdminData()
+  const batchRows = await getLmsBatches(org.id)
+  const batches = batchRows.map((row) => ({
+    id: String(row.id),
+    courseId: String(row.course_id),
+    name: String(row.name || ''),
+    status: String(row.status || ''),
+    quota: row.quota == null ? null : Number(row.quota),
+  }))
   return {
     org,
     stores: dashboard.stores,
@@ -49,6 +58,7 @@ export async function getLmsProductSalesData() {
     learningCourses: dashboard.learningCourses,
     accessPackages: dashboard.accessPackages,
     productEntitlements: dashboard.productEntitlements,
+    batches,
     primaryLmsHostname: domainData.domains.find((domain) => (
       domain.isPrimary && domain.status === 'VERIFIED'
     ))?.hostname || null,

@@ -273,8 +273,24 @@ export default async function AdminManageCoursePage(props: {
                                 </span>
                               </div>
                             </td>
-                            <td className="px-4 py-4 text-right font-mono text-xs font-semibold">
-                              {b.price ? formatRupiah(b.price) : 'Gratis'}
+                            <td className="px-4 py-4 text-right">
+                              {Array.isArray(b.linked_products) && b.linked_products.length > 0 ? (
+                                <div className="space-y-1">
+                                  {(b.linked_products as Array<{ storeProductId: string; name: string; price: number }>).map((linked) => (
+                                    <Link
+                                      key={linked.storeProductId}
+                                      href={`/lms/admin/penjualan/produk/${linked.storeProductId}`}
+                                      className="block cursor-pointer text-xs font-semibold text-indigo-700 hover:underline"
+                                    >
+                                      Terhubung produk: {linked.name} — {formatRupiah(Number(linked.price) || 0)}
+                                    </Link>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="font-mono text-xs font-semibold">
+                                  {b.price ? formatRupiah(b.price) : 'Gratis'}
+                                </span>
+                              )}
                             </td>
                           </tr>
                         )

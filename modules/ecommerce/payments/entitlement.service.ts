@@ -15,6 +15,7 @@ type SnapshotRow = {
   access_duration_unit: string | null
   source_snapshot: Record<string, unknown>
   store_product_id: string
+  batch_id: string | null
   subscription_id: string | null
   subscription_expires_at: string | null
 }
@@ -71,6 +72,7 @@ export async function snapshotOrderEntitlements(
     source_kind: 'DIRECT' | 'PACKAGE'
     package_id: string | null
     package_version: number | null
+    batch_id: string | null
   }>(
     `SELECT
        item.id::text AS order_item_id,
@@ -86,7 +88,8 @@ export async function snapshotOrderEntitlements(
        ) AS duration_unit,
        'DIRECT'::text AS source_kind,
        NULL::text AS package_id,
-       NULL::integer AS package_version
+       NULL::integer AS package_version,
+       product_course.batch_id::text AS batch_id
      FROM public.ecommerce_order_items item
      JOIN public.store_products store_product
        ON store_product.org_id = item.org_id
@@ -119,7 +122,8 @@ export async function snapshotOrderEntitlements(
        ) AS duration_unit,
        'PACKAGE'::text AS source_kind,
        access_package.id::text AS package_id,
-       access_package.version AS package_version
+       access_package.version AS package_version,
+       NULL::text AS batch_id
      FROM public.ecommerce_order_items item
      JOIN public.store_products store_product
        ON store_product.org_id = item.org_id
@@ -151,10 +155,16 @@ export async function snapshotOrderEntitlements(
   }
 
   for (const [courseId, sources] of byCourse) {
-    const selected = [...sources].sort((left, right) => (
-      normalizedDurationWeight(right.duration_value, right.duration_unit)
-      - normalizedDurationWeight(left.duration_value, left.duration_unit)
-    ))[0]
+    const selected = [...sources].sort((left, right) => {
+      // Kandidat yang pin ke batch spesifik menang atas yang tidak (lebih spesifik),
+      // baru fallback ke urutan durasi seperti sebelumnya.
+      const batchWeight = Number(Boolean(right.batch_id)) - Number(Boolean(left.batch_id))
+      if (batchWeight !== 0) return batchWeight
+      return (
+        normalizedDurationWeight(right.duration_value, right.duration_unit)
+        - normalizedDurationWeight(left.duration_value, left.duration_unit)
+      )
+    })[0]
     const packageSources = sources.filter((source) => source.package_id)
     const hasDirect = sources.some((source) => source.source_kind === 'DIRECT')
     const hasPackage = packageSources.length > 0
@@ -174,10 +184,10 @@ export async function snapshotOrderEntitlements(
       `INSERT INTO public.commerce_order_entitlements (
          org_id, order_id, order_item_id, store_product_id, course_id,
          source_kind, package_ids, package_versions,
-         access_duration_value, access_duration_unit, source_snapshot
+         access_duration_value, access_duration_unit, source_snapshot, batch_id
        ) VALUES (
          $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid,
-         $6, $7::uuid[], $8::jsonb, $9, $10, $11::jsonb
+         $6, $7::uuid[], $8::jsonb, $9, $10, $11::jsonb, $12::uuid
        )
        ON CONFLICT (org_id, order_id, course_id) DO NOTHING`,
       [
@@ -200,6 +210,7 @@ export async function snapshotOrderEntitlements(
             durationUnit: source.duration_unit,
           })),
         }),
+        selected.batch_id,
       ],
     )
   }
@@ -368,6 +379,7 @@ export async function provisionOrderEntitlements(
        entitlement.access_duration_unit,
        entitlement.source_snapshot,
        entitlement.store_product_id::text,
+       entitlement.batch_id::text,
        subscription.id::text AS subscription_id,
        subscription.current_period_end::text AS subscription_expires_at
      FROM public.commerce_order_entitlements entitlement
@@ -418,15 +430,37 @@ export async function provisionOrderEntitlements(
         entitlement.access_duration_value,
         entitlement.access_duration_unit,
       )
+
+    // Jaring pengaman kuota untuk race manual transfer: tidak pernah blokir
+    // pembeli yang sudah bayar, cukup tandai overbooked untuk ditindaklanjuti admin.
+    let isOverbooked = false
+    if (entitlement.batch_id) {
+      const batchResult = await client.query<{ quota: number | null }>(
+        `SELECT quota FROM public.lms_course_batches WHERE id = $1::uuid AND org_id = $2::uuid LIMIT 1`,
+        [entitlement.batch_id, order.org_id],
+      )
+      const quota = Number(batchResult.rows[0]?.quota || 0)
+      if (quota > 0) {
+        const activeCount = await client.query<{ count: number }>(
+          `SELECT COUNT(*)::int AS count
+           FROM public.learning_access_grants
+           WHERE org_id = $1::uuid AND batch_id = $2::uuid AND status = 'ACTIVE'
+             AND user_id != $3::uuid`,
+          [order.org_id, entitlement.batch_id, order.user_id],
+        )
+        isOverbooked = Number(activeCount.rows[0]?.count || 0) >= quota
+      }
+    }
+
     const grant = await client.query<{ id: string }>(
       `INSERT INTO public.learning_access_grants (
          org_id, user_id, course_id, source_type, source_id,
          source_reference, status, starts_at, expires_at,
-         idempotency_key, metadata
+         idempotency_key, metadata, batch_id, is_overbooked
        ) VALUES (
          $1::uuid, $2::uuid, $3::uuid, $4, $5::uuid,
          $6, 'ACTIVE', $7::timestamptz, $8::timestamptz,
-         $9, $10::jsonb
+         $9, $10::jsonb, $11::uuid, $12
        )
        ON CONFLICT (org_id, idempotency_key) DO UPDATE
        SET
@@ -440,6 +474,8 @@ export async function provisionOrderEntitlements(
          revoked_at = NULL,
          revoked_reason = NULL,
          metadata = public.learning_access_grants.metadata || EXCLUDED.metadata,
+         batch_id = COALESCE(EXCLUDED.batch_id, public.learning_access_grants.batch_id),
+         is_overbooked = public.learning_access_grants.is_overbooked OR EXCLUDED.is_overbooked,
          updated_at = NOW()
        RETURNING id::text`,
       [
@@ -459,15 +495,17 @@ export async function provisionOrderEntitlements(
           packageIds: entitlement.package_ids,
           entitlementSnapshot: entitlement.source_snapshot,
         }),
+        entitlement.batch_id,
+        isOverbooked,
       ],
     )
     const grantId = grant.rows[0].id
     grantIds.push(grantId)
     await client.query(
       `INSERT INTO public.learning_enrollments (
-         org_id, user_id, course_id, access_grant_id, status, started_at
+         org_id, user_id, course_id, access_grant_id, status, started_at, batch_id
        ) VALUES (
-         $1::uuid, $2::uuid, $3::uuid, $4::uuid, 'IN_PROGRESS', NOW()
+         $1::uuid, $2::uuid, $3::uuid, $4::uuid, 'IN_PROGRESS', NOW(), $5::uuid
        )
        ON CONFLICT (org_id, user_id, course_id) DO UPDATE
        SET
@@ -476,8 +514,9 @@ export async function provisionOrderEntitlements(
            WHEN public.learning_enrollments.status = 'COMPLETED' THEN 'COMPLETED'
            ELSE 'IN_PROGRESS'
          END,
+         batch_id = COALESCE(EXCLUDED.batch_id, public.learning_enrollments.batch_id),
          updated_at = NOW()`,
-      [order.org_id, order.user_id, entitlement.course_id, grantId],
+      [order.org_id, order.user_id, entitlement.course_id, grantId, entitlement.batch_id],
     )
   }
 

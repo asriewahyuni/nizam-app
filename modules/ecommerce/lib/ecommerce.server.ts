@@ -1650,6 +1650,7 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
         courseId: string
         accessDurationValue: number | null
         accessDurationUnit: string | null
+        batchId: string | null
       }>
       package_ids: string[]
       resolved_course_ids: string[]
@@ -1661,7 +1662,8 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
              JSONB_BUILD_OBJECT(
                'courseId', product_course.course_id,
                'accessDurationValue', product_course.access_duration_value,
-               'accessDurationUnit', product_course.access_duration_unit
+               'accessDurationUnit', product_course.access_duration_unit,
+               'batchId', product_course.batch_id
              )
              ORDER BY course.title
            )
@@ -2018,7 +2020,8 @@ export async function getEcommerceDashboardData(): Promise<EcommerceDashboardDat
     version: Number(row.version || 1),
     defaultAccessDurationValue: row.default_access_duration_value,
     defaultAccessDurationUnit: row.default_access_duration_unit,
-    courses: row.courses || [],
+    // Paket Akses selalu resolve ke akses umum course (tidak pin batch spesifik).
+    courses: (row.courses || []).map((course) => ({ ...course, batchId: null })),
     activeSubscriptionMembers: Number(row.active_subscription_members || 0),
   }))
   const dashboardProductEntitlements: AdminProductEntitlementView[] = productEntitlementResult.rows.map((row) => ({

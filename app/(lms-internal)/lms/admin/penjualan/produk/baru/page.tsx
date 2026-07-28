@@ -29,6 +29,7 @@ export default async function NewLmsProductPage({
       stores={data.stores}
       courses={data.learningCourses}
       packages={data.accessPackages}
+      batches={data.batches}
       initialProduct={null}
       initialEntitlement={null}
       returnTo={safeReturnTo(query.returnTo)}
