@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Volume2, VolumeX, Bell, CheckCircle2, ShoppingBag, X, ExternalLink } from 'lucide-react'
+import { CheckCircle2, ShoppingBag, X, ExternalLink } from 'lucide-react'
 import { checkLmsAdminOrderAlertsAction, type OrderAlertItem } from '@/modules/edu/actions/lms-order-alerts.actions'
 import { formatRupiah } from '@/lib/utils'
 
@@ -82,34 +82,14 @@ export default function LmsAdminAudioNotifier({ orgId }: { orgId: string }) {
 
   const [enabled, setEnabled] = useState(true)
   const [toasts, setToasts] = useState<ToastNotification[]>([])
-  const [isTesting, setIsTesting] = useState(false)
 
   const lastCheckedRef = useRef<string>('')
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Baca pengaturan mute dari localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('lms_admin_audio_enabled')
-    if (saved === 'false') {
-      setEnabled(false)
-    }
-  }, [])
-
-  const toggleEnabled = () => {
-    const next = !enabled
-    setEnabled(next)
-    localStorage.setItem('lms_admin_audio_enabled', String(next))
-    if (next) {
-      playMelodicChime('new_order')
-    }
-  }
-
-  const testAudio = () => {
-    setIsTesting(true)
+  const testAudio = useCallback(() => {
     playMelodicChime('new_order')
     setTimeout(() => {
       playMelodicChime('payment_confirmed')
-      setIsTesting(false)
     }, 600)
 
     // Munculkan toast tes sementara
@@ -129,7 +109,31 @@ export default function LmsAdminAudioNotifier({ orgId }: { orgId: string }) {
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== testId))
     }, 6000)
-  }
+  }, [])
+
+  // Baca pengaturan mute dari localStorage & dengarkan event perubahan dari halaman Settings
+  useEffect(() => {
+    const syncEnabled = () => {
+      const saved = localStorage.getItem('lms_admin_audio_enabled')
+      setEnabled(saved !== 'false')
+    }
+
+    syncEnabled()
+
+    const handleTestAudio = () => {
+      testAudio()
+    }
+
+    window.addEventListener('lms_admin_audio_settings_changed', syncEnabled)
+    window.addEventListener('lms_admin_audio_test', handleTestAudio)
+    window.addEventListener('storage', syncEnabled)
+
+    return () => {
+      window.removeEventListener('lms_admin_audio_settings_changed', syncEnabled)
+      window.removeEventListener('lms_admin_audio_test', handleTestAudio)
+      window.removeEventListener('storage', syncEnabled)
+    }
+  }, [testAudio])
 
   const dismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -216,94 +220,60 @@ export default function LmsAdminAudioNotifier({ orgId }: { orgId: string }) {
     }
   }, [pathname, pollAlerts])
 
-  // Hanya tampilkan jika sedang di dalam area /lms/admin
+  // Hanya jalankan jika sedang di dalam area /lms/admin
   if (!pathname.startsWith('/lms/admin')) return null
 
+  if (toasts.length === 0) return null
+
   return (
-    <>
-      {/* Tombol indikator/toggle suara di header Admin */}
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={toggleEnabled}
-          title={enabled ? 'Notifikasi Suara: AKTIF (Klik untuk nonaktifkan)' : 'Notifikasi Suara: BISU (Klik untuk aktifkan)'}
-          className={`relative inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
-            enabled
-              ? 'border-indigo-200 bg-indigo-50/80 text-indigo-700 hover:bg-indigo-100/80'
-              : 'border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200/80'
-          }`}
+    <div className="fixed top-20 right-4 z-50 flex w-full max-w-sm flex-col gap-3 pointer-events-none sm:right-6">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className="pointer-events-auto flex flex-col gap-2 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xl shadow-slate-900/10 transition-all duration-300 animate-in fade-in slide-in-from-top-5"
         >
-          {enabled ? <Volume2 size={13} className="text-indigo-600" /> : <VolumeX size={13} />}
-          <span className="hidden sm:inline">{enabled ? 'Audio Alerts' : 'Muted'}</span>
-          {enabled && (
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-indigo-600" />
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={testAudio}
-          disabled={isTesting}
-          title="Tes suara notifikasi pesanan & pembayaran"
-          className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 shadow-2xs transition hover:bg-slate-50 hover:text-slate-900"
-        >
-          Tes Suara
-        </button>
-      </div>
-
-      {/* Floating Notification Toasts di pojok kanan atas layar */}
-      <div className="fixed top-20 right-4 z-50 flex w-full max-w-sm flex-col gap-3 pointer-events-none sm:right-6">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className="pointer-events-auto flex flex-col gap-2 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xl shadow-slate-900/10 transition-all duration-300 animate-in fade-in slide-in-from-top-5"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                    t.type === 'new_order'
-                      ? 'bg-indigo-50 text-indigo-600'
-                      : 'bg-emerald-50 text-emerald-600'
-                  }`}
-                >
-                  {t.type === 'new_order' ? <ShoppingBag size={18} /> : <CheckCircle2 size={18} />}
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900">{t.title}</div>
-                  <div className="text-[11px] font-semibold text-slate-500">
-                    {t.orderNumber} &bull; <span className="text-slate-900">{formatRupiah(t.amount)}</span>
-                  </div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                  t.type === 'new_order'
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'bg-emerald-50 text-emerald-600'
+                }`}
+              >
+                {t.type === 'new_order' ? <ShoppingBag size={18} /> : <CheckCircle2 size={18} />}
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-900">{t.title}</div>
+                <div className="text-[11px] font-semibold text-slate-500">
+                  {t.orderNumber} &bull; <span className="text-slate-900">{formatRupiah(t.amount)}</span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => dismissToast(t.id)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X size={14} />
-              </button>
             </div>
-            <div className="text-xs font-medium text-slate-600 pl-1">{t.message}</div>
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  dismissToast(t.id)
-                  router.push('/lms/admin/penjualan/transaksi')
-                }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800"
-              >
-                <span>Lihat Transaksi</span>
-                <ExternalLink size={12} />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => dismissToast(t.id)}
+              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            >
+              <X size={14} />
+            </button>
           </div>
-        ))}
-      </div>
-    </>
+          <div className="text-xs font-medium text-slate-600 pl-1">{t.message}</div>
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                dismissToast(t.id)
+                router.push('/lms/admin/penjualan/transaksi')
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800"
+            >
+              <span>Lihat Transaksi</span>
+              <ExternalLink size={12} />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }

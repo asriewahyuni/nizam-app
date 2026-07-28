@@ -3,6 +3,7 @@ import { Mail, MessageCircle, ArrowRight, TicketPercent } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
 import LmsSettingsForm from './LmsSettingsForm'
+import LmsAudioAlertSettingsCard from './LmsAudioAlertSettingsCard'
 
 export const metadata = {
   title: 'Pengaturan LMS — Nizam LMS Admin',
@@ -57,6 +58,8 @@ export default async function LmsSettingsPage() {
         </div>
         <ArrowRight size={18} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition" />
       </Link>
+
+      <LmsAudioAlertSettingsCard />
 
       <Link
         href="/lms/admin/settings/afiliasi"
