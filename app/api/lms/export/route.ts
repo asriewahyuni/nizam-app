@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
           search: searchParams.get('search') || '',
           levelFilter: searchParams.get('levelFilter') || 'ALL',
           courseFilter: searchParams.get('courseFilter') || 'ALL',
+          courseId: searchParams.get('courseId') || '',
           sortBy: searchParams.get('sortBy') || 'level_desc',
         })
         filename = `Member-Directory_${today}.xlsx`

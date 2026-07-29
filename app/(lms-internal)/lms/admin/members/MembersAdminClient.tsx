@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import {
   MemberSummary,
+  MemberCourseOption,
   LmsGamificationSettings,
   updateLmsGamificationSettings,
 } from '@/modules/edu/actions/lms-members.actions'
@@ -36,6 +37,7 @@ interface MembersAdminClientProps {
   orgSlug: string
   initialMembers: MemberSummary[]
   initialSettings: LmsGamificationSettings
+  courseOptions: MemberCourseOption[]
   totalCount: number
   page: number
   pageSize: number
@@ -46,6 +48,7 @@ export function MembersAdminClient({
   orgSlug,
   initialMembers,
   initialSettings,
+  courseOptions,
   totalCount,
   page,
   pageSize,
@@ -58,6 +61,7 @@ export function MembersAdminClient({
   const currentSearch = searchParams.get('search') || ''
   const currentLevelFilter = searchParams.get('levelFilter') || 'ALL'
   const currentCourseFilter = searchParams.get('courseFilter') || 'ALL'
+  const currentCourseId = searchParams.get('courseId') || 'ALL'
   const currentSortBy = searchParams.get('sortBy') || 'level_desc'
 
   const [search, setSearch] = useState(currentSearch)
@@ -172,7 +176,7 @@ export function MembersAdminClient({
         </div>
         <div className="flex items-center gap-3">
           <a
-            href={`/api/lms/export?type=members&search=${encodeURIComponent(currentSearch)}&levelFilter=${encodeURIComponent(currentLevelFilter)}&courseFilter=${encodeURIComponent(currentCourseFilter)}&sortBy=${encodeURIComponent(currentSortBy)}`}
+            href={`/api/lms/export?type=members&search=${encodeURIComponent(currentSearch)}&levelFilter=${encodeURIComponent(currentLevelFilter)}&courseFilter=${encodeURIComponent(currentCourseFilter)}&courseId=${encodeURIComponent(currentCourseId)}&sortBy=${encodeURIComponent(currentSortBy)}`}
             className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
           >
             <FileSpreadsheet className="h-4 w-4 text-slate-500" />
@@ -233,6 +237,23 @@ export function MembersAdminClient({
             <option value="COMPLETED">Completed at least 1 Course</option>
             <option value="NOT_ENROLLED">Not Enrolled Yet</option>
           </select>
+
+          {/* Specific Course Filter */}
+          <div className="flex items-center gap-1.5">
+            <BookOpen className="h-3.5 w-3.5 text-slate-400" />
+            <select
+              value={currentCourseId}
+              onChange={(e) => handleFilterChange('courseId', e.target.value)}
+              className="max-w-[220px] rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="ALL">Any Course</option>
+              {courseOptions.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.title}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Sorting Option */}
           <div className="flex items-center gap-1.5">

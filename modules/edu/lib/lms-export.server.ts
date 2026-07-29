@@ -66,6 +66,7 @@ export async function buildLmsMembersXLSX(filters: {
   search?: string
   levelFilter?: string
   courseFilter?: string
+  courseId?: string
   sortBy?: string
 }): Promise<Buffer> {
   const columns: TableColumn[] = [
@@ -91,6 +92,7 @@ export async function buildLmsMembersXLSX(filters: {
       filters.sortBy || 'level_desc',
       page,
       EXPORT_PAGE_SIZE,
+      filters.courseId || '',
     )
     for (const member of result.members) {
       rows.push({

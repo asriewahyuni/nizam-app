@@ -32,6 +32,11 @@ export interface MemberSummary {
   badges: MemberBadge[]
 }
 
+export interface MemberCourseOption {
+  id: string
+  title: string
+}
+
 export interface MemberTimelineEvent {
   id: string
   type: 'JOINED_ORG' | 'COURSE_ENROLLED' | 'COURSE_COMPLETED' | 'BADGE_AWARDED'
@@ -183,13 +188,29 @@ const MEMBERS_SORT_COLUMNS: Record<string, string> = {
   level_desc: 'level_index DESC, joined_at DESC',
 }
 
+export async function getLmsCourseOptions(): Promise<MemberCourseOption[]> {
+  const orgData = await assertOrgAdmin()
+  const orgId = orgData.org.id
+
+  const { rows } = await queryPostgres<{ id: string; title: string }>(
+    `SELECT id::text, title
+     FROM public.learning_courses
+     WHERE org_id = $1::uuid AND is_active = TRUE
+     ORDER BY title ASC`,
+    [orgId]
+  )
+
+  return rows.map((row) => ({ id: row.id, title: row.title }))
+}
+
 export async function getLmsAdminMembers(
   search = '',
   levelFilter = 'ALL',
   courseFilter = 'ALL',
   sortBy = 'level_desc',
   page = 1,
-  pageSize = 25
+  pageSize = 25,
+  courseId = ''
 ): Promise<{
   members: MemberSummary[]
   settings: LmsGamificationSettings
@@ -231,6 +252,18 @@ export async function getLmsAdminMembers(
   if (courseFilter === 'ENROLLED') conditions.push('enrolled_count > 0')
   else if (courseFilter === 'COMPLETED') conditions.push('completed_count > 0')
   else if (courseFilter === 'NOT_ENROLLED') conditions.push('enrolled_count = 0')
+
+  const trimmedCourseId = courseId.trim()
+  if (trimmedCourseId && trimmedCourseId !== 'ALL') {
+    conditions.push(
+      `EXISTS (
+         SELECT 1 FROM public.learning_enrollments e2
+         WHERE e2.org_id = $1::uuid AND e2.user_id = scored.user_id AND e2.course_id = $${paramIdx}::uuid
+       )`
+    )
+    params.push(trimmedCourseId)
+    paramIdx++
+  }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
   const limitIdx = paramIdx
