@@ -557,6 +557,11 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                   <button
                     type="button"
                     onClick={async () => {
+                      const amountLine = profitSharingBaseAmount > 0 ? formatRupiah(profitSharingBaseAmount) : 'Rp 0 (tidak akan diposting)'
+                      const sourceWarning = profitDistribution?.source === 'ORG_NET_PROFIT'
+                        ? '\n\nPERINGATAN: Nominal ini diambil dari LABA BERSIH KUMULATIF organisasi (bukan alokasi manual). Jika ini bukan nominal yang dimaksud, batalkan dan isi dulu kolom "Alokasi Bagi Hasil" di atas.'
+                        : ''
+                      if (!await confirm(`Posting bagi hasil periode ${profitSharingPeriod}?\n\nNominal yang akan diposting: ${amountLine}${sourceWarning}`)) return
                       await runProfitSharingSync(true, profitSharingPeriod)
                       router.refresh()
                     }}

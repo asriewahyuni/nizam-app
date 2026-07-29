@@ -359,7 +359,6 @@ export function MembersAdminClient({
                         ) : (
                           <LogIn className="h-3.5 w-3.5" />
                         )}
-                        Login sebagai Member
                       </button>
                       <button
                         onClick={() => setSelectedMember(member)}

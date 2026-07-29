@@ -40,6 +40,7 @@ export default async function LMSLearnPage(props: {
       return String((media as Record<string, unknown>).type || '') === 'video'
     }) as Record<string, unknown> | undefined
     if (videoMedia) videoUrl = String(videoMedia.url || '') || null
+    if (!videoUrl && lesson.embed_url) videoUrl = lesson.embed_url
   }
 
   return (

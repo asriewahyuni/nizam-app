@@ -28,6 +28,8 @@ export async function getLMSLessonDetails(
       content_md: lesson.contentHtml,
       content_html: lesson.contentHtml,
       media_items: lesson.mediaItems,
+      embed_provider: lesson.embedProvider,
+      embed_url: lesson.embedUrl,
       lesson_type: lesson.lessonType,
       course_title: lesson.courseTitle,
       course_slug: lesson.courseSlug,

@@ -55,8 +55,12 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
     setProfitSharingDraft(Number(profitSharingReferenceGroup.estimatedNetProfit || 0))
   }, [profitSharingReferenceContract, profitSharingReferenceGroup])
 
-  const handleBagiHasil = async (contractId: string, title: string) => {
-    if (!await confirm(`Posting bagi hasil untuk akad "${title}"? Jurnal akan dibuat otomatis:\nDebit 3130 - Bagi Hasil Syirkah\nKredit Bank Operasional (sesuai rekening pembayaran di akad)`)) return
+  const handleBagiHasil = async (contractId: string, title: string, amount: number, source: string | null) => {
+    const amountLine = amount > 0 ? formatRupiah(amount) : 'Rp 0 (tidak akan diposting)'
+    const sourceWarning = source === 'ORG_NET_PROFIT'
+      ? '\n\nPERINGATAN: Nominal ini diambil dari LABA BERSIH KUMULATIF organisasi (bukan alokasi manual). Jika ini bukan nominal yang dimaksud, batalkan dan isi dulu kolom "Alokasi Bagi Hasil" di detail akad.'
+      : ''
+    if (!await confirm(`Posting bagi hasil untuk akad "${title}"?\n\nNominal yang akan diposting: ${amountLine}${sourceWarning}\n\nJurnal akan dibuat otomatis:\nDebit 3130 - Bagi Hasil Syirkah\nKredit Bank Operasional (sesuai rekening pembayaran di akad)`)) return
     setBagiHasilLoadingId(contractId)
     try {
       const result = await syncSyirkahProfitSharingToCore(contractId)
@@ -442,7 +446,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
                           {c.status === 'ACTIVE' && (
                             <button
                               type="button"
-                              onClick={() => handleBagiHasil(c.id, c.title)}
+                              onClick={() => handleBagiHasil(c.id, c.title, Number(memberGroup.estimatedNetProfit || 0), memberGroup.distributionSource || null)}
                               disabled={bagiHasilLoadingId === c.id}
                               title={
                                 memberGroup.distributionStatus === 'ESTIMATED' && Number(memberGroup.estimatedNetProfit) > 0
