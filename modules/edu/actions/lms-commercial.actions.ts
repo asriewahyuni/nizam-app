@@ -309,6 +309,7 @@ export async function createLmsBatch(
     const mode = (formData.get('mode') as string) || 'OFFLINE'
     const description = (formData.get('description') as string)?.trim() || null
     const paymentInstructions = (formData.get('paymentInstructions') as string)?.trim() || null
+    const discussionGroupUrl = (formData.get('discussionGroupUrl') as string)?.trim() || null
     const taxRate = Number(formData.get('taxRate') || 0)
     const isTaxIncluded = formData.get('isTaxIncluded') === 'on'
 
@@ -337,6 +338,7 @@ export async function createLmsBatch(
       mode,
       description,
       payment_instructions: paymentInstructions,
+      discussion_group_url: discussionGroupUrl,
       fee_structure: feeStructure,
       cost_structure: costStructure,
       status,
@@ -368,6 +370,7 @@ export async function updateLmsBatch(formData: FormData) {
   const status = (formData.get('status') as string) || 'OPEN'
   const taxRate = Number(formData.get('taxRate') || 0)
   const isTaxIncluded = formData.get('isTaxIncluded') === 'on'
+  const discussionGroupUrl = (formData.get('discussionGroupUrl') as string)?.trim() || null
 
   if (!batchId || !name) throw new Error('ID dan Nama Batch wajib diisi')
 
@@ -383,6 +386,7 @@ export async function updateLmsBatch(formData: FormData) {
       status,
       tax_rate: taxRate,
       is_tax_included: isTaxIncluded,
+      discussion_group_url: discussionGroupUrl,
       updated_at: new Date().toISOString(),
     })
     .eq('id', batchId)

@@ -33,6 +33,7 @@ type AccessGrantRow = {
   id: string
   starts_at: string
   expires_at: string | null
+  discussion_group_url: string | null
 }
 
 export type LearningAsset = {
@@ -59,6 +60,7 @@ export type AccessibleLesson = {
   isRequired: boolean
   embedProvider: string | null
   embedUrl: string | null
+  discussionGroupUrl: string | null
   assets: LearningAsset[]
 }
 
@@ -116,15 +118,21 @@ async function getStaffOverride(orgId: string, userId: string) {
 
 async function getActiveGrant(orgId: string, userId: string, courseId: string) {
   const result = await queryPostgres<AccessGrantRow>(
-    `SELECT id::text, starts_at::text, expires_at::text
-     FROM public.learning_access_grants
-     WHERE org_id = $1::uuid
-       AND user_id = $2::uuid
-       AND course_id = $3::uuid
-       AND status = 'ACTIVE'
-       AND starts_at <= NOW()
-       AND (expires_at IS NULL OR expires_at > NOW())
-     ORDER BY expires_at DESC NULLS FIRST, created_at DESC
+    `SELECT
+       grant_row.id::text,
+       grant_row.starts_at::text,
+       grant_row.expires_at::text,
+       batch.discussion_group_url
+     FROM public.learning_access_grants grant_row
+     LEFT JOIN public.lms_course_batches batch
+       ON batch.id = grant_row.batch_id
+     WHERE grant_row.org_id = $1::uuid
+       AND grant_row.user_id = $2::uuid
+       AND grant_row.course_id = $3::uuid
+       AND grant_row.status = 'ACTIVE'
+       AND grant_row.starts_at <= NOW()
+       AND (grant_row.expires_at IS NULL OR grant_row.expires_at > NOW())
+     ORDER BY grant_row.expires_at DESC NULLS FIRST, grant_row.created_at DESC
      LIMIT 1`,
     [orgId, userId, courseId],
   )
@@ -332,6 +340,7 @@ export async function resolveLessonAccess(input: {
         isRequired: row.is_required,
         embedProvider: row.embed_provider,
         embedUrl: row.embed_url,
+        discussionGroupUrl: grant?.discussion_group_url || null,
         assets,
       },
     }

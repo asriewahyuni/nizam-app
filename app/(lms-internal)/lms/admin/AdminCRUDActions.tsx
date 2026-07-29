@@ -35,6 +35,7 @@ function EditBatchModal({
   const [endDate, setEndDate] = useState(batch.end_date ? String(batch.end_date).slice(0, 10) : '')
   const [description, setDescription] = useState(batch.description || '')
   const [paymentInstructions, setPaymentInstructions] = useState(batch.payment_instructions || '')
+  const [discussionGroupUrl, setDiscussionGroupUrl] = useState(batch.discussion_group_url || '')
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -51,6 +52,7 @@ function EditBatchModal({
     fd.set('mode', mode)
     fd.set('description', description)
     fd.set('paymentInstructions', paymentInstructions)
+    fd.set('discussionGroupUrl', discussionGroupUrl.trim())
     if (startDate) fd.set('startDate', startDate)
     if (endDate) fd.set('endDate', endDate)
 
@@ -130,6 +132,13 @@ function EditBatchModal({
             <textarea rows={3} value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)}
               placeholder={'Transfer ke BCA 1234567890 a.n. PT Contoh\nKonfirmasi via WhatsApp ke 08xx-xxxx-xxxx'}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500">Link Grup Diskusi (WhatsApp/Telegram)</label>
+            <input type="url" value={discussionGroupUrl} onChange={(e) => setDiscussionGroupUrl(e.target.value)}
+              placeholder="https://chat.whatsapp.com/..."
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+            <p className="mt-1 text-[11px] text-slate-400">Ditampilkan ke peserta angkatan ini di tab Diskusi halaman materi.</p>
           </div>
           {error && <p className="text-xs font-semibold text-rose-500 bg-rose-50 rounded-xl px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-2">

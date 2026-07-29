@@ -108,6 +108,13 @@ export default function CreateBatchForm({ courses }: { courses: Course[] }) {
         <textarea name="paymentInstructions" rows={2} placeholder="Transfer ke BCA 123456 a.n. PT Contoh..." className={inputCls + ' resize-none'} />
       </div>
 
+      {/* Link Grup Diskusi */}
+      <div>
+        <label className={labelCls}>Link Grup Diskusi <span className="font-normal text-slate-400">(opsional)</span></label>
+        <input type="url" name="discussionGroupUrl" placeholder="https://chat.whatsapp.com/..." className={inputCls} />
+        <p className="mt-1 text-[11px] text-slate-400">Ditampilkan ke peserta angkatan ini di tab Diskusi halaman materi.</p>
+      </div>
+
       {/* Fee & Cost Structure */}
       <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
         <BatchStructureBuilder />

@@ -30,6 +30,7 @@ export async function getLMSLessonDetails(
       media_items: lesson.mediaItems,
       embed_provider: lesson.embedProvider,
       embed_url: lesson.embedUrl,
+      discussion_group_url: lesson.discussionGroupUrl,
       lesson_type: lesson.lessonType,
       course_title: lesson.courseTitle,
       course_slug: lesson.courseSlug,

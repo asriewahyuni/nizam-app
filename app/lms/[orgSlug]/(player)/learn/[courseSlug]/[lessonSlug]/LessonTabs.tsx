@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ClipboardCheck, Download, ExternalLink, FileText, MessageCircle } from 'lucide-react'
+import { ClipboardCheck, Download, ExternalLink, FileText, MessageCircle, Link2 } from 'lucide-react'
 import type { LessonAssessmentOverview } from '@/modules/lms/actions/assessment.actions'
 import MarkCompleteButton from './MarkCompleteButton'
 import AssessmentPanel from './AssessmentPanel'
@@ -24,6 +24,7 @@ type Lesson = {
   content_md?: string | null
   is_preview?: boolean
   assets?: LessonAsset[]
+  discussion_group_url?: string | null
 }
 
 export default function LessonTabs({
@@ -142,10 +143,28 @@ export default function LessonTabs({
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-7 text-center">
             <MessageCircle aria-hidden="true" className="mx-auto text-emerald-700" size={32} />
             <h2 className="mt-4 text-lg font-bold text-slate-800">Ruang diskusi course</h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-              Diskusi internal dan tautan grup resmi dikelola per course dan angkatan.
-              Gunakan panel diskusi yang diberikan tutor untuk menjaga percakapan tetap aman.
-            </p>
+            {lesson.discussion_group_url ? (
+              <>
+                <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                  Diskusi angkatan ini dikelola lewat grup resmi berikut. Gunakan panel
+                  diskusi yang diberikan tutor untuk menjaga percakapan tetap aman.
+                </p>
+                <a
+                  href={lesson.discussion_group_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-bold text-white shadow-sm transition-colors duration-200 hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                >
+                  <Link2 aria-hidden="true" size={17} />
+                  Buka grup diskusi
+                </a>
+              </>
+            ) : (
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                Diskusi internal dan tautan grup resmi dikelola per course dan angkatan.
+                Gunakan panel diskusi yang diberikan tutor untuk menjaga percakapan tetap aman.
+              </p>
+            )}
           </div>
         )}
       </div>
