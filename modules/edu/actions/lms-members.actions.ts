@@ -258,7 +258,7 @@ export async function getLmsAdminMembers(
     conditions.push(
       `EXISTS (
          SELECT 1 FROM public.learning_enrollments e2
-         WHERE e2.org_id = $1::uuid AND e2.user_id = scored.user_id AND e2.course_id = $${paramIdx}::uuid
+         WHERE e2.org_id = $1::uuid AND e2.user_id::text = scored.user_id AND e2.course_id = $${paramIdx}::uuid
        )`
     )
     params.push(trimmedCourseId)
