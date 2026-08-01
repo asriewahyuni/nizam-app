@@ -398,14 +398,7 @@ export default function ReportsClient({
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               {activeTab === 'BS' ? (
                 <div className="flex items-center gap-2 bg-white/10 border border-white/15 px-3 py-2 rounded-xl">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Bandingkan</span>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => updateDates(e.target.value, endDate)}
-                    className="text-xs font-semibold text-white bg-transparent outline-none cursor-pointer [color-scheme:dark]"
-                  />
-                  <ArrowRight size={11} className="text-slate-400 shrink-0" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Per Tanggal</span>
                   <input
                     type="date"
                     value={endDate}

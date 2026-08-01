@@ -1,12 +1,12 @@
 'use server'
 
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { queryPostgres } from '@/lib/db/postgres'
 import { revalidatePath } from 'next/cache'
 import { getDateInTimeZone } from '@/lib/utils'
 import { getProfitLoss } from '@/modules/accounting/actions/reports.actions'
-import { createJournalEntry, postJournalEntry } from '@/modules/accounting/actions/journal.actions'
+import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
 import {
   buildSyirkahDistributionContext,
   resolveSyirkahContractDistribution,
@@ -806,117 +806,6 @@ export async function getSyirkahProfitSharingHistory(
       source: tags.source,
     }
   })
-}
-
-async function syncSyirkahProfitSharingJournalInPlace(
-  supabase: any,
-  params: {
-    orgId: string
-    journal: SyirkahCoreJournalDetail
-    entryDate: string
-    description: string
-    notes: string
-    amount: number
-    debitAccountId: string
-    creditAccountId: string
-  }
-) {
-  const journalStatus = String(params.journal.status || '').trim().toUpperCase()
-  if (journalStatus === 'VOIDED') {
-    return { error: 'Jurnal bagi hasil yang sudah ada berstatus VOIDED. Rekonsiliasi jurnal lama terlebih dahulu sebelum sinkron ulang.' }
-  }
-
-  if (params.journal.lines.length !== 2) {
-    return { error: 'Jurnal bagi hasil yang sudah ada tidak memiliki struktur 2 baris yang bisa diperbarui otomatis.' }
-  }
-
-  const debitLine =
-    params.journal.lines.find((line) => toMoneyNumber(line.debit) > 0.009)
-    || params.journal.lines[0]
-    || null
-  const creditLine =
-    params.journal.lines.find((line) => line.id !== debitLine?.id)
-    || null
-
-  if (!debitLine?.id || !creditLine?.id) {
-    return { error: 'Baris jurnal bagi hasil yang sudah ada tidak lengkap untuk diperbarui otomatis.' }
-  }
-
-  const { error: headerError } = await (supabase as any)
-    .from('journal_entries')
-    .update({
-      entry_date: params.entryDate,
-      description: params.description,
-      notes: params.notes,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', params.journal.id)
-    .eq('org_id', params.orgId)
-    .neq('status', 'VOIDED')
-
-  if (headerError) {
-    return { error: 'Gagal memperbarui header jurnal bagi hasil: ' + headerError.message }
-  }
-
-  const { error: debitLineError } = await (supabase as any)
-    .from('journal_lines')
-    .update({
-      account_id: params.debitAccountId,
-      debit: params.amount,
-      credit: 0,
-      memo: 'Pembebanan bagi hasil syirkah',
-    })
-    .eq('id', debitLine.id)
-    .eq('entry_id', params.journal.id)
-
-  if (debitLineError) {
-    return { error: 'Gagal memperbarui baris debit jurnal bagi hasil: ' + debitLineError.message }
-  }
-
-  const { error: creditLineError } = await (supabase as any)
-    .from('journal_lines')
-    .update({
-      account_id: params.creditAccountId,
-      debit: 0,
-      credit: params.amount,
-      memo: 'Pembayaran bagi hasil syirkah melalui rekening kas/bank',
-    })
-    .eq('id', creditLine.id)
-    .eq('entry_id', params.journal.id)
-
-  if (creditLineError) {
-    return { error: 'Gagal memperbarui baris kredit jurnal bagi hasil: ' + creditLineError.message }
-  }
-
-  // Anti-silo: bank_transactions yang tertaut ke jurnal ini (dibuat saat jurnal pertama kali
-  // dibuat) ikut disinkronkan nominal/tanggalnya, supaya "Mutasi Detail" di Kas & Bank tidak
-  // menampilkan nominal lama saat jurnal periode yang sama diperbarui (mis. alokasi diedit).
-  try {
-    await (supabase as any)
-      .from('bank_transactions')
-      .update({
-        transaction_date: params.entryDate,
-        description: params.description,
-        amount: params.amount,
-      })
-      .eq('journal_entry_id', params.journal.id)
-      .eq('org_id', params.orgId)
-  } catch {
-    // bank_transactions sinkron tidak wajib; jurnal (sumber kebenaran utama) sudah benar
-  }
-
-  if (journalStatus === 'DRAFT') {
-    const postResult = await postJournalEntry(params.journal.id, params.orgId, { skipRevalidate: true })
-    if ((postResult as any).error) {
-      return { error: 'Gagal memposting jurnal bagi hasil yang sudah ada: ' + (postResult as any).error }
-    }
-  }
-
-  return {
-    success: true,
-    entryId: params.journal.id,
-    entryNumber: params.journal.entry_number || null,
-  }
 }
 
 function isSyirkahCoreJournalAligned(
@@ -1869,42 +1758,12 @@ export async function syncSyirkahProfitSharingToCore(
     }
   }
 
-  if (existingJournal?.id) {
-    const syncExistingResult = await syncSyirkahProfitSharingJournalInPlace(supabase, {
-      orgId: normalizedContract.org_id,
-      journal: existingJournal,
-      entryDate,
-      description,
-      notes,
-      amount: distributionAmount,
-      debitAccountId: equityAccount.id,
-      creditAccountId: cashAccount.id,
-    })
-
-    if ('error' in syncExistingResult) {
-      return syncExistingResult
-    }
-
-    const persistResult = await persistProfitSharingLink(existingJournal.id)
-    if ('error' in persistResult) {
-      return { error: 'Gagal menautkan jurnal bagi hasil yang sudah ada: ' + persistResult.error }
-    }
-
-    if (shouldRevalidate) {
-      revalidatePath('/accounting/journal')
-      revalidatePath('/syirkah')
-      revalidatePath(`/syirkah/${contractId}`)
-    }
-
-    return {
-      success: true,
-      entryId: syncExistingResult.entryId,
-      entryNumber: syncExistingResult.entryNumber,
-      amount: distributionAmount,
-      period,
-      message: `Posting bagi hasil syirkah periode ${period} berhasil diperbarui pada jurnal yang sudah ada.`,
-    }
-  }
+  // Kebijakan: setiap posting bagi hasil yang tidak persis sama dengan jurnal yang sudah ada
+  // WAJIB menjadi jurnal baru dengan tanggal & created_at sendiri — tidak boleh menimpa baris
+  // journal_lines yang sudah POSTED (pernah terjadi: dua bagi hasil berbeda di periode yang
+  // sama saling menimpa dan salah satunya hilang tanpa jejak). Kalau sudah ada jurnal untuk
+  // periode ini, reference_id dibuat unik per-posting supaya tidak bentrok dengan yang lama.
+  const newReferenceId = existingJournal?.id ? randomUUID() : periodReferenceId
 
   const buildProfitSharingJournalPayload = (useLegacyReferenceType = false) => ({
     org_id: normalizedContract.org_id,
@@ -1912,7 +1771,7 @@ export async function syncSyirkahProfitSharingToCore(
     entry_date: entryDate,
     description,
     ...(useLegacyReferenceType ? {} : { reference_type: 'SYIRKAH_PROFIT_SHARING' as const }),
-    reference_id: periodReferenceId,
+    reference_id: newReferenceId,
     notes,
     auto_post: true,
     skipRevalidate: options.skipRevalidate,
@@ -1941,45 +1800,13 @@ export async function syncSyirkahProfitSharingToCore(
     createResult = await createJournalEntry(buildProfitSharingJournalPayload(true))
   }
 
+  // Race condition: dua request nyaris bersamaan bisa berebut reference_id yang sama.
+  // Jangan menimpa jurnal yang menang duluan — coba lagi sekali dengan reference_id baru.
   if ((createResult as any).error && isReferenceConstraintError((createResult as any).error)) {
-    cachedExistingJournal = undefined
-    const duplicateJournal = await getExistingProfitSharingJournal()
-    if (duplicateJournal?.id) {
-      const syncExistingResult = await syncSyirkahProfitSharingJournalInPlace(supabase, {
-        orgId: normalizedContract.org_id,
-        journal: duplicateJournal,
-        entryDate,
-        description,
-        notes,
-        amount: distributionAmount,
-        debitAccountId: equityAccount.id,
-        creditAccountId: cashAccount.id,
-      })
-
-      if ('error' in syncExistingResult) {
-        return syncExistingResult
-      }
-
-      const persistResult = await persistProfitSharingLink(duplicateJournal.id)
-      if ('error' in persistResult) {
-        return { error: 'Gagal menautkan jurnal bagi hasil yang sudah ada: ' + persistResult.error }
-      }
-
-      if (shouldRevalidate) {
-        revalidatePath('/accounting/journal')
-        revalidatePath('/syirkah')
-        revalidatePath(`/syirkah/${contractId}`)
-      }
-
-      return {
-        success: true,
-        entryId: syncExistingResult.entryId,
-        entryNumber: syncExistingResult.entryNumber,
-        amount: distributionAmount,
-        period,
-        message: `Posting bagi hasil syirkah periode ${period} memakai jurnal yang sudah ada untuk referensi akad ini.`,
-      }
-    }
+    createResult = await createJournalEntry({
+      ...buildProfitSharingJournalPayload(!hasDedicatedColumns),
+      reference_id: randomUUID(),
+    })
   }
 
   if ((createResult as any).error || !(createResult as any).entryId) {
@@ -2000,39 +1827,10 @@ export async function syncSyirkahProfitSharingToCore(
     return { error: 'Gagal menautkan jurnal bagi hasil ke akad syirkah: ' + persistResult.error }
   }
 
-  if (
-    existingJournal?.id
-    && existingJournal.id !== newEntryId
-  ) {
-    const cleanupPreviousResult = await cleanupSyirkahCoreJournal(supabase, {
-      orgId: normalizedContract.org_id,
-      entryId: existingJournal.id,
-      userId: String(user.id),
-      reason: 'SYNC_SYIRKAH_PROFIT_SHARING_REPLACED',
-    })
-
-    if ('error' in cleanupPreviousResult) {
-      if (hasDedicatedColumns) {
-        await (supabase as any)
-          .from('syirkah_contracts')
-          .update({
-            profit_sharing_journal_entry_id: existingJournal.id,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', normalizedContract.id)
-          .eq('org_id', normalizedContract.org_id)
-      }
-
-      await cleanupSyirkahCoreJournal(supabase, {
-        orgId: normalizedContract.org_id,
-        entryId: newEntryId,
-        userId: String(user.id),
-        reason: 'SYNC_SYIRKAH_PROFIT_SHARING_REVERT',
-      })
-
-      return cleanupPreviousResult
-    }
-  }
+  // Catatan: jurnal bagi hasil periode ini yang sudah ada sebelumnya (jika ada) SENGAJA
+  // tidak disentuh/di-void di sini. Setiap posting adalah transaksi bagi hasil tersendiri
+  // dengan tanggal dan nomor jurnalnya sendiri — kalau ada yang keliru, harus di-void manual
+  // lewat halaman Jurnal dengan alasan yang jelas, bukan otomatis ditimpa/dihapus oleh sync ini.
 
   // Anti-silo: catat ke bank_transactions agar Kas & Bank bisa melacak arus keluar ini.
   // Status RECONCILED agar trigger auto-journal tidak aktif (jurnal sudah dibuat di atas).
