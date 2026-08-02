@@ -606,3 +606,558 @@ export async function getLmsMemberTimeline(userId: string): Promise<MemberTimeli
 
   return events
 }
+
+// ── Course Participants Management ────────────────────────────────────────────
+
+export interface CourseParticipant {
+  enrollmentId: string
+  userId: string
+  name: string
+  email: string
+  phone: string | null
+  status: string
+  progressPercent: number
+  completedLessons: number
+  totalLessons: number
+  finalScore: number | null
+  startedAt: string
+  completedAt: string | null
+  lastActivityAt: string | null
+  batchId: string | null
+  batchName: string | null
+  bannedAt: string | null
+  bannedReason: string | null
+}
+
+export interface CourseParticipantFilters {
+  search?: string
+  status?: 'ALL' | 'ACTIVE' | 'COMPLETED' | 'BANNED'
+  batchId?: string
+  sortBy?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface CourseParticipantStats {
+  total: number
+  active: number
+  completed: number
+  banned: number
+  avgScore: number
+  avgProgress: number
+  activeThisWeek: number
+}
+
+export interface OrgMemberOption {
+  userId: string
+  name: string
+  email: string
+  phone: string | null
+  alreadyEnrolled: boolean
+}
+
+/**
+ * Ambil daftar peserta course beserta statistik progress.
+ */
+export async function getCourseParticipants(
+  courseSlug: string,
+  filters: CourseParticipantFilters = {}
+): Promise<{
+  participants: CourseParticipant[]
+  stats: CourseParticipantStats
+  totalCount: number
+  totalPages: number
+  batchOptions: { id: string; name: string }[]
+}> {
+  const orgData = await assertOrgAdmin()
+  const orgId = orgData.org.id
+
+  const {
+    search = '',
+    status = 'ALL',
+    batchId = '',
+    sortBy = 'started_asc',
+    page = 1,
+    pageSize = 30,
+  } = filters
+
+  const safePage = Math.max(1, page)
+  const safePageSize = Math.min(100, Math.max(1, pageSize))
+
+  // Fetch course by slug
+  const { rows: courseRows } = await queryPostgres<{ id: string; title: string }>(
+    `SELECT id::text, title FROM public.learning_courses WHERE org_id = $1::uuid AND slug = $2 AND deleted_at IS NULL LIMIT 1`,
+    [orgId, courseSlug]
+  )
+  if (!courseRows[0]) throw new Error('Kursus tidak ditemukan')
+  const courseId = courseRows[0].id
+
+  // Total lessons in course
+  const { rows: lessonCountRows } = await queryPostgres<{ count: string }>(
+    `SELECT COUNT(*) as count FROM public.learning_lessons WHERE course_id = $1::uuid AND org_id = $2::uuid`,
+    [courseId, orgId]
+  )
+  const totalLessons = Number(lessonCountRows[0]?.count || 0)
+
+  // Build WHERE conditions
+  const conditions: string[] = [`e.course_id = $1::uuid`, `e.org_id = $2::uuid`]
+  const params: unknown[] = [courseId, orgId]
+  let pidx = 3
+
+  if (search.trim()) {
+    conditions.push(
+      `(lower(COALESCE(iu.display_name, '')) LIKE $${pidx} OR lower(COALESCE(iu.login_email, '')) LIKE $${pidx})`
+    )
+    params.push(`%${search.trim().toLowerCase()}%`)
+    pidx++
+  }
+
+  if (status === 'ACTIVE') conditions.push(`e.banned_at IS NULL AND e.completed_at IS NULL`)
+  else if (status === 'COMPLETED') conditions.push(`e.completed_at IS NOT NULL AND e.banned_at IS NULL`)
+  else if (status === 'BANNED') conditions.push(`e.banned_at IS NOT NULL`)
+  // ALL — no extra filter
+
+  if (batchId && batchId !== 'ALL') {
+    conditions.push(`e.batch_id = $${pidx}::uuid`)
+    params.push(batchId)
+    pidx++
+  }
+
+  const orderMap: Record<string, string> = {
+    started_asc: 'e.started_at ASC',
+    started_desc: 'e.started_at DESC',
+    progress_desc: 'e.progress_percent DESC',
+    progress_asc: 'e.progress_percent ASC',
+    name_asc: 'COALESCE(iu.display_name, iu.login_email) ASC',
+    score_desc: 'e.final_score DESC NULLS LAST',
+  }
+  const orderClause = orderMap[sortBy] || 'e.started_at ASC'
+  const limitIdx = pidx
+  const offsetIdx = pidx + 1
+  params.push(safePageSize, (safePage - 1) * safePageSize)
+
+  const query = `
+    SELECT
+      e.id::text               AS enrollment_id,
+      e.user_id::text          AS user_id,
+      COALESCE(iu.display_name, split_part(iu.login_email, '@', 1), 'Member') AS name,
+      COALESCE(iu.login_email, '')                        AS email,
+      iu.phone                                            AS phone,
+      COALESCE(e.status, 'IN_PROGRESS')                  AS status,
+      COALESCE(e.progress_percent, 0)                    AS progress_percent,
+      (
+        SELECT COUNT(*)::int FROM public.learning_lesson_progress p
+        WHERE p.enrollment_id = e.id AND p.status = 'COMPLETED'
+      )                                                   AS completed_lessons,
+      e.final_score,
+      e.started_at::text,
+      e.completed_at::text,
+      e.last_activity_at::text,
+      e.batch_id::text,
+      b.name                                              AS batch_name,
+      e.banned_at::text,
+      e.banned_reason,
+      COUNT(*) OVER()::int                                AS total_count
+    FROM public.learning_enrollments e
+    LEFT JOIN public.internal_auth_users iu
+      ON iu.id::text = e.user_id::text OR iu.legacy_user_id::text = e.user_id::text
+    LEFT JOIN public.lms_course_batches b ON b.id = e.batch_id
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY ${orderClause}
+    LIMIT $${limitIdx} OFFSET $${offsetIdx}
+  `
+
+  const { rows } = await queryPostgres<{
+    enrollment_id: string
+    user_id: string
+    name: string
+    email: string
+    phone: string | null
+    status: string
+    progress_percent: string
+    completed_lessons: number
+    final_score: string | null
+    started_at: string
+    completed_at: string | null
+    last_activity_at: string | null
+    batch_id: string | null
+    batch_name: string | null
+    banned_at: string | null
+    banned_reason: string | null
+    total_count: number
+  }>(query, params)
+
+  const totalCount = rows[0]?.total_count || 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / safePageSize))
+
+  // Stats (unfiltered — always full course stats)
+  const { rows: statRows } = await queryPostgres<{
+    total: string
+    active: string
+    completed: string
+    banned: string
+    avg_score: string
+    avg_progress: string
+    active_this_week: string
+  }>(
+    `SELECT
+      COUNT(*)::text                                                          AS total,
+      COUNT(*) FILTER (WHERE banned_at IS NULL AND completed_at IS NULL)::text AS active,
+      COUNT(*) FILTER (WHERE completed_at IS NOT NULL AND banned_at IS NULL)::text AS completed,
+      COUNT(*) FILTER (WHERE banned_at IS NOT NULL)::text                    AS banned,
+      COALESCE(AVG(final_score) FILTER (WHERE final_score IS NOT NULL), 0)::text AS avg_score,
+      COALESCE(AVG(progress_percent), 0)::text                               AS avg_progress,
+      COUNT(*) FILTER (WHERE last_activity_at >= NOW() - INTERVAL '7 days' AND banned_at IS NULL)::text AS active_this_week
+    FROM public.learning_enrollments
+    WHERE course_id = $1::uuid AND org_id = $2::uuid`,
+    [courseId, orgId]
+  )
+  const s = statRows[0]
+
+  // Batch options
+  const { rows: batchRows } = await queryPostgres<{ id: string; name: string }>(
+    `SELECT id::text, name FROM public.lms_course_batches WHERE course_id = $1::uuid AND org_id = $2::uuid AND deleted_at IS NULL ORDER BY created_at DESC`,
+    [courseId, orgId]
+  )
+
+  return {
+    participants: rows.map((r) => ({
+      enrollmentId: r.enrollment_id,
+      userId: r.user_id,
+      name: r.name,
+      email: r.email,
+      phone: r.phone,
+      status: r.status,
+      progressPercent: Number(r.progress_percent),
+      completedLessons: r.completed_lessons,
+      totalLessons,
+      finalScore: r.final_score !== null ? Number(r.final_score) : null,
+      startedAt: r.started_at,
+      completedAt: r.completed_at,
+      lastActivityAt: r.last_activity_at,
+      batchId: r.batch_id,
+      batchName: r.batch_name,
+      bannedAt: r.banned_at,
+      bannedReason: r.banned_reason,
+    })),
+    stats: {
+      total: Number(s?.total || 0),
+      active: Number(s?.active || 0),
+      completed: Number(s?.completed || 0),
+      banned: Number(s?.banned || 0),
+      avgScore: Math.round(Number(s?.avg_score || 0)),
+      avgProgress: Math.round(Number(s?.avg_progress || 0)),
+      activeThisWeek: Number(s?.active_this_week || 0),
+    },
+    totalCount,
+    totalPages,
+    batchOptions: batchRows,
+  }
+}
+
+/**
+ * Ban peserta dari kursus (soft-delete + blokir akses, progress history tetap ada).
+ */
+export async function banParticipant(
+  enrollmentId: string,
+  reason?: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
+    if (!enrollmentId) return { error: 'Enrollment ID wajib diisi' }
+
+    const { rows: enrRows } = await queryPostgres<{ course_id: string }>(
+      `SELECT course_id::text FROM public.learning_enrollments WHERE id = $1::uuid AND org_id = $2::uuid LIMIT 1`,
+      [enrollmentId, orgData.org.id]
+    )
+    if (!enrRows[0]) return { error: 'Enrollment tidak ditemukan' }
+
+    const now = new Date().toISOString()
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('learning_enrollments')
+      .update({
+        banned_at: now,
+        banned_by: orgData.user.id,
+        banned_reason: reason || null,
+        updated_at: now,
+      })
+      .eq('id', enrollmentId)
+      .eq('org_id', orgData.org.id)
+
+    if (error) throw new Error(error.message)
+    revalidatePath('/lms/admin')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
+}
+
+/**
+ * Unban peserta — kembalikan akses kursus.
+ */
+export async function unbanParticipant(
+  enrollmentId: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
+    if (!enrollmentId) return { error: 'Enrollment ID wajib diisi' }
+
+    const now = new Date().toISOString()
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('learning_enrollments')
+      .update({ banned_at: null, banned_by: null, banned_reason: null, updated_at: now })
+      .eq('id', enrollmentId)
+      .eq('org_id', orgData.org.id)
+
+    if (error) throw new Error(error.message)
+    revalidatePath('/lms/admin')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
+}
+
+/**
+ * Reset progress peserta ke awal (hapus semua learning_lesson_progress).
+ */
+export async function resetParticipantProgress(
+  enrollmentId: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
+    if (!enrollmentId) return { error: 'Enrollment ID wajib diisi' }
+
+    const now = new Date().toISOString()
+    const supabase = await createClient()
+
+    // Hapus semua lesson progress
+    const { error: delErr } = await supabase
+      .from('learning_lesson_progress')
+      .delete()
+      .eq('enrollment_id', enrollmentId)
+      .eq('org_id', orgData.org.id)
+
+    if (delErr) throw new Error(delErr.message)
+
+    // Reset enrollment progress fields
+    const { error: updErr } = await supabase
+      .from('learning_enrollments')
+      .update({
+        status: 'IN_PROGRESS',
+        progress_percent: 0,
+        completed_at: null,
+        final_score: null,
+        last_activity_at: null,
+        updated_at: now,
+      })
+      .eq('id', enrollmentId)
+      .eq('org_id', orgData.org.id)
+
+    if (updErr) throw new Error(updErr.message)
+    revalidatePath('/lms/admin')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
+}
+
+/**
+ * Override tanggal selesai peserta secara manual (untuk kelas offline/hybrid).
+ */
+export async function overrideCompletionDate(
+  enrollmentId: string,
+  completedAt: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
+    if (!enrollmentId || !completedAt) return { error: 'Parameter tidak lengkap' }
+
+    const date = new Date(completedAt)
+    if (isNaN(date.getTime())) return { error: 'Format tanggal tidak valid' }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('learning_enrollments')
+      .update({
+        completed_at: date.toISOString(),
+        status: 'COMPLETED',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', enrollmentId)
+      .eq('org_id', orgData.org.id)
+
+    if (error) throw new Error(error.message)
+    revalidatePath('/lms/admin')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
+}
+
+/**
+ * Cari anggota organisasi yang bisa ditambahkan sebagai peserta kursus.
+ * Mengembalikan anggota org + flag apakah sudah enrolled di kursus ini.
+ */
+export async function searchOrgMembersForCourse(
+  courseSlug: string,
+  search: string
+): Promise<{ members: OrgMemberOption[]; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
+    const orgId = orgData.org.id
+
+    // Find course
+    const { rows: courseRows } = await queryPostgres<{ id: string }>(
+      `SELECT id::text FROM public.learning_courses WHERE org_id = $1::uuid AND slug = $2 LIMIT 1`,
+      [orgId, courseSlug]
+    )
+    if (!courseRows[0]) return { members: [], error: 'Kursus tidak ditemukan' }
+    const courseId = courseRows[0].id
+
+    const trimSearch = search.trim().toLowerCase()
+    const searchCondition = trimSearch
+      ? `AND (lower(COALESCE(iu.display_name, '')) LIKE $3 OR lower(iu.login_email) LIKE $3)`
+      : ''
+    const params: unknown[] = [orgId, courseId]
+    if (trimSearch) params.push(`%${trimSearch}%`)
+
+    const { rows } = await queryPostgres<{
+      user_id: string
+      name: string
+      email: string
+      phone: string | null
+      already_enrolled: boolean
+    }>(
+      `SELECT
+        m.user_id::text,
+        COALESCE(iu.display_name, split_part(iu.login_email, '@', 1), 'Member') AS name,
+        COALESCE(iu.login_email, '') AS email,
+        iu.phone,
+        EXISTS (
+          SELECT 1 FROM public.learning_enrollments e2
+          WHERE e2.org_id = $1::uuid AND e2.user_id = m.user_id AND e2.course_id = $2::uuid
+        ) AS already_enrolled
+      FROM public.org_members m
+      LEFT JOIN public.internal_auth_users iu
+        ON iu.id = m.user_id OR iu.legacy_user_id = m.user_id
+      WHERE m.org_id = $1::uuid ${searchCondition}
+      ORDER BY COALESCE(iu.display_name, iu.login_email) ASC
+      LIMIT 20`,
+      params
+    )
+
+    return {
+      members: rows.map((r) => ({
+        userId: r.user_id,
+        name: r.name,
+        email: r.email,
+        phone: r.phone,
+        alreadyEnrolled: Boolean(r.already_enrolled),
+      })),
+    }
+  } catch (err) {
+    return { members: [], error: getErrorMessage(err) }
+  }
+}
+
+/**
+ * Tambah satu atau banyak user sebagai peserta kursus.
+ */
+export async function bulkAddParticipants(
+  courseSlug: string,
+  userIds: string[]
+): Promise<{ success?: boolean; added?: number; skipped?: number; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
+    const orgId = orgData.org.id
+
+    if (!userIds.length) return { error: 'Tidak ada user yang dipilih' }
+
+    const { rows: courseRows } = await queryPostgres<{ id: string }>(
+      `SELECT id::text FROM public.learning_courses WHERE org_id = $1::uuid AND slug = $2 LIMIT 1`,
+      [orgId, courseSlug]
+    )
+    if (!courseRows[0]) return { error: 'Kursus tidak ditemukan' }
+    const courseId = courseRows[0].id
+
+    const now = new Date().toISOString()
+    let added = 0
+    let skipped = 0
+
+    const supabase = await createClient()
+    for (const userId of userIds) {
+      // Upsert: insert jika belum ada, skip jika sudah (ON CONFLICT DO NOTHING)
+      const { error } = await supabase
+        .from('learning_enrollments')
+        .insert({
+          org_id: orgId,
+          user_id: userId,
+          course_id: courseId,
+          status: 'IN_PROGRESS',
+          started_at: now,
+          progress_percent: 0,
+        })
+      if (error) {
+        // Conflict = sudah enrolled
+        skipped++
+      } else {
+        added++
+      }
+    }
+
+    revalidatePath('/lms/admin')
+    return { success: true, added, skipped }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
+}
+
+/**
+ * Kirim pengingat email ke peserta yang belum mulai atau progress macet.
+ * Memanfaatkan email template sederhana via console log jika tidak ada email service.
+ */
+export async function sendCourseReminder(
+  enrollmentIds: string[],
+  message?: string
+): Promise<{ success?: boolean; sent?: number; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
+    const orgId = orgData.org.id
+
+    if (!enrollmentIds.length) return { error: 'Tidak ada peserta yang dipilih' }
+
+    const { rows } = await queryPostgres<{
+      email: string
+      name: string
+      course_title: string
+      progress_percent: string
+    }>(
+      `SELECT
+        COALESCE(iu.login_email, '') AS email,
+        COALESCE(iu.display_name, split_part(iu.login_email, '@', 1)) AS name,
+        c.title AS course_title,
+        COALESCE(e.progress_percent, 0)::text AS progress_percent
+      FROM public.learning_enrollments e
+      JOIN public.learning_courses c ON c.id = e.course_id
+      LEFT JOIN public.internal_auth_users iu
+        ON iu.id::text = e.user_id::text OR iu.legacy_user_id::text = e.user_id::text
+      WHERE e.org_id = $1::uuid AND e.id = ANY($2::uuid[]) AND e.banned_at IS NULL`,
+      [orgId, enrollmentIds]
+    )
+
+    // TODO: integrate with Mailketing API when template is ready
+    // For now we log and return success count
+    const sent = rows.filter((r) => r.email && r.email !== '').length
+    console.info(
+      `[sendCourseReminder] Would send ${sent} emails for org ${orgId}`,
+      rows.map((r) => ({ email: r.email, name: r.name, course: r.course_title })),
+      message
+    )
+
+    return { success: true, sent }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
+}

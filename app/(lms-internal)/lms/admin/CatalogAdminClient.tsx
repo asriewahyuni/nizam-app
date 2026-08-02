@@ -410,10 +410,14 @@ export function CatalogAdminClient({ courses, totalCount, activeCount }: Catalog
                     {c.relatedProducts}
                   </td>
                   <td className="whitespace-nowrap px-4 py-4 text-center">
-                    <span className="inline-flex items-center gap-1 text-sm font-semibold text-slate-700">
-                      <Users className="h-3.5 w-3.5 text-slate-400" />
+                    <Link
+                      href={`/lms/admin/course/${c.slug}/participants`}
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-indigo-600 transition-colors cursor-pointer group"
+                      title="Kelola peserta"
+                    >
+                      <Users className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
                       {c.enrolled}
-                    </span>
+                    </Link>
                   </td>
                   <td className="whitespace-nowrap px-4 py-4 text-center">
                     <StatusPill isActive={c.isActive} isArchived={c.isArchived} />

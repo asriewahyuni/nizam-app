@@ -13,6 +13,7 @@ import {
   buildLmsMembersXLSX,
   buildLmsProductsXLSX,
   buildLmsSalesXLSX,
+  buildLmsCourseParticipantsXLSX,
 } from '@/modules/edu/lib/lms-export.server'
 
 export const runtime = 'nodejs'
@@ -76,6 +77,16 @@ export async function GET(request: NextRequest) {
         buffer = await buildLmsAffiliatePayoutsXLSX(orgId)
         filename = `Pencairan-Afiliasi_${today}.xlsx`
         break
+      case 'participants': {
+        const courseSlug = searchParams.get('courseSlug') || ''
+        if (!courseSlug) {
+          return NextResponse.json({ error: 'Parameter courseSlug wajib diisi' }, { status: 400 })
+        }
+        const statusFilter = searchParams.get('status') || 'ALL'
+        buffer = await buildLmsCourseParticipantsXLSX(courseSlug, statusFilter)
+        filename = `Peserta_${courseSlug}_${today}.xlsx`
+        break
+      }
       default:
         return NextResponse.json(
           { error: 'Tipe export tidak valid. Gunakan: courses | members | sales | products | coupons | affiliates | payouts' },
