@@ -31,14 +31,21 @@ async function assertOrgAdmin() {
 
 // ── Courses (Program) ─────────────────────────────────────────────────────────
 
-export async function getLmsCourses(orgId: string) {
+export async function getLmsCourses(orgId: string, includeArchived = false) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from('learning_courses')
     .select('*')
     .eq('org_id', orgId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
+
+  // Jika tidak include archived, exclude course yang sudah diarsipkan
+  if (!includeArchived) {
+    query = query.is('archived_at', null)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('[getLmsCourses]', error)
@@ -161,6 +168,50 @@ export async function deleteLmsCourse(courseId: string) {
 
   revalidatePath('/lms/admin')
   revalidatePath('/lms')
+}
+
+/**
+ * Set status kursus: 'published' (aktif), 'draft' (tidak aktif), atau 'archived' (disembunyikan dari daftar).
+ * Kursus yang diarsipkan tidak muncul di katalog publik maupun admin default.
+ */
+export async function setLmsCourseStatus(
+  courseId: string,
+  status: 'published' | 'draft' | 'archived'
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
+    if (!courseId) return { error: 'Course ID wajib diisi' }
+
+    const now = new Date().toISOString()
+    let patch: Record<string, unknown>
+
+    if (status === 'published') {
+      patch = { is_active: true, archived_at: null, updated_at: now }
+    } else if (status === 'draft') {
+      patch = { is_active: false, archived_at: null, updated_at: now }
+    } else {
+      // archived — nonaktifkan dan set archived_at
+      patch = { is_active: false, archived_at: now, updated_at: now }
+    }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('learning_courses')
+      .update(patch)
+      .eq('id', courseId)
+      .eq('org_id', orgData.org.id)
+
+    if (error) {
+      console.error('[setLmsCourseStatus]', JSON.stringify(error))
+      return { error: getErrorMessage(error) }
+    }
+
+    revalidatePath('/lms/admin')
+    revalidatePath('/lms')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
 }
 
 export async function getLmsCourseAnalytics(courseId: string) {
