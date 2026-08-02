@@ -22,12 +22,14 @@ import {
   MoreVertical,
   CheckCircle2,
   Loader2,
+  ExternalLink,
 } from 'lucide-react'
 import { setLmsCourseStatus } from '@/modules/edu/actions/lms-commercial.actions'
 
 interface CourseCatalogRow {
   id: string
   slug: string
+  orgSlug?: string
   title: string
   isActive: boolean
   isArchived: boolean
@@ -116,7 +118,19 @@ function StatusActionMenu({ course }: { course: CourseCatalogRow }) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg ring-1 ring-slate-900/5">
+          <div className="absolute right-0 top-8 z-20 min-w-[180px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg ring-1 ring-slate-900/5">
+            {/* Buka di Portal Member */}
+            <Link
+              href={`/lms/${course.orgSlug || 'coreisec'}/course/${course.slug}`}
+              target="_blank"
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Buka di Portal Member
+            </Link>
+
+            <div className="my-1 border-t border-slate-100" />
+
             {/* Published */}
             <button
               onClick={() => handleAction('published')}
@@ -424,6 +438,15 @@ export function CatalogAdminClient({ courses, totalCount, activeCount }: Catalog
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1.5">
+                      <Link
+                        href={`/lms/${c.orgSlug || 'coreisec'}/course/${c.slug}`}
+                        target="_blank"
+                        title="Buka di Portal Member (As Admin)"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 focus:outline-none"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Portal Member
+                      </Link>
                       {!c.isArchived && (
                         <Link
                           href={`/lms/admin/course/${c.slug}`}

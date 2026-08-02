@@ -100,10 +100,11 @@ export default async function AdminManageCoursePage(props: {
               
               <div className="mt-5 flex flex-col gap-2">
                 <Link
-                  href={`/lms/course/${course.slug}`}
-                  className="w-full text-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm transition-all hover:bg-slate-50"
+                  href={`/lms/${orgData.org.slug}/course/${course.slug}`}
+                  target="_blank"
+                  className="w-full text-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-indigo-600"
                 >
-                  Preview Publik
+                  Buka di Portal Member (As Admin)
                 </Link>
                 <button className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition-colors">
                   Publish
@@ -189,11 +190,11 @@ export default async function AdminManageCoursePage(props: {
                         </Link>
                         <LessonActions lessonId={l.id} courseId={course.id} />
                         <Link
-                          href={`/lms/course/${course.slug}/lesson/${l.slug}`}
+                          href={`/lms/${orgData.org.slug}/learn/${course.slug}/${l.slug}`}
                           target="_blank"
-                          className="ml-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+                          className="ml-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 shadow-sm transition-all"
                         >
-                          Preview
+                          Portal Member
                         </Link>
                       </div>
                     </div>

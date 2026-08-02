@@ -38,6 +38,11 @@ export default async function LMSCourseDetailPage({
             <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-widest rounded">
               {course.level_code || 'ALL LEVEL'}
             </span>
+            {access.isStaffOverride && (course.is_active === false || course.status === 'DRAFT') && (
+              <span className="px-2 py-0.5 bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold uppercase tracking-wider rounded">
+                Draft (Admin Preview)
+              </span>
+            )}
           </div>
           <h1 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">{course.title}</h1>
           <p className="text-xs text-slate-600 leading-relaxed mb-6">

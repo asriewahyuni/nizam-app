@@ -34,12 +34,14 @@ export default async function LMSLearnPage(props: {
 
   // Extract video URL if any
   let videoUrl: string | null = null
-  if (lesson.lesson_type === 'VIDEO' && Array.isArray(lesson.media_items)) {
-    const videoMedia = lesson.media_items.find((media: unknown) => {
-      if (!media || typeof media !== 'object') return false
-      return String((media as Record<string, unknown>).type || '') === 'video'
-    }) as Record<string, unknown> | undefined
-    if (videoMedia) videoUrl = String(videoMedia.url || '') || null
+  if (lesson.lesson_type === 'VIDEO') {
+    if (Array.isArray(lesson.media_items)) {
+      const videoMedia = lesson.media_items.find((media: unknown) => {
+        if (!media || typeof media !== 'object') return false
+        return String((media as Record<string, unknown>).type || '') === 'video'
+      }) as Record<string, unknown> | undefined
+      if (videoMedia) videoUrl = String(videoMedia.url || '') || null
+    }
     if (!videoUrl && lesson.embed_url) videoUrl = lesson.embed_url
   }
 

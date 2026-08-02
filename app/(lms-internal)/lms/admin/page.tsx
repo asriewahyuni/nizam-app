@@ -53,6 +53,7 @@ export default async function CatalogAdminPage() {
     return {
       id: cid,
       slug: c.slug as string,
+      orgSlug: orgData.org.slug,
       title: c.title as string,
       isActive: Boolean(c.is_active),
       isArchived: Boolean(c.archived_at),
