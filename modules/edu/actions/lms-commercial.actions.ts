@@ -737,15 +737,26 @@ export async function updateLmsLesson(
     }
     mediaItems = [...mediaItems, ...parsedAttachments]
 
+    const embedProvider =
+      lessonType === 'VIDEO' && videoUrl
+        ? videoUrl.includes('youtu')
+          ? 'youtube'
+          : videoUrl.includes('vimeo')
+          ? 'vimeo'
+          : null
+        : null
+
     const { error } = await supabase
       .from('learning_lessons')
       .update({
         title,
-        content_md:  contentMd,
-        lesson_type: lessonType,
-        is_required: isRequired,
-        media_items: mediaItems,
-        updated_at:  new Date().toISOString(),
+        content_md:     contentMd,
+        lesson_type:    lessonType,
+        is_required:    isRequired,
+        media_items:    mediaItems,
+        embed_url:      lessonType === 'VIDEO' ? videoUrl : null,
+        embed_provider: embedProvider,
+        updated_at:     new Date().toISOString(),
       })
       .eq('id', lessonId)
       .eq('org_id', orgData.org.id)

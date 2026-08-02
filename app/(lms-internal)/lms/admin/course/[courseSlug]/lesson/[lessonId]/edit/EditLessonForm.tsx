@@ -14,9 +14,9 @@ export default function EditLessonForm({ lesson, courseSlug }: { lesson: any, co
   const [state, action, isPending] = useActionState(updateLmsLesson, {})
   const [lessonType, setLessonType] = useState(lesson.lesson_type || 'TEXT')
   
-  // Extract existing video url from media_items if it exists
+  // Extract existing video url from media_items if it exists, fallback to embed_url from migration
   const existingVideo = (lesson.media_items || []).find((m: any) => m.type === 'video')
-  const defaultVideoUrl = existingVideo ? existingVideo.url : ''
+  const defaultVideoUrl = existingVideo ? existingVideo.url : (lesson.embed_url || '')
   const [videoUrl, setVideoUrl] = useState(defaultVideoUrl)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
