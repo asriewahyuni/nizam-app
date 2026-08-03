@@ -620,16 +620,20 @@ export async function deleteLmsSession(sessionId: string) {
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 export async function getLmsLessonsByCourseId(orgId: string, courseId: string) {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('learning_lessons')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('course_id', courseId)
-    .order('sort_order', { ascending: true })
-
-  if (error) return []
-  return data
+  try {
+    const res = await queryPostgres(
+      `SELECT l.*
+       FROM learning_lessons l
+       LEFT JOIN learning_course_sections s ON s.id = l.section_id
+       WHERE l.org_id = $1 AND l.course_id = $2
+       ORDER BY COALESCE(s.sort_order, 0) ASC, l.sort_order ASC, l.created_at ASC`,
+      [orgId, courseId]
+    )
+    return res.rows
+  } catch (err) {
+    console.error('getLmsLessonsByCourseId error:', err)
+    return []
+  }
 }
 
 // ── Lesson CRUD ───────────────────────────────────────────────────────────────
