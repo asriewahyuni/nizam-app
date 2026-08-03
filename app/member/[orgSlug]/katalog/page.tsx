@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { ArrowRight, BookOpen, Clock3, Layers3 } from 'lucide-react'
 import { getLMSCourses } from '@/modules/lms/actions/course.actions'
 import { getPortalTenant } from '@/modules/member/lib/portal.server'
-import { formatRupiah } from '@/lib/utils'
+import { formatRupiah, stripHtml } from '@/lib/utils'
 
 export default async function MemberCatalogPage({
   params,
@@ -57,7 +57,7 @@ export default async function MemberCatalogPage({
                 </div>
                 <h2 className="mt-3 line-clamp-2 text-base font-bold">{course.title}</h2>
                 <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">
-                  {course.description || 'Detail program akan disampaikan pada halaman kelas.'}
+                  {stripHtml(course.description) || 'Detail program akan disampaikan pada halaman kelas.'}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3.5 text-xs text-slate-600">
                   <span className="flex items-center gap-1.5">

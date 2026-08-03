@@ -44,10 +44,16 @@ export default async function LMSCourseDetailPage({
               </span>
             )}
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-3 tracking-tight">{course.title}</h1>
-          <p className="text-xs text-slate-600 leading-relaxed mb-6">
-            {course.description || 'Tidak ada deskripsi kursus.'}
-          </p>
+          {course.description ? (
+            <div
+              className="prose prose-slate max-w-none text-xs sm:text-sm text-slate-600 leading-relaxed mb-6 prose-img:rounded-xl prose-img:max-h-[400px] prose-img:object-cover prose-a:text-indigo-600 hover:prose-a:text-indigo-500 prose-headings:text-slate-900 prose-p:my-2"
+              dangerouslySetInnerHTML={{ __html: course.description }}
+            />
+          ) : (
+            <p className="text-xs text-slate-600 leading-relaxed mb-6">
+              Tidak ada deskripsi kursus.
+            </p>
+          )}
           
           <div>
             {access.allowed ? (

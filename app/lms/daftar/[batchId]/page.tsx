@@ -74,9 +74,10 @@ export default async function PublicRegistrationPage({
                 {batch.name}
               </h1>
               {course?.description && (
-                <p className="mt-3 text-base text-slate-600 leading-relaxed">
-                  {course.description}
-                </p>
+                <div
+                  className="prose prose-slate mt-3 max-w-none text-base text-slate-600 leading-relaxed prose-img:rounded-xl prose-img:max-h-[380px] prose-img:object-cover prose-a:text-indigo-600 hover:prose-a:text-indigo-500"
+                  dangerouslySetInnerHTML={{ __html: course.description }}
+                />
               )}
             </div>
 

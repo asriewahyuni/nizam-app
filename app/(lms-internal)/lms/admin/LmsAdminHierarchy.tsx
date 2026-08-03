@@ -7,7 +7,7 @@ import { createLmsBatch, createLmsSession } from '@/modules/edu/actions/lms-comm
 import { CourseActions, BatchActions, SessionActions } from './AdminCRUDActions'
 import SessionQRClient from './SessionQRClient'
 import CreateCourseForm from './CreateCourseForm'
-import { formatRupiah } from '@/lib/utils'
+import { formatRupiah, stripHtml } from '@/lib/utils'
 
 type Course = {
   id: string
@@ -316,7 +316,7 @@ function CourseSection({
           </div>
           <h3 className="mt-2 text-xl font-semibold text-slate-900">{course.title}</h3>
           {course.description && (
-            <p className="mt-1 text-sm font-medium text-slate-500 leading-relaxed line-clamp-2">{course.description}</p>
+            <p className="mt-1 text-sm font-medium text-slate-500 leading-relaxed line-clamp-2">{stripHtml(course.description)}</p>
           )}
         </div>
 

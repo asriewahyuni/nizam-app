@@ -109,9 +109,16 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
             <h1 className="mb-3 text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
               {course.title}
             </h1>
-            <p className="mb-6 text-xs leading-relaxed text-slate-600 sm:text-sm">
-              {course.description || 'Tidak ada deskripsi kursus.'}
-            </p>
+            {course.description ? (
+              <div
+                className="prose prose-slate mb-6 max-w-none text-xs leading-relaxed text-slate-600 sm:text-sm prose-img:rounded-xl prose-img:max-h-[400px] prose-img:object-cover prose-a:text-indigo-600 hover:prose-a:text-indigo-500 prose-headings:text-slate-900 prose-p:my-2"
+                dangerouslySetInnerHTML={{ __html: course.description }}
+              />
+            ) : (
+              <p className="mb-6 text-xs leading-relaxed text-slate-600 sm:text-sm">
+                Tidak ada deskripsi kursus.
+              </p>
+            )}
 
             {/* CTA Utama & Progress */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
