@@ -183,17 +183,40 @@ export default function EditLessonForm({ lesson, courseSlug }: { lesson: any, co
         {attachments.length > 0 && (
           <div className="mb-3 space-y-2">
             {attachments.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs font-semibold text-slate-700">
-                <span className="truncate max-w-[280px]">
-                  {item.type === 'attachment' ? '📎' : '🔗'} {item.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
-                  className="text-red-500 hover:text-red-700 font-bold ml-2"
-                >
-                  Remove
-                </button>
+              <div
+                key={idx}
+                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-700"
+              >
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="shrink-0">{item.type === 'attachment' ? '📎' : '🔗'}</span>
+                  <span className="font-bold text-slate-900 truncate">{item.name}</span>
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate text-indigo-600 underline hover:text-indigo-800 ml-1"
+                    title={item.url}
+                  >
+                    ({item.url})
+                  </a>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-indigo-600 hover:text-indigo-800"
+                  >
+                    Buka Link
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
+                    className="font-bold text-red-600 hover:text-red-800"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>

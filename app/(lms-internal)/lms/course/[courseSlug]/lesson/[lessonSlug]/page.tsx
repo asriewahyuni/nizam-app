@@ -132,7 +132,10 @@ export default async function LearningLessonPage(props: {
                       ) : (
                         <ExternalLink className="h-4 w-4 text-slate-500 shrink-0" />
                       )}
-                      <span className="truncate">{item.name || (isAttachment ? 'Download Attachment' : 'Open Link')}</span>
+                      <span className="truncate font-bold text-slate-800">
+                        {item.name || (isAttachment ? 'Download Attachment' : 'Open Link')}
+                      </span>
+                      <span className="text-slate-500 font-normal truncate">({item.url})</span>
                     </a>
                   )
                 })}
