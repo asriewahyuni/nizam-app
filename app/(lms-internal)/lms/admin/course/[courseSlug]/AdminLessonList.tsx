@@ -494,7 +494,7 @@ export default function AdminLessonList({
                 onClick={collapseAllSections}
                 className="text-slate-600 hover:text-indigo-600 transition-colors cursor-pointer"
               >
-                Lipat Semua Bab
+                Tutup Semua Bab
               </button>
             </div>
           )}
