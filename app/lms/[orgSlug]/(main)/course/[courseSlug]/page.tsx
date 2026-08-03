@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getLMSCourseDetails } from '@/modules/lms/actions/course.actions'
 import { Book, Play, CheckCircle, ArrowLeft, Eye, LockKeyhole } from 'lucide-react'
 import BatchSelector from './BatchSelector'
+import CourseDescriptionViewer from './CourseDescriptionViewer'
 
 export default async function LMSCourseDetailPage({
   params,
@@ -44,16 +45,7 @@ export default async function LMSCourseDetailPage({
               </span>
             )}
           </div>
-          {course.description ? (
-            <div
-              className="prose prose-slate max-w-none text-xs sm:text-sm text-slate-600 leading-relaxed mb-6 prose-img:rounded-xl prose-img:max-h-[400px] prose-img:object-cover prose-a:text-indigo-600 hover:prose-a:text-indigo-500 prose-headings:text-slate-900 prose-p:my-2"
-              dangerouslySetInnerHTML={{ __html: course.description }}
-            />
-          ) : (
-            <p className="text-xs text-slate-600 leading-relaxed mb-6">
-              Tidak ada deskripsi kursus.
-            </p>
-          )}
+          <CourseDescriptionViewer description={course.description} />
           
           <div>
             {access.allowed ? (
