@@ -5,6 +5,7 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
   getLmsCourseBySlug,
   getLmsLessonsByCourseId,
+  getLmsSectionsByCourseId,
   getLmsBatchesByCourseId,
   getLmsSessionsByCourseId,
   getLmsCourseAnalytics,
@@ -15,7 +16,6 @@ import CreateBatchForm from '../../CreateBatchForm'
 import CreateSessionForm from '../../CreateSessionForm'
 import SessionQRClient from '../../SessionQRClient'
 import CreateLessonForm from '../../CreateLessonForm'
-import LessonActions from '../../LessonActions'
 import { formatRupiah } from '@/lib/utils'
 import { StatusBadge, EmptyState, modeColor, statusColor } from '../../../ui'
 import AdminLessonList from './AdminLessonList'
@@ -50,6 +50,7 @@ export default async function AdminManageCoursePage(props: {
   const canAccessParticipantAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning') || canManageAssessment
 
   const lessons = await getLmsLessonsByCourseId(orgData.org.id, course.id)
+  const sections = await getLmsSectionsByCourseId(orgData.org.id, course.id)
   const batches = await getLmsBatchesByCourseId(orgData.org.id, course.id)
   const sessions = await getLmsSessionsByCourseId(orgData.org.id, course.id)
   
@@ -154,6 +155,7 @@ export default async function AdminManageCoursePage(props: {
             ) : (
               <AdminLessonList
                 lessons={lessons}
+                sections={sections}
                 courseSlug={course.slug}
                 courseId={course.id}
                 orgSlug={orgData.org.slug}

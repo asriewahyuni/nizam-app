@@ -5,7 +5,6 @@ import Link from 'next/link'
 import {
   Search,
   Filter,
-  ArrowUpDown,
   AlertTriangle,
   Paperclip,
   FileText,
@@ -14,7 +13,12 @@ import {
   ExternalLink,
   X,
   Edit2,
-  Check,
+  Folder,
+  FolderOpen,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  List,
 } from 'lucide-react'
 import LessonActions from '../../LessonActions'
 
@@ -31,10 +35,20 @@ type LessonItem = {
   content_html?: string | null
   created_at?: string
   section_id?: string | null
+  [key: string]: unknown
+}
+
+type SectionItem = {
+  id: string
+  title: string
+  sort_order: number
+  description?: string | null
+  [key: string]: unknown
 }
 
 type AdminLessonListProps = {
   lessons: LessonItem[]
+  sections?: SectionItem[]
   courseSlug: string
   courseId: string
   orgSlug: string
@@ -42,6 +56,7 @@ type AdminLessonListProps = {
 
 export default function AdminLessonList({
   lessons,
+  sections = [],
   courseSlug,
   courseId,
   orgSlug,
@@ -50,6 +65,46 @@ export default function AdminLessonList({
   const [typeFilter, setTypeFilter] = useState<string>('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [sortBy, setSortBy] = useState<string>('CURRICULUM')
+
+  // View mode switcher: Default to GROUPED if sections exist, otherwise FLAT
+  const [viewMode, setViewMode] = useState<'FLAT' | 'GROUPED'>(
+    sections.length > 0 ? 'GROUPED' : 'FLAT'
+  )
+
+  // Accordion open/close state for sections (all open by default)
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {}
+    sections.forEach((s) => {
+      init[s.id] = true
+    })
+    init['UNASSIGNED'] = true
+    return init
+  })
+
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [sectionId]: !prev[sectionId],
+    }))
+  }
+
+  const expandAllSections = () => {
+    const next: Record<string, boolean> = {}
+    sections.forEach((s) => {
+      next[s.id] = true
+    })
+    next['UNASSIGNED'] = true
+    setExpandedSections(next)
+  }
+
+  const collapseAllSections = () => {
+    const next: Record<string, boolean> = {}
+    sections.forEach((s) => {
+      next[s.id] = false
+    })
+    next['UNASSIGNED'] = false
+    setExpandedSections(next)
+  }
 
   // Pre-annotate original index so admin always knows chronological order #
   const annotatedLessons = useMemo(() => {
@@ -157,6 +212,26 @@ export default function AdminLessonList({
       })
   }, [annotatedLessons, searchQuery, typeFilter, statusFilter, sortBy])
 
+  // Grouping logic for GROUPED mode
+  const groupedData = useMemo(() => {
+    const map: Record<string, typeof filteredLessons> = {}
+    const unassigned: typeof filteredLessons = []
+
+    sections.forEach((s) => {
+      map[s.id] = []
+    })
+
+    filteredLessons.forEach((l) => {
+      if (l.section_id && map[l.section_id]) {
+        map[l.section_id].push(l)
+      } else {
+        unassigned.push(l)
+      }
+    })
+
+    return { map, unassigned }
+  }, [filteredLessons, sections])
+
   const hasActiveFilters =
     searchQuery.trim() !== '' ||
     typeFilter !== 'ALL' ||
@@ -168,6 +243,151 @@ export default function AdminLessonList({
     setTypeFilter('ALL')
     setStatusFilter('ALL')
     setSortBy('CURRICULUM')
+  }
+
+  // Render a single lesson card (reusable across flat & grouped modes)
+  const renderLessonCard = (l: (typeof annotatedLessons)[number]) => {
+    const isVideo = l.lesson_type === 'VIDEO'
+    const hasVidUrl = Boolean(
+      l.embed_url || (Array.isArray(l.media_items) && l.media_items.some((m) => m.type === 'video'))
+    )
+    const nonVideoAtts = Array.isArray(l.media_items)
+      ? l.media_items.filter((m) => m.type !== 'video')
+      : []
+    const hasText = Boolean(
+      (l.content_md && l.content_md.trim().length > 0) ||
+        (l.content_html && l.content_html.trim().length > 0)
+    )
+
+    return (
+      <div
+        key={l.id}
+        className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all hover:border-indigo-300 hover:shadow-md"
+      >
+        <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
+          {/* Icon Tipe Materi */}
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-500 border border-slate-200/80 font-semibold group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-200 transition-all">
+            {isVideo ? (
+              <PlayCircle className="h-5 w-5" />
+            ) : (
+              <FileText className="h-5 w-5" />
+            )}
+          </div>
+
+          {/* Title */}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-400">
+                #{l.originalIndex} •
+              </span>
+              <h4 className="font-bold text-slate-900 truncate max-w-full text-sm">
+                {l.title}
+              </h4>
+              {l.is_required && (
+                <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-rose-600 border border-rose-100">
+                  Wajib
+                </span>
+              )}
+            </div>
+
+            {/* Nyala & Mati Icon Indicators Row */}
+            <div className="mt-2.5 flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                {l.lesson_type}
+              </span>
+
+              <span className="text-slate-300 text-xs">•</span>
+
+              {/* 1. Video Status Icon */}
+              {isVideo ? (
+                hasVidUrl ? (
+                  <div
+                    title="Video: Sudah Terisi (Ready)"
+                    className="flex items-center justify-center size-6 rounded-full bg-emerald-100 text-emerald-600 ring-2 ring-emerald-400/40 shadow-xs transition-transform group-hover:scale-105"
+                  >
+                    <Video className="h-3.5 w-3.5 fill-emerald-600/20" />
+                  </div>
+                ) : (
+                  <div
+                    title="⚠️ Peringatan: Video Belum Diisi (Kosong)!"
+                    className="flex items-center justify-center size-6 rounded-full bg-rose-100 text-rose-600 ring-2 ring-rose-500 animate-pulse shadow-xs"
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                  </div>
+                )
+              ) : (
+                <div
+                  title="Bukan materi Video"
+                  className="flex items-center justify-center size-6 rounded-full bg-slate-100 text-slate-300 opacity-60"
+                >
+                  <Video className="h-3 w-3" />
+                </div>
+              )}
+
+              {/* 2. Deskripsi Teks Icon */}
+              {hasText ? (
+                <div
+                  title="Deskripsi Teks: Ada"
+                  className="flex items-center justify-center size-6 rounded-full bg-blue-100 text-blue-600 ring-2 ring-blue-400/40 shadow-xs transition-transform group-hover:scale-105"
+                >
+                  <FileText className="h-3.5 w-3.5 fill-blue-600/20" />
+                </div>
+              ) : (
+                <div
+                  title="Deskripsi Teks: Kosong"
+                  className="flex items-center justify-center size-6 rounded-full bg-slate-100 text-slate-300 opacity-60"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                </div>
+              )}
+
+              {/* 3. Aset / Lampiran Icon */}
+              {nonVideoAtts.length > 0 ? (
+                <div
+                  title={`Aset / Lampiran: ${nonVideoAtts.length} file/link`}
+                  className="relative flex items-center justify-center size-6 rounded-full bg-purple-100 text-purple-600 ring-2 ring-purple-400/40 shadow-xs transition-transform group-hover:scale-105"
+                >
+                  <Paperclip className="h-3.5 w-3.5" />
+                  {nonVideoAtts.length > 1 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-purple-600 text-[8px] font-extrabold text-white">
+                      {nonVideoAtts.length}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div
+                  title="Aset / Lampiran: Kosong"
+                  className="flex items-center justify-center size-6 rounded-full bg-slate-100 text-slate-300 opacity-60"
+                >
+                  <Paperclip className="h-3.5 w-3.5" />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+          <Link
+            href={`/lms/admin/course/${courseSlug}/lesson/${l.id}/edit`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 shadow-xs transition-all cursor-pointer"
+            title="Edit Materi"
+          >
+            <Edit2 className="h-3.5 w-3.5" />
+            <span>Edit</span>
+          </Link>
+          <LessonActions lessonId={l.id} courseId={courseId} />
+          <Link
+            href={`/lms/${orgSlug}/learn/${courseSlug}/${l.slug}`}
+            target="_blank"
+            className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+          >
+            <span>Player</span>
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -219,10 +439,69 @@ export default function AdminLessonList({
         </div>
       </div>
 
-      {/* 2. Search, Filter & Sort Bar */}
+      {/* 2. Search, Filter & View Mode Switcher Bar */}
       <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4 shadow-xs">
+        {/* Top bar: View Mode switch buttons + Sort */}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between pb-3 border-b border-slate-200/60">
+          {/* Grouping / View Mode Switcher */}
+          <div className="flex items-center gap-1.5 rounded-lg bg-slate-200/70 p-1 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setViewMode('GROUPED')}
+              disabled={sections.length === 0}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'GROUPED'
+                  ? 'bg-white text-indigo-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed'
+              }`}
+              title={
+                sections.length === 0
+                  ? 'Belum ada seksi / bab di kelas ini'
+                  : `Kelompokkan materi berdasarkan ${sections.length} Bab/Modul`
+              }
+            >
+              <Layers className="h-3.5 w-3.5" />
+              <span>Kelompokkan Bab ({sections.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('FLAT')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'FLAT'
+                  ? 'bg-white text-indigo-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Tampilkan daftar berurutan datar"
+            >
+              <List className="h-3.5 w-3.5" />
+              <span>Daftar Datar</span>
+            </button>
+          </div>
+
+          {/* Expand / Collapse All buttons (only in GROUPED mode) */}
+          {viewMode === 'GROUPED' && (
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <button
+                type="button"
+                onClick={expandAllSections}
+                className="text-slate-600 hover:text-indigo-600 transition-colors cursor-pointer"
+              >
+                Buka Semua Bab
+              </button>
+              <span className="text-slate-300">•</span>
+              <button
+                type="button"
+                onClick={collapseAllSections}
+                className="text-slate-600 hover:text-indigo-600 transition-colors cursor-pointer"
+              >
+                Lipat Semua Bab
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Search & Sort */}
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-          {/* Search */}
           <div className="relative flex-1 min-w-[240px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
@@ -236,14 +515,13 @@ export default function AdminLessonList({
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
           </div>
 
-          {/* Sort Dropdown */}
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-xs font-semibold text-slate-500 hidden md:inline">Urutan:</span>
             <select
@@ -261,13 +539,12 @@ export default function AdminLessonList({
         </div>
 
         {/* Filters & Legend Row */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-200/60">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200/60">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-slate-600 mr-1 flex items-center gap-1">
               <Filter className="h-3.5 w-3.5" /> Filter:
             </span>
 
-            {/* Type Filter */}
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
@@ -280,7 +557,6 @@ export default function AdminLessonList({
               <option value="ASSIGNMENT">Tugas</option>
             </select>
 
-            {/* Status Completeness Filter */}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -335,7 +611,7 @@ export default function AdminLessonList({
         </div>
       </div>
 
-      {/* 3. Lesson Cards List */}
+      {/* 3. Lesson List Rendering (Flat vs Grouped by Section) */}
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-800">
@@ -356,152 +632,147 @@ export default function AdminLessonList({
               Reset Semua Filter
             </button>
           </div>
-        ) : (
+        ) : viewMode === 'FLAT' ? (
+          /* ============= FLAT MODE ============= */
           <div className="flex flex-col gap-3">
-            {filteredLessons.map((l) => {
-              const isVideo = l.lesson_type === 'VIDEO'
-              const hasVidUrl = Boolean(
-                l.embed_url ||
-                  (Array.isArray(l.media_items) && l.media_items.some((m) => m.type === 'video'))
-              )
-              const nonVideoAtts = Array.isArray(l.media_items)
-                ? l.media_items.filter((m) => m.type !== 'video')
-                : []
-              const hasText = Boolean(
-                (l.content_md && l.content_md.trim().length > 0) ||
-                  (l.content_html && l.content_html.trim().length > 0)
-              )
+            {filteredLessons.map(renderLessonCard)}
+          </div>
+        ) : (
+          /* ============= GROUPED BY SECTION MODE ============= */
+          <div className="flex flex-col gap-5">
+            {sections.map((sec, secIdx) => {
+              const secLessons = groupedData.map[sec.id] || []
+              if (secLessons.length === 0 && hasActiveFilters) {
+                return null // hide empty section when filtering
+              }
+              const isExpanded = expandedSections[sec.id] !== false
+
+              // Count completeness for this section
+              let secVidReady = 0
+              let secVidMissing = 0
+              secLessons.forEach((l) => {
+                if (l.lesson_type === 'VIDEO') {
+                  const ready = Boolean(
+                    l.embed_url ||
+                      (Array.isArray(l.media_items) && l.media_items.some((m) => m.type === 'video'))
+                  )
+                  if (ready) secVidReady++
+                  else secVidMissing++
+                }
+              })
 
               return (
                 <div
-                  key={l.id}
-                  className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all hover:border-indigo-300 hover:shadow-md"
+                  key={sec.id}
+                  className="rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden transition-all"
                 >
-                  <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
-                    {/* Icon Tipe Materi */}
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-500 border border-slate-200/80 font-semibold group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-200 transition-all">
-                      {isVideo ? (
-                        <PlayCircle className="h-5 w-5" />
+                  {/* Section Header */}
+                  <div
+                    onClick={() => toggleSection(sec.id)}
+                    className="flex items-center justify-between gap-4 bg-slate-50/90 px-5 py-3.5 border-b border-slate-200/70 hover:bg-slate-100/70 transition-colors cursor-pointer select-none"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-xs">
+                        {isExpanded ? (
+                          <FolderOpen className="size-4" />
+                        ) : (
+                          <Folder className="size-4" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
+                            BAB / MODUL #{secIdx + 1}
+                          </span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-xs font-extrabold text-slate-700">
+                            {secLessons.length} Materi
+                          </span>
+                        </div>
+                        <h4 className="font-extrabold text-slate-900 text-base truncate">
+                          {sec.title}
+                        </h4>
+                      </div>
+                    </div>
+
+                    {/* Section right badge & caret */}
+                    <div className="flex items-center gap-3 shrink-0">
+                      {secVidMissing > 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 text-rose-700 px-2.5 py-0.5 text-[10px] font-bold border border-rose-300">
+                          ⚠️ {secVidMissing} Video Kosong
+                        </span>
                       ) : (
-                        <FileText className="h-5 w-5" />
+                        <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-0.5 text-[10px] font-bold border border-emerald-200">
+                          ✅ {secVidReady} Video Ready
+                        </span>
+                      )}
+
+                      <div className="flex size-7 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 shadow-2xs">
+                        {isExpanded ? (
+                          <ChevronUp className="size-4" />
+                        ) : (
+                          <ChevronDown className="size-4" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section Body (Lessons inside this section) */}
+                  {isExpanded && (
+                    <div className="p-3 bg-slate-50/40">
+                      {secLessons.length === 0 ? (
+                        <div className="py-6 text-center text-xs font-semibold text-slate-400">
+                          Belum ada materi di bab ini.
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2.5">
+                          {secLessons.map(renderLessonCard)}
+                        </div>
                       )}
                     </div>
-
-                    {/* Title */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-xs font-bold text-slate-400">
-                          #{l.originalIndex} •
-                        </span>
-                        <h4 className="font-bold text-slate-900 truncate max-w-full text-sm">
-                          {l.title}
-                        </h4>
-                        {l.is_required && (
-                          <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-rose-600 border border-rose-100">
-                            Wajib
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Nyala & Mati Icon Indicators Row */}
-                      <div className="mt-2.5 flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                          {l.lesson_type}
-                        </span>
-
-                        <span className="text-slate-300 text-xs">•</span>
-
-                        {/* 1. Video Status Icon */}
-                        {isVideo ? (
-                          hasVidUrl ? (
-                            <div
-                              title="Video: Sudah Terisi (Ready)"
-                              className="flex items-center justify-center size-6 rounded-full bg-emerald-100 text-emerald-600 ring-2 ring-emerald-400/40 shadow-xs transition-transform group-hover:scale-105"
-                            >
-                              <Video className="h-3.5 w-3.5 fill-emerald-600/20" />
-                            </div>
-                          ) : (
-                            <div
-                              title="⚠️ Peringatan: Video Belum Diisi (Kosong)!"
-                              className="flex items-center justify-center size-6 rounded-full bg-rose-100 text-rose-600 ring-2 ring-rose-500 animate-pulse shadow-xs"
-                            >
-                              <AlertTriangle className="h-3.5 w-3.5" />
-                            </div>
-                          )
-                        ) : (
-                          <div
-                            title="Bukan materi Video"
-                            className="flex items-center justify-center size-6 rounded-full bg-slate-100 text-slate-300 opacity-60"
-                          >
-                            <Video className="h-3 w-3" />
-                          </div>
-                        )}
-
-                        {/* 2. Deskripsi Teks Icon */}
-                        {hasText ? (
-                          <div
-                            title="Deskripsi Teks: Ada"
-                            className="flex items-center justify-center size-6 rounded-full bg-blue-100 text-blue-600 ring-2 ring-blue-400/40 shadow-xs transition-transform group-hover:scale-105"
-                          >
-                            <FileText className="h-3.5 w-3.5 fill-blue-600/20" />
-                          </div>
-                        ) : (
-                          <div
-                            title="Deskripsi Teks: Kosong"
-                            className="flex items-center justify-center size-6 rounded-full bg-slate-100 text-slate-300 opacity-60"
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                          </div>
-                        )}
-
-                        {/* 3. Aset / Lampiran Icon */}
-                        {nonVideoAtts.length > 0 ? (
-                          <div
-                            title={`Aset / Lampiran: ${nonVideoAtts.length} file/link`}
-                            className="relative flex items-center justify-center size-6 rounded-full bg-purple-100 text-purple-600 ring-2 ring-purple-400/40 shadow-xs transition-transform group-hover:scale-105"
-                          >
-                            <Paperclip className="h-3.5 w-3.5" />
-                            {nonVideoAtts.length > 1 && (
-                              <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-purple-600 text-[8px] font-extrabold text-white">
-                                {nonVideoAtts.length}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <div
-                            title="Aset / Lampiran: Kosong"
-                            className="flex items-center justify-center size-6 rounded-full bg-slate-100 text-slate-300 opacity-60"
-                          >
-                            <Paperclip className="h-3.5 w-3.5" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-end gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
-                    <Link
-                      href={`/lms/admin/course/${courseSlug}/lesson/${l.id}/edit`}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 shadow-xs transition-all cursor-pointer"
-                      title="Edit Materi"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                      <span>Edit</span>
-                    </Link>
-                    <LessonActions lessonId={l.id} courseId={courseId} />
-                    <Link
-                      href={`/lms/${orgSlug}/learn/${courseSlug}/${l.slug}`}
-                      target="_blank"
-                      className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 shadow-xs transition-all flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>Player</span>
-                      <ExternalLink className="h-3 w-3" />
-                    </Link>
-                  </div>
+                  )}
                 </div>
               )
             })}
+
+            {/* Unassigned lessons (if any) */}
+            {groupedData.unassigned.length > 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+                <div
+                  onClick={() => toggleSection('UNASSIGNED')}
+                  className="flex items-center justify-between gap-4 bg-amber-50/80 px-5 py-3.5 border-b border-amber-200 hover:bg-amber-100/70 transition-colors cursor-pointer select-none"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-600 text-white shadow-xs">
+                      <Folder className="size-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                        Tanpa Seksi / Bab
+                      </span>
+                      <h4 className="font-extrabold text-slate-900 text-base">
+                        Materi Belum Dikelompokkan ({groupedData.unassigned.length})
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="flex size-7 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 shadow-2xs">
+                    {expandedSections['UNASSIGNED'] !== false ? (
+                      <ChevronUp className="size-4" />
+                    ) : (
+                      <ChevronDown className="size-4" />
+                    )}
+                  </div>
+                </div>
+
+                {expandedSections['UNASSIGNED'] !== false && (
+                  <div className="p-3 bg-slate-50/40 flex flex-col gap-2.5">
+                    {groupedData.unassigned.map(renderLessonCard)}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

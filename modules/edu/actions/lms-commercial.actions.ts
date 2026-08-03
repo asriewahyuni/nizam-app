@@ -619,7 +619,7 @@ export async function deleteLmsSession(sessionId: string) {
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-export async function getLmsLessonsByCourseId(orgId: string, courseId: string) {
+export async function getLmsLessonsByCourseId(orgId: string, courseId: string): Promise<any[]> {
   try {
     const res = await queryPostgres(
       `SELECT l.*
@@ -632,6 +632,22 @@ export async function getLmsLessonsByCourseId(orgId: string, courseId: string) {
     return res.rows
   } catch (err) {
     console.error('getLmsLessonsByCourseId error:', err)
+    return []
+  }
+}
+
+export async function getLmsSectionsByCourseId(orgId: string, courseId: string): Promise<any[]> {
+  try {
+    const res = await queryPostgres(
+      `SELECT *
+       FROM learning_course_sections
+       WHERE org_id = $1 AND course_id = $2
+       ORDER BY sort_order ASC, created_at ASC`,
+      [orgId, courseId]
+    )
+    return res.rows
+  } catch (err) {
+    console.error('getLmsSectionsByCourseId error:', err)
     return []
   }
 }
