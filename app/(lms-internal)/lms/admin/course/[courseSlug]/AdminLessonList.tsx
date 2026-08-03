@@ -474,7 +474,7 @@ export default function AdminLessonList({
               title="Tampilkan daftar berurutan datar"
             >
               <List className="h-3.5 w-3.5" />
-              <span>Daftar Datar</span>
+              <span>Daftar Materi</span>
             </button>
           </div>
 
