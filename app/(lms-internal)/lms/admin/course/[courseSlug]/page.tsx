@@ -169,7 +169,7 @@ export default async function AdminManageCoursePage(props: {
                 <span className="size-2 rounded-full bg-indigo-600" />
                 Buat Materi Baru
               </h2>
-              <CreateLessonForm courseId={course.id} />
+              <CreateLessonForm courseId={course.id} sections={sections} />
             </div>
           </div>
         </div>

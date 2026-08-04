@@ -9,7 +9,9 @@ import { useRouter } from 'next/navigation'
 const inputCls = 'w-full rounded-md border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-colors focus:border-indigo-600 focus:ring-0 hover:border-slate-300'
 const labelCls = 'block text-sm font-bold text-slate-900 mb-1.5'
 
-export default function EditLessonForm({ lesson, courseSlug }: { lesson: any, courseSlug: string }) {
+type LessonSection = { id: string; title: string }
+
+export default function EditLessonForm({ lesson, courseSlug, sections = [] }: { lesson: any; courseSlug: string; sections?: LessonSection[] }) {
   const router = useRouter()
   const [state, action, isPending] = useActionState(updateLmsLesson, {})
   const [lessonType, setLessonType] = useState(lesson.lesson_type || 'TEXT')
@@ -112,6 +114,18 @@ export default function EditLessonForm({ lesson, courseSlug }: { lesson: any, co
 
       <input type="hidden" name="lessonId" value={lesson.id} />
       <input type="hidden" name="attachmentsJson" value={JSON.stringify(attachments)} />
+
+      {sections.length > 0 && (
+        <div>
+          <label htmlFor="lesson-section" className={labelCls}>Grup Lesson</label>
+          <select id="lesson-section" name="sectionId" defaultValue={lesson.section_id || ''} className={inputCls}>
+            <option value="">Tanpa grup</option>
+            {sections.map((section) => (
+              <option key={section.id} value={section.id}>{section.title}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div>
         <label className={labelCls}>Lesson Title <span className="text-red-400">*</span></label>

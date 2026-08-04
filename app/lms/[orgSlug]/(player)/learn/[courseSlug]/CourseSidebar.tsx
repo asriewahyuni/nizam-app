@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { useParams, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { PlayCircle, FileText, Check } from 'lucide-react'
 
 interface Lesson {
@@ -11,6 +11,8 @@ interface Lesson {
   title: string
   lesson_type: string
   sort_order: number
+  section_id: string | null
+  section_title: string | null
 }
 
 interface CourseSidebarProps {
@@ -31,7 +33,17 @@ export default function CourseSidebar({ orgSlug, courseSlug, lessons, progress }
       
       <div className="flex-1 overflow-y-auto">
         <div className="flex flex-col">
-          {lessons.map((lesson, idx) => {
+          {lessons.reduce<Array<{ id: string; title: string; lessons: Lesson[] }>>((groups, lesson) => {
+            const id = lesson.section_id || 'UNASSIGNED'
+            const group = groups.find((item) => item.id === id)
+            if (group) group.lessons.push(lesson)
+            else groups.push({ id, title: lesson.section_title || 'Materi lainnya', lessons: [lesson] })
+            return groups
+          }, []).map((group) => (
+            <section key={group.id} aria-labelledby={`sidebar-section-${group.id}`}>
+              <h3 id={`sidebar-section-${group.id}`} className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">{group.title}</h3>
+              {group.lessons.map((lesson) => {
+            const idx = lessons.indexOf(lesson)
             const isActive = pathname.includes(`/learn/${courseSlug}/${lesson.slug}`)
             const isCompleted = Boolean(progress[lesson.id]?.completed)
 
@@ -65,7 +77,9 @@ export default function CourseSidebar({ orgSlug, courseSlug, lessons, progress }
                 </div>
               </Link>
             )
-          })}
+              })}
+            </section>
+          ))}
         </div>
       </div>
     </div>

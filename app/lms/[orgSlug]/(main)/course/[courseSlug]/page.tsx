@@ -1,7 +1,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { getLMSCourseDetails } from '@/modules/lms/actions/course.actions'
-import { Book, Play, CheckCircle, ArrowLeft, Eye, LockKeyhole } from 'lucide-react'
+import { Book, Play, ArrowLeft, Eye, LockKeyhole } from 'lucide-react'
 import BatchSelector from './BatchSelector'
 import CourseDescriptionViewer from './CourseDescriptionViewer'
 
@@ -84,14 +84,31 @@ export default async function LMSCourseDetailPage({
               <Book size={28} className="mx-auto text-slate-300 mb-2" />
               <p className="text-xs text-slate-500 font-medium">Belum ada materi untuk kursus ini.</p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {lessons.map((lesson, index) => {
-                const canOpen = access.allowed || lesson.is_preview
+           ) : (
+             <div className="space-y-5">
+               {lessons.reduce<Array<{ sectionId: string; title: string; lessons: typeof lessons }>>((groups, lesson) => {
+                 const sectionId = lesson.section_id || 'UNASSIGNED'
+                 const title = lesson.section_title || 'Materi lainnya'
+                 const group = groups.find((item) => item.sectionId === sectionId)
+                 if (group) group.lessons.push(lesson)
+                 else groups.push({ sectionId, title, lessons: [lesson] })
+                 return groups
+               }, []).map((group) => (
+                 <section key={group.sectionId} aria-labelledby={`section-${group.sectionId}`}>
+                   <div className="mb-2 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                     <h3 id={`section-${group.sectionId}`} className="text-xs font-bold uppercase tracking-wider text-slate-700">{group.title}</h3>
+                     <span className="text-[10px] font-semibold text-slate-500">{group.lessons.length} materi</span>
+                   </div>
+                   <div className="space-y-3">
+                     {group.lessons.map((lesson) => {
+                 const canOpen = access.allowed || lesson.is_preview
+                 const lessonNumber = lessons.indexOf(lesson) + 1
+
                 const content = (
                   <>
                   <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold mr-3 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors shrink-0">
-                    {index + 1}
+                     {lessonNumber}
+
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-bold text-slate-900 truncate">{lesson.title}</h3>
@@ -124,9 +141,12 @@ export default async function LMSCourseDetailPage({
                     {content}
                   </div>
                 )
-              })}
-            </div>
-          )}
+                     })}
+                   </div>
+                 </section>
+               ))}
+             </div>
+           )}
         </div>
       </div>
     </div>
