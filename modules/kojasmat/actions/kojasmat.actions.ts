@@ -1104,9 +1104,14 @@ export async function createPembiayaan(payload: {
     const kehadiranAkad = payload.kehadiran_akad ?? 'SENDIRI'
     const ujrahDiwakilkan = kehadiranAkad === 'DIWAKILKAN' ? Number(proyekData.ujrah_wakalah_akad ?? 0) : 0
 
+    // status di-set eksplisit 'AKTIF' — jangan andalkan DEFAULT kolom. Kolom ini
+    // pernah di-drift di database (default berubah jadi 'KOMITMEN') tanpa kode
+    // aplikasi pernah dibuat untuk mengelola status selain AKTIF/SELESAI/GAGAL,
+    // yang bikin pembiayaan baru macet dan tidak bisa dibatalkan (batalkanPembiayaan
+    // & sudah_dibiayai sama-sama mensyaratkan status='AKTIF').
     const { rows } = await client.query(
-      `INSERT INTO kojasmat_pembiayaan (org_id, proyek_id, pemodal_id, jumlah, porsi_pct, kehadiran_akad, ujrah_diwakilkan)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      `INSERT INTO kojasmat_pembiayaan (org_id, proyek_id, pemodal_id, jumlah, porsi_pct, kehadiran_akad, ujrah_diwakilkan, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'AKTIF') RETURNING *`,
       [payload.org_id, payload.proyek_id, payload.pemodal_id, payload.jumlah, porsiPct, kehadiranAkad, ujrahDiwakilkan]
     )
     resultRow = rows[0]
