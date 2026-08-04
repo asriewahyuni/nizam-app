@@ -10,6 +10,7 @@ import {
   AlertTriangle, ClipboardList, Eye, Link2, ExternalLink,
   BookOpen, ArrowDownCircle, X, Copy, Check, Pencil, Trash2, Upload, FolderOpen,
   TrendingDown, Scale, Loader2, CalendarClock, FileSignature, History, Lock, MessageCircle,
+  Download, FileSpreadsheet,
 } from 'lucide-react'
 import {
   createAnggota, updateAnggota,
@@ -33,6 +34,10 @@ import {
   type KojasmatLaporanProyek, type KojasmatTindakan,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
 import { seedKojasmatDummyData, resetAndReseedKojasmat } from '@/modules/kojasmat/actions/kojasmat-seeder.actions'
+import {
+  parseKojasmatBulkImportFile, executeKojasmatBulkImport,
+  type KojasmatBulkPreview, type KojasmatBulkImportResult,
+} from '@/modules/kojasmat/actions/kojasmat-bulk-import.actions'
 import {
   catatTransaksiProyek, getTransaksiByProyek, getLaporanKeuanganProyek,
   getPemodalDenganPotensi, distribusikanBagiHasil,
@@ -533,6 +538,174 @@ function DokumenProyekPanel({ proyek, orgId }: { proyek: KojasmatProyek; orgId: 
   )
 }
 
+// ─── MODAL: IMPORT DATA MASSAL ─────────────────────────────────────────────────
+
+function BulkImportModal({ orgId, open, onClose }: { orgId: string; open: boolean; onClose: () => void }) {
+  const [pending, startTransition] = useTransition()
+  const [step, setStep] = useState<'upload' | 'preview' | 'result'>('upload')
+  const [fileName, setFileName] = useState('')
+  const [parseError, setParseError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<KojasmatBulkPreview | null>(null)
+  const [result, setResult] = useState<KojasmatBulkImportResult | null>(null)
+
+  function reset() {
+    setStep('upload'); setFileName(''); setParseError(null); setPreview(null); setResult(null)
+  }
+
+  function handleClose() {
+    reset()
+    onClose()
+  }
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFileName(file.name)
+    setParseError(null)
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = String(reader.result).split(',')[1] || ''
+      startTransition(async () => {
+        const res = await parseKojasmatBulkImportFile(orgId, base64)
+        if (res.error) {
+          setParseError(res.error)
+          return
+        }
+        setPreview(res)
+        setStep('preview')
+      })
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  function handleExecute() {
+    if (!preview) return
+    startTransition(async () => {
+      const res = await executeKojasmatBulkImport(orgId, preview)
+      setResult(res)
+      setStep('result')
+    })
+  }
+
+  const anggotaOk = preview?.anggota.filter(a => a.errors.length === 0).length ?? 0
+  const anggotaErr = (preview?.anggota.length ?? 0) - anggotaOk
+  const simpananOk = preview?.simpanan.filter(s => s.errors.length === 0).length ?? 0
+  const simpananErr = (preview?.simpanan.length ?? 0) - simpananOk
+  const proyekOk = preview?.proyek.filter(p => p.errors.length === 0).length ?? 0
+  const proyekErr = (preview?.proyek.length ?? 0) - proyekOk
+  const totalOk = anggotaOk + simpananOk + proyekOk
+  const totalErr = anggotaErr + simpananErr + proyekErr
+  const allErrors = [
+    ...(preview?.anggota.flatMap(a => a.errors) ?? []),
+    ...(preview?.simpanan.flatMap(s => s.errors) ?? []),
+    ...(preview?.proyek.flatMap(p => p.errors) ?? []),
+  ]
+
+  return (
+    <Modal open={open} onClose={handleClose} title="Import Data Massal — Kojasmat">
+      <div className="space-y-4">
+        {step === 'upload' && (
+          <>
+            <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-sm text-blue-800 space-y-2">
+              <p className="font-medium">Isi anggota, saldo simpanan awal, dan/atau proyek sekaligus lewat template Excel.</p>
+              <p className="text-xs text-blue-600">
+                Anggota baru diresolusi berdasarkan NIK, proyek masuk berstatus DRAFT (lanjut review DMR/DPS seperti biasa),
+                dan setoran simpanan otomatis tersync ke jurnal akuntansi ERP.
+              </p>
+            </div>
+            <a
+              href="/api/kojasmat/bulk-import/template"
+              className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors cursor-pointer"
+            >
+              <Download className="h-4 w-4" /> Download Template
+            </a>
+            <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 py-8 text-sm text-gray-500 hover:border-emerald-400 hover:bg-emerald-50/50 transition-colors cursor-pointer">
+              <Upload className="h-6 w-6 text-gray-400" />
+              <span>{pending ? 'Memproses file...' : fileName || 'Klik untuk pilih file template yang sudah diisi (.xlsx)'}</span>
+              <input type="file" accept=".xlsx" className="hidden" onChange={handleFile} disabled={pending} />
+            </label>
+            {parseError && (
+              <p className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <AlertTriangle className="h-4 w-4 shrink-0" /> {parseError}
+              </p>
+            )}
+          </>
+        )}
+
+        {step === 'preview' && preview && (
+          <>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+                <p className="text-lg font-bold text-gray-900">{preview.anggota.length}</p>
+                <p className="text-xs text-gray-500">Anggota ({anggotaOk} valid)</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+                <p className="text-lg font-bold text-gray-900">{preview.simpanan.length}</p>
+                <p className="text-xs text-gray-500">Simpanan ({simpananOk} valid)</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+                <p className="text-lg font-bold text-gray-900">{preview.proyek.length}</p>
+                <p className="text-xs text-gray-500">Proyek ({proyekOk} valid)</p>
+              </div>
+            </div>
+
+            {totalErr > 0 && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 max-h-40 overflow-y-auto space-y-1">
+                <p className="text-xs font-medium text-red-700">{totalErr} baris bermasalah (akan dilewati):</p>
+                {allErrors.slice(0, 30).map((e, i) => (
+                  <p key={i} className="text-xs text-red-600">• {e}</p>
+                ))}
+                {allErrors.length > 30 && <p className="text-xs text-red-500">... dan {allErrors.length - 30} lainnya</p>}
+              </div>
+            )}
+
+            {totalOk === 0 ? (
+              <p className="text-sm text-gray-500">Tidak ada baris valid untuk diimport.</p>
+            ) : (
+              <p className="text-sm text-gray-600">{totalOk} baris siap diimport.</p>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={reset}
+                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Ganti File
+              </button>
+              <button onClick={handleExecute} disabled={pending || totalOk === 0}
+                className="flex-1 rounded-xl bg-emerald-600 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+                {pending ? 'Mengimport...' : `Import ${totalOk} Baris`}
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 'result' && result && (
+          <>
+            <div className={cn('rounded-xl border p-4 text-sm',
+              result.success ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700')}>
+              <p className="font-medium">
+                {result.anggota_created} anggota, {result.simpanan_created} simpanan, {result.proyek_created} proyek berhasil diimport.
+              </p>
+              {result.failed > 0 && <p className="text-xs mt-1">{result.failed} baris gagal — lihat rincian di bawah.</p>}
+            </div>
+            {result.rows.some(r => r.status === 'error') && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 max-h-40 overflow-y-auto space-y-1">
+                {result.rows.filter(r => r.status === 'error').slice(0, 30).map((r, i) => (
+                  <p key={i} className="text-xs text-red-600">• [{r.entity}] Baris {r.row_no}: {r.error}</p>
+                ))}
+              </div>
+            )}
+            <button onClick={handleClose}
+              className="w-full rounded-xl bg-gray-900 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors cursor-pointer">
+              Selesai
+            </button>
+          </>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 // ─── TAB: DASHBOARD ───────────────────────────────────────────────────────────
 
 function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string }) {
@@ -540,6 +713,7 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
   const [seedResult, setSeedResult] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  const [bulkImportOpen, setBulkImportOpen] = useState(false)
 
   function handleSeed() {
     startTransition(async () => {
@@ -634,6 +808,27 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
             Buka Formulir
           </a>
         </div>
+      </div>
+
+      {/* Import Data Massal */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50">
+            <FileSpreadsheet className="h-4.5 w-4.5 text-blue-600" />
+          </div>
+          <div>
+            <p className="font-medium text-gray-800 text-sm">Import Data Massal</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Isi anggota, saldo simpanan awal, dan proyek sekaligus lewat template Excel.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setBulkImportOpen(true)}
+          className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+        >
+          <Upload className="h-4 w-4" /> Import Data
+        </button>
       </div>
 
       {/* Dummy Data Section */}
@@ -740,6 +935,8 @@ function TabDashboard({ stats, orgId }: { stats: KojasmatStats; orgId: string })
           </div>
         </div>
       </Modal>
+
+      <BulkImportModal orgId={orgId} open={bulkImportOpen} onClose={() => setBulkImportOpen(false)} />
     </div>
   )
 }
