@@ -199,7 +199,7 @@ export async function buatPendaftaran(payload: {
 // (status awal CALON) maupun alur otomatis test+bayar (status langsung AKTIF).
 async function createAnggotaFromPendaftaran(
   pend: KojasmatPendaftaran & { simpanan_pokok_dibayar?: number | null; simpanan_wajib_dibayar?: number | null; biaya_admin_dibayar?: number | null },
-  opts: { status: 'CALON' | 'AKTIF'; reviewedBy?: string | null }
+  opts: { status: 'CALON' | 'AKTIF' }
 ) {
   // Buat nomor anggota baru
   const { rows: lastRow } = await queryPostgres(
@@ -296,16 +296,19 @@ async function createAnggotaFromPendaftaran(
       })
     }
     if (nominalAdmin > 0) {
-      await jurnalPendapatanBiayaAdmin(pend.org_id, nominalAdmin, pend.id)
+      // Non-fatal seperti postSimpananMutasi — anggota & setoran sudah tercatat,
+      // jangan sampai kegagalan posting jurnal biaya admin menggagalkan seluruh approval.
+      try {
+        await jurnalPendapatanBiayaAdmin(pend.org_id, nominalAdmin, pend.id)
+      } catch (_) { /* jurnal non-fatal */ }
     }
   }
 
-  // Update pendaftaran
+  // Tautkan anggota yang baru dibuat ke pendaftaran (status/ditinjau_oleh/ditinjau_at
+  // sudah di-claim atomik oleh setujuiPendaftaran sebelum fungsi ini dipanggil).
   await queryPostgres(
-    `UPDATE kojasmat_pendaftaran
-     SET status='DISETUJUI', anggota_id=$2, ditinjau_oleh=$3, ditinjau_at=NOW(), updated_at=NOW()
-     WHERE id=$1`,
-    [pend.id, anggota.id, opts.reviewedBy ?? null]
+    `UPDATE kojasmat_pendaftaran SET anggota_id=$2, updated_at=NOW() WHERE id=$1`,
+    [pend.id, anggota.id]
   )
 
   revalidatePath('/kojasmat')
@@ -329,18 +332,25 @@ export async function setujuiPendaftaran(pendaftaranId: string) {
     const session = await getInternalAuthSession()
     if (!session) return { error: 'Tidak terautentikasi' }
 
+    // Klaim baris secara atomik (status hanya berpindah dari MENUNGGU/DIREVISI sekali)
+    // supaya klik ganda / race dua request tidak sama-sama lolos dan membuat dua anggota.
     const { rows: [pend] } = await queryPostgres(
-      `SELECT * FROM kojasmat_pendaftaran WHERE id = $1`,
-      [pendaftaranId]
+      `UPDATE kojasmat_pendaftaran
+       SET status='DISETUJUI', ditinjau_oleh=$2, ditinjau_at=NOW(), updated_at=NOW()
+       WHERE id=$1 AND status IN ('MENUNGGU','DIREVISI')
+       RETURNING *`,
+      [pendaftaranId, getInternalUserId(session)]
     )
-    if (!pend) return { error: 'Pendaftaran tidak ditemukan' }
-    if (pend.status !== 'MENUNGGU' && pend.status !== 'DIREVISI') {
-      return { error: 'Pendaftaran sudah diproses' }
+    if (!pend) {
+      const { rows: [existing] } = await queryPostgres(
+        `SELECT id FROM kojasmat_pendaftaran WHERE id = $1`,
+        [pendaftaranId]
+      )
+      return { error: existing ? 'Pendaftaran sudah diproses' : 'Pendaftaran tidak ditemukan' }
     }
 
     const data = await createAnggotaFromPendaftaran(pend as KojasmatPendaftaran, {
       status: pend.status_bayar === 'SUDAH' ? 'AKTIF' : 'CALON',
-      reviewedBy: getInternalUserId(session),
     })
     return { data }
   } catch (err) {
