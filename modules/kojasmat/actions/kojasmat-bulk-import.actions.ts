@@ -59,6 +59,14 @@ export interface KojasmatBulkPreview {
   error?: string
 }
 
+export interface AnggotaCredentialRow {
+  row_no: number
+  kode_anggota: string
+  nama: string
+  login_identifier: string
+  temp_password: string
+}
+
 export interface KojasmatBulkImportResult {
   success: boolean
   anggota_created: number
@@ -66,6 +74,7 @@ export interface KojasmatBulkImportResult {
   proyek_created: number
   failed: number
   rows: { row_no: number; entity: 'ANGGOTA' | 'SIMPANAN' | 'PROYEK'; status: 'ok' | 'error'; error?: string }[]
+  credentials: AnggotaCredentialRow[]
 }
 
 const STATUS_VALUES = new Set(['CALON', 'AKTIF', 'TIDAK_AKTIF', 'DIBEKUKAN'])
@@ -281,10 +290,11 @@ export async function executeKojasmatBulkImport(
 ): Promise<KojasmatBulkImportResult> {
   const session = await getInternalAuthSession()
   if (!session) {
-    return { success: false, anggota_created: 0, simpanan_created: 0, proyek_created: 0, failed: 1, rows: [{ row_no: 0, entity: 'ANGGOTA', status: 'error', error: 'Tidak terautentikasi' }] }
+    return { success: false, anggota_created: 0, simpanan_created: 0, proyek_created: 0, failed: 1, rows: [{ row_no: 0, entity: 'ANGGOTA', status: 'error', error: 'Tidak terautentikasi' }], credentials: [] }
   }
 
   const rows: KojasmatBulkImportResult['rows'] = []
+  const credentials: AnggotaCredentialRow[] = []
   let anggotaCreated = 0, simpananCreated = 0, proyekCreated = 0, failed = 0
 
   // nik → anggota_id, mulai dari yang sudah ada di database
@@ -319,6 +329,15 @@ export async function executeKojasmatBulkImport(
     }
     nikToId.set(a.nik, res.data.id)
     anggotaCreated++
+    if (res.tempPassword && res.loginIdentifier) {
+      credentials.push({
+        row_no: a.row_no,
+        kode_anggota: res.data.kode_anggota,
+        nama: a.nama,
+        login_identifier: res.loginIdentifier,
+        temp_password: res.tempPassword,
+      })
+    }
 
     // Set status/verifikasi kalau bukan default (CALON/belum terverifikasi)
     if (a.status !== 'CALON' || a.is_verified) {
@@ -410,5 +429,6 @@ export async function executeKojasmatBulkImport(
     proyek_created: proyekCreated,
     failed,
     rows,
+    credentials,
   }
 }

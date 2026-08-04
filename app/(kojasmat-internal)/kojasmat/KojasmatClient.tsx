@@ -547,14 +547,26 @@ function BulkImportModal({ orgId, open, onClose }: { orgId: string; open: boolea
   const [parseError, setParseError] = useState<string | null>(null)
   const [preview, setPreview] = useState<KojasmatBulkPreview | null>(null)
   const [result, setResult] = useState<KojasmatBulkImportResult | null>(null)
+  const [credentialsCopied, setCredentialsCopied] = useState(false)
 
   function reset() {
-    setStep('upload'); setFileName(''); setParseError(null); setPreview(null); setResult(null)
+    setStep('upload'); setFileName(''); setParseError(null); setPreview(null); setResult(null); setCredentialsCopied(false)
   }
 
   function handleClose() {
     reset()
     onClose()
+  }
+
+  async function handleCopyCredentials() {
+    if (!result?.credentials.length) return
+    const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    const text = result.credentials.map(c => (
+      `${c.nama}\nKode Anggota: ${c.kode_anggota}\nLogin di: ${appUrl}/anggota/login\nEmail/NIK: ${c.login_identifier}\nPassword: ${c.temp_password}`
+    )).join('\n\n')
+    await navigator.clipboard.writeText(text)
+    setCredentialsCopied(true)
+    setTimeout(() => setCredentialsCopied(false), 2500)
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -695,6 +707,47 @@ function BulkImportModal({ orgId, open, onClose }: { orgId: string; open: boolea
                 ))}
               </div>
             )}
+
+            {result.credentials.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Kredensial Login Anggota Baru ({result.credentials.length})
+                </p>
+                <div className="rounded-xl border border-gray-100 overflow-hidden">
+                  <div className="max-h-56 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 text-gray-500 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">Kode</th>
+                          <th className="px-3 py-2 text-left font-medium">Nama</th>
+                          <th className="px-3 py-2 text-left font-medium">Email/NIK</th>
+                          <th className="px-3 py-2 text-left font-medium">Password</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {result.credentials.map((c, i) => (
+                          <tr key={i}>
+                            <td className="px-3 py-2 font-mono font-medium text-emerald-700 whitespace-nowrap">{c.kode_anggota}</td>
+                            <td className="px-3 py-2 text-gray-800">{c.nama}</td>
+                            <td className="px-3 py-2 font-mono text-gray-600 whitespace-nowrap">{c.login_identifier}</td>
+                            <td className="px-3 py-2 font-mono font-bold text-gray-900 whitespace-nowrap">{c.temp_password}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400">Password ini hanya ditampilkan sekali — salin dan bagikan ke anggota sebelum menutup jendela ini.</p>
+                <button onClick={handleCopyCredentials}
+                  className={cn(
+                    'w-full rounded-xl py-2 text-sm font-semibold transition-colors cursor-pointer',
+                    credentialsCopied ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  )}>
+                  {credentialsCopied ? '✓ Tersalin!' : 'Salin Semua Kredensial'}
+                </button>
+              </div>
+            )}
+
             <button onClick={handleClose}
               className="w-full rounded-xl bg-gray-900 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors cursor-pointer">
               Selesai
@@ -960,6 +1013,8 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
   const [modalOpen, setModalOpen] = useState(false)
   const [selected, setSelected] = useState<KojasmatAnggota | null>(null)
   const [form, setForm] = useState<AnggotaForm>(emptyAnggotaForm)
+  const [kredensial, setKredensial] = useState<KredensialAnggota | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const filtered = anggota.filter(a =>
     a.nama.toLowerCase().includes(search.toLowerCase()) ||
@@ -981,6 +1036,29 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
     setModalOpen(true)
   }
 
+  function buildAnggotaWaText(k: KredensialAnggota) {
+    const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    return [
+      `Halo ${k.nama},`,
+      ``,
+      `Akun keanggotaan koperasi Anda sudah aktif.`,
+      ``,
+      `*Kode Anggota:* ${k.kode_anggota}`,
+      `*Login di:* ${appUrl}/anggota/login`,
+      k.login_identifier ? `*Email/NIK:* ${k.login_identifier}` : null,
+      k.temp_password ? `*Password:* ${k.temp_password}` : null,
+      ``,
+      `Silakan login dan ganti password setelah masuk pertama kali.`,
+    ].filter(Boolean).join('\n')
+  }
+
+  async function handleCopyWa() {
+    if (!kredensial) return
+    await navigator.clipboard.writeText(buildAnggotaWaText(kredensial))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
+  }
+
   function handleSave() {
     startTransition(async () => {
       if (selected) {
@@ -989,7 +1067,15 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
           status: form.status as KojasmatAnggota['status'],
         })
       } else {
-        await createAnggota({ org_id: orgId, ...form })
+        const res = await createAnggota({ org_id: orgId, ...form })
+        if (res.data && res.tempPassword) {
+          setKredensial({
+            kode_anggota: res.data.kode_anggota,
+            nama: res.data.nama,
+            login_identifier: res.loginIdentifier ?? null,
+            temp_password: res.tempPassword,
+          })
+        }
       }
       setModalOpen(false)
     })
@@ -1162,6 +1248,59 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
             </button>
           </div>
         </div>
+      </Modal>
+
+      <Modal open={!!kredensial} onClose={() => setKredensial(null)} title="Anggota Dibuat — Info Login">
+        {kredensial && (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-center">
+              <p className="text-xs text-emerald-600 mb-1">Kode Anggota</p>
+              <p className="text-2xl font-bold font-mono text-emerald-700">{kredensial.kode_anggota}</p>
+              <p className="text-sm text-emerald-600 mt-0.5">{kredensial.nama}</p>
+            </div>
+
+            {kredensial.temp_password ? (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Kredensial Login</p>
+                <div className="rounded-xl border border-gray-100 bg-gray-50 divide-y divide-gray-100">
+                  {kredensial.login_identifier && (
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <span className="text-xs text-gray-400">Email / NIK</span>
+                      <span className="font-mono text-sm font-medium text-gray-800">{kredensial.login_identifier}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="text-xs text-gray-400">Password Sementara</span>
+                    <span className="font-mono text-sm font-bold text-gray-900 tracking-widest">{kredensial.temp_password}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400">Anggota bisa login di halaman <strong>/anggota/login</strong> memakai kode anggota + password di atas.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3 text-sm text-amber-700">
+                Anggota tidak memiliki email/NIK — akun login tidak dibuat. Tambahkan email/NIK untuk membuat akun.
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={() => setKredensial(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Tutup
+              </button>
+              {kredensial.temp_password && (
+                <button onClick={handleCopyWa}
+                  className={cn(
+                    'flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors cursor-pointer',
+                    copied
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  )}>
+                  {copied ? '✓ Tersalin!' : 'Salin Pesan WA'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

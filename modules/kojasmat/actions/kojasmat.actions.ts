@@ -3,7 +3,7 @@
 // Kojasmat — platform koperasi syariah: anggota, simpanan, proyek, pembiayaan, DPS, pelatihan
 
 import { queryPostgres, connectPostgresClient } from '@/lib/db/postgres'
-import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
+import { getInternalAuthSession, createInternalAuthUser } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
 import {
   jurnalSetorSimpanan,
@@ -14,6 +14,7 @@ import {
   jurnalPembatalanPembiayaan,
   jurnalPembatalanUjrah,
 } from '@/lib/erp-bridge/kojasmat-journals'
+import { generateTempPassword } from '../lib/temp-password'
 
 // session.user.id bisa berisi legacy_user_id (Supabase UUID), bukan internal_auth_users.id.
 // Gunakan fungsi ini untuk FK yang merujuk ke internal_auth_users(id).
@@ -315,8 +316,33 @@ export async function createAnggota(payload: {
     [payload.org_id, anggota.id]
   )
 
+  // Anggota butuh akun login portal member (kode anggota + password) — provisikan
+  // internal_auth_users di sini supaya anggota yang dibuat manual maupun lewat bulk
+  // import bisa langsung login, bukan cuma tercatat sebagai data tanpa kredensial.
+  let tempPassword: string | null = null
+  let loginIdentifier: string | null = null
+  if (payload.email || payload.nik) {
+    tempPassword = generateTempPassword()
+    const userResult = await createInternalAuthUser({
+      email: payload.email ?? null,
+      nik: payload.nik ?? null,
+      password: tempPassword,
+      fullName: payload.nama,
+      userType: 'member',
+    })
+    if ('error' in userResult) {
+      tempPassword = null
+    } else {
+      await queryPostgres(
+        `UPDATE kojasmat_anggota SET user_id=$2 WHERE id=$1`,
+        [anggota.id, userResult.internalUserId]
+      )
+      loginIdentifier = payload.email ?? payload.nik ?? null
+    }
+  }
+
   revalidatePath('/kojasmat')
-  return { data: anggota as KojasmatAnggota }
+  return { data: anggota as KojasmatAnggota, tempPassword, loginIdentifier }
 }
 
 export async function updateAnggota(id: string, payload: Partial<KojasmatAnggota>) {

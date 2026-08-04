@@ -7,11 +7,7 @@ import { getInternalAuthSession, createInternalAuthUser } from '@/lib/auth/inter
 import { revalidatePath } from 'next/cache'
 import { postSimpananMutasi } from './kojasmat.actions'
 import { jurnalPendapatanBiayaAdmin } from '@/lib/erp-bridge/kojasmat-journals'
-
-function generateTempPassword(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
-  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-}
+import { generateTempPassword } from '../lib/temp-password'
 
 // session.user.id bisa berisi legacy_user_id (Supabase UUID), bukan internal_auth_users.id.
 // Gunakan fungsi ini untuk FK yang merujuk ke internal_auth_users(id).
