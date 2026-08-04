@@ -243,13 +243,13 @@ export function CashClient({
   const shouldCheckAvailableCash = txType === 'OUT' || txType === 'TRANSFER'
   const isAmountExceedingAvailable = shouldCheckAvailableCash && Boolean(txBankAccountId) && txAmount > availableCashBalance
   const reconcileScopeLabel = activeBranchName
-    ? `unit aktif ${activeBranchName}`
-    : 'unit aktif organisasi induk yang sedang dipilih'
+    ? `cabang aktif ${activeBranchName}`
+    : 'cabang aktif organisasi induk yang sedang dipilih'
   const visibleScopeLabel = isAllBranchesView
-    ? 'semua unit'
+    ? 'semua cabang'
     : activeBranchName
-      ? `unit aktif ${activeBranchName}`
-      : 'unit aktif organisasi induk yang sedang dipilih'
+      ? `cabang aktif ${activeBranchName}`
+      : 'cabang aktif organisasi induk yang sedang dipilih'
   const filteredTransactions = recentTransactions.filter(
     (transaction) => transaction.status === filterStatus && (!filterAccountId || transaction.bank_account_id === filterAccountId)
   )
@@ -283,11 +283,11 @@ export function CashClient({
     ? 'Mode holding aktif. Pantau saldo dan mutasi organisasi induk + seluruh entitas dari satu halaman.'
     : isAllBranchesView
       ? (activeBranchName
-          ? `Menampilkan saldo dan mutasi semua unit. Transaksi baru tetap diproses dari unit aktif ${activeBranchName}.`
-          : 'Menampilkan saldo dan mutasi semua unit. Pilih unit aktif spesifik untuk membuat rekening atau transaksi baru.')
+          ? `Menampilkan saldo dan mutasi semua cabang. Transaksi baru tetap diproses dari cabang aktif ${activeBranchName}.`
+          : 'Menampilkan saldo dan mutasi semua cabang. Pilih cabang aktif spesifik untuk membuat rekening atau transaksi baru.')
     : activeBranchName
-      ? `Mutasi kas dan bank untuk unit aktif ${activeBranchName}.`
-      : 'Mode semua unit aktif. Pilih unit spesifik untuk membuat rekening atau transaksi baru.'
+      ? `Mutasi kas dan bank untuk cabang aktif ${activeBranchName}.`
+      : 'Mode semua cabang aktif. Pilih cabang spesifik untuk membuat rekening atau transaksi baru.'
 
   useEffect(() => {
     const pay = searchParams.get('pay')
@@ -529,8 +529,8 @@ export function CashClient({
                   disabled={!canOpenParentAccountModal}
                   title={
                     !canManageDirect
-                      ? 'Pindah ke konteks Unit Utama organisasi induk untuk membuat rekening.'
-                      : (!canWriteCash ? 'Pilih unit aktif organisasi induk terlebih dahulu.' : undefined)
+                      ? 'Pindah ke konteks Cabang Utama organisasi induk untuk membuat rekening.'
+                      : (!canWriteCash ? 'Pilih cabang aktif organisasi induk terlebih dahulu.' : undefined)
                   }
                   onClick={() => setShowAccountModal(true)}
                 >
@@ -574,16 +574,16 @@ export function CashClient({
 
       {!canWriteCash ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
-          Pilih unit aktif terlebih dahulu untuk menambah rekening, mencatat transaksi, atau unggah mutasi bank.
+          Pilih cabang aktif terlebih dahulu untuk menambah rekening, mencatat transaksi, atau unggah mutasi bank.
         </div>
       ) : null}
       {isHoldingView && hasCrossEntityAccounts ? (
         <div className="rounded-xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-900 shadow-sm">
-          Mode holding aktif: kartu rekening dan aktivitas terbaru menampilkan organisasi induk + seluruh entitas anak. Pencatatan transaksi baru dan rekonsiliasi tetap diproses dari unit aktif organisasi induk.
+          Mode holding aktif: kartu rekening dan aktivitas terbaru menampilkan organisasi induk + seluruh entitas anak. Pencatatan transaksi baru dan rekonsiliasi tetap diproses dari cabang aktif organisasi induk.
         </div>
       ) : isParentButRestricted ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
-          Anda berada di organisasi induk, tetapi pembuatan rekening hanya bisa dari konteks Unit Utama. Pindah unit aktif ke Unit Utama organisasi induk lalu coba lagi.
+          Anda berada di organisasi induk, tetapi pembuatan rekening hanya bisa dari konteks Cabang Utama. Pindah cabang aktif ke Cabang Utama organisasi induk lalu coba lagi.
         </div>
       ) : canUseHoldingView && hasCrossEntityAccounts ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-6 py-4 text-sm font-semibold text-slate-700 shadow-sm">
@@ -591,7 +591,7 @@ export function CashClient({
         </div>
       ) : isAllBranchesView ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-900 shadow-sm">
-          Mode semua unit aktif: total likuiditas dan daftar rekening di bawah ini mencakup seluruh unit dalam entitas ini. Pencatatan transaksi baru tetap memakai unit aktif {activeBranchName || 'yang sedang dipilih'}.
+          Mode semua cabang aktif: total likuiditas dan daftar rekening di bawah ini mencakup seluruh cabang dalam entitas ini. Pencatatan transaksi baru tetap memakai cabang aktif {activeBranchName || 'yang sedang dipilih'}.
         </div>
       ) : null}
 
@@ -681,7 +681,7 @@ export function CashClient({
                              <span className="mt-2 inline-flex items-center rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-blue-700 border border-blue-100">
                                {isCrossEntity
                                  ? `${acc.org_name || 'Entitas Anak'}${acc.branch_name ? ` • ${acc.branch_name}` : ''}`
-                                 : (acc.branch_name || 'Semua Unit')}
+                                 : (acc.branch_name || 'Semua Cabang')}
                              </span>
                            )}
                         </div>
@@ -1240,7 +1240,7 @@ export function CashClient({
 
                  {placementNodes.length > 0 ? (
                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Penempatan Rekening (Organisasi & Unit)</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Penempatan Rekening (Organisasi & Cabang)</label>
                       <div className="relative">
                         <select 
                           name="target_org_branch" 
@@ -1268,7 +1268,7 @@ export function CashClient({
                  ) : (
                    branches.length > 0 && (
                      <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Penempatan Rekening (Unit)</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Penempatan Rekening (Cabang)</label>
                         <div className="relative">
                           <select name="target_branch_id" defaultValue={activeBranchId || undefined} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner">
                              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -1424,7 +1424,7 @@ export function CashClient({
                             <p className="text-[10px] font-bold text-blue-500 ml-1">
                               {isInterOrgTransfer
                                 ? 'Transfer lintas entitas: pilih rekening entitas tujuan yang sudah diajukan dan aktif. Sistem akan posting OUT investasi di organisasi induk dan IN pendanaan di entitas tujuan.'
-                                : 'Target harus rekening kas/bank lain dalam unit aktif yang sama.'}
+                                : 'Target harus rekening kas/bank lain dalam cabang aktif yang sama.'}
                             </p>
                           </>
                         ) : (
@@ -1459,7 +1459,7 @@ export function CashClient({
                        />
                        {sourceInterOrgCounterAccounts.length > 0 ? (
                          <p className="text-[10px] font-bold text-blue-500 ml-1">
-                           Gunakan akun investasi organisasi induk, idealnya 1601 Investasi pada Entitas Anak / Unit.
+                           Gunakan akun investasi organisasi induk, idealnya 1601 Investasi pada Entitas Anak / Cabang.
                          </p>
                        ) : (
                          <p className="text-[10px] font-bold text-amber-600 ml-1">
@@ -1492,7 +1492,7 @@ export function CashClient({
                         ? 'Choosing REVENUE will increase equity. Choosing an ASSET account like Accounts Receivable will settle a customer debt.'
                         : isInterOrgTransfer
                           ? 'Transfer modal antar entitas membuat dua jurnal otomatis: organisasi induk mencatat arus kas investasi, sedangkan entitas penerima mencatat arus kas pendanaan pada rekening target yang dipilih.'
-                          : 'A transfer credits the source bank account and debits the target bank account in the same unit.'}
+                          : 'A transfer credits the source bank account and debits the target bank account in the same branch.'}
                  </div>
 
                  <div className="flex gap-4 pt-4 shrink-0">

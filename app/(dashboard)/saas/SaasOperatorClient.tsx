@@ -903,14 +903,14 @@ export default function SaasOperatorClient({
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Unit / Cabang</span>
+                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Cabang</span>
                   <input type="number" min="0" value={extraBranchQty}
                     onChange={(e) => setExtraBranchQty(Math.max(0, Number(e.target.value || 0)))}
                     className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold"
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Harga / Unit</span>
+                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">Harga / Cabang</span>
                   <input type="number" min="0" value={extraBranchUnitPrice}
                     onChange={(e) => setExtraBranchUnitPrice(e.target.value)}
                     placeholder={String(99000)}
@@ -922,7 +922,7 @@ export default function SaasOperatorClient({
                 <div className="mt-2 text-[11px] font-semibold text-slate-500">
                   {extraEntityQty > 0 && <span>{extraEntityQty} child × {formatIdr(extraEntityUnitPriceValue)} = {formatIdr(extraEntityQty * extraEntityUnitPriceValue)} / bln</span>}
                   {extraEntityQty > 0 && extraBranchQty > 0 && <span className="mx-2 text-slate-300">|</span>}
-                  {extraBranchQty > 0 && <span>{extraBranchQty} unit × {formatIdr(extraBranchUnitPriceValue)} = {formatIdr(extraBranchQty * extraBranchUnitPriceValue)} / bln</span>}
+                  {extraBranchQty > 0 && <span>{extraBranchQty} Cabang × {formatIdr(extraBranchUnitPriceValue)} = {formatIdr(extraBranchQty * extraBranchUnitPriceValue)} / bln</span>}
                 </div>
               )}
             </section>
@@ -1113,7 +1113,7 @@ export default function SaasOperatorClient({
                     {selectedModulesMonthlyTotal > 0 && <div className="flex justify-between text-emerald-700"><span>Modul custom</span><span>{formatIdr(selectedModulesMonthlyTotal)}</span></div>}
                     {selectedAddonMonthlyTotal > 0 && <div className="flex justify-between"><span>Add-on bulanan</span><span>{formatIdr(selectedAddonMonthlyTotal)}</span></div>}
                     {extraEntityQty > 0 && <div className="flex justify-between"><span>Child entity ×{extraEntityQty}</span><span>{formatIdr(extraEntityTotal)}</span></div>}
-                    {extraBranchQty > 0 && <div className="flex justify-between"><span>Unit ×{extraBranchQty}</span><span>{formatIdr(extraBranchTotal)}</span></div>}
+                    {extraBranchQty > 0 && <div className="flex justify-between"><span>Cabang ×{extraBranchQty}</span><span>{formatIdr(extraBranchTotal)}</span></div>}
                     {selectedAddonSingleBillTotal > 0 && <div className="flex justify-between text-slate-400"><span>One-time add-on</span><span>{formatIdr(selectedAddonSingleBillTotal)}</span></div>}
                   </div>
                   <div className="mt-2 flex justify-between border-t border-indigo-100 pt-2">

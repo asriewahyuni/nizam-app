@@ -147,7 +147,7 @@ export function WarehouseDetailClient({
   const shouldAutoOpenCreateBin = searchParams.get('createBin') === '1'
   const isAdmin = ['owner', 'admin', 'manager'].includes(userRole)
   const binMutationGuardMessage = !activeBranchId
-    ? 'Mode Semua Unit hanya untuk baca. Pilih unit aktif untuk mengelola bin gudang.'
+    ? 'Mode Semua Cabang hanya untuk baca. Pilih Cabang aktif untuk mengelola bin gudang.'
     : null
   const [bins, setBins] = useState<WarehouseBin[]>(() => initialBins.map((bin) => normalizeBin(bin)))
   const { confirm, ConfirmUI } = useConfirm()
@@ -278,7 +278,7 @@ export function WarehouseDetailClient({
       <div className="space-y-6">
         {binMutationGuardMessage && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
-            {binMutationGuardMessage} {activeBranchName ? `Unit aktif saat ini: ${activeBranchName}.` : ''}
+            {binMutationGuardMessage} {activeBranchName ? `Cabang aktif saat ini: ${activeBranchName}.` : ''}
           </div>
         )}
 

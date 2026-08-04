@@ -143,7 +143,7 @@ export function ManufacturingClient({
   const [shortItems, setShortItems] = useState<any[]>([])
   const [pendingWo, setPendingWo] = useState<any>(null)
   const [showQuotationPrompt, setShowQuotationPrompt] = useState(false)
-  const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk memakai modul manufaktur.'
+  const branchGuardMessage = 'Pilih satu Cabang aktif terlebih dahulu untuk memakai modul manufaktur.'
   const spkStats = [
     { label: 'Kapasitas Air', value: '15.000 L', icon: Zap, color: 'text-[#2563EB] bg-blue-50' },
     { label: 'SPK Aktif', value: workOrders.filter(w => w.status === 'RELEASED').length, icon: Play, color: 'text-blue-600 bg-blue-50' },
@@ -360,7 +360,7 @@ export function ManufacturingClient({
           </h1>
           <p className="text-sm text-slate-500 font-medium">
             Pengelolaan Bill of Materials (BoM) dan Work Order (SPK) dengan Accurate Costing.
-            {activeBranchName ? ` Scope aktif: ${activeBranchName}.` : ' Mode semua unit hanya baca.'}
+            {activeBranchName ? ` Scope aktif: ${activeBranchName}.` : ' Mode semua Cabang hanya baca.'}
           </p>
         </div>
 
@@ -411,9 +411,9 @@ export function ManufacturingClient({
             <AlertTriangle size={22} />
           </div>
           <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-amber-900 uppercase tracking-wide">Pilih Unit Aktif</h3>
+            <h3 className="text-sm font-semibold text-amber-900 uppercase tracking-wide">Pilih Cabang Aktif</h3>
             <p className="text-sm font-medium text-amber-800/80">
-              Anda sedang melihat data lintas unit. Pilih satu unit dari header untuk membuat BoM, menerbitkan SPK, mencatat biaya produksi, atau menyelesaikan produksi.
+              Anda sedang melihat data lintas Cabang. Pilih satu Cabang dari header untuk membuat BoM, menerbitkan SPK, mencatat biaya produksi, atau menyelesaikan produksi.
             </p>
           </div>
         </div>
@@ -484,7 +484,7 @@ export function ManufacturingClient({
                                 <p className="text-xs text-slate-500">{wo.bom?.product?.name}</p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[9px] font-semibold uppercase tracking-wide border border-blue-100">
-                                    {wo.branch?.name || 'Semua Unit'}
+                                    {wo.branch?.name || 'Semua Cabang'}
                                   </span>
                                   {wo.bom?.branch?.name && (
                                     <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-semibold uppercase tracking-wide border border-slate-200">
@@ -603,7 +603,7 @@ export function ManufacturingClient({
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-semibold uppercase tracking-wide border border-indigo-100">
-                            {bom.branch?.name || 'Shared / Semua Unit'}
+                            {bom.branch?.name || 'Shared / Semua Cabang'}
                           </span>
                         </div>
                         <h3 className="text-xl font-bold text-slate-900">{bom.product?.name}</h3>
@@ -758,7 +758,7 @@ export function ManufacturingClient({
                       </p>
                     </div>
                     <div className="text-sm text-slate-600 font-medium space-y-1 md:text-right">
-                      <p>Unit: {selectedPrintWo.branch?.name || activeBranchName || 'Semua Unit'}</p>
+                      <p>Cabang: {selectedPrintWo.branch?.name || activeBranchName || 'Semua Cabang'}</p>
                       <p>BOM: {selectedPrintWo.bom?.code || '-'}</p>
                       <p>Dicetak: {printIssuedAt || '-'}</p>
                     </div>

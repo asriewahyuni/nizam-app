@@ -182,7 +182,7 @@ export default function POSClient({
          message: null,
       }
    ), [posShiftConfig, posShiftSnapshot])
-   const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk memakai POS.'
+   const branchGuardMessage = 'Pilih satu Cabang aktif terlebih dahulu untuk memakai POS.'
    const isStockTrackedProduct = (item: any) => (item?.type || 'INVENTORY') === 'INVENTORY'
    const formatStockQty = (value: number) => {
       const parsed = Number(value || 0)
@@ -1014,7 +1014,7 @@ export default function POSClient({
                 <div>
                    <h1 className="text-sm md:text-lg font-semibold tracking-tight leading-none">{orgSettings.brand_name || 'Nizam POS'}</h1>
                   <div className="text-[8px] md:text-[10px] font-bold text-white/70 uppercase tracking-wide flex items-center gap-1 mt-0.5">
-                     <MapPin size={8} className="md:w-[10px]" /> {activeBranchName || 'Pilih Unit Aktif'}
+                     <MapPin size={8} className="md:w-[10px]" /> {activeBranchName || 'Pilih Cabang Aktif'}
                   </div>
                </div>
             </div>
@@ -1165,7 +1165,7 @@ export default function POSClient({
                               <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">Rekam Shift Per Hari</div>
                               <div className="text-sm md:text-base font-semibold text-slate-900 mt-1">
                                  {historyShiftCount > 0
-                                    ? `${historyShiftCount} shift terekam di unit ${activeBranchName || 'aktif'}`
+                                    ? `${historyShiftCount} shift terekam di Cabang ${activeBranchName || 'aktif'}`
                                     : 'Belum ada histori shift tersimpan'}
                               </div>
                               <div className="text-[11px] text-slate-500 font-medium mt-1">
@@ -1433,9 +1433,9 @@ export default function POSClient({
                            <div className="w-14 h-14 mx-auto rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
                               <MapPin size={26} />
                            </div>
-                           <h3 className="text-lg font-semibold text-slate-800 mb-2">Pilih Unit Aktif</h3>
+                           <h3 className="text-lg font-semibold text-slate-800 mb-2">Pilih Cabang Aktif</h3>
                            <p className="text-sm font-medium text-slate-500 leading-relaxed">
-                              POS hanya bisa dipakai di satu unit aktif. Pilih unit dari header terlebih dahulu agar stok dan jurnal tidak tercampur.
+                              POS hanya bisa dipakai di satu Cabang aktif. Pilih Cabang dari header terlebih dahulu agar stok dan jurnal tidak tercampur.
                            </p>
                         </div>
                      </div>
@@ -1688,7 +1688,7 @@ export default function POSClient({
                      <div className="px-5 md:px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                         <div>
                            <h3 className="text-lg md:text-xl font-semibold text-slate-900">Buka Shift POS</h3>
-                           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-1">Unit {activeBranchName || 'Aktif'}</p>
+                           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-1">Cabang {activeBranchName || 'Aktif'}</p>
                         </div>
                         <button type="button" onClick={() => setShowOpenShiftModal(false)} className="p-2 rounded-full hover:bg-white text-slate-400 hover:text-slate-700">
                            <X size={20} />
@@ -2317,7 +2317,7 @@ export default function POSClient({
                         <img src={logoUrl} alt="Logo" className="w-12 h-12 object-contain mb-1" />
                      )}
                      <h2 className="font-bold text-sm uppercase">{orgSettings.brand_name || 'NIZAM POS'}</h2>
-                     <p className="text-[8px] uppercase font-bold">{activeBranchName || 'Unit Belum Dipilih'}</p>
+                     <p className="text-[8px] uppercase font-bold">{activeBranchName || 'Cabang Belum Dipilih'}</p>
                      <p className="text-[8px]">{orgSettings.company_address || 'Pusat Penjualan Retil'}</p>
                   </div>
                   <div className="border-b border-dashed border-black mb-2" />

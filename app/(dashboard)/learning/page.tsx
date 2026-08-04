@@ -155,7 +155,7 @@ export default async function LearningPage(props: {
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
               Di sini setiap entitas bisa membuat pelatihannya sendiri. Gunakan konteks organisasi aktif untuk parent
-              atau child, lalu pilih scope unit bila pelatihan hanya berlaku untuk cabang tertentu.
+              atau child, lalu pilih scope Cabang bila pelatihan hanya berlaku untuk cabang tertentu.
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide text-slate-600">
               <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
@@ -163,11 +163,11 @@ export default async function LearningPage(props: {
               </span>
               {dashboard.activeUnit ? (
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
-                  Unit Aktif: {dashboard.activeUnit.name}
+                  Cabang Aktif: {dashboard.activeUnit.name}
                 </span>
               ) : null}
               <span className="rounded-full border border-slate-200 bg-white px-3 py-1">
-                {branches.length} unit dapat dipilih
+                {branches.length} Cabang dapat dipilih
               </span>
             </div>
           </div>
@@ -325,12 +325,12 @@ export default async function LearningPage(props: {
                     className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
                   >
                     <option value="ORG">Seluruh entitas aktif</option>
-                    <option value="BRANCH">Unit tertentu</option>
+                    <option value="BRANCH">Cabang tertentu</option>
                   </select>
                 </label>
 
                 <label className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
-                  <div className="font-semibold text-slate-900">Unit Target</div>
+                  <div className="font-semibold text-slate-900">Cabang Target</div>
                   <select
                     name="branchId"
                     defaultValue={dashboard.activeUnit?.id || ''}
@@ -344,7 +344,7 @@ export default async function LearningPage(props: {
                     ))}
                   </select>
                   <p className="mt-2 text-xs leading-5 text-slate-500">
-                    Jika scope `Unit tertentu`, sistem akan memakai unit ini.
+                    Jika scope `Cabang tertentu`, sistem akan memakai Cabang ini.
                   </p>
                 </label>
 
@@ -440,7 +440,7 @@ export default async function LearningPage(props: {
             <Layers className="h-5 w-5 text-slate-700" />
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Konteks Aktif</div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-900">Entitas dan unit tempat pelatihan dibuat</h2>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900">Entitas dan Cabang tempat pelatihan dibuat</h2>
             </div>
           </div>
           <div className="mt-5 space-y-4">
@@ -456,7 +456,7 @@ export default async function LearningPage(props: {
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[18px] border border-emerald-200 bg-white p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Unit</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cabang</div>
                   <div className="mt-2 text-xl font-semibold text-slate-900">{branches.length}</div>
                 </div>
                 <div className="rounded-[18px] border border-emerald-200 bg-white p-4">
@@ -470,13 +470,13 @@ export default async function LearningPage(props: {
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Unit Aktif</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cabang Aktif</div>
                     <h3 className="mt-2 text-base font-semibold text-slate-900">{dashboard.activeUnit.name}</h3>
                   </div>
                   <CalendarDays className="h-5 w-5 text-slate-500" />
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-600">
-                  Saat Anda memilih scope `Unit tertentu`, pelatihan akan ditautkan ke unit ini atau unit yang dipilih di form.
+                  Saat Anda memilih scope `Cabang tertentu`, pelatihan akan ditautkan ke Cabang ini atau Cabang yang dipilih di form.
                 </p>
               </div>
             ) : null}
@@ -486,7 +486,7 @@ export default async function LearningPage(props: {
               <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
                 <p>Parent membuat program untuk parent saat konteks aktif di parent.</p>
                 <p>Child membuat programnya sendiri setelah switch ke child terkait.</p>
-                <p>Unit bisa punya program khusus lewat scope `Unit tertentu`.</p>
+                <p>Cabang bisa punya program khusus lewat scope `Cabang tertentu`.</p>
               </div>
             </div>
           </div>
@@ -521,7 +521,7 @@ export default async function LearningPage(props: {
                       </span>
                       <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
                         {training.scopeType === 'BRANCH'
-                          ? `Unit • ${training.branchCode || training.branchName || 'Tanpa nama'}`
+                          ? `Cabang • ${training.branchCode || training.branchName || 'Tanpa nama'}`
                           : 'Entitas aktif'}
                       </span>
                       <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
@@ -633,9 +633,9 @@ export default async function LearningPage(props: {
         </div>
         <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
           <Layers className="h-5 w-5 text-emerald-700" />
-          <h3 className="mt-4 text-base font-semibold text-slate-900">Per Entitas dan Unit</h3>
+          <h3 className="mt-4 text-base font-semibold text-slate-900">Per Entitas dan Cabang</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Parent, child, dan unit bisa punya katalog pelatihan berbeda sesuai konteks aktif yang dipilih.
+            Parent, child, dan Cabang bisa punya katalog pelatihan berbeda sesuai konteks aktif yang dipilih.
           </p>
         </div>
         <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">

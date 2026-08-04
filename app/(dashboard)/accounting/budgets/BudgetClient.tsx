@@ -106,14 +106,14 @@ export function BudgetClient({
   const hasActiveBranch = Boolean(activeBranchId)
   const isPeriodClosed = safePeriodStatus.isClosed
   const canEditBudget = hasActiveBranch && !isPeriodClosed
-  const scopeLabel = activeBranchName || (allowAllBranchSelection ? 'Semua Unit' : 'Unit belum dipilih')
-  const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk mengelola budget.'
+  const scopeLabel = activeBranchName || (allowAllBranchSelection ? 'Semua Cabang' : 'Cabang belum dipilih')
+  const branchGuardMessage = 'Pilih satu Cabang aktif terlebih dahulu untuk mengelola budget.'
   const periodLockMessage = safePeriodStatus.fiscalPeriodName
     ? `Periode fiskal ${safePeriodStatus.fiscalPeriodName} sudah ditutup. Budget untuk periode ini terkunci.`
     : 'Periode fiskal untuk bulan ini sudah ditutup. Budget untuk periode ini terkunci.'
   const readOnlyBudgetHint = allowAllBranchSelection
-    ? 'Pilih satu unit aktif dari header untuk membuka form input budget bulanan.'
-    : 'Akses unit aktif belum tersedia untuk akun ini, sehingga budget hanya bisa dilihat.'
+    ? 'Pilih satu Cabang aktif dari header untuk membuka form input budget bulanan.'
+    : 'Akses Cabang aktif belum tersedia untuk akun ini, sehingga budget hanya bisa dilihat.'
   const parentAccountIds = new Set(
     accounts
       .map((account) => String(account.parent_id || '').trim())
@@ -284,7 +284,7 @@ export function BudgetClient({
           <div className="space-y-1">
             <p className="text-sm font-semibold text-amber-900 uppercase tracking-wide">Mode Read-Only</p>
             <p className="text-sm font-medium text-amber-800">
-              Pilih satu unit aktif terlebih dahulu untuk menyusun atau mengubah budget. Dalam mode ini data masih tampil sebagai ringkasan {scopeLabel.toLowerCase()}.
+              Pilih satu Cabang aktif terlebih dahulu untuk menyusun atau mengubah budget. Dalam mode ini data masih tampil sebagai ringkasan {scopeLabel.toLowerCase()}.
             </p>
             <p className="text-sm font-semibold text-amber-700">
               {readOnlyBudgetHint}
@@ -389,9 +389,9 @@ export function BudgetClient({
              {!hasActiveBranch ? (
                <div className="p-16 text-center space-y-4">
                  <AlertCircle size={28} className="mx-auto text-amber-500" />
-                 <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Pilih Unit Aktif</h3>
+                 <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Pilih Cabang Aktif</h3>
                  <p className="text-sm font-medium text-slate-500 max-w-xl mx-auto">
-                   Budget sekarang disimpan per unit. Pilih satu unit aktif dari header sebelum melakukan alokasi budget bulanan.
+                   Budget sekarang disimpan per Cabang. Pilih satu Cabang aktif dari header sebelum melakukan alokasi budget bulanan.
                  </p>
                  <p className="text-sm font-semibold text-amber-700 max-w-xl mx-auto">
                    {readOnlyBudgetHint}
@@ -444,7 +444,7 @@ export function BudgetClient({
                           {' '}
                           <span className="font-semibold">POSTED</span>
                           {' '}
-                          ke akun dan unit yang sama.
+                          ke akun dan Cabang yang sama.
                         </p>
                       </div>
                       {budgetableAccounts.map((account) => {
@@ -510,7 +510,7 @@ export function BudgetClient({
                                 </div>
                               ) : (
                                 <p className="mt-4 text-xs font-medium text-slate-400">
-                                  Belum ada realisasi yang terbaca untuk akun ini pada periode dan unit aktif.
+                                  Belum ada realisasi yang terbaca untuk akun ini pada periode dan Cabang aktif.
                                 </p>
                               )}
                             </div>

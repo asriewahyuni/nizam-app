@@ -348,9 +348,9 @@ export default async function DashboardLayout({
                 <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
                   <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-amber-600">Mode Semua Unit</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-amber-600">Mode Semua Cabang</p>
                       <p className="mt-0.5 text-sm font-medium text-slate-700">
-                        Ringkasan lintas unit aktif. Pilih satu unit dari header untuk membuat transaksi.
+                        Ringkasan lintas cabang aktif. Pilih satu cabang dari header untuk membuat transaksi.
                       </p>
                     </div>
                     <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-600">Read-only</span>

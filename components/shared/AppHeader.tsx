@@ -413,7 +413,7 @@ export function AppHeader({
       setBranches(navigationData.branches)
       setHasLoadedNavigationContext(true)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Gagal memuat organisasi dan unit.'
+      const message = error instanceof Error ? error.message : 'Gagal memuat organisasi dan cabang.'
       setOrgFeedback({ type: 'error', message })
     } finally {
       isLoadingNavRef.current = false
@@ -599,8 +599,8 @@ export function AppHeader({
 
   const handleBranchChange = async (branchId: string | null) => {
     const targetBranchLabel = branchId
-      ? branches.find((branch) => branch.id === branchId)?.name || 'unit terpilih'
-      : 'Semua Unit'
+      ? branches.find((branch) => branch.id === branchId)?.name || 'cabang terpilih'
+      : 'Semua Cabang'
 
     setPendingContextSwitch({
       kind: 'branch',
@@ -632,7 +632,7 @@ export function AppHeader({
       kind: 'branch',
       orgId: targetOrgId,
       branchId: targetBranchId,
-      label: targetBranch?.name || 'unit terpilih',
+      label: targetBranch?.name || 'cabang terpilih',
     })
 
     if (targetOrgId !== activeOrgId) {
@@ -693,7 +693,7 @@ export function AppHeader({
         )
       }
 
-      setBranchFeedback({ type: 'success', message: 'Unit baru dibuat dan langsung dijadikan unit aktif.' })
+      setBranchFeedback({ type: 'success', message: 'Cabang baru dibuat dan langsung dijadikan cabang aktif.' })
       setIsQuickCreateOpen(false)
       setIsBranchMenuOpen(false)
       form.reset()
@@ -807,14 +807,14 @@ export function AppHeader({
     return () => window.removeEventListener('mousedown', onClickOutside)
   }, [isBranchMenuOpen])
 
-  const branchHeadline = activeBranch?.name || (allowAllBranchSelection ? 'Semua Unit' : branches[0]?.name || 'Pilih Unit')
+  const branchHeadline = activeBranch?.name || (allowAllBranchSelection ? 'Semua Cabang' : branches[0]?.name || 'Pilih Cabang')
   const branchCaption = activeBranch
     ? activeBranch.code
     : allowAllBranchSelection
       ? branches.length > 1
         ? 'Mode agregat read-only'
-        : 'Tidak ada unit aktif'
-      : 'Transaksi butuh unit aktif'
+        : 'Tidak ada cabang aktif'
+      : 'Transaksi butuh cabang aktif'
   const activeOrganization = organizations.find((membership) => membership.orgId === activeOrgId) || null
   const effectiveActiveOrgRole = activeOrganization?.role || activeOrgRole || 'member'
   const effectiveActiveOrgParentName = activeOrganization?.org.parent_org_name || activeOrgParentName
@@ -839,7 +839,7 @@ export function AppHeader({
   const contextSwitchLabel = pendingContextSwitch
     ? pendingContextSwitch.kind === 'org'
       ? `Membuka ${pendingContextSwitch.label}...`
-      : `Mengganti unit ke ${pendingContextSwitch.label}...`
+      : `Mengganti cabang ke ${pendingContextSwitch.label}...`
     : null
 
   const openOrgDeck = useCallback(() => {
@@ -1267,7 +1267,7 @@ export function AppHeader({
                     {activeOrgHierarchyLabel}
                   </div>
                   <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">
-                    Pilih organisasi aktif sebelum memilih unit kerja. Setiap organisasi punya konteks unit, data, dan paketnya sendiri.
+                    Pilih organisasi aktif sebelum memilih cabang kerja. Setiap organisasi punya konteks cabang, data, dan paketnya sendiri.
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${activeOrgIsParent ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
@@ -1552,16 +1552,16 @@ export function AppHeader({
             {isBranchMenuOpen && (
               <div className="absolute top-full left-0 mt-2 w-[320px] bg-white border border-slate-100 rounded-xl shadow-md p-3 z-50">
                 <div className="px-2 pt-1 pb-3 border-b border-slate-100">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Konteks Unit</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Konteks Cabang</div>
                   <div className="mt-1 text-sm font-semibold text-slate-900">
-                    {activeBranch?.name || (allowAllBranchSelection ? 'Semua Unit' : 'Belum ada unit aktif')}
+                    {activeBranch?.name || (allowAllBranchSelection ? 'Semua Cabang' : 'Belum ada cabang aktif')}
                   </div>
                   <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">
                     {activeBranch
-                      ? 'Semua transaksi baru akan dibuat atas nama unit ini.'
+                      ? 'Semua transaksi baru akan dibuat atas nama cabang ini.'
                       : allowAllBranchSelection
-                        ? 'Mode Semua Unit cocok untuk membaca ringkasan lintas unit. Pilih satu unit untuk membuat transaksi baru.'
-                        : 'Pilih satu unit yang dapat Anda akses untuk memulai transaksi baru.'}
+                        ? 'Mode Semua Cabang cocok untuk membaca ringkasan lintas cabang. Pilih satu cabang untuk membuat transaksi baru.'
+                        : 'Pilih satu cabang yang dapat Anda akses untuk memulai transaksi baru.'}
                   </p>
                 </div>
 
@@ -1574,7 +1574,7 @@ export function AppHeader({
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === null ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
                     >
                       <div className="text-left">
-                        <div className="text-xs font-bold truncate">Semua Unit</div>
+                        <div className="text-xs font-bold truncate">Semua Cabang</div>
                         <div className={`text-[9px] font-semibold uppercase tracking-wide ${activeBranchId === null ? 'text-white/70' : 'text-slate-400'}`}>
                           Read-only agregat
                         </div>
@@ -1609,7 +1609,7 @@ export function AppHeader({
                 })}
                 {branches.length === 0 && (
                   <div className="px-3 py-4 rounded-xl bg-amber-50 border border-amber-100 text-xs font-bold text-amber-700">
-                    {isLoadingNavigationContext ? 'Memuat unit yang bisa diakses...' : 'Belum ada unit yang bisa diakses.'}
+                    {isLoadingNavigationContext ? 'Memuat cabang yang bisa diakses...' : 'Belum ada cabang yang bisa diakses.'}
                   </div>
                 )}
                 </div>
@@ -1637,14 +1637,14 @@ export function AppHeader({
                         className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50 transition-all"
                       >
                         <Plus size={14} />
-                        Tambah Unit
+                        Tambah Cabang
                       </button>
                       <Link
                         href="/settings/branches"
                         onClick={() => setIsBranchMenuOpen(false)}
                         className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#003366] hover:text-[#00264d]"
                       >
-                        Kelola Unit
+                        Kelola Cabang
                       </Link>
                     </div>
 
@@ -1653,13 +1653,13 @@ export function AppHeader({
                         <input
                           name="name"
                           required
-                          placeholder="Nama unit"
+                          placeholder="Nama cabang"
                           className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-[#003366]"
                         />
                         <input
                           name="code"
                           required
-                          placeholder="Kode unit"
+                          placeholder="Kode cabang"
                           className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold uppercase text-slate-900 outline-none focus:border-[#003366]"
                         />
                         <textarea
@@ -1672,7 +1672,7 @@ export function AppHeader({
                           disabled={isCreatingBranch || isSwitchingContext}
                           className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#003366] transition-all disabled:cursor-wait disabled:opacity-60"
                         >
-                          {isCreatingBranch ? 'Membuat Unit...' : 'Buat Dan Aktifkan'}
+                          {isCreatingBranch ? 'Membuat Cabang...' : 'Buat Dan Aktifkan'}
                         </button>
                       </form>
                     )}
@@ -2332,7 +2332,7 @@ export function AppHeader({
                                     ? 'border-white/10 bg-white/10 text-white'
                                     : 'border-slate-200 bg-white/80 text-slate-500 hover:text-blue-700'
                                 }`}
-                                aria-label="Geser kartu unit"
+                                aria-label="Geser kartu cabang"
                               >
                                 <Move size={11} />
                               </button>

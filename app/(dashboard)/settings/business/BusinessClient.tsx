@@ -622,7 +622,7 @@ export default function BusinessClient({
               Reset Semua Data Operasional
             </div>
             <p className="text-sm text-rose-700/80 leading-6">
-              Selain transaksi, mode ini juga menghapus produk, kontak, karyawan, bank account, gudang, fleet master, invitation link, dan master operasional lain. Struktur cabang akan dikembalikan ke satu Unit Utama. Profil bisnis, owner, role, akun, serta billing tetap dipertahankan.
+              Selain transaksi, mode ini juga menghapus produk, kontak, karyawan, bank account, gudang, fleet master, invitation link, dan master operasional lain. Struktur cabang akan dikembalikan ke satu Cabang Utama. Profil bisnis, owner, role, akun, serta billing tetap dipertahankan.
             </p>
           </div>
         </div>
@@ -688,7 +688,7 @@ export default function BusinessClient({
                   >
                     <p className="text-sm font-semibold text-slate-900 uppercase tracking-tight">Reset Semua Data Operasional</p>
                     <p className="text-sm text-slate-500 mt-3 leading-6">
-                      Menghapus transaksi sekaligus master operasional sehingga organisasi terasa kembali ke fase awal, dengan menyisakan satu Unit Utama untuk akun dan konteks dasar organisasi.
+                      Menghapus transaksi sekaligus master operasional sehingga organisasi terasa kembali ke fase awal, dengan menyisakan satu Cabang Utama untuk akun dan konteks dasar organisasi.
                     </p>
                   </button>
                 </div>

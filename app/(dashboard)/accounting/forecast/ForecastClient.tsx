@@ -33,7 +33,7 @@ export default function ForecastClient({ forecast, orgId, activeBranchName = nul
   const router = useRouter()
   const searchParams = useSearchParams()
   const days = parseInt(searchParams.get('days') || '30')
-  const scopeLabel = activeBranchName || 'Semua Unit'
+  const scopeLabel = activeBranchName || 'Semua Cabang'
 
   const changeDays = (d: number) => {
     const params = new URLSearchParams(searchParams)

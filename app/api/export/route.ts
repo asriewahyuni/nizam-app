@@ -58,10 +58,10 @@ export async function GET(request: NextRequest) {
 
   if (!isOrgScopedExport && branchId) {
     if (!branchAccessScope.accessibleBranchIds.includes(branchId)) {
-      return NextResponse.json({ error: 'Anda tidak memiliki akses ke unit tersebut' }, { status: 403 })
+      return NextResponse.json({ error: 'Anda tidak memiliki akses ke cabang tersebut' }, { status: 403 })
     }
   } else if (!isOrgScopedExport && !branchAccessScope.canAccessAllBranches) {
-    return NextResponse.json({ error: 'Pilih unit aktif terlebih dahulu untuk export laporan' }, { status: 400 })
+    return NextResponse.json({ error: 'Pilih cabang aktif terlebih dahulu untuk export laporan' }, { status: 400 })
   }
 
   // Get org name for header

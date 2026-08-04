@@ -332,7 +332,7 @@ export default function HrisClient({
 
   const handleOpenNew = () => {
     if (!activeBranchId) {
-      showToast('Pilih unit aktif terlebih dahulu untuk menambahkan karyawan baru.', 'info')
+      showToast('Pilih cabang aktif terlebih dahulu untuk menambahkan karyawan baru.', 'info')
       return
     }
 
@@ -673,7 +673,7 @@ export default function HrisClient({
     e.preventDefault()
     if (!transferingEmp) return
     if (!transferTargetOrgId || !transferTargetBranchId) {
-      showToast('Pilih entitas dan unit tujuan terlebih dahulu.', 'error')
+      showToast('Pilih entitas dan cabang tujuan terlebih dahulu.', 'error')
       return
     }
 
@@ -750,26 +750,26 @@ export default function HrisClient({
   }
 
   const employeeScopeLabel = activeBranchName
-    ? `Unit aktif: ${activeBranchName}`
+    ? `Cabang aktif: ${activeBranchName}`
     : allowAllBranchSelection
-      ? 'Mode semua unit aktif'
-      : 'Unit aktif belum dipilih'
+      ? 'Mode semua cabang aktif'
+      : 'Cabang aktif belum dipilih'
   const attendanceScopeLabel = activeBranchName
-    ? `Absensi & cuti untuk unit ${activeBranchName}`
+    ? `Absensi & cuti untuk cabang ${activeBranchName}`
     : allowAllBranchSelection
-      ? 'Mode semua unit aktif'
-      : 'Unit aktif belum dipilih'
+      ? 'Mode semua cabang aktif'
+      : 'Cabang aktif belum dipilih'
   const payrollScopeLabel = activeBranchName
-    ? `Payroll run untuk unit ${activeBranchName}`
+    ? `Payroll run untuk cabang ${activeBranchName}`
     : allowAllBranchSelection
-      ? 'Mode semua unit aktif'
-      : 'Unit aktif belum dipilih'
+      ? 'Mode semua cabang aktif'
+      : 'Cabang aktif belum dipilih'
 
   const hrisSubtitle =
     activeTab === 'ATTENDANCE'
       ? `Kontrol absensi harian dan pengajuan cuti dengan scope ${attendanceScopeLabel.toLowerCase()}.`
       : activeTab === 'PAYROLL'
-        ? 'Atur template gaji, tunjangan, dan potongan karyawan. Komponen gaji tetap org-wide, tetapi payroll run sudah terscope per unit.'
+        ? 'Atur template gaji, tunjangan, dan potongan karyawan. Komponen gaji tetap org-wide, tetapi payroll run sudah terscope per cabang.'
         : activeTab === 'RUNS'
           ? `Lakukan generate slip gaji otomatis dan pencatatan kas jurnal dengan scope ${payrollScopeLabel.toLowerCase()}.`
           : `Manajemen sumber daya manusia dengan scope ${employeeScopeLabel.toLowerCase()}.`
@@ -947,7 +947,7 @@ export default function HrisClient({
                   </div>
                   {!activeBranchId && (
                     <div className="text-[11px] font-bold text-slate-500">
-                      Pilih satu unit dari header jika ingin mendaftarkan karyawan baru.
+                      Pilih satu cabang dari header jika ingin mendaftarkan karyawan baru.
                     </div>
                   )}
                   {transferTargets.length === 0 && transferDisabledReason && (
@@ -1202,7 +1202,7 @@ export default function HrisClient({
             <SectionCard>
               <SectionHeader
                 title="Attendance Register"
-                subtitle="Kelola absensi manual per hari berdasarkan karyawan yang termasuk ke unit yang bisa Anda akses."
+                subtitle="Kelola absensi manual per hari berdasarkan karyawan yang termasuk ke cabang yang bisa Anda akses."
                 icon={Clock}
                 actions={
                   <div className="flex items-center gap-2">
@@ -1210,7 +1210,7 @@ export default function HrisClient({
                       <AttendanceQRButton
                         orgId={orgId}
                         branchId={activeBranchId}
-                        branchName={activeBranchName || 'Unit Aktif'}
+                        branchName={activeBranchName || 'Cabang Aktif'}
                       />
                     )}
                     <SafeButton
@@ -1234,8 +1234,8 @@ export default function HrisClient({
                   </div>
                   <div className="text-[11px] font-bold text-slate-500">
                     {allowAllBranchSelection && !activeBranchId
-                      ? 'Anda sedang melihat semua unit yang bisa diakses. Pilih karyawan untuk merekam absensi pada unitnya.'
-                      : 'Catatan terbaru menampilkan 14 hari terakhir pada scope unit aktif.'}
+                      ? 'Anda sedang melihat semua cabang yang bisa diakses. Pilih karyawan untuk merekam absensi pada cabangnya.'
+                      : 'Catatan terbaru menampilkan 14 hari terakhir pada scope cabang aktif.'}
                   </div>
                 </div>
 
@@ -1291,7 +1291,7 @@ export default function HrisClient({
                   {attendanceRecords.length === 0 && (
                     <EmptyState
                       title="Belum ada catatan absensi"
-                      description="Mulai isi absensi harian per unit agar HRIS punya log kehadiran yang konsisten."
+                      description="Mulai isi absensi harian per cabang agar HRIS punya log kehadiran yang konsisten."
                       icon={ClipboardList}
                       action={
                         <SafeButton
@@ -1313,7 +1313,7 @@ export default function HrisClient({
             <SectionCard>
               <SectionHeader
                 title="Leave Requests"
-                subtitle="Kelola pengajuan cuti karyawan per unit. Approval sekarang sinkron ke HRIS dan Approval Center."
+                subtitle="Kelola pengajuan cuti karyawan per cabang. Approval sekarang sinkron ke HRIS dan Approval Center."
                 icon={CalendarDays}
                 actions={
                   <SafeButton
@@ -1391,7 +1391,7 @@ export default function HrisClient({
                   {leaveRequests.length === 0 && (
                     <EmptyState
                       title="Belum ada pengajuan cuti"
-                      description="Gunakan form pengajuan untuk mulai mencatat leave request per unit."
+                      description="Gunakan form pengajuan untuk mulai mencatat leave request per cabang."
                       icon={CalendarDays}
                       action={
                         <SafeButton
@@ -1537,7 +1537,7 @@ export default function HrisClient({
                   </div>
                   {!activeBranchId && (
                     <div className="text-[11px] font-bold text-slate-500">
-                      Pilih satu unit dari header jika ingin membuat atau memperbaiki payroll run.
+                      Pilih satu cabang dari header jika ingin membuat atau memperbaiki payroll run.
                     </div>
                   )}
                 </div>
@@ -1794,7 +1794,7 @@ export default function HrisClient({
                               <div className="space-y-1 text-xs font-semibold text-slate-500">
                                 <p>Email login: {candidate.email || '-'}</p>
                                 <p>NIK: {candidate.nik || '-'}</p>
-                                <p>Unit default: {candidate.branchName || 'Tidak terikat unit tertentu'}</p>
+                                <p>Cabang default: {candidate.branchName || 'Tidak terikat cabang tertentu'}</p>
                               </div>
                             </div>
                             <SafeButton
@@ -2064,7 +2064,7 @@ export default function HrisClient({
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold text-slate-900 tracking-tight uppercase italic">Attendance Register</h3>
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">Catat kehadiran berdasarkan unit karyawan</p>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">Catat kehadiran berdasarkan cabang karyawan</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => setIsAttendanceModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
@@ -2074,13 +2074,13 @@ export default function HrisClient({
 
               <form onSubmit={handleSaveAttendance} className="p-5 space-y-8">
                 <div className="rounded-xl border px-6 py-5 border-blue-100 bg-blue-50/60">
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Konteks Unit</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Konteks Cabang</div>
                   <div className="text-sm font-semibold text-slate-800">
                     {activeBranchName
-                      ? `Anda sedang bekerja di unit ${activeBranchName}.`
+                      ? `Anda sedang bekerja di cabang ${activeBranchName}.`
                       : allowAllBranchSelection
-                        ? 'Mode semua unit aktif. Unit akan mengikuti branch karyawan yang dipilih.'
-                        : 'Unit aktif belum dipilih.'}
+                        ? 'Mode semua cabang aktif. Cabang akan mengikuti branch karyawan yang dipilih.'
+                        : 'Cabang aktif belum dipilih.'}
                   </div>
                 </div>
 
@@ -2160,7 +2160,7 @@ export default function HrisClient({
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold text-slate-900 tracking-tight uppercase italic">Leave Request</h3>
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">Ajukan cuti sesuai unit karyawan</p>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">Ajukan cuti sesuai cabang karyawan</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => setIsLeaveModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
@@ -2274,8 +2274,8 @@ export default function HrisClient({
                 <div className="p-6 bg-blue-50/50 rounded-[32px] border border-blue-100/50">
                   <p className="text-[11px] text-blue-600 font-bold leading-relaxed text-center italic">
                     {activeBranchName
-                      ? `Payroll hanya akan dibuat untuk karyawan di unit ${activeBranchName}.`
-                      : 'Pilih unit aktif terlebih dahulu untuk membuat payroll run.'}
+                      ? `Payroll hanya akan dibuat untuk karyawan di cabang ${activeBranchName}.`
+                      : 'Pilih cabang aktif terlebih dahulu untuk membuat payroll run.'}
                   </p>
                 </div>
                 <SafeButton
@@ -2438,14 +2438,14 @@ export default function HrisClient({
                 <form id="emp-form" onSubmit={handleCreateEmp} className="space-y-12">
                   <div className={`rounded-xl border px-6 py-5 ${editingEmp ? 'border-blue-100 bg-blue-50/60' : activeBranchId ? 'border-emerald-100 bg-emerald-50/60' : 'border-amber-100 bg-amber-50/60'}`}>
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
-                      Konteks Unit
+                      Konteks Cabang
                     </div>
                     <div className="text-sm font-semibold text-slate-800">
                       {editingEmp?.branch?.name
-                        ? `Profil ini terdaftar di unit ${editingEmp.branch.name}.`
+                        ? `Profil ini terdaftar di cabang ${editingEmp.branch.name}.`
                         : activeBranchName
-                          ? `Karyawan baru akan didaftarkan ke unit ${activeBranchName}.`
-                          : 'Pilih unit aktif dari header sebelum menambahkan karyawan baru.'}
+                          ? `Karyawan baru akan didaftarkan ke cabang ${activeBranchName}.`
+                          : 'Pilih cabang aktif dari header sebelum menambahkan karyawan baru.'}
                     </div>
                   </div>
 
@@ -2590,11 +2590,11 @@ export default function HrisClient({
                   <div className="space-y-6">
                       <div className="flex items-center gap-3">
                         <div className="h-4 w-1 bg-emerald-600 rounded-full" />
-                      <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Penugasan PIC Unit (Opsional)</h4>
+                      <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Penugasan PIC Cabang (Opsional)</h4>
                     </div>
                     <div className="space-y-2">
                        <p className="text-xs font-semibold text-slate-500 mb-3">
-                          Pilih unit operasional yang akan dikelola oleh karyawan ini sebagai Manager (PIC).
+                          Pilih cabang operasional yang akan dikelola oleh karyawan ini sebagai Manager (PIC).
                        </p>
                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50">
                           {branchOptions?.map((b: any) => (
@@ -2610,7 +2610,7 @@ export default function HrisClient({
                              </label>
                           ))}
                           {(!branchOptions || branchOptions.length === 0) && (
-                             <p className="text-xs text-slate-400 italic">Belum ada data unit.</p>
+                             <p className="text-xs text-slate-400 italic">Belum ada data cabang.</p>
                           )}
                        </div>
                     </div>
@@ -2717,20 +2717,20 @@ export default function HrisClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Unit Tujuan</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Cabang Tujuan</label>
                   <select
                     required
                     value={transferTargetBranchId}
                     onChange={(e) => setTransferTargetBranchId(e.target.value)}
                     className="w-full px-5 py-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500"
                   >
-                    <option value="">-- Pilih Unit --</option>
+                    <option value="">-- Pilih Cabang --</option>
                     {selectedTransferBranches.map((branch: any) => (
                       <option key={branch.id} value={branch.id}>{branch.name} ({branch.code || '-'})</option>
                     ))}
                   </select>
                   {transferTargetOrgId && selectedTransferBranches.length === 0 && (
-                    <p className="text-[11px] font-semibold text-amber-600">Entitas ini belum memiliki unit aktif yang bisa dipilih.</p>
+                    <p className="text-[11px] font-semibold text-amber-600">Entitas ini belum memiliki cabang aktif yang bisa dipilih.</p>
                   )}
                 </div>
 
@@ -2743,7 +2743,7 @@ export default function HrisClient({
                     className="mt-1 h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
                   />
                   <label htmlFor="transfer-pic-target" className="text-xs font-bold text-emerald-700">
-                    Setelah mutasi, tetapkan karyawan ini sebagai PIC pada unit tujuan.
+                    Setelah mutasi, tetapkan karyawan ini sebagai PIC pada cabang tujuan.
                   </label>
                 </div>
 
@@ -2759,7 +2759,7 @@ export default function HrisClient({
                 </div>
 
                 <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-[11px] font-semibold text-indigo-700">
-                  Mutasi akan: memindahkan profil ke entitas tujuan, menghapus profil asal (atau fallback RESIGNED jika terikat histori transaksi), melepas PIC unit lama, dan menulis riwayat mutasi.
+                  Mutasi akan: memindahkan profil ke entitas tujuan, menghapus profil asal (atau fallback RESIGNED jika terikat histori transaksi), melepas PIC cabang lama, dan menulis riwayat mutasi.
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">

@@ -6,7 +6,7 @@ import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { ACTIVE_BRANCH_COOKIE, type BranchSummary } from './org-context'
 
 const FULL_BRANCH_ACCESS_ROLES = new Set(['owner', 'admin'])
-const DEFAULT_BRANCH_NAME = 'Unit Utama'
+const DEFAULT_BRANCH_NAME = 'Cabang Utama'
 const DEFAULT_BRANCH_CODE = 'MAIN'
 
 export type BranchAccessScope = {
@@ -286,24 +286,24 @@ export async function resolveAccessibleBranchSelection(
   }
 
   if (scope.accessibleBranches.length === 0) {
-    return { scope, error: 'Anda belum memiliki akses ke unit mana pun pada organisasi ini.' }
+    return { scope, error: 'Anda belum memiliki akses ke Cabang mana pun pada organisasi ini.' }
   }
 
   if (branchId !== undefined) {
     if (branchId === null) {
       if (!scope.canAccessAllBranches) {
-        return { scope, error: 'Anda tidak memiliki akses ke semua unit pada organisasi ini.' }
+        return { scope, error: 'Anda tidak memiliki akses ke semua Cabang pada organisasi ini.' }
       }
       return { scope, branchId: null }
     }
 
     const trimmedBranchId = branchId.trim()
     if (!trimmedBranchId) {
-      return { scope, error: 'Unit tidak valid.' }
+      return { scope, error: 'Cabang tidak valid.' }
     }
 
     if (!scope.accessibleBranchIds.includes(trimmedBranchId)) {
-      return { scope, error: 'Anda tidak memiliki akses ke unit tersebut.' }
+      return { scope, error: 'Anda tidak memiliki akses ke Cabang tersebut.' }
     }
 
     return { scope, branchId: trimmedBranchId }

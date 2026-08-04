@@ -519,11 +519,11 @@ export default function JournalClient({
 
 	      {!canCreateManualJournal ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
-          Pilih unit aktif terlebih dahulu untuk membuat jurnal manual. Buku besar saat ini masih menampilkan data level organisasi.
+          Pilih Cabang aktif terlebih dahulu untuk membuat jurnal manual. Buku besar saat ini masih menampilkan data level organisasi.
         </div>
 	      ) : (
 	        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-900 shadow-sm">
-	          Jurnal manual baru akan dicatat ke unit aktif: <span className="font-semibold">{activeBranchName}</span>.
+	          Jurnal manual baru akan dicatat ke Cabang aktif: <span className="font-semibold">{activeBranchName}</span>.
 	        </div>
 	      )}
 

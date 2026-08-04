@@ -391,9 +391,9 @@ export function UserActivityMonitor() {
                         <div className="rounded-xl border border-slate-200 px-4 py-3">
                           <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                             <MapPin size={12} />
-                            Unit
+                            Cabang
                           </div>
-                          <div className="mt-1 font-bold text-slate-800">{user.branchName || 'Semua Unit'}</div>
+                          <div className="mt-1 font-bold text-slate-800">{user.branchName || 'Semua Cabang'}</div>
                         </div>
                       </div>
 
@@ -491,7 +491,7 @@ export function UserActivityMonitor() {
                   <tr className="border-b border-slate-100">
                     <th className="px-4 py-4 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Waktu</th>
                     <th className="px-4 py-4 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">User</th>
-                    <th className="px-4 py-4 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tenant / Unit</th>
+                    <th className="px-4 py-4 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tenant / Cabang</th>
                     <th className="px-4 py-4 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Route</th>
                     <th className="px-4 py-4 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">Akses</th>
                   </tr>
@@ -513,7 +513,7 @@ export function UserActivityMonitor() {
                       <td className="px-4 py-4 align-top">
                         <div className="text-sm font-bold text-slate-800">{activity.orgName || '-'}</div>
                         <div className="mt-1 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                          {activity.branchName || 'Semua Unit'}
+                          {activity.branchName || 'Semua Cabang'}
                         </div>
                       </td>
                       <td className="px-4 py-4 align-top">

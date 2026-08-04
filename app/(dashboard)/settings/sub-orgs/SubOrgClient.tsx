@@ -320,7 +320,7 @@ export default function SubOrgClient({
 
     const agreed = await confirm(
       nextMode === 'LOCAL'
-        ? `Aktifkan CoA lokal untuk "${childName}"?\n\nEntitas anak nanti bisa mengelola rekening CoA sendiri saat berada di konteks Unit Utama.`
+        ? `Aktifkan CoA lokal untuk "${childName}"?\n\nEntitas anak nanti bisa mengelola rekening CoA sendiri saat berada di konteks Cabang Utama.`
         : `Kembalikan "${childName}" ke mode CoA holding?\n\nPastikan akun aktif child sudah selaras dengan holding sebelum melanjutkan.`
     )
     if (!agreed) return
@@ -954,7 +954,7 @@ export default function SubOrgClient({
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-md p-5">
             <h3 className="text-2xl font-semibold text-slate-900 mb-2">Tambah Anak Perusahaan</h3>
             <p className="text-sm text-slate-500 mb-8">
-              Buat organisasi anak baru yang langsung terhubung ke holding ini. Unit utama dan struktur dasarnya akan disiapkan otomatis.
+              Buat organisasi anak baru yang langsung terhubung ke holding ini. Cabang utama dan struktur dasarnya akan disiapkan otomatis.
             </p>
 
             <form onSubmit={handleCreateChildOrg} className="space-y-6">

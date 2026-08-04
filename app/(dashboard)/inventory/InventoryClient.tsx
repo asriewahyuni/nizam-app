@@ -298,9 +298,9 @@ export default function InventoryClient({
   const hasActiveBranch = Boolean(activeBranchId)
   const hasWarehouses = warehouses.length > 0
   const physicalStockGuardMessage = !hasActiveBranch
-    ? 'Pilih unit aktif terlebih dahulu untuk melakukan mutasi stok dan kelola gudang fisik.'
+    ? 'Pilih Cabang aktif terlebih dahulu untuk melakukan mutasi stok dan kelola gudang fisik.'
     : !hasWarehouses
-      ? `Belum ada gudang aktif di unit ${activeBranchName || 'terpilih'}. Tambahkan gudang terlebih dahulu.`
+      ? `Belum ada gudang aktif di Cabang ${activeBranchName || 'terpilih'}. Tambahkan gudang terlebih dahulu.`
       : null
   const searchParams = useSearchParams()
   const adjustId = searchParams.get('adjust')

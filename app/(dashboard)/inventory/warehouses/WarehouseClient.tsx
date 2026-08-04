@@ -78,7 +78,7 @@ export function WarehouseClient({
   const [formData, setFormData] = useState<WarehouseFormState>(createEmptyForm)
   const isAdmin = ['owner', 'admin', 'manager'].includes(userRole)
   const warehouseMutationGuardMessage = !activeBranchId
-    ? 'Mode Semua Unit hanya untuk baca. Pilih unit aktif untuk menambah, mengubah, atau menghapus gudang.'
+    ? 'Mode Semua Cabang hanya untuk baca. Pilih Cabang aktif untuk menambah, mengubah, atau menghapus gudang.'
     : null
 
   useEffect(() => {
@@ -228,7 +228,7 @@ export function WarehouseClient({
 
       {warehouseMutationGuardMessage && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
-          {warehouseMutationGuardMessage} {activeBranchName ? `Unit aktif saat ini: ${activeBranchName}.` : ''}
+          {warehouseMutationGuardMessage} {activeBranchName ? `Cabang aktif saat ini: ${activeBranchName}.` : ''}
         </div>
       )}
 

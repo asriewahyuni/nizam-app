@@ -120,7 +120,7 @@ export function AssetClient({
   })
   const [disposeLoading, setDisposeLoading] = useState(false)
   const [disposeResult, setDisposeResult] = useState<any>(null)
-  const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk mengelola aset tetap.'
+  const branchGuardMessage = 'Pilih satu Cabang aktif terlebih dahulu untuk mengelola aset tetap.'
 
   const refreshAssetsPage = () => {
     startTransition(() => {
@@ -399,7 +399,7 @@ export function AssetClient({
           </h1>
           <p className="text-slate-500 font-medium text-lg mt-2">
             Inventory Aset, Kapitalisasi, dan Kalkulasi Penyusutan Berjalan.
-            {activeBranchName ? ` Scope aktif: ${activeBranchName}.` : ' Mode semua unit hanya baca.'}
+            {activeBranchName ? ` Scope aktif: ${activeBranchName}.` : ' Mode semua Cabang hanya baca.'}
           </p>
         </div>
         
@@ -459,9 +459,9 @@ export function AssetClient({
             <AlertTriangle size={22} />
           </div>
           <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-amber-900 uppercase tracking-wide">Pilih Unit Aktif</h3>
+            <h3 className="text-sm font-semibold text-amber-900 uppercase tracking-wide">Pilih Cabang Aktif</h3>
             <p className="text-sm font-medium text-amber-800/80">
-              Anda sedang melihat aset lintas unit. Pilih satu unit dari header untuk mendaftarkan aset, menjalankan penyusutan, mengubah data, atau melepas aset.
+              Anda sedang melihat aset lintas Cabang. Pilih satu Cabang dari header untuk mendaftarkan aset, menjalankan penyusutan, mengubah data, atau melepas aset.
             </p>
           </div>
         </div>
