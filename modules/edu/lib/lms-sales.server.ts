@@ -51,7 +51,7 @@ export async function getLmsSalesSummaryMetrics(
     queryPostgres<{ total: number; count: number }>(
       `SELECT COALESCE(SUM(grand_total), 0)::float8 AS total, COUNT(*)::int AS count
        FROM public.ecommerce_orders
-       WHERE org_id = $1::uuid AND status = 'PAID'`,
+       WHERE org_id = $1::uuid AND status IN ('PAID', 'READY_TO_FULFILL', 'FULFILLING', 'SHIPPED', 'COMPLETED')`,
       [orgId],
     ),
     queryPostgres<{ count: number }>(
@@ -107,7 +107,7 @@ export async function getLmsAdminSalesList(
         orders.subtotal_amount::float8 AS subtotal_amount,
         orders.discount_amount::float8 AS discount_amount,
         CASE
-          WHEN orders.status = 'PAID' THEN 'PAID'
+          WHEN orders.status IN ('PAID', 'READY_TO_FULFILL', 'FULFILLING', 'SHIPPED', 'COMPLETED') THEN 'PAID'
           WHEN orders.status IN ('CANCELLED', 'PAYMENT_REJECTED') THEN 'CANCELLED'
           WHEN orders.status = 'PAYMENT_EXCEPTION' THEN 'EXPIRED'
           ELSE 'PENDING'
