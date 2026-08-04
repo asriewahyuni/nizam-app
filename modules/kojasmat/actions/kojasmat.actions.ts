@@ -1083,6 +1083,23 @@ export async function createPembiayaan(payload: {
       throw new Error(`Melebihi sisa kebutuhan (Rp ${sisa.toLocaleString('id-ID')})`)
     }
 
+    // Pembiayaan hanya boleh memakai simpanan SUKARELA — simpanan pokok/wajib
+    // adalah setoran keanggotaan, bukan dana yang boleh diinvestasikan ke proyek.
+    const { rows: [simpananSukarela] } = await client.query(
+      `SELECT saldo FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='SUKARELA'`,
+      [payload.pemodal_id]
+    )
+    const saldoSukarela = Number(simpananSukarela?.saldo ?? 0)
+    if (payload.jumlah > saldoSukarela) {
+      throw new Error(`Melebihi saldo simpanan sukarela Anda (Rp ${saldoSukarela.toLocaleString('id-ID')})`)
+    }
+
+    const { rows: [existing] } = await client.query(
+      `SELECT id FROM kojasmat_pembiayaan WHERE proyek_id=$1 AND pemodal_id=$2`,
+      [payload.proyek_id, payload.pemodal_id]
+    )
+    if (existing) throw new Error('Anda sudah membiayai proyek ini sebelumnya.')
+
     const porsiPct = (payload.jumlah / Number(proyekData.kebutuhan_modal)) * 100
     const kehadiranAkad = payload.kehadiran_akad ?? 'SENDIRI'
     const ujrahDiwakilkan = kehadiranAkad === 'DIWAKILKAN' ? Number(proyekData.ujrah_wakalah_akad ?? 0) : 0
@@ -1110,9 +1127,8 @@ export async function createPembiayaan(payload: {
     await client.query('ROLLBACK')
     client.release()
     return { error: error instanceof Error ? error.message : 'Terjadi kesalahan sistem' }
-  } finally {
-    if (client) client.release()
   }
+  client.release()
 
   const ujrahDiwakilkan = payload.kehadiran_akad === 'DIWAKILKAN' ? Number(proyekData?.ujrah_wakalah_akad ?? 0) : 0
 
@@ -1337,7 +1353,7 @@ export type KojasmatStats = {
 export async function getProyekTersedia(
   orgId: string,
   anggotaId: string,
-  totalSimpanan: number
+  saldoSukarela: number
 ): Promise<KojasmatProyek[]> {
   const { rows } = await queryPostgres(
     `SELECT
@@ -1365,11 +1381,11 @@ export async function getProyekTersedia(
      ORDER BY
        -- Proyek yang diminati anggota ini duluan
        EXISTS(SELECT 1 FROM kojasmat_minat WHERE proyek_id=p.id AND anggota_id=$2) DESC,
-       -- Lalu proyek yang sesuai kapasitas simpanan (sisa kebutuhan ≤ total simpanan)
+       -- Lalu proyek yang sesuai kapasitas (sisa kebutuhan ≤ saldo simpanan sukarela)
        (p.kebutuhan_modal - p.modal_terkumpul) <= $3 DESC,
        -- Proyek dengan progress paling mendekati penuh (butuh dorongan akhir)
        (p.modal_terkumpul::float / NULLIF(p.kebutuhan_modal,0)) DESC`,
-    [orgId, anggotaId, totalSimpanan]
+    [orgId, anggotaId, saldoSukarela]
   )
   return rows as KojasmatProyek[]
 }

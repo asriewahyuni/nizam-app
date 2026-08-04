@@ -1149,6 +1149,7 @@ function TabPenawaran({ anggota, penawaran }: {
   const [sheetBiayai, setSheetBiayai] = useState<KojasmatPenawaran | null>(null)
   const [jumlah, setJumlah] = useState('')
   const [kehadiranAkad, setKehadiranAkad] = useState<'SENDIRI' | 'DIWAKILKAN'>('SENDIRI')
+  const [biayaiError, setBiayaiError] = useState<string | null>(null)
 
   function handleTandai(id: string, status: string) {
     startTransition(async () => { await updateStatusPenawaran(id, status) })
@@ -1156,14 +1157,19 @@ function TabPenawaran({ anggota, penawaran }: {
 
   function handleBiayai() {
     if (!sheetBiayai) return
+    setBiayaiError(null)
     startTransition(async () => {
-      await createPembiayaan({
+      const res = await createPembiayaan({
         org_id: anggota.org_id,
         proyek_id: sheetBiayai.proyek_id,
         pemodal_id: anggota.id,
         jumlah: Number(jumlah),
         kehadiran_akad: kehadiranAkad,
       })
+      if (res.error) {
+        setBiayaiError(res.error)
+        return
+      }
       await updateStatusPenawaran(sheetBiayai.id, 'BERMINAT')
       setSheetBiayai(null)
       setJumlah('')
@@ -1215,7 +1221,7 @@ function TabPenawaran({ anggota, penawaran }: {
 
                 {(p.status === 'TERKIRIM' || p.status === 'DIBACA') && p.proyek_status === 'FUNDING_AKTIF' && (
                   <div className="mt-3 flex gap-2">
-                    <button onClick={() => { setSheetBiayai(p); setJumlah(''); setKehadiranAkad('SENDIRI') }}
+                    <button onClick={() => { setSheetBiayai(p); setJumlah(''); setKehadiranAkad('SENDIRI'); setBiayaiError(null) }}
                       className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2.5 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
                       <ArrowUpCircle className="h-3.5 w-3.5" /> Biayai
                     </button>
@@ -1299,6 +1305,9 @@ function TabPenawaran({ anggota, penawaran }: {
                 </button>
               </div>
             </div>
+            {biayaiError && (
+              <p className="text-xs text-rose-600">{biayaiError}</p>
+            )}
             <div className="flex gap-3">
               <button onClick={() => setSheetBiayai(null)}
                 className="flex-1 rounded-2xl border border-gray-200 py-3 text-sm font-medium text-gray-600 cursor-pointer">
@@ -1507,7 +1516,9 @@ function TabInvestasi({
   const [batalkanId, setBatalkanId] = useState<string | null>(null)
   const [batalkanError, setBatalkanError] = useState<{ id: string; message: string } | null>(null)
 
-  const totalSimpanan = simpanan.reduce((s, x) => s + Number(x.saldo), 0)
+  // Pembiayaan proyek hanya boleh dari simpanan SUKARELA — pokok/wajib adalah
+  // setoran keanggotaan, bukan dana yang boleh diinvestasikan.
+  const saldoSukarela = Number(simpanan.find(s => s.jenis === 'SUKARELA')?.saldo ?? 0)
 
   function handleBatalkan(pembiayaanId: string) {
     setBatalkanId(pembiayaanId)
@@ -1568,9 +1579,9 @@ function TabInvestasi({
     <div className="space-y-4">
       {/* Kapasitas investasi anggota */}
       <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-        <p className="text-xs text-emerald-600 font-medium">Total Simpanan Anda</p>
-        <p className="text-xl font-bold text-emerald-800 mt-0.5">{fmt(totalSimpanan)}</p>
-        <p className="text-xs text-emerald-600 mt-0.5">Dapat digunakan sebagai modal investasi</p>
+        <p className="text-xs text-emerald-600 font-medium">Simpanan Sukarela Anda</p>
+        <p className="text-xl font-bold text-emerald-800 mt-0.5">{fmt(saldoSukarela)}</p>
+        <p className="text-xs text-emerald-600 mt-0.5">Dapat digunakan sebagai modal investasi (simpanan pokok/wajib tidak termasuk)</p>
       </div>
 
       {pembiayaanList.length > 0 && (
@@ -1652,9 +1663,9 @@ function TabInvestasi({
         const pct = Number(p.kebutuhan_modal) > 0
           ? Math.min(100, Math.round(Number(p.modal_terkumpul) / Number(p.kebutuhan_modal) * 100))
           : 0
-        const terjangkau = totalSimpanan > 0 && sisa <= totalSimpanan
+        const terjangkau = saldoSukarela > 0 && sisa <= saldoSukarela
         const minInv = Number(p.min_investasi)
-        const bisaInvest = minInv === 0 || totalSimpanan >= minInv
+        const bisaInvest = minInv === 0 || saldoSukarela >= minInv
 
         return (
           <div key={p.id} className={cn(
@@ -1727,9 +1738,11 @@ function TabInvestasi({
 
               <button
                 onClick={() => { setSheetBiayai(p); setJumlah(''); setKehadiranAkad('SENDIRI'); setBiayaiError(null) }}
-                className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2.5 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer"
+                disabled={p.sudah_dibiayai}
+                className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2.5 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <ArrowUpCircle className="h-3.5 w-3.5" /> Biayai Proyek Ini
+                <ArrowUpCircle className="h-3.5 w-3.5" />
+                {p.sudah_dibiayai ? 'Sudah Anda Biayai' : 'Biayai Proyek Ini'}
               </button>
             </div>
 
@@ -1752,7 +1765,7 @@ function TabInvestasi({
                 <span className={cn('flex items-center gap-1', !bisaInvest && 'text-amber-600')}>
                   <Users className="h-3.5 w-3.5 shrink-0" />
                   Min. {fmt(minInv)}
-                  {!bisaInvest && ' (di atas simpanan Anda)'}
+                  {!bisaInvest && ' (di atas simpanan sukarela Anda)'}
                 </span>
               )}
               {p.agunan && (
@@ -1780,9 +1793,13 @@ function TabInvestasi({
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Jumlah Pembiayaan (Rp) *</label>
               <input type="number"
+                max={saldoSukarela}
                 className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 text-lg font-semibold"
                 placeholder="1000000"
                 value={jumlah} onChange={e => setJumlah(e.target.value)} />
+              <p className="mt-1.5 text-xs text-gray-400">
+                Maks. {fmt(saldoSukarela)} (saldo simpanan sukarela Anda)
+              </p>
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
@@ -1833,7 +1850,7 @@ function TabInvestasi({
                 className="flex-1 rounded-2xl border border-gray-200 py-3 text-sm font-medium text-gray-600 cursor-pointer">
                 Batal
               </button>
-              <button onClick={handleBiayai} disabled={!jumlah || pending}
+              <button onClick={handleBiayai} disabled={!jumlah || Number(jumlah) > saldoSukarela || pending}
                 className="flex-1 rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 cursor-pointer">
                 {pending ? 'Memproses...' : 'Konfirmasi'}
               </button>

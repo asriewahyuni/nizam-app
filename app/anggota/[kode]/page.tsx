@@ -63,9 +63,11 @@ export default async function AnggotaPortalPage({
 
   const proyekDiajukan = proyekSemua.filter(p => p.pengaju_id === anggota.id)
 
-  const totalSimpanan = simpanan.reduce((s, x) => s + Number(x.saldo), 0)
+  // Kapasitas investasi hanya dari simpanan SUKARELA — pokok/wajib adalah setoran
+  // keanggotaan, bukan dana yang boleh dipakai membiayai proyek.
+  const saldoSukarela = Number(simpanan.find(s => s.jenis === 'SUKARELA')?.saldo ?? 0)
   const [proyekTersedia, pelatihan] = await Promise.all([
-    getProyekTersedia(anggota.org_id, anggota.id, totalSimpanan),
+    getProyekTersedia(anggota.org_id, anggota.id, saldoSukarela),
     getPelatihanTerjadwal(anggota.org_id, anggota.id),
   ])
 
