@@ -130,6 +130,30 @@ export async function buatPendaftaran(payload: {
   alasan_bergabung?: string
 }) {
   try {
+    // Cek dulu apakah calon anggota ini sudah pernah mendaftar di koperasi ini
+    // (email/NIK sama) — supaya submit ganda (network lambat, klik dua kali,
+    // reload di tengah wizard) melanjutkan pendaftaran yang sama, bukan gagal
+    // dengan pesan generik dari constraint UNIQUE global internal_auth_users.
+    if (payload.email || payload.nik) {
+      const { rows: existingRows } = await queryPostgres(
+        `SELECT id, status, created_at FROM kojasmat_pendaftaran
+         WHERE org_id = $1
+           AND ((email IS NOT NULL AND email = $2) OR (nik IS NOT NULL AND nik = $3))
+         ORDER BY created_at DESC LIMIT 1`,
+        [payload.org_id, payload.email ?? null, payload.nik ?? null]
+      )
+      const existing = existingRows[0]
+      if (existing) {
+        if (existing.status === 'MENUNGGU' || existing.status === 'DIREVISI') {
+          return { data: existing as { id: string; status: string; created_at: string } }
+        }
+        if (existing.status === 'DISETUJUI') {
+          return { error: 'Email/NIK ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
+        }
+        return { error: 'Pendaftaran sebelumnya dengan email/NIK ini telah ditolak. Hubungi pengurus koperasi untuk info lebih lanjut.' }
+      }
+    }
+
     let authUserId: string | null = null
 
     // Buat akun auth jika email + password disediakan
@@ -142,6 +166,11 @@ export async function buatPendaftaran(payload: {
         userType: 'anggota',
       })
       if ('error' in authResult) {
+        // Email/NIK sudah dipakai akun lain di platform Nizam (bukan pendaftaran
+        // koperasi ini — sudah dicek di atas) — kemungkinan akun organisasi lain.
+        if ((authResult.error ?? '').toLowerCase().includes('sudah terdaftar')) {
+          return { error: 'Email atau NIK ini sudah terpakai untuk akun lain di sistem. Gunakan email/NIK berbeda, atau hubungi pengurus koperasi jika Anda yakin ini keliru.' }
+        }
         return { error: authResult.error }
       }
       authUserId = authResult.internalUserId ?? null
