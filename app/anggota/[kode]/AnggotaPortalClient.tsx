@@ -1142,14 +1142,15 @@ function TabProyek({ anggota, proyekDiajukan }: {
 
 // ─── TAB: PENAWARAN ───────────────────────────────────────────────────────────
 
-function TabPenawaran({ anggota, penawaran }: {
-  anggota: KojasmatAnggota; penawaran: KojasmatPenawaran[]
+function TabPenawaran({ anggota, penawaran, simpanan }: {
+  anggota: KojasmatAnggota; penawaran: KojasmatPenawaran[]; simpanan: KojasmatSimpanan[]
 }) {
   const [pending, startTransition] = useTransition()
   const [sheetBiayai, setSheetBiayai] = useState<KojasmatPenawaran | null>(null)
   const [jumlah, setJumlah] = useState('')
   const [kehadiranAkad, setKehadiranAkad] = useState<'SENDIRI' | 'DIWAKILKAN'>('SENDIRI')
   const [biayaiError, setBiayaiError] = useState<string | null>(null)
+  const saldoSukarela = Number(simpanan.find(s => s.jenis === 'SUKARELA')?.saldo ?? 0)
 
   function handleTandai(id: string, status: string) {
     startTransition(async () => { await updateStatusPenawaran(id, status) })
@@ -1260,9 +1261,23 @@ function TabPenawaran({ anggota, penawaran }: {
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Jumlah Pembiayaan (Rp) *</label>
               <input type="number"
+                max={saldoSukarela}
                 className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 text-lg font-semibold"
                 placeholder="1000000"
                 value={jumlah} onChange={e => setJumlah(e.target.value)} />
+              <p className="mt-1.5 text-xs text-gray-400">
+                Maks. {fmt(saldoSukarela)} (saldo simpanan sukarela Anda)
+              </p>
+              {Number(jumlah) > saldoSukarela && (
+                <div className="mt-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    Saldo simpanan sukarela Anda tidak cukup untuk jumlah ini.
+                    Silakan setor/top up simpanan sukarela terlebih dahulu, atau
+                    kurangi nominal pembiayaan.
+                  </span>
+                </div>
+              )}
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
@@ -1313,7 +1328,7 @@ function TabPenawaran({ anggota, penawaran }: {
                 className="flex-1 rounded-2xl border border-gray-200 py-3 text-sm font-medium text-gray-600 cursor-pointer">
                 Batal
               </button>
-              <button onClick={handleBiayai} disabled={!jumlah || pending}
+              <button onClick={handleBiayai} disabled={!jumlah || Number(jumlah) > saldoSukarela || pending}
                 className="flex-1 rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 cursor-pointer">
                 {pending ? 'Memproses...' : 'Konfirmasi'}
               </button>
@@ -1800,6 +1815,16 @@ function TabInvestasi({
               <p className="mt-1.5 text-xs text-gray-400">
                 Maks. {fmt(saldoSukarela)} (saldo simpanan sukarela Anda)
               </p>
+              {Number(jumlah) > saldoSukarela && (
+                <div className="mt-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    Saldo simpanan sukarela Anda tidak cukup untuk jumlah ini.
+                    Silakan setor/top up simpanan sukarela terlebih dahulu, atau
+                    kurangi nominal pembiayaan.
+                  </span>
+                </div>
+              )}
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
@@ -1912,7 +1937,7 @@ export default function AnggotaPortalClient(props: Props) {
         {activeTab === 'simpanan'  && <TabSimpanan simpanan={simpanan} />}
         {activeTab === 'proyek'    && <TabProyek anggota={anggota} proyekDiajukan={proyekDiajukan} />}
         {activeTab === 'investasi' && <TabInvestasi anggota={anggota} simpanan={simpanan} proyekTersedia={proyekTersedia} pembiayaan={pembiayaan} />}
-        {activeTab === 'penawaran' && <TabPenawaran anggota={anggota} penawaran={penawaran} />}
+        {activeTab === 'penawaran' && <TabPenawaran anggota={anggota} penawaran={penawaran} simpanan={simpanan} />}
         {activeTab === 'laporan'   && <TabLaporan anggota={anggota} proyekDiajukan={proyekDiajukan} laporan={laporan} />}
       </div>
 
