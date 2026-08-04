@@ -5,7 +5,6 @@
 import { queryPostgres } from '@/lib/db/postgres'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
-import { cobaAktivasiOtomatis } from './kojasmat-membership.actions'
 
 const DEFAULT_PASSING_THRESHOLD = 70
 const SOAL_PER_TEST = 20
@@ -357,8 +356,10 @@ export async function submitPembayaranPendaftaran(pendaftaranId: string, payload
       [pendaftaranId, payload.biaya_admin, payload.simpanan_pokok, payload.simpanan_wajib, dokumen.id]
     )
 
-    const aktivasi = await cobaAktivasiOtomatis(pendaftaranId)
-    return { data: aktivasi }
+    // Status pendaftaran TETAP MENUNGGU — aktivasi anggota (termasuk posting
+    // setoran pokok/wajib ke jurnal) baru terjadi saat pengurus memverifikasi
+    // bukti transfer secara manual lewat setujuiPendaftaran(). Lihat kojasmat-membership.actions.ts.
+    return { data: { activated: false } }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Gagal menyimpan pembayaran' }
   }

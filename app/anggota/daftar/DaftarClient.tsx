@@ -827,17 +827,16 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
             </>
           ) : (
             <>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Pendaftaran Diterima!</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Pembayaran Diterima — Menunggu Verifikasi</h2>
               <p className="text-sm text-gray-600 mb-6">
-                Permohonan keanggotaan Anda di <strong>{orgNama}</strong> telah kami terima.
-                Pengurus akan meninjau dokumen dan menghubungi Anda.
+                Bukti transfer Anda sudah kami terima. Pengurus <strong>{orgNama}</strong> akan
+                memverifikasi pembayaran sebelum akun keanggotaan Anda diaktifkan.
               </p>
               <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-left space-y-2 text-sm">
                 <p className="font-semibold text-emerald-800">Proses selanjutnya:</p>
-                <p className="text-emerald-700">1. Pengurus meninjau dokumen Anda</p>
-                <p className="text-emerald-700">2. Persetujuan dan pemberian akun anggota</p>
-                <p className="text-emerald-700">3. Ikuti pelatihan untuk status Terverifikasi</p>
-                <p className="text-emerald-700">4. Mulai ajukan proyek atau biayai proyek anggota lain</p>
+                <p className="text-emerald-700">1. Pengurus memverifikasi bukti transfer Anda</p>
+                <p className="text-emerald-700">2. Akun anggota diaktifkan dan kode anggota dikirim</p>
+                <p className="text-emerald-700">3. Login ke portal anggota untuk mulai bertransaksi</p>
               </div>
             </>
           )}

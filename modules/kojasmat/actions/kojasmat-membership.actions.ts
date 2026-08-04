@@ -289,6 +289,12 @@ async function createAnggotaFromPendaftaran(
   }
 }
 
+// Anggota baru selalu butuh persetujuan manual staf (owner/admin/manager) di sini —
+// tidak ada jalur aktivasi otomatis. Kalau pendaftar sudah lulus test masuk DAN sudah
+// upload bukti transfer (status_bayar='SUDAH'), approve di sini langsung mengaktifkan
+// akun (status AKTIF) serta memposting setoran pokok/wajib & biaya admin ke jurnal —
+// karena persetujuan staf DI SINI-lah titik verifikasi manual bahwa dana sudah diterima.
+// Kalau belum ada pembayaran online (pendaftaran offline/manual), tetap jadi CALON dulu.
 export async function setujuiPendaftaran(pendaftaranId: string) {
   try {
     const session = await getInternalAuthSession()
@@ -304,45 +310,12 @@ export async function setujuiPendaftaran(pendaftaranId: string) {
     }
 
     const data = await createAnggotaFromPendaftaran(pend as KojasmatPendaftaran, {
-      status: 'CALON',
+      status: pend.status_bayar === 'SUDAH' ? 'AKTIF' : 'CALON',
       reviewedBy: getInternalUserId(session),
     })
     return { data }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Gagal menyetujui pendaftaran' }
-  }
-}
-
-// Dipanggil otomatis setelah calon anggota menyelesaikan pembayaran di wizard publik —
-// mengaktifkan langsung (status AKTIF) kalau test masuk terakhir sudah LULUS.
-// Tidak butuh auth staf karena ini bagian dari alur self-service publik.
-export async function cobaAktivasiOtomatis(pendaftaranId: string) {
-  try {
-    const { rows: [pend] } = await queryPostgres(
-      `SELECT * FROM kojasmat_pendaftaran WHERE id = $1`,
-      [pendaftaranId]
-    )
-    if (!pend) return { error: 'Pendaftaran tidak ditemukan' }
-    if (pend.status !== 'MENUNGGU' && pend.status !== 'DIREVISI') {
-      return { error: 'Pendaftaran sudah diproses', already_processed: true }
-    }
-    if (pend.status_bayar !== 'SUDAH') {
-      return { error: 'Pembayaran belum lengkap', activated: false }
-    }
-
-    const { rows: [latestTest] } = await queryPostgres(
-      `SELECT status FROM kojasmat_test_masuk
-       WHERE pendaftaran_id=$1 ORDER BY created_at DESC LIMIT 1`,
-      [pendaftaranId]
-    )
-    if (!latestTest || latestTest.status !== 'LULUS') {
-      return { error: 'Test masuk belum lulus', activated: false }
-    }
-
-    const data = await createAnggotaFromPendaftaran(pend as KojasmatPendaftaran, { status: 'AKTIF', reviewedBy: null })
-    return { data: { ...data, activated: true } }
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Gagal mengaktifkan anggota' }
   }
 }
 
