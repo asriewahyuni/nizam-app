@@ -19,7 +19,7 @@ import CreateLessonForm from '../../CreateLessonForm'
 import { formatRupiah } from '@/lib/utils'
 import { StatusBadge, EmptyState, modeColor, statusColor } from '../../../ui'
 import AdminLessonList from './AdminLessonList'
-import CourseActions from '../CourseActions'
+import CourseActions from '../../CourseActions'
 
 export default async function AdminManageCoursePage(props: {
   params: Promise<{ courseSlug: string }>
