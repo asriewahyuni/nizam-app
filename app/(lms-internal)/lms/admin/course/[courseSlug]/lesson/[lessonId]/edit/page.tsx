@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import EditLessonForm from './EditLessonForm'
 import { createClient } from '@/lib/supabase/server'
+import { getLmsSectionsByCourseId } from '@/modules/edu/actions/lms-commercial.actions'
 
 export const metadata = {
   title: 'Edit Materi — Nizam LMS Admin',
@@ -35,6 +36,8 @@ export default async function EditLessonPage(props: { params: Promise<{ courseSl
 
   if (!lesson) return redirect(`/lms/admin/course/${params.courseSlug}?tab=curriculum`)
 
+  const sections = await getLmsSectionsByCourseId(orgData.org.id, course.id)
+
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-8">
@@ -48,7 +51,7 @@ export default async function EditLessonPage(props: { params: Promise<{ courseSl
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <EditLessonForm lesson={lesson} courseSlug={params.courseSlug} />
+        <EditLessonForm lesson={lesson} courseSlug={params.courseSlug} sections={sections} />
       </div>
     </div>
   )

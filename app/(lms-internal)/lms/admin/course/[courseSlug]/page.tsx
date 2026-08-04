@@ -5,6 +5,7 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
   getLmsCourseBySlug,
   getLmsLessonsByCourseId,
+  getLmsSectionsByCourseId,
   getLmsBatchesByCourseId,
   getLmsSessionsByCourseId,
   getLmsCourseAnalytics,
@@ -15,9 +16,9 @@ import CreateBatchForm from '../../CreateBatchForm'
 import CreateSessionForm from '../../CreateSessionForm'
 import SessionQRClient from '../../SessionQRClient'
 import CreateLessonForm from '../../CreateLessonForm'
-import LessonActions from '../../LessonActions'
 import { formatRupiah } from '@/lib/utils'
 import { StatusBadge, EmptyState, modeColor, statusColor } from '../../../ui'
+import AdminLessonList from './AdminLessonList'
 
 export default async function AdminManageCoursePage(props: {
   params: Promise<{ courseSlug: string }>
@@ -49,6 +50,7 @@ export default async function AdminManageCoursePage(props: {
   const canAccessParticipantAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning') || canManageAssessment
 
   const lessons = await getLmsLessonsByCourseId(orgData.org.id, course.id)
+  const sections = await getLmsSectionsByCourseId(orgData.org.id, course.id)
   const batches = await getLmsBatchesByCourseId(orgData.org.id, course.id)
   const sessions = await getLmsSessionsByCourseId(orgData.org.id, course.id)
   
@@ -100,10 +102,11 @@ export default async function AdminManageCoursePage(props: {
               
               <div className="mt-5 flex flex-col gap-2">
                 <Link
-                  href={`/lms/course/${course.slug}`}
-                  className="w-full text-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm transition-all hover:bg-slate-50"
+                  href={`/lms/${orgData.org.slug}/course/${course.slug}`}
+                  target="_blank"
+                  className="w-full text-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:text-indigo-600"
                 >
-                  Preview Publik
+                  Buka di Portal Member (As Admin)
                 </Link>
                 <button className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition-colors">
                   Publish
@@ -150,55 +153,13 @@ export default async function AdminManageCoursePage(props: {
                 description="Mulai bangun kurikulum dengan menambahkan materi pertama di form bawah."
               />
             ) : (
-              <div className="flex flex-col gap-3">
-                  {lessons.map((l: any, idx: number) => (
-                    <div key={l.id} className="group relative flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-50 text-slate-500 border border-slate-100 font-semibold group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                          {l.lesson_type === 'VIDEO' ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-play-circle"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-                          ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-file-text"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-400">Materi {l.sort_order || idx + 1}:</span>
-                            <h3 className="font-semibold text-slate-800">{l.title}</h3>
-                            {l.is_required && (
-                              <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-rose-600">
-                                Wajib
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
-                            <span className="capitalize">{l.lesson_type.toLowerCase()}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Actions - visible on hover for desktop, always for mobile */}
-                      <div className="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <Link
-                          href={`/lms/admin/course/${course.slug}/lesson/${l.id}/edit`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-indigo-600"
-                          title="Edit Materi"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
-                        </Link>
-                        <LessonActions lessonId={l.id} courseId={course.id} />
-                        <Link
-                          href={`/lms/course/${course.slug}/lesson/${l.slug}`}
-                          target="_blank"
-                          className="ml-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-                        >
-                          Preview
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-              </div>
+              <AdminLessonList
+                lessons={lessons}
+                sections={sections}
+                courseSlug={course.slug}
+                courseId={course.id}
+                orgSlug={orgData.org.slug}
+              />
             )}
           </div>
 
@@ -208,7 +169,7 @@ export default async function AdminManageCoursePage(props: {
                 <span className="size-2 rounded-full bg-indigo-600" />
                 Buat Materi Baru
               </h2>
-              <CreateLessonForm courseId={course.id} />
+              <CreateLessonForm courseId={course.id} sections={sections} />
             </div>
           </div>
         </div>

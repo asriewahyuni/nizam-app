@@ -7,7 +7,7 @@
 import 'server-only'
 
 import { buildTableXLSXBuffer, type TableColumn } from '@/lib/xlsx/table-workbook.server'
-import { getLmsAdminMembers } from '@/modules/edu/actions/lms-members.actions'
+import { getLmsAdminMembers, getCourseParticipants } from '@/modules/edu/actions/lms-members.actions'
 import { getLmsCourses } from '@/modules/edu/actions/lms-commercial.actions'
 import { getLmsAdminSalesList } from '@/modules/edu/lib/lms-sales.server'
 import {
@@ -303,4 +303,54 @@ export async function buildLmsAffiliatePayoutsXLSX(orgId: string): Promise<Buffe
   }))
 
   return buildTableXLSXBuffer('Pencairan Afiliasi', columns, rows)
+}
+
+/**
+ * Export peserta kursus dengan progress dan skor ke XLSX.
+ */
+export async function buildLmsCourseParticipantsXLSX(
+  courseSlug: string,
+  status?: string
+): Promise<Buffer> {
+  const result = await getCourseParticipants(courseSlug, {
+    status: (status as 'ALL' | 'ACTIVE' | 'COMPLETED' | 'BANNED') || 'ALL',
+    pageSize: 100,
+    page: 1,
+  })
+
+  const columns: TableColumn[] = [
+    { header: 'Nama', key: 'name', width: 28 },
+    { header: 'Email', key: 'email', width: 32 },
+    { header: 'No. HP', key: 'phone', width: 18 },
+    { header: 'Status', key: 'status', width: 14 },
+    { header: 'Batch/Angkatan', key: 'batchName', width: 20 },
+    { header: 'Progress (%)', key: 'progressPercent', width: 14 },
+    { header: 'Materi Selesai', key: 'completedLessons', width: 16 },
+    { header: 'Total Materi', key: 'totalLessons', width: 14 },
+    { header: 'Skor Akhir', key: 'finalScore', width: 12 },
+    { header: 'Mulai', key: 'startedAt', width: 20 },
+    { header: 'Selesai', key: 'completedAt', width: 20 },
+    { header: 'Aktivitas Terakhir', key: 'lastActivityAt', width: 22 },
+    { header: 'Dibanned', key: 'bannedAt', width: 20 },
+    { header: 'Alasan Ban', key: 'bannedReason', width: 28 },
+  ]
+
+  const rows = result.participants.map((p) => ({
+    name: p.name,
+    email: p.email,
+    phone: p.phone || '',
+    status: p.bannedAt ? 'BANNED' : p.completedAt ? 'COMPLETED' : 'ACTIVE',
+    batchName: p.batchName || '',
+    progressPercent: p.progressPercent,
+    completedLessons: p.completedLessons,
+    totalLessons: p.totalLessons,
+    finalScore: p.finalScore ?? '',
+    startedAt: formatDate(p.startedAt),
+    completedAt: formatDate(p.completedAt),
+    lastActivityAt: formatDate(p.lastActivityAt),
+    bannedAt: formatDate(p.bannedAt),
+    bannedReason: p.bannedReason || '',
+  }))
+
+  return buildTableXLSXBuffer('Peserta Kursus', columns, rows)
 }

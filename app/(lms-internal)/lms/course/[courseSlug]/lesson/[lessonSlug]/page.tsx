@@ -54,7 +54,8 @@ export default async function LearningLessonPage(props: {
   }
 
   const videoItem = (lesson.media_items || []).find((m: any) => m.type === 'video')
-  const isVideo = lesson.lesson_type === 'VIDEO' && videoItem
+  const videoUrl = videoItem?.url || lesson.embed_url || null
+  const isVideo = lesson.lesson_type === 'VIDEO' && Boolean(videoUrl)
 
   const attachments = (lesson.media_items || []).filter((m: any) => m.type !== 'video')
 
@@ -87,17 +88,17 @@ export default async function LearningLessonPage(props: {
 
         {/* Video Player or Main Content */}
         <section className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
-          {isVideo ? (
+          {isVideo && videoUrl ? (
             <div className="mb-8 rounded-xl overflow-hidden bg-black aspect-video relative shadow-inner ring-1 ring-slate-900/10">
-              {videoItem.url.includes('youtube.com') || videoItem.url.includes('youtu.be') ? (
+              {videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') ? (
                 <iframe
-                  src={videoItem.url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                  src={videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
                   allowFullScreen
                   className="w-full h-full border-0"
                 />
               ) : (
                 <video
-                  src={videoItem.url}
+                  src={videoUrl}
                   controls
                   controlsList="nodownload"
                   className="w-full h-full object-contain"
@@ -131,7 +132,10 @@ export default async function LearningLessonPage(props: {
                       ) : (
                         <ExternalLink className="h-4 w-4 text-slate-500 shrink-0" />
                       )}
-                      <span className="truncate">{item.name || (isAttachment ? 'Download Attachment' : 'Open Link')}</span>
+                      <span className="truncate font-bold text-slate-800">
+                        {item.name || (isAttachment ? 'Download Attachment' : 'Open Link')}
+                      </span>
+                      <span className="text-slate-500 font-normal truncate">({item.url})</span>
                     </a>
                   )
                 })}

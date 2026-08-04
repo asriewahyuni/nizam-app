@@ -31,14 +31,21 @@ async function assertOrgAdmin() {
 
 // ── Courses (Program) ─────────────────────────────────────────────────────────
 
-export async function getLmsCourses(orgId: string) {
+export async function getLmsCourses(orgId: string, includeArchived = false) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from('learning_courses')
     .select('*')
     .eq('org_id', orgId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
+
+  // Jika tidak include archived, exclude course yang sudah diarsipkan
+  if (!includeArchived) {
+    query = query.is('archived_at', null)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('[getLmsCourses]', error)
@@ -161,6 +168,50 @@ export async function deleteLmsCourse(courseId: string) {
 
   revalidatePath('/lms/admin')
   revalidatePath('/lms')
+}
+
+/**
+ * Set status kursus: 'published' (aktif), 'draft' (tidak aktif), atau 'archived' (disembunyikan dari daftar).
+ * Kursus yang diarsipkan tidak muncul di katalog publik maupun admin default.
+ */
+export async function setLmsCourseStatus(
+  courseId: string,
+  status: 'published' | 'draft' | 'archived'
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const orgData = await assertOrgAdmin()
+    if (!courseId) return { error: 'Course ID wajib diisi' }
+
+    const now = new Date().toISOString()
+    let patch: Record<string, unknown>
+
+    if (status === 'published') {
+      patch = { is_active: true, archived_at: null, updated_at: now }
+    } else if (status === 'draft') {
+      patch = { is_active: false, archived_at: null, updated_at: now }
+    } else {
+      // archived — nonaktifkan dan set archived_at
+      patch = { is_active: false, archived_at: now, updated_at: now }
+    }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('learning_courses')
+      .update(patch)
+      .eq('id', courseId)
+      .eq('org_id', orgData.org.id)
+
+    if (error) {
+      console.error('[setLmsCourseStatus]', JSON.stringify(error))
+      return { error: getErrorMessage(error) }
+    }
+
+    revalidatePath('/lms/admin')
+    revalidatePath('/lms')
+    return { success: true }
+  } catch (err) {
+    return { error: getErrorMessage(err) }
+  }
 }
 
 export async function getLmsCourseAnalytics(courseId: string) {
@@ -568,17 +619,37 @@ export async function deleteLmsSession(sessionId: string) {
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-export async function getLmsLessonsByCourseId(orgId: string, courseId: string) {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('learning_lessons')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('course_id', courseId)
-    .order('sort_order', { ascending: true })
+export async function getLmsLessonsByCourseId(orgId: string, courseId: string): Promise<any[]> {
+  try {
+    const res = await queryPostgres(
+      `SELECT l.*
+       FROM learning_lessons l
+       LEFT JOIN learning_course_sections s ON s.id = l.section_id
+       WHERE l.org_id = $1 AND l.course_id = $2
+       ORDER BY COALESCE(s.sort_order, 0) ASC, l.sort_order ASC, l.created_at ASC`,
+      [orgId, courseId]
+    )
+    return res.rows
+  } catch (err) {
+    console.error('getLmsLessonsByCourseId error:', err)
+    return []
+  }
+}
 
-  if (error) return []
-  return data
+export async function getLmsSectionsByCourseId(orgId: string, courseId: string): Promise<any[]> {
+  try {
+    const res = await queryPostgres(
+      `SELECT *
+       FROM learning_course_sections
+       WHERE org_id = $1 AND course_id = $2
+       ORDER BY sort_order ASC, created_at ASC`,
+      [orgId, courseId]
+    )
+    return res.rows
+  } catch (err) {
+    console.error('getLmsSectionsByCourseId error:', err)
+    return []
+  }
 }
 
 // ── Lesson CRUD ───────────────────────────────────────────────────────────────
@@ -592,6 +663,7 @@ export async function createLmsLesson(
     const supabase = await createClient()
 
     const courseId   = formData.get('courseId') as string
+    const sectionIdRaw = (formData.get('sectionId') as string)?.trim()
     const title      = (formData.get('title') as string)?.trim()
     const contentMd  = (formData.get('contentMd') as string)?.trim() || null
     const lessonType = (formData.get('lessonType') as string) || 'TEXT'
@@ -600,6 +672,18 @@ export async function createLmsLesson(
     const attachmentsJson = formData.get('attachmentsJson') as string
 
     if (!courseId || !title) return { error: 'courseId dan title wajib diisi.' }
+
+    const sectionId = sectionIdRaw || null
+    if (sectionId) {
+      const { data: section } = await supabase
+        .from('learning_course_sections')
+        .select('id')
+        .eq('id', sectionId)
+        .eq('course_id', courseId)
+        .eq('org_id', orgData.org.id)
+        .single()
+      if (!section) return { error: 'Grup lesson tidak valid.' }
+    }
 
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now()
 
@@ -622,6 +706,7 @@ export async function createLmsLesson(
       .select('sort_order')
       .eq('course_id', courseId)
       .eq('org_id', orgData.org.id)
+      .eq('section_id', sectionId)
       .order('sort_order', { ascending: false })
       .limit(1)
       
@@ -635,9 +720,10 @@ export async function createLmsLesson(
       content_md:  contentMd,
       lesson_type: lessonType,
       sort_order:  sortOrder,
-      is_required: isRequired,
-      media_items: mediaItems,
-    })
+       is_required: isRequired,
+       media_items: mediaItems,
+       section_id: sectionId,
+     })
 
     if (error) return { error: getErrorMessage(error) }
     revalidatePath('/lms')
@@ -656,6 +742,7 @@ export async function updateLmsLesson(
     const supabase = await createClient()
 
     const lessonId   = formData.get('lessonId') as string
+    const sectionIdRaw = (formData.get('sectionId') as string)?.trim()
     const title      = (formData.get('title') as string)?.trim()
     const contentMd  = (formData.get('contentMd') as string)?.trim() || null
     const lessonType = (formData.get('lessonType') as string) || 'TEXT'
@@ -664,6 +751,25 @@ export async function updateLmsLesson(
     const attachmentsJson = formData.get('attachmentsJson') as string
 
     if (!lessonId || !title) return { error: 'lessonId dan title wajib diisi.' }
+
+    const sectionId = sectionIdRaw || null
+    const { data: currentLesson } = await supabase
+      .from('learning_lessons')
+      .select('course_id')
+      .eq('id', lessonId)
+      .eq('org_id', orgData.org.id)
+      .single()
+    if (!currentLesson) return { error: 'Materi tidak ditemukan.' }
+    if (sectionId) {
+      const { data: section } = await supabase
+        .from('learning_course_sections')
+        .select('id')
+        .eq('id', sectionId)
+        .eq('course_id', currentLesson.course_id)
+        .eq('org_id', orgData.org.id)
+        .single()
+      if (!section) return { error: 'Grup lesson tidak valid.' }
+    }
 
     let parsedAttachments: any[] = []
     if (attachmentsJson) {
@@ -686,15 +792,27 @@ export async function updateLmsLesson(
     }
     mediaItems = [...mediaItems, ...parsedAttachments]
 
+    const embedProvider =
+      lessonType === 'VIDEO' && videoUrl
+        ? videoUrl.includes('youtu')
+          ? 'youtube'
+          : videoUrl.includes('vimeo')
+          ? 'vimeo'
+          : null
+        : null
+
     const { error } = await supabase
       .from('learning_lessons')
       .update({
         title,
-        content_md:  contentMd,
-        lesson_type: lessonType,
-        is_required: isRequired,
-        media_items: mediaItems,
-        updated_at:  new Date().toISOString(),
+        content_md:     contentMd,
+        lesson_type:    lessonType,
+        is_required:    isRequired,
+        media_items:    mediaItems,
+        embed_url:      lessonType === 'VIDEO' ? videoUrl : null,
+         embed_provider: embedProvider,
+         section_id:     sectionId,
+         updated_at:     new Date().toISOString(),
       })
       .eq('id', lessonId)
       .eq('org_id', orgData.org.id)
@@ -712,26 +830,35 @@ export async function moveLmsLesson(lessonId: string, courseId: string, directio
     const orgData = await assertOrgAdmin()
     const supabase = await createClient()
 
-    // Ambil semua lesson di course ini dan urutkan
+    const { data: current } = await supabase
+      .from('learning_lessons')
+      .select('id, sort_order, section_id')
+      .eq('id', lessonId)
+      .eq('course_id', courseId)
+      .eq('org_id', orgData.org.id)
+      .single()
+    if (!current) return { error: 'Materi tidak ditemukan' }
+
     const { data: lessons } = await supabase
       .from('learning_lessons')
-      .select('id, sort_order')
+      .select('id, sort_order, section_id')
       .eq('course_id', courseId)
       .eq('org_id', orgData.org.id)
       .order('sort_order', { ascending: true })
 
     if (!lessons) return { error: 'Gagal mengambil data materi' }
+    const sameSectionLessons = lessons.filter((lesson: any) => lesson.section_id === current.section_id)
 
-    const currentIndex = lessons.findIndex((l: any) => l.id === lessonId)
+    const currentIndex = sameSectionLessons.findIndex((l: any) => l.id === lessonId)
     if (currentIndex === -1) return { error: 'Materi tidak ditemukan' }
 
     const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
-    if (targetIndex < 0 || targetIndex >= lessons.length) {
+    if (targetIndex < 0 || targetIndex >= sameSectionLessons.length) {
       return { success: true } // Sudah di ujung
     }
 
-    const currentLesson = lessons[currentIndex]
-    const targetLesson = lessons[targetIndex]
+    const currentLesson = sameSectionLessons[currentIndex]
+    const targetLesson = sameSectionLessons[targetIndex]
 
     // Swap sort_order
     await supabase.from('learning_lessons').update({ sort_order: targetLesson.sort_order }).eq('id', currentLesson.id)

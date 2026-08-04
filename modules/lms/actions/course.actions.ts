@@ -6,7 +6,7 @@
  */
 import { queryPostgres } from '@/lib/db/postgres'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
-import { canUserAccessCourse } from '@/modules/lms/lib/access.server'
+import { canUserAccessCourse, getStaffOverride } from '@/modules/lms/lib/access.server'
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error || 'Kesalahan tidak diketahui')
@@ -139,6 +139,8 @@ type CourseDetailRow = {
   duration_minutes: number | null
   outcomes: unknown
   closed_access_message: string | null
+  is_active?: boolean
+  status?: string | null
 }
 
 type LessonOutlineRow = {
@@ -180,6 +182,9 @@ export async function getLMSCourseDetails(orgSlug: string, courseSlug: string) {
     const orgId = orgResult.rows[0]?.id
     if (!orgId) return { error: 'Organisasi tidak ditemukan.' }
 
+    const session = await getInternalAuthSession()
+    const isStaff = session?.user ? await getStaffOverride(orgId, session.user.id) : false
+
     const courseResult = await queryPostgres<CourseDetailRow>(
       `SELECT
          id::text,
@@ -191,20 +196,21 @@ export async function getLMSCourseDetails(orgSlug: string, courseSlug: string) {
          preview_video_url,
          duration_minutes,
          outcomes,
-         closed_access_message
+         closed_access_message,
+         COALESCE(is_active, FALSE) AS is_active,
+         status
        FROM public.learning_courses
        WHERE org_id = $1::uuid
          AND slug = $2
-         AND is_active = TRUE
-         AND COALESCE(status, 'PUBLISHED') = 'PUBLISHED'
+         AND ($3::boolean = TRUE OR (is_active = TRUE AND COALESCE(status, 'PUBLISHED') = 'PUBLISHED'))
          AND deleted_at IS NULL
        LIMIT 1`,
-      [orgId, courseSlug],
+      [orgId, courseSlug, isStaff],
     )
     const course = courseResult.rows[0]
     if (!course) return { error: 'Kursus tidak ditemukan.' }
 
-    const [lessonsResult, batchesResult, session] = await Promise.all([
+    const [lessonsResult, batchesResult] = await Promise.all([
       queryPostgres<LessonOutlineRow>(
         `SELECT
            lesson.id::text,

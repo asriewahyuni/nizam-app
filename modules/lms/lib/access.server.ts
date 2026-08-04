@@ -95,7 +95,7 @@ function dripMilliseconds(value: number, unit: string) {
   return 0
 }
 
-async function getStaffOverride(orgId: string, userId: string) {
+export async function getStaffOverride(orgId: string, userId: string) {
   const result = await queryPostgres<{ allowed: boolean }>(
     `SELECT EXISTS (
        SELECT 1
@@ -217,6 +217,21 @@ export async function resolveLessonAccess(input: {
   lessonSlug: string
 }): Promise<LessonAccessDecision> {
   try {
+    const session = await getInternalAuthSession()
+    const userId = session?.user?.id || null
+
+    let staffOverride = false
+    if (userId) {
+      const orgRes = await queryPostgres<{ id: string }>(
+        `SELECT id::text FROM public.organizations WHERE slug = $1 AND is_active = TRUE LIMIT 1`,
+        [input.orgSlug],
+      )
+      const orgId = orgRes.rows[0]?.id
+      if (orgId) {
+        staffOverride = await getStaffOverride(orgId, userId)
+      }
+    }
+
     const lessonResult = await queryPostgres<LessonAccessRow>(
       `SELECT
          organization.id::text AS org_id,
@@ -246,29 +261,21 @@ export async function resolveLessonAccess(input: {
        WHERE organization.slug = $1
          AND organization.is_active = TRUE
          AND course.slug = $2
-         AND course.is_active = TRUE
-         AND COALESCE(course.status, 'PUBLISHED') = 'PUBLISHED'
+         AND ($4::boolean = TRUE OR (course.is_active = TRUE AND COALESCE(course.status, 'PUBLISHED') = 'PUBLISHED'))
          AND course.deleted_at IS NULL
          AND lesson.slug = $3
          AND lesson.deleted_at IS NULL
        LIMIT 1`,
-      [input.orgSlug, input.courseSlug, input.lessonSlug],
+      [input.orgSlug, input.courseSlug, input.lessonSlug, staffOverride],
     )
     const row = lessonResult.rows[0]
     if (!row) {
       return { allowed: false, code: 'NOT_FOUND', message: 'Materi tidak ditemukan.' }
     }
 
-    const session = await getInternalAuthSession()
-    const userId = session?.user?.id || null
     let grant: AccessGrantRow | null = null
-    let staffOverride = false
-
-    if (userId) {
-      staffOverride = await getStaffOverride(row.org_id, userId)
-      if (!staffOverride) {
-        grant = await getActiveGrant(row.org_id, userId, row.course_id)
-      }
+    if (userId && !staffOverride) {
+      grant = await getActiveGrant(row.org_id, userId, row.course_id)
     }
 
     if (!row.is_preview && !staffOverride && !userId) {

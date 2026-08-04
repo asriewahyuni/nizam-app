@@ -1,17 +1,16 @@
+import React from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { unstable_noStore as noStore } from 'next/cache'
 import { notFound, redirect } from 'next/navigation'
 import {
   ArrowLeft,
   ArrowRight,
-  BookOpen,
+  Book,
   CheckCircle2,
   ClipboardCheck,
-  Clock,
-  GraduationCap,
-  ShieldCheck,
-  Trophy
+  Eye,
+  Play,
+  Settings,
 } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getLmsCourseBySlug, getLmsLessonsByCourseId } from '@/modules/edu/actions/lms-commercial.actions'
@@ -31,19 +30,15 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
   if (!course) notFound()
 
   const lessons = await getLmsLessonsByCourseId(orgData.org.id, course.id)
-  const track: any = null // Optional fallback if you want to support track UI later
-  
-  // Dummy fallbacks for UI styling since we no longer have MVP hardcoded attributes
-  const outcomes = ['Peningkatan skill teknis', 'Pemahaman operasional', 'Kesiapan terjun lapangan']
-  const assessmentSummary = ['Ujian Pilihan Ganda', 'Ujian Praktik', 'Review Penilai']
-  
+
   const learningAccess = await getLearningAccessContext({
     userRole: orgData.role,
     permissions: orgData.permissions,
     email: orgData.user?.email,
   })
   const canManageAssessment = learningAccess.canReviewAssessments
-  const canAccessParticipantAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning') || canManageAssessment
+  const canAccessParticipantAssessment =
+    hasRolePermission(orgData.role, orgData.permissions, 'learning') || canManageAssessment
 
   let progressPercentage = 0
   let completedCount = 0
@@ -62,210 +57,192 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
         .select('*', { count: 'exact', head: true })
         .eq('enrollment_id', enrollment.id)
         .eq('status', 'COMPLETED')
-      
+
       completedCount = count || 0
       progressPercentage = Math.round((completedCount / lessons.length) * 100)
     }
   }
 
+  const firstLesson = lessons[0]
+  const isAdmin = ['owner', 'admin'].includes(orgData.role)
+
   return (
     <MotionWrapper>
-      <div className="space-y-6">
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-        <Link
-          href={track ? `/lms/track/${track.slug}` : '/lms'}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Kembali ke {track?.title || 'Training Center'}
-        </Link>
+      <div className="mx-auto max-w-4xl px-4 py-6">
+        {/* Navigasi Atas */}
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href="/lms"
+            className="inline-flex cursor-pointer items-center text-xs font-semibold text-slate-500 transition-colors hover:text-indigo-600"
+          >
+            <ArrowLeft size={14} className="mr-1.5" /> Kembali ke Katalog
+          </Link>
 
-        <div className="mt-5 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-              <GraduationCap className="h-3.5 w-3.5" />
-              {course.level_code || 'ALL'} • {course.is_active ? 'Live' : 'Soon'}
+          {isAdmin && (
+            <Link
+              href={`/lms/admin/course/${course.slug}?tab=curriculum`}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-indigo-600"
+            >
+              <Settings size={14} className="text-slate-400" /> Kelola di Admin LMS
+            </Link>
+          )}
+        </div>
+
+        {/* Kartu Utama Kursus (Selaras dengan Portal Member) */}
+        <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 bg-slate-50 p-6">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="rounded bg-indigo-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-indigo-700">
+                {course.level_code || 'ALL LEVEL'}
+              </span>
+              <span
+                className={`rounded px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest ${
+                  course.is_active
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-amber-100 text-amber-800'
+                }`}
+              >
+                {course.is_active ? 'Aktif' : 'Draft'}
+              </span>
             </div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+
+            <h1 className="mb-3 text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
               {course.title}
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
-              {course.description || 'Tidak ada deskripsi'}
-            </p>
+            {course.description ? (
+              <div
+                className="prose prose-slate mb-6 max-w-none text-xs leading-relaxed text-slate-600 sm:text-sm prose-img:rounded-xl prose-img:max-h-[400px] prose-img:object-cover prose-a:text-indigo-600 hover:prose-a:text-indigo-500 prose-headings:text-slate-900 prose-p:my-2"
+                dangerouslySetInnerHTML={{ __html: course.description }}
+              />
+            ) : (
+              <p className="mb-6 text-xs leading-relaxed text-slate-600 sm:text-sm">
+                Tidak ada deskripsi kursus.
+              </p>
+            )}
 
-            <div className="mt-5 flex flex-wrap gap-3 text-sm font-bold text-slate-600">
-              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2">
-                <Clock className="h-4 w-4" />
-                60 menit
+            {/* CTA Utama & Progress */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              {firstLesson ? (
+                <Link
+                  href={`/lms/course/${course.slug}/lesson/${firstLesson.slug}`}
+                  className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all duration-200 hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                >
+                  <Play aria-hidden="true" size={16} />
+                  {progressPercentage > 0 ? 'Lanjutkan belajar' : 'Mulai belajar'}
+                </Link>
+              ) : (
+                <div className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-500">
+                  Materi belum tersedia
+                </div>
+              )}
+
+              {/* Progress Bar */}
+              {lessons.length > 0 && (
+                <div className="w-full sm:max-w-xs">
+                  <div className="mb-1.5 flex justify-between text-xs font-semibold text-slate-600">
+                    <span>
+                      {completedCount}/{lessons.length} materi selesai
+                    </span>
+                    <strong className="text-emerald-800">{progressPercentage}%</strong>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/80">
+                    <div
+                      className="h-full rounded-full bg-emerald-600 transition-all duration-300"
+                      style={{ width: `${Math.max(0, Math.min(100, progressPercentage))}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Assessment & Tugas Shortcut (Jika Punya Akses) */}
+          {(canAccessParticipantAssessment || canManageAssessment) && (
+            <div className="border-b border-slate-100 bg-slate-50/60 px-6 py-4">
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Assessment & Penilaian
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2">
-                <BookOpen className="h-4 w-4" />
-                {lessons.length} lesson
+              <div className="grid gap-3 sm:grid-cols-2">
+                {canAccessParticipantAssessment && (
+                  <Link
+                    href={`/lms/course/${course.slug}/assessment/participant`}
+                    className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-white p-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-all hover:border-emerald-300 hover:text-emerald-700 hover:shadow-sm"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <ClipboardCheck className="h-4 w-4 text-emerald-600" />
+                      <span>Halaman Assessment Peserta</span>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-slate-400" />
+                  </Link>
+                )}
+
+                {canManageAssessment && (
+                  <Link
+                    href={`/lms/course/${course.slug}/assessment`}
+                    className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-800 bg-slate-900 p-3.5 text-xs font-semibold text-white shadow-2xs transition-all hover:bg-black"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                      <span>Panel Assessor / Penilai</span>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-slate-400" />
+                  </Link>
+                )}
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2">
-                <ShieldCheck className="h-4 w-4" />
-                Internal & External
+            </div>
+          )}
+
+          {/* Daftar Materi Kursus (Card-Based Minimalism selaras Portal Member) */}
+          <div className="p-6">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Materi Kursus</h2>
+              <div className="text-xs font-semibold text-slate-500">
+                {lessons.length} Modul
               </div>
             </div>
 
-            {course.is_active && lessons[0] ? (
-              <div className="mt-8 flex flex-col sm:flex-row gap-4 sm:items-center">
-                <Link
-                  href={`/lms/course/${course.slug}/lesson/${lessons[0].slug}`}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
-                >
-                  {progressPercentage > 0 ? 'Lanjutkan Belajar' : 'Mulai Lesson 1'}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-
-                {progressPercentage > 0 && (
-                  <div className="flex-1 max-w-sm ml-0 sm:ml-4">
-                    <div className="flex items-center justify-between mb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      <span>Progres Anda</span>
-                      <span className={progressPercentage === 100 ? 'text-emerald-600' : ''}>{progressPercentage}%</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-500 ${progressPercentage === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                        style={{ width: `${progressPercentage}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
+            {lessons.length === 0 ? (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 py-8 text-center">
+                <Book size={28} className="mx-auto mb-2 text-slate-300" />
+                <p className="text-xs font-medium text-slate-500">
+                  Belum ada materi untuk kursus ini.
+                </p>
               </div>
             ) : (
-              <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-4 text-sm font-bold text-slate-500">
-                Course ini belum dibuka untuk peserta.
+              <div className="space-y-3">
+                {lessons.map((lesson: any, index: number) => (
+                  <Link
+                    key={lesson.id}
+                    href={`/lms/course/${course.slug}/lesson/${lesson.slug}`}
+                    className="group flex min-h-12 cursor-pointer items-center rounded-xl border border-slate-200 bg-white p-3.5 transition-all duration-200 hover:border-emerald-300 hover:shadow-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                  >
+                    <div className="mr-3.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 transition-colors group-hover:bg-indigo-100 group-hover:text-indigo-600">
+                      {index + 1}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-sm font-bold text-slate-900">
+                        {lesson.title}
+                      </h3>
+                      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                        {lesson.lesson_type || 'TEXT'}
+                        {lesson.is_preview ? ' • PREVIEW' : ''}
+                      </p>
+                    </div>
+                    {lesson.is_preview ? (
+                      <span className="flex shrink-0 items-center gap-1 text-[10px] font-bold text-emerald-700">
+                        <Eye aria-hidden="true" size={14} />
+                        Preview
+                      </span>
+                    ) : (
+                      <Play aria-hidden="true" className="shrink-0 text-emerald-700" size={16} />
+                    )}
+                  </Link>
+                ))}
               </div>
             )}
           </div>
-
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-            <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100 flex items-center justify-center">
-              <GraduationCap className="w-24 h-24 text-slate-200" />
-            </div>
-          </div>
         </div>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Outcome</div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-900">Hasil belajar yang diharapkan</h2>
-            </div>
-          </div>
-          <div className="mt-5 space-y-3 text-sm text-slate-600">
-            {outcomes.map((outcome) => (
-              <div key={outcome} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                {outcome}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <ClipboardCheck className="h-5 w-5 text-slate-700" />
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Assessment</div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-900">Ringkasan penilaian</h2>
-            </div>
-          </div>
-          <div className="mt-5 space-y-3 text-sm text-slate-600">
-            {assessmentSummary.map((item) => (
-              <div key={item} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                {item}
-              </div>
-            ))}
-          </div>
-          {course.is_active ? (
-            <div className="mt-5 space-y-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Masuk Sebagai</div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {canAccessParticipantAssessment ? (
-                  <Link
-                    href={`/lms/course/${course.slug}/assessment/participant`}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-white"
-                  >
-                    <div className="font-semibold text-slate-900">Peserta</div>
-                    <p className="mt-2 leading-6 text-slate-600">
-                      Isi jawaban teori, bukti praktik, dan lihat riwayat review pribadi.
-                    </p>
-                    <div className="mt-3 inline-flex items-center gap-2 font-semibold text-emerald-700">
-                      Buka Halaman Peserta
-                      <ArrowRight className="h-4 w-4" />
-                    </div>
-                  </Link>
-                ) : null}
-
-                {canManageAssessment ? (
-                  <Link
-                    href={`/lms/course/${course.slug}/assessment`}
-                    className="rounded-xl border border-slate-900 bg-slate-900 p-4 text-sm text-white shadow-lg shadow-slate-200 transition hover:bg-black"
-                  >
-                    <div className="font-semibold">Penilai</div>
-                    <p className="mt-2 leading-6 text-slate-200">
-                      Review submission peserta, isi keputusan akhir, dan pantau status kelulusan per entitas.
-                    </p>
-                    <div className="mt-3 inline-flex items-center gap-2 font-semibold text-white">
-                      Buka Panel Penilai
-                      <ArrowRight className="h-4 w-4" />
-                    </div>
-                  </Link>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Lesson Plan</div>
-            <h2 className="mt-2 text-xl font-semibold text-slate-900">Urutan lesson di course ini</h2>
-          </div>
-          <div className="rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-            {lessons.length} lesson
-          </div>
-        </div>
-
-        <div className="mt-5 space-y-4">
-          {lessons.length === 0 ? (
-             <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm font-bold text-slate-500">
-               Belum ada lesson yang diunggah ke course ini.
-             </div>
-          ) : lessons.map((lesson: any, idx: number) => (
-            <div key={lesson.slug} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-semibold text-slate-900 shadow-sm">
-                    {lesson.sort_order || idx + 1}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{lesson.title}</h3>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{lesson.summary || 'Tidak ada ringkasan'}</p>
-                    <div className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-500">
-                      15 menit
-                    </div>
-                  </div>
-                </div>
-                <Link
-                  href={`/lms/course/${course.slug}/lesson/${lesson.slug}`}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm ring-1 ring-slate-200 transition hover:text-emerald-800"
-                >
-                  Buka Lesson
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
+      </div>
     </MotionWrapper>
   )
 }

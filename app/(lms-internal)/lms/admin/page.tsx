@@ -13,7 +13,7 @@ export default async function CatalogAdminPage() {
   if (!orgData) return null
 
   const [courses, allBatches] = await Promise.all([
-    getLmsCourses(orgData.org.id),
+    getLmsCourses(orgData.org.id, true), // include archived agar admin bisa kelola
     getLmsBatches(orgData.org.id),
   ])
 
@@ -53,8 +53,10 @@ export default async function CatalogAdminPage() {
     return {
       id: cid,
       slug: c.slug as string,
+      orgSlug: orgData.org.slug,
       title: c.title as string,
       isActive: Boolean(c.is_active),
+      isArchived: Boolean(c.archived_at),
       chapterCount: lessonCount > 0 ? 1 : 0,
       lessonCount,
       relatedProducts,

@@ -1,6 +1,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { getLMSLessonDetails } from '@/modules/lms/actions/lesson.actions'
+import { getLMSCourseDetails } from '@/modules/lms/actions/course.actions'
 import { getLessonAssessmentOverview } from '@/modules/lms/actions/assessment.actions'
 import LessonTabs from './LessonTabs'
 import VideoPlayer from './VideoPlayer'
@@ -23,6 +24,11 @@ export default async function LMSLearnPage(props: {
   }
 
   const lesson = result.data
+  const courseResult = await getLMSCourseDetails(params.orgSlug, params.courseSlug)
+  const courseLessons = courseResult.data?.lessons || []
+  const lessonIndex = courseLessons.findIndex((item) => item.slug === params.lessonSlug)
+  const previousLesson = lessonIndex > 0 ? courseLessons[lessonIndex - 1] : null
+  const nextLesson = lessonIndex >= 0 && lessonIndex < courseLessons.length - 1 ? courseLessons[lessonIndex + 1] : null
   const assessmentResult = lesson.is_preview
     ? null
     : await getLessonAssessmentOverview(
@@ -34,12 +40,14 @@ export default async function LMSLearnPage(props: {
 
   // Extract video URL if any
   let videoUrl: string | null = null
-  if (lesson.lesson_type === 'VIDEO' && Array.isArray(lesson.media_items)) {
-    const videoMedia = lesson.media_items.find((media: unknown) => {
-      if (!media || typeof media !== 'object') return false
-      return String((media as Record<string, unknown>).type || '') === 'video'
-    }) as Record<string, unknown> | undefined
-    if (videoMedia) videoUrl = String(videoMedia.url || '') || null
+  if (lesson.lesson_type === 'VIDEO') {
+    if (Array.isArray(lesson.media_items)) {
+      const videoMedia = lesson.media_items.find((media: unknown) => {
+        if (!media || typeof media !== 'object') return false
+        return String((media as Record<string, unknown>).type || '') === 'video'
+      }) as Record<string, unknown> | undefined
+      if (videoMedia) videoUrl = String(videoMedia.url || '') || null
+    }
     if (!videoUrl && lesson.embed_url) videoUrl = lesson.embed_url
   }
 
@@ -63,8 +71,20 @@ export default async function LMSLearnPage(props: {
           orgSlug={params.orgSlug} 
           courseSlug={params.courseSlug} 
           assessments={assessments}
-        />
-      </div>
-    </div>
-  )
+         />
+         <nav aria-label="Navigasi materi" className="mt-8 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-between">
+           {previousLesson ? (
+             <Link href={`/lms/${params.orgSlug}/learn/${params.courseSlug}/${previousLesson.slug}`} className="min-h-11 cursor-pointer rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:border-indigo-300 hover:bg-indigo-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-200">
+               ← {previousLesson.title}
+             </Link>
+           ) : <span />}
+           {nextLesson && (
+             <Link href={`/lms/${params.orgSlug}/learn/${params.courseSlug}/${nextLesson.slug}`} className="min-h-11 cursor-pointer rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-200">
+               {nextLesson.title} →
+             </Link>
+           )}
+         </nav>
+       </div>
+     </div>
+   )
 }

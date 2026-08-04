@@ -98,7 +98,7 @@ export default async function CoursePlayerLayout(props: {
             className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
           >
             <span>{index + 1}.</span>
-            <span className="max-w-48 truncate">{lesson.title}</span>
+            <span className="max-w-48 truncate">{lesson.section_title ? `${lesson.section_title}: ` : ''}{lesson.title}</span>
             {progressData[lesson.id]?.completed && (
               <CheckCircle aria-label="Selesai" size={16} className="text-emerald-700" />
             )}

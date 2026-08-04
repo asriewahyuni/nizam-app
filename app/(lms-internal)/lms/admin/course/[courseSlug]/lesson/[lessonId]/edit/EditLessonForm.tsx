@@ -9,14 +9,16 @@ import { useRouter } from 'next/navigation'
 const inputCls = 'w-full rounded-md border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-colors focus:border-indigo-600 focus:ring-0 hover:border-slate-300'
 const labelCls = 'block text-sm font-bold text-slate-900 mb-1.5'
 
-export default function EditLessonForm({ lesson, courseSlug }: { lesson: any, courseSlug: string }) {
+type LessonSection = { id: string; title: string }
+
+export default function EditLessonForm({ lesson, courseSlug, sections = [] }: { lesson: any; courseSlug: string; sections?: LessonSection[] }) {
   const router = useRouter()
   const [state, action, isPending] = useActionState(updateLmsLesson, {})
   const [lessonType, setLessonType] = useState(lesson.lesson_type || 'TEXT')
   
-  // Extract existing video url from media_items if it exists
+  // Extract existing video url from media_items if it exists, fallback to embed_url from migration
   const existingVideo = (lesson.media_items || []).find((m: any) => m.type === 'video')
-  const defaultVideoUrl = existingVideo ? existingVideo.url : ''
+  const defaultVideoUrl = existingVideo ? existingVideo.url : (lesson.embed_url || '')
   const [videoUrl, setVideoUrl] = useState(defaultVideoUrl)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -113,6 +115,18 @@ export default function EditLessonForm({ lesson, courseSlug }: { lesson: any, co
       <input type="hidden" name="lessonId" value={lesson.id} />
       <input type="hidden" name="attachmentsJson" value={JSON.stringify(attachments)} />
 
+      {sections.length > 0 && (
+        <div>
+          <label htmlFor="lesson-section" className={labelCls}>Grup Lesson</label>
+          <select id="lesson-section" name="sectionId" defaultValue={lesson.section_id || ''} className={inputCls}>
+            <option value="">Tanpa grup</option>
+            {sections.map((section) => (
+              <option key={section.id} value={section.id}>{section.title}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div>
         <label className={labelCls}>Lesson Title <span className="text-red-400">*</span></label>
         <input name="title" required defaultValue={lesson.title} className={inputCls} />
@@ -183,17 +197,40 @@ export default function EditLessonForm({ lesson, courseSlug }: { lesson: any, co
         {attachments.length > 0 && (
           <div className="mb-3 space-y-2">
             {attachments.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs font-semibold text-slate-700">
-                <span className="truncate max-w-[280px]">
-                  {item.type === 'attachment' ? '📎' : '🔗'} {item.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
-                  className="text-red-500 hover:text-red-700 font-bold ml-2"
-                >
-                  Remove
-                </button>
+              <div
+                key={idx}
+                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-700"
+              >
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="shrink-0">{item.type === 'attachment' ? '📎' : '🔗'}</span>
+                  <span className="font-bold text-slate-900 truncate">{item.name}</span>
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate text-indigo-600 underline hover:text-indigo-800 ml-1"
+                    title={item.url}
+                  >
+                    ({item.url})
+                  </a>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-indigo-600 hover:text-indigo-800"
+                  >
+                    Buka Link
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
+                    className="font-bold text-red-600 hover:text-red-800"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>

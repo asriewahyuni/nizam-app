@@ -180,3 +180,15 @@ export function toPgArray(arr: string[] | null | undefined): string {
   if (!arr || !Array.isArray(arr) || arr.length === 0) return '{}'
   return '{' + arr.map(s => `"${String(s).replace(/"/g, '\\"')}"`).join(',') + '}'
 }
+
+/**
+ * Strip HTML tags from a string (useful for previews and cards).
+ * Usage: stripHtml('<p>Hello</p>') → 'Hello'
+ */
+export function stripHtml(html?: string | null): string {
+  if (!html) return ''
+  return String(html)
+    .replace(/<[^>]*>?/gm, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim()
+}
