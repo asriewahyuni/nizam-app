@@ -435,16 +435,18 @@ export async function resetKojasmatData(orgId: string) {
   const authUserIds = authRows.map(r => r.user_id as string)
 
   // 2. Hapus journal entries terkait kojasmat untuk org ini
+  // reference_type adalah enum (journal_reference_type) — LIKE butuh cast ke text dulu,
+  // Postgres tidak punya operator LIKE untuk tipe enum.
   await queryPostgres(
     `DELETE FROM journal_lines
-     WHERE journal_id IN (
+     WHERE entry_id IN (
        SELECT id FROM journal_entries
-       WHERE org_id=$1 AND reference_type LIKE 'KOJASMAT_%'
+       WHERE org_id=$1 AND reference_type::text LIKE 'KOJASMAT_%'
      )`,
     [orgId]
   )
   await queryPostgres(
-    `DELETE FROM journal_entries WHERE org_id=$1 AND reference_type LIKE 'KOJASMAT_%'`,
+    `DELETE FROM journal_entries WHERE org_id=$1 AND reference_type::text LIKE 'KOJASMAT_%'`,
     [orgId]
   )
 

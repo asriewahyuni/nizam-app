@@ -2,7 +2,7 @@
 
 // Kojasmat — platform koperasi syariah: anggota, simpanan, proyek, pembiayaan, DPS, pelatihan
 
-import { queryPostgres } from '@/lib/db/postgres'
+import { queryPostgres, connectPostgresClient } from '@/lib/db/postgres'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
 import {
