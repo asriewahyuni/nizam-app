@@ -13,7 +13,7 @@ import {
   Download, FileSpreadsheet,
 } from 'lucide-react'
 import {
-  createAnggota, updateAnggota,
+  createAnggota, updateAnggota, deleteAnggota,
   catatSimpananMutasi,
   getSimpananByAnggota, getMutasiByAnggota,
   createProyek, updateProyek, deleteProyek, updateProyekStatus,
@@ -1015,6 +1015,8 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
   const [form, setForm] = useState<AnggotaForm>(emptyAnggotaForm)
   const [kredensial, setKredensial] = useState<KredensialAnggota | null>(null)
   const [copied, setCopied] = useState(false)
+  const [modalDelete, setModalDelete] = useState<KojasmatAnggota | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const filtered = anggota.filter(a =>
     a.nama.toLowerCase().includes(search.toLowerCase()) ||
@@ -1078,6 +1080,19 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
         }
       }
       setModalOpen(false)
+    })
+  }
+
+  function handleDeleteAnggota() {
+    if (!modalDelete) return
+    setDeleteError(null)
+    startTransition(async () => {
+      const res = await deleteAnggota(modalDelete.id)
+      if (res.error) {
+        setDeleteError(res.error)
+        return
+      }
+      setModalDelete(null)
     })
   }
 
@@ -1156,6 +1171,11 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
                       <button onClick={() => openEdit(a)}
                         className="rounded-lg p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer">
                         <ChevronRight className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => { setModalDelete(a); setDeleteError(null) }}
+                        title="Hapus anggota"
+                        className="rounded-lg p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer">
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -1248,6 +1268,37 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
             </button>
           </div>
         </div>
+      </Modal>
+
+      <Modal open={!!modalDelete} onClose={() => setModalDelete(null)} title="Hapus Anggota">
+        {modalDelete && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+              <p className="font-medium text-red-800">{modalDelete.nama}</p>
+              <p className="text-sm text-red-600 mt-1 font-mono">{modalDelete.kode_anggota}</p>
+            </div>
+            <p className="text-sm text-gray-600">
+              Anggota ini akan dihapus permanen beserta akun login dan rekening simpanannya.
+              Hanya bisa dihapus kalau belum ada riwayat transaksi (setoran, proyek, pembiayaan,
+              penawaran, bagi hasil) — kalau sudah ada, gunakan status Tidak Aktif/Dibekukan.
+            </p>
+            {deleteError && (
+              <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {deleteError}
+              </p>
+            )}
+            <div className="flex gap-3">
+              <button onClick={() => setModalDelete(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Batal
+              </button>
+              <button onClick={handleDeleteAnggota} disabled={pending}
+                className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer">
+                {pending ? 'Menghapus...' : 'Ya, Hapus'}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal open={!!kredensial} onClose={() => setKredensial(null)} title="Anggota Dibuat — Info Login">

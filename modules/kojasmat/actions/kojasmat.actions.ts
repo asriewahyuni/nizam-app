@@ -365,6 +365,60 @@ export async function updateAnggota(id: string, payload: Partial<KojasmatAnggota
   return { data: rows[0] as KojasmatAnggota }
 }
 
+// Hapus anggota permanen — HANYA diizinkan kalau belum ada transaksi keuangan
+// apa pun atas namanya (setoran/tarik simpanan, proyek, pembiayaan, penawaran,
+// bagi hasil). Kalau sudah ada satu saja, tolak dan arahkan ke ubah status
+// Tidak Aktif/Dibekukan supaya jejak keuangan tidak ikut hilang.
+export async function deleteAnggota(id: string) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const { rows: [anggota] } = await queryPostgres(
+    `SELECT id, org_id, kode_anggota, user_id FROM kojasmat_anggota WHERE id=$1`,
+    [id]
+  )
+  if (!anggota) return { error: 'Anggota tidak ditemukan' }
+
+  if (!(await isOrgAdminOrManajemen(session.user.id, anggota.org_id))) {
+    return { error: 'Hanya owner/admin/manager yang dapat menghapus anggota.' }
+  }
+
+  const { rows: [counts] } = await queryPostgres(
+    `SELECT
+       (SELECT COUNT(*) FROM kojasmat_simpanan_mutasi WHERE anggota_id=$1)::int AS mutasi,
+       (SELECT COUNT(*) FROM kojasmat_proyek WHERE pengaju_id=$1)::int AS proyek,
+       (SELECT COUNT(*) FROM kojasmat_pembiayaan WHERE pemodal_id=$1)::int AS pembiayaan,
+       (SELECT COUNT(*) FROM kojasmat_penawaran WHERE anggota_id=$1)::int AS penawaran,
+       (SELECT COUNT(*) FROM kojasmat_bagi_hasil WHERE pemodal_id=$1)::int AS bagi_hasil`,
+    [id]
+  )
+  const alasan: string[] = []
+  if (counts.mutasi > 0) alasan.push(`${counts.mutasi} mutasi simpanan`)
+  if (counts.proyek > 0) alasan.push(`${counts.proyek} proyek`)
+  if (counts.pembiayaan > 0) alasan.push(`${counts.pembiayaan} pembiayaan`)
+  if (counts.penawaran > 0) alasan.push(`${counts.penawaran} penawaran`)
+  if (counts.bagi_hasil > 0) alasan.push(`${counts.bagi_hasil} bagi hasil`)
+  if (alasan.length > 0) {
+    return {
+      error: `Anggota ini sudah punya riwayat transaksi (${alasan.join(', ')}) — tidak bisa dihapus. Ubah status ke Tidak Aktif atau Dibekukan sebagai gantinya.`,
+    }
+  }
+
+  // Bersihkan pendaftaran yang tertaut supaya tidak jadi baris "Disetujui" yatim
+  await queryPostgres(`DELETE FROM kojasmat_pendaftaran WHERE anggota_id=$1`, [id])
+  // Hapus akun login kalau ada — supaya email/NIK bisa dipakai daftar ulang
+  if (anggota.user_id) {
+    await queryPostgres(`DELETE FROM internal_auth_users WHERE id=$1`, [anggota.user_id])
+  }
+  // Sisanya (kojasmat_simpanan, minat, pelatihan_peserta, tindakan, laporan_proyek,
+  // project_posts) ikut terhapus lewat ON DELETE CASCADE — semuanya kosong/non-finansial
+  // karena sudah lolos pengecekan transaksi di atas.
+  await queryPostgres(`DELETE FROM kojasmat_anggota WHERE id=$1`, [id])
+
+  revalidatePath('/kojasmat')
+  return { success: true }
+}
+
 // ─── SIMPANAN ─────────────────────────────────────────────────────────────────
 
 export async function getSimpananByAnggota(anggotaId: string): Promise<KojasmatSimpanan[]> {
