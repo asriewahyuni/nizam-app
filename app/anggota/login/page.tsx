@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
+import { resolveInternalUserId } from '@/lib/auth/internal-auth.shared'
 import { getAnggotaByUserId } from '@/modules/kojasmat/actions/kojasmat.actions'
 import AnggotaLoginClient from './AnggotaLoginClient'
 
@@ -16,7 +17,7 @@ export default async function AnggotaLoginPage({
   // Jika sudah login dan adalah anggota, langsung ke portal mereka (scope ke org)
   const session = await getInternalAuthSession()
   if (session) {
-    const anggota = await getAnggotaByUserId(session.user.id, org)
+    const anggota = await getAnggotaByUserId(resolveInternalUserId(session), org)
     if (anggota) {
       redirect(`/anggota/${anggota.kode_anggota}?org=${anggota.org_id}`)
     }

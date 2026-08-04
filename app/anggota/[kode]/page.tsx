@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
+import { resolveInternalUserId } from '@/lib/auth/internal-auth.shared'
 import { queryPostgres } from '@/lib/db/postgres'
 import {
   getAnggotaByUserId,
@@ -32,9 +33,11 @@ export default async function AnggotaPortalPage({
 
   // Cari anggota by user_id scope ke org, lalu fallback by kode HANYA untuk
   // owner/admin/manajer organisasi terkait (preview) — bukan sembarang staf yang login.
-  let anggota = await getAnggotaByUserId(session.user.id, org)
+  let anggota = await getAnggotaByUserId(resolveInternalUserId(session), org)
   if (!anggota) {
     const preview = await getAnggotaByKodeOnly(kode, org)
+    // isOrgAdminOrManajemen mengecek org_members, yang menyimpan legacy_user_id
+    // (session.user.id mentah) — berbeda dari kojasmat_anggota.user_id yang FK ke internal_auth_users(id).
     if (preview && await isOrgAdminOrManajemen(session.user.id, preview.org_id)) {
       anggota = preview
     }
