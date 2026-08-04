@@ -19,6 +19,7 @@ import CreateLessonForm from '../../CreateLessonForm'
 import { formatRupiah } from '@/lib/utils'
 import { StatusBadge, EmptyState, modeColor, statusColor } from '../../../ui'
 import AdminLessonList from './AdminLessonList'
+import CourseActions from '../CourseActions'
 
 export default async function AdminManageCoursePage(props: {
   params: Promise<{ courseSlug: string }>
@@ -87,8 +88,11 @@ export default async function AdminManageCoursePage(props: {
                 background: `linear-gradient(135deg, hsl(231 90% 60%), hsl(240 60% 40%))`,
               }}
             />
-            <div className="p-5">
-              <h1 className="text-lg font-bold text-slate-900 leading-tight mb-2">{course.title}</h1>
+              <div className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="text-lg font-bold text-slate-900 leading-tight mb-2">{course.title}</h1>
+                <CourseActions course={course} />
+              </div>
               <span
                 className={
                   'inline-flex rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ring-inset ' +
