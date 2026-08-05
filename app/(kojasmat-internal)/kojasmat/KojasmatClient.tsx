@@ -92,6 +92,18 @@ function fmt(n: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
 }
 
+function fmtWaktu(d: string) {
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).format(new Date(d)) + ' WIB'
+}
+
+const METODE_BAYAR_LABEL: Record<string, string> = {
+  TRANSFER: 'Transfer Bank',
+  QRIS: 'QRIS',
+}
+
 const STATUS_PROYEK: Record<string, { label: string; color: string }> = {
   DRAFT:                { label: 'Draft',               color: 'bg-gray-100 text-gray-600' },
   MENUNGGU_DMR:         { label: 'Menunggu DMR',         color: 'bg-yellow-100 text-yellow-700' },
@@ -2761,6 +2773,12 @@ function TabSimpanan({ orgId, anggota, setoranPending }: {
     })
   }
 
+  async function openBuktiSetoran(key: string) {
+    const res = await fetch(`/api/kojasmat/file?key=${encodeURIComponent(key)}`)
+    const { url } = await res.json() as { url: string }
+    window.open(url, '_blank')
+  }
+
   const filtered = anggota.filter(a =>
     a.nama.toLowerCase().includes(search.toLowerCase()) ||
     a.kode_anggota.includes(search)
@@ -2821,14 +2839,16 @@ function TabSimpanan({ orgId, anggota, setoranPending }: {
                 <div>
                   <p className="font-medium text-gray-900 text-sm">{s.anggota_nama} <span className="text-gray-400 font-mono text-xs">· {s.kode_anggota}</span></p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Simpanan {s.jenis_simpanan} · {fmt(Number(s.jumlah))} · {String(s.tanggal).split('T')[0]}
+                    Simpanan {s.jenis_simpanan} · {fmt(Number(s.jumlah))}
+                    {s.metode_bayar && <> · {METODE_BAYAR_LABEL[s.metode_bayar] ?? s.metode_bayar}</>}
                   </p>
+                  <p className="text-xs text-gray-400 mt-0.5">{fmtWaktu(s.created_at)}</p>
                   {s.keterangan && <p className="text-xs text-gray-400 mt-0.5">{s.keterangan}</p>}
                   {s.bukti_file_key && (
-                    <a href={`/api/kojasmat/file?key=${encodeURIComponent(s.bukti_file_key)}`} target="_blank"
+                    <button type="button" onClick={() => openBuktiSetoran(s.bukti_file_key!)}
                       className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 mt-1.5 cursor-pointer">
                       <Eye className="h-3 w-3" /> Lihat Bukti Transfer
-                    </a>
+                    </button>
                   )}
                   {setoranError?.id === s.id && (
                     <p className="text-xs text-rose-600 mt-1.5">{setoranError.message}</p>

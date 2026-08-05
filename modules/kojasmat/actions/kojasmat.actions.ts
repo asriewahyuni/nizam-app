@@ -61,6 +61,7 @@ export type KojasmatSimpananMutasi = {
   keterangan?: string
   tanggal: string
   status: 'PENDING' | 'DISETUJUI' | 'DITOLAK'
+  metode_bayar?: 'TRANSFER' | 'QRIS' | null
   bukti_dokumen_id?: string | null
   catatan_admin?: string | null
   direview_oleh?: string | null
@@ -550,6 +551,7 @@ export async function ajukanSetoranSimpanan(payload: {
   anggota_id: string
   jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA'
   jumlah: number
+  metode_bayar?: 'TRANSFER' | 'QRIS'
   keterangan?: string
   file_key: string
   nama_file: string
@@ -566,10 +568,10 @@ export async function ajukanSetoranSimpanan(payload: {
 
   const { rows: [mutasi] } = await queryPostgres(
     `INSERT INTO kojasmat_simpanan_mutasi
-       (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, keterangan, status)
-     VALUES ($1,$2,$3,'SETOR',$4,$5,'PENDING')
-     RETURNING id`,
-    [payload.org_id, simpanan.id, payload.anggota_id, payload.jumlah, payload.keterangan ?? null]
+       (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, keterangan, status, metode_bayar)
+     VALUES ($1,$2,$3,'SETOR',$4,$5,'PENDING',$6)
+     RETURNING id, created_at`,
+    [payload.org_id, simpanan.id, payload.anggota_id, payload.jumlah, payload.keterangan ?? null, payload.metode_bayar ?? null]
   )
 
   const { rows: [dokumen] } = await queryPostgres(
@@ -586,7 +588,7 @@ export async function ajukanSetoranSimpanan(payload: {
   )
 
   revalidatePath('/kojasmat')
-  return { data: { id: mutasi.id as string } }
+  return { data: { id: mutasi.id as string, created_at: mutasi.created_at as string } }
 }
 
 export async function getSetoranPendingByOrg(orgId: string): Promise<KojasmatSetoranPending[]> {
