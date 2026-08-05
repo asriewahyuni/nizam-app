@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import {
   User, Phone, MapPin, Briefcase, FileText, Upload,
   CheckCircle, ChevronRight, Loader2, X, Eye, EyeOff, ClipboardList, Wallet, XCircle,
-  PiggyBank, HandCoins, Receipt, Info, Star
+  PiggyBank, Info, Star
 } from 'lucide-react'
 import {
   buatPendaftaran,
@@ -257,7 +257,6 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   const [metodeBayar, setMetodeBayar] = useState<'TRANSFER' | 'QRIS'>('TRANSFER')
   const [buktiFile, setBuktiFile] = useState<{ key: string; name: string; size: number } | null>(null)
   const [buktiUploading, setBuktiUploading] = useState(false)
-  const [setujuSpk, setSetujuSpk] = useState(false)
   const [setujuIjarah, setSetujuIjarah] = useState(false)
   const [topupSukarelaChecked, setTopupSukarelaChecked] = useState(false)
   const [topupSukarelaAmount, setTopupSukarelaAmount] = useState('')
@@ -288,15 +287,15 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   }
 
   function submitBayar() {
-    if (!pendaftaranId || !buktiFile || !infoBayar || !setujuSpk || !setujuIjarah) return
+    if (!pendaftaranId || !buktiFile || !infoBayar || !setujuIjarah) return
     if (topupSukarelaChecked && Number(topupSukarelaAmount) < infoBayar.ijarah_sukarela_opsional_minimal) return
     setError(null)
     startTransition(async () => {
       const res = await submitPembayaranPendaftaran(pendaftaranId, {
         org_id: orgId,
-        biaya_admin: infoBayar.biaya_admin_pendaftaran,
-        simpanan_pokok: infoBayar.nominal_simpanan_pokok,
-        simpanan_wajib: infoBayar.nominal_simpanan_wajib,
+        biaya_admin: 0,
+        simpanan_pokok: 0,
+        simpanan_wajib: 0,
         ijarah_fee: infoBayar.ijarah_platform_fee,
         sukarela_topup: topupSukarelaChecked ? Number(topupSukarelaAmount) || 0 : 0,
         file_key: buktiFile.key,
@@ -696,66 +695,19 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
             )}
             {infoBayar && (() => {
               const fmtIdr = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
-              const totalSpk = infoBayar.nominal_simpanan_pokok + infoBayar.nominal_simpanan_wajib + infoBayar.biaya_admin_pendaftaran
+              const topupAmount = topupSukarelaChecked ? (Number(topupSukarelaAmount) || 0) : 0
+              const totalDibayar = infoBayar.ijarah_platform_fee + topupAmount
               return (
               <>
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                    {STEPS.indexOf('bayar') + 1}. Biaya Simpanan Keanggotaan (SPK)
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-3">
-                    Simpanan Keanggotaan (SPK) sebesar <strong className="text-gray-800">{fmtIdr(totalSpk)}</strong>, dengan distribusi sbb:
-                  </p>
-
-                  <div className="rounded-xl border border-gray-200 divide-y divide-gray-100">
-                    <div className="flex items-center justify-between px-4 py-3">
-                      <span className="flex items-center gap-2 text-sm text-gray-700">
-                        <PiggyBank className="h-4 w-4 text-blue-500" /> Simpanan Pokok (SP)
-                      </span>
-                      <span className="text-sm font-semibold text-gray-900">{fmtIdr(infoBayar.nominal_simpanan_pokok)}</span>
-                    </div>
-                    <div className="flex items-center justify-between px-4 py-3">
-                      <span className="flex items-center gap-2 text-sm text-gray-700">
-                        <HandCoins className="h-4 w-4 text-emerald-500" /> Simpanan Wajib (SW)
-                      </span>
-                      <span className="text-sm font-semibold text-gray-900">{fmtIdr(infoBayar.nominal_simpanan_wajib)}</span>
-                    </div>
-                    <div className="flex items-center justify-between px-4 py-3">
-                      <span className="flex items-center gap-2 text-sm text-gray-700">
-                        <Receipt className="h-4 w-4 text-amber-500" /> Admin Keanggotaan (ADK)
-                      </span>
-                      <span className="text-sm font-semibold text-gray-900">{fmtIdr(infoBayar.biaya_admin_pendaftaran)}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between px-4 py-3 mt-2 rounded-xl bg-emerald-50 border border-emerald-100">
-                    <span className="text-sm font-bold text-emerald-800">Total SPK</span>
-                    <span className="text-sm font-bold text-emerald-900">{fmtIdr(totalSpk)}</span>
-                  </div>
-
-                  <div className="mt-3 flex items-start gap-2 text-xs text-gray-500">
-                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    <p>SP &amp; SW dicatat sebagai simpanan Anda. ADK merupakan biaya administrasi pendaftaran satu kali, tidak dikembalikan (berbeda dari akad Ijarah Platform di bawah, yang berlaku berkala).</p>
-                  </div>
-
-                  <label className="mt-3 flex items-start gap-2 rounded-xl border border-gray-200 p-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors">
-                    <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-emerald-600"
-                      checked={setujuSpk} onChange={e => setSetujuSpk(e.target.checked)} />
-                    <span className="text-gray-700">
-                      Saya setuju membayar biaya Simpanan Keanggotaan (SPK) sesuai rincian di atas.
-                    </span>
-                  </label>
-                </div>
-
-                <div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
-                    <Wallet className="h-4 w-4 text-purple-500" /> {STEPS.indexOf('bayar') + 2}. Ijarah Platform
+                    <Wallet className="h-4 w-4 text-purple-500" /> {STEPS.indexOf('bayar') + 1}. Biaya Pendaftaran — Akad Ijarah Platform
                   </h3>
                   <p className="text-sm text-gray-500 mb-3">
                     Akad sewa manfaat (ijarah) atas layanan platform koperasi, sebesar{' '}
                     <strong className="text-gray-800">{fmtIdr(infoBayar.ijarah_platform_fee)}</strong> setiap{' '}
-                    {infoBayar.ijarah_platform_periode_hari} hari. Siklus pertama dibayar sekarang bersama SPK;
-                    siklus berikutnya dipotong otomatis dari Simpanan Sukarela Anda — Simpanan Pokok &amp; Wajib tidak akan disentuh.
+                    {infoBayar.ijarah_platform_periode_hari} hari. Siklus pertama dibayar sekarang;
+                    siklus berikutnya dipotong otomatis dari Simpanan Sukarela Anda.
                   </p>
 
                   <label className="flex items-start gap-2 rounded-xl border border-purple-200 bg-purple-50/50 p-3 text-sm cursor-pointer hover:bg-purple-50 transition-colors">
@@ -779,18 +731,40 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between px-4 py-3 mt-3 rounded-xl bg-purple-50 border border-purple-100">
-                    <span className="text-sm font-bold text-purple-800">Total Dibayar Sekarang</span>
-                    <span className="text-sm font-bold text-purple-900">
-                      {fmtIdr(totalSpk + infoBayar.ijarah_platform_fee + (topupSukarelaChecked ? (Number(topupSukarelaAmount) || 0) : 0))}
-                    </span>
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-gray-900 mb-2">Ringkasan Pembayaran</p>
+                    <div className="rounded-xl border border-gray-200 divide-y divide-gray-100">
+                      <div className="flex items-center justify-between px-4 py-3">
+                        <span className="flex items-center gap-2 text-sm text-gray-700">
+                          <Wallet className="h-4 w-4 text-purple-500" /> Ijarah Platform (siklus pertama, {infoBayar.ijarah_platform_periode_hari} hari)
+                        </span>
+                        <span className="text-sm font-semibold text-gray-900">{fmtIdr(infoBayar.ijarah_platform_fee)}</span>
+                      </div>
+                      {topupAmount > 0 && (
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <span className="flex items-center gap-2 text-sm text-gray-700">
+                            <PiggyBank className="h-4 w-4 text-blue-500" /> Simpanan Sukarela (opsional)
+                          </span>
+                          <span className="text-sm font-semibold text-gray-900">{fmtIdr(topupAmount)}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-3 mt-2 rounded-xl bg-purple-50 border border-purple-100">
+                      <span className="text-sm font-bold text-purple-800">Total Dibayar</span>
+                      <span className="text-sm font-bold text-purple-900">{fmtIdr(totalDibayar)}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-start gap-2 text-xs text-gray-500">
+                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <p>Tidak ada biaya lain selain akad ijarah di atas, kecuali Anda memilih menambah Simpanan Sukarela secara sukarela.</p>
                   </div>
 
                   <label className="mt-3 flex items-start gap-2 rounded-xl border border-gray-200 p-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors">
                     <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-purple-600"
                       checked={setujuIjarah} onChange={e => setSetujuIjarah(e.target.checked)} />
                     <span className="text-gray-700">
-                      Saya setuju dengan akad ijarah platform sesuai rincian di atas.
+                      Saya setuju membayar sesuai ringkasan di atas.
                     </span>
                   </label>
                 </div>
@@ -861,7 +835,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
                 <button
                   onClick={submitBayar}
-                  disabled={!buktiFile || !setujuSpk || !setujuIjarah || pending || (topupSukarelaChecked && Number(topupSukarelaAmount) < infoBayar.ijarah_sukarela_opsional_minimal)}
+                  disabled={!buktiFile || !setujuIjarah || pending || (topupSukarelaChecked && Number(topupSukarelaAmount) < infoBayar.ijarah_sukarela_opsional_minimal)}
                   className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Memproses...</> : <>Konfirmasi Pembayaran <ChevronRight className="h-4 w-4" /></>}
