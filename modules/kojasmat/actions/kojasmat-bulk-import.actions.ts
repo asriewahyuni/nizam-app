@@ -30,7 +30,7 @@ export interface SimpananPreviewRow {
   row_no: number
   nik_anggota: string
   resolved: boolean
-  jenis: 'POKOK' | 'WAJIB' | 'SUKARELA' | ''
+  jenis: 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP' | ''
   saldo_awal: number
   tanggal: string
   keterangan: string
@@ -373,7 +373,7 @@ export async function executeKojasmatBulkImport(
     const res = await catatSimpananMutasi({
       org_id: orgId,
       anggota_id: anggotaId,
-      jenis_simpanan: s.jenis as 'POKOK' | 'WAJIB' | 'SUKARELA',
+      jenis_simpanan: s.jenis as 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP',
       jenis_mutasi: 'SETOR',
       jumlah: s.saldo_awal,
       keterangan: s.keterangan || 'Saldo awal (bulk import)',

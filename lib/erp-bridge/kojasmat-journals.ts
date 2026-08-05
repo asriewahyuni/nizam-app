@@ -46,10 +46,15 @@ async function postJurnal(
   })
 }
 
-const SIMPANAN_ROLE: Record<'POKOK' | 'WAJIB' | 'SUKARELA', KojasmatAccountRole> = {
+const SIMPANAN_ROLE: Record<'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP', KojasmatAccountRole> = {
   POKOK:    'simpanan_pokok',
   WAJIB:    'simpanan_wajib',
   SUKARELA: 'simpanan_sukarela',
+  PROYEK:   'simpanan_proyek',
+  HIBAH_NAMETAG: 'hibah_nametag',
+  HIBAH_MEMBERCARD: 'hibah_membercard',
+  HIBAH_KAJIAN: 'hibah_kajian',
+  HIBAH_BOP: 'hibah_bop',
 }
 
 const DST_ROLE: Record<'MUDHARABAH' | 'MURABAHAH' | 'INAN', KojasmatAccountRole> = {
@@ -65,7 +70,7 @@ const DST_ROLE: Record<'MUDHARABAH' | 'MURABAHAH' | 'INAN', KojasmatAccountRole>
  */
 export async function jurnalSetorSimpanan(
   orgId: string,
-  jenis: 'POKOK' | 'WAJIB' | 'SUKARELA',
+  jenis: 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP',
   jumlah: number,
   simpananId: string,
   keteranganExtra?: string,
@@ -97,7 +102,7 @@ export async function jurnalPendapatanBiayaAdmin(
  */
 export async function jurnalTarikSimpanan(
   orgId: string,
-  jenis: 'POKOK' | 'WAJIB' | 'SUKARELA',
+  jenis: 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP',
   jumlah: number,
   simpananId: string,
   keteranganExtra?: string,

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useTransition, useCallback } from 'react'
+import { useState, useEffect, useTransition, useCallback, useRef, useMemo } from 'react'
 import { cn } from '@/lib/utils'
+import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts'
 import {
   Users, Briefcase, Wallet, GraduationCap, LayoutDashboard,
-  Plus, Search, ChevronRight, CheckCircle, XCircle,
-  ArrowUpCircle, Shield, Send, RefreshCw,
+  Plus, Search, ChevronRight, ChevronLeft, CheckCircle, XCircle,
+  ArrowUpCircle, Shield, Send, RefreshCw, ArrowUpDown, Filter,
   TrendingUp, Banknote, Star, Clock, FileText,
   AlertTriangle, ClipboardList, Eye, Link2, ExternalLink,
   BookOpen, ArrowDownCircle, X, Copy, Check, Pencil, Trash2, Upload, FolderOpen,
@@ -26,7 +27,7 @@ import {
   type KojasmatAnggota, type KojasmatProyek, type KojasmatPelatihan, type KojasmatStats,
   type KojasmatSimpanan, type KojasmatSimpananMutasi,
   type KojasmatAkad, type KojasmatProyekHistory, type KojasmatProyekDiskusi,
-  getProyekDiskusi, kirimPesanDiskusi,
+  getProyekDiskusi, kirimPesanDiskusi, getSimpananReport, type KojasmatSimpananReport,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
   setujuiPendaftaran, tolakPendaftaran, mintaRevisiPendaftaran,
@@ -203,7 +204,7 @@ function BukuTabunganPanel({
   const [loading, setLoading] = useState(true)
   const [simpanan, setSimpanan] = useState<KojasmatSimpanan[]>([])
   const [mutasi, setMutasi] = useState<KojasmatSimpananMutasi[]>([])
-  const [filterJenis, setFilterJenis] = useState<'SEMUA' | 'POKOK' | 'WAJIB' | 'SUKARELA'>('SEMUA')
+  const [filterJenis, setFilterJenis] = useState<'SEMUA' | 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP'>('SEMUA')
 
   useEffect(() => {
     let cancelled = false
@@ -220,10 +221,10 @@ function BukuTabunganPanel({
     return () => { cancelled = true }
   }, [anggota.id])
 
-  const saldo = (jenis: 'POKOK' | 'WAJIB' | 'SUKARELA') =>
+  const saldo = (jenis: 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP') =>
     Number(simpanan.find(s => s.jenis === jenis)?.saldo ?? 0)
 
-  const totalSaldo = saldo('POKOK') + saldo('WAJIB') + saldo('SUKARELA')
+  const totalSaldo = simpanan.reduce((acc, curr) => acc + Number(curr.saldo), 0)
 
   const mutasiFilt = filterJenis === 'SEMUA'
     ? mutasi
@@ -234,6 +235,8 @@ function BukuTabunganPanel({
 
   const JENIS_LABEL: Record<string, string> = {
     POKOK: 'Pokok', WAJIB: 'Wajib', SUKARELA: 'Sukarela',
+    PROYEK: 'Proyek', HIBAH_NAMETAG: 'Hibah Name Tag', HIBAH_MEMBERCARD: 'Hibah Member Card',
+    HIBAH_KAJIAN: 'Hibah Kajian', HIBAH_BOP: 'Hibah BOP'
   }
   const MUTASI_COLOR: Record<string, string> = {
     SETOR: 'text-emerald-600', BAGI_HASIL: 'text-blue-600',
@@ -259,14 +262,14 @@ function BukuTabunganPanel({
 
       {/* 3 saldo cards */}
       {loading ? (
-        <div className="grid grid-cols-3 gap-3">
-          {['POKOK','WAJIB','SUKARELA'].map(j => (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {['POKOK','WAJIB','SUKARELA','PROYEK'].map(j => (
             <div key={j} className="h-20 animate-pulse rounded-2xl bg-gray-100" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
-          {(['POKOK','WAJIB','SUKARELA'] as const).map(jenis => (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {(['POKOK','WAJIB','SUKARELA','PROYEK'] as const).map(jenis => (
             <button
               key={jenis}
               onClick={() => setFilterJenis(f => f === jenis ? 'SEMUA' : jenis)}
@@ -277,7 +280,7 @@ function BukuTabunganPanel({
                   : 'border-gray-100 bg-white hover:border-emerald-200 hover:bg-emerald-50/40'
               )}
             >
-              <p className="text-xs font-medium text-gray-500">Simpanan {JENIS_LABEL[jenis]}</p>
+              <p className="text-xs font-medium text-gray-500">{JENIS_LABEL[jenis]}</p>
               <p className={cn('mt-1 text-sm font-bold', filterJenis === jenis ? 'text-emerald-700' : 'text-gray-900')}>
                 {fmt(saldo(jenis))}
               </p>
@@ -1031,6 +1034,11 @@ const emptyAnggotaForm: AnggotaForm = {
 function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggota[] }) {
   const [pending, startTransition] = useTransition()
   const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<string>('ALL')
+  const [sortOrder, setSortOrder] = useState<'kode' | 'nama' | 'tanggal'>('kode')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [currentPage, setCurrentPage] = useState(1)
+
   const [modalOpen, setModalOpen] = useState(false)
   const [selected, setSelected] = useState<KojasmatAnggota | null>(null)
   const [form, setForm] = useState<AnggotaForm>(emptyAnggotaForm)
@@ -1039,10 +1047,28 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
   const [modalDelete, setModalDelete] = useState<KojasmatAnggota | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  const filtered = anggota.filter(a =>
-    a.nama.toLowerCase().includes(search.toLowerCase()) ||
-    a.kode_anggota.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredData = anggota.filter(a => {
+    const matchSearch = a.nama.toLowerCase().includes(search.toLowerCase()) || 
+                        a.kode_anggota.toLowerCase().includes(search.toLowerCase())
+    const matchStatus = filterStatus === 'ALL' || a.status === filterStatus
+    return matchSearch && matchStatus
+  })
+
+  const sortedData = [...filteredData].sort((a, b) => {
+    let cmp = 0
+    if (sortOrder === 'kode') cmp = a.kode_anggota.localeCompare(b.kode_anggota)
+    else if (sortOrder === 'nama') cmp = a.nama.localeCompare(b.nama)
+    else if (sortOrder === 'tanggal') cmp = (a.joined_at ?? '').localeCompare(b.joined_at ?? '')
+    return sortDir === 'asc' ? cmp : -cmp
+  })
+
+  const itemsPerPage = 10
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage) || 1
+  const paginatedData = sortedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, filterStatus, sortOrder, sortDir])
 
   function openEdit(a: KojasmatAnggota) {
     setSelected(a)
@@ -1126,17 +1152,55 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-            placeholder="Cari nama atau kode..."
-            value={search} onChange={e => setSearch(e.target.value)}
-          />
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex flex-1 w-full flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              placeholder="Cari nama atau kode..."
+              value={search} onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            <div className="relative flex items-center">
+              <Filter className="absolute left-3 h-4 w-4 text-gray-400" />
+              <select 
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value)}
+                className="rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-8 text-sm outline-none focus:border-emerald-500 appearance-none cursor-pointer"
+              >
+                <option value="ALL">Semua Status</option>
+                <option value="CALON">Calon</option>
+                <option value="AKTIF">Aktif</option>
+                <option value="TIDAK_AKTIF">Tidak Aktif</option>
+                <option value="DIBEKUKAN">Dibekukan</option>
+              </select>
+            </div>
+
+            <div className="flex rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <select
+                value={sortOrder}
+                onChange={e => setSortOrder(e.target.value as any)}
+                className="border-none py-2 pl-3 pr-8 text-sm outline-none focus:ring-0 bg-transparent appearance-none cursor-pointer"
+              >
+                <option value="kode">Urut Kode</option>
+                <option value="nama">Urut Nama</option>
+                <option value="tanggal">Urut Tanggal</option>
+              </select>
+              <button 
+                onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                className="px-2 border-l border-gray-200 hover:bg-gray-50 text-gray-500 cursor-pointer flex items-center justify-center"
+                title={`Urut ${sortDir === 'asc' ? 'Menaik' : 'Menurun'}`}
+              >
+                <ArrowUpDown className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
         <button onClick={openNew}
-          className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors cursor-pointer">
+          className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors cursor-pointer whitespace-nowrap">
           <Plus className="h-4 w-4" /> Anggota Baru
         </button>
       </div>
@@ -1156,10 +1220,10 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.length === 0 && (
+              {paginatedData.length === 0 && (
                 <tr><td colSpan={7} className="py-10 text-center text-gray-400">Belum ada anggota</td></tr>
               )}
-              {filtered.map(a => (
+              {paginatedData.map(a => (
                 <tr key={a.id} className="hover:bg-gray-50/60 transition-colors">
                   <td className="px-4 py-3 font-mono font-medium text-emerald-700">{a.kode_anggota}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{a.nama}</td>
@@ -1205,6 +1269,34 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/50 px-4 py-3">
+            <span className="text-sm text-gray-500">
+              Menampilkan <span className="font-medium text-gray-900">{paginatedData.length}</span> dari <span className="font-medium text-gray-900">{filteredData.length}</span> data
+            </span>
+            <div className="flex items-center gap-1">
+              <button 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-200 disabled:opacity-50 cursor-pointer flex items-center justify-center"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="px-2 text-sm font-medium text-gray-700 min-w-[3rem] text-center">
+                {currentPage} / {totalPages}
+              </span>
+              <button 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-200 disabled:opacity-50 cursor-pointer flex items-center justify-center"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)}
@@ -2205,7 +2297,7 @@ function TabProyek({ orgId, proyek, anggota }: {
                   </button>
                 )}
                 {p.status === 'DISETUJUI' && (
-                  <button onClick={() => { setModalFunding(p); setFundingForm({ funding_mulai: new Date().toISOString().slice(0, 10), funding_selesai: '', funding_instruksi: '', target_modal_awal: String(p.kebutuhan_modal) }) }}
+                  <button onClick={() => { setModalFunding(p); setFundingForm({ funding_mulai: new Date().toISOString().slice(0, 10), funding_selesai: '', funding_instruksi: '', target_modal_awal: String(p.kebutuhan_modal), published_at: '' }) }}
                     className="flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-100 transition-colors cursor-pointer">
                     <CalendarClock className="h-3.5 w-3.5" /> Jadwalkan Pendanaan
                   </button>
@@ -2735,10 +2827,82 @@ function TabProyek({ orgId, proyek, anggota }: {
 
 // ─── TAB: SIMPANAN ────────────────────────────────────────────────────────────
 
-function TabSimpanan({ orgId, anggota, setoranPending }: {
-  orgId: string; anggota: KojasmatAnggota[]; setoranPending: KojasmatSetoranPending[]
+function TabSimpanan({ orgId, anggota, setoranPending, stats }: {
+  orgId: string; anggota: KojasmatAnggota[]; setoranPending: KojasmatSetoranPending[]; stats: KojasmatStats
 }) {
   const [pending, startTransition] = useTransition()
+  const [dateFilter, setDateFilter] = useState<string>('SEMUA')
+  const [report, setReport] = useState<KojasmatSimpananReport | null>(null)
+  
+  const simpananLabels: Record<string, string> = {
+    POKOK: 'Pokok',
+    WAJIB: 'Wajib',
+    SUKARELA: 'Sukarela',
+    PROYEK: 'Proyek',
+    HIBAH_NAMETAG: 'Name Tag',
+    HIBAH_MEMBERCARD: 'Member Card',
+    HIBAH_KAJIAN: 'Kajian',
+    HIBAH_BOP: 'BOP',
+  }
+
+  const chartData = useMemo(() => {
+    let pokok = 0, wajib = 0, sukarela = 0, proyek = 0, hibah = 0
+    for (const b of (report?.breakdown_per_jenis || [])) {
+      if (b.jenis === 'POKOK') pokok += Number(b.total)
+      else if (b.jenis === 'WAJIB') wajib += Number(b.total)
+      else if (b.jenis === 'SUKARELA') sukarela += Number(b.total)
+      else if (b.jenis === 'PROYEK') proyek += Number(b.total)
+      else if (b.jenis.startsWith('HIBAH_')) hibah += Number(b.total)
+    }
+    return [
+      { name: 'Pokok', total: pokok },
+      { name: 'Wajib', total: wajib },
+      { name: 'Sukarela', total: sukarela },
+      { name: 'Proyek', total: proyek },
+      { name: 'Hibah', total: hibah },
+    ].sort((a, b) => b.total - a.total)
+  }, [report])
+
+  useEffect(() => {
+    let start: string | undefined
+    let end: string | undefined
+    const now = new Date()
+
+    if (dateFilter === 'HARI_INI') {
+      start = now.toISOString().split('T')[0]
+      end = start
+    } else if (dateFilter === 'KEMARIN') {
+      const yesterday = new Date(now)
+      yesterday.setDate(now.getDate() - 1)
+      start = yesterday.toISOString().split('T')[0]
+      end = start
+    } else if (dateFilter === '7_HARI') {
+      const past = new Date(now)
+      past.setDate(now.getDate() - 7)
+      start = past.toISOString().split('T')[0]
+      end = now.toISOString().split('T')[0]
+    } else if (dateFilter === '30_HARI') {
+      const past = new Date(now)
+      past.setDate(now.getDate() - 30)
+      start = past.toISOString().split('T')[0]
+      end = now.toISOString().split('T')[0]
+    } else if (dateFilter === 'BULAN_INI') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+    } else if (dateFilter === 'BULAN_LALU') {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0]
+      end = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0]
+    } else if (dateFilter === 'TAHUN_INI') {
+      start = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]
+      end = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0]
+    } else if (dateFilter === 'TAHUN_LALU') {
+      start = new Date(now.getFullYear() - 1, 0, 1).toISOString().split('T')[0]
+      end = new Date(now.getFullYear() - 1, 11, 31).toISOString().split('T')[0]
+    }
+
+    getSimpananReport(orgId, start, end).then(setReport)
+  }, [orgId, dateFilter])
+
   const [selectedAnggota, setSelectedAnggota] = useState<KojasmatAnggota | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [bukuAnggota, setBukuAnggota] = useState<KojasmatAnggota | null>(null)
@@ -2788,10 +2952,39 @@ function TabSimpanan({ orgId, anggota, setoranPending }: {
     window.open(url, '_blank')
   }
 
-  const filtered = anggota.filter(a =>
-    a.nama.toLowerCase().includes(search.toLowerCase()) ||
-    a.kode_anggota.includes(search)
-  )
+  const [filterStatus, setFilterStatus] = useState<string>('ALL')
+  const [sortOrder, setSortOrder] = useState<'kode' | 'nama' | 'status' | 'total'>('kode')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const mergedAnggota = anggota.map(a => {
+    const r = report?.breakdown_per_anggota.find(x => x.anggota_id === a.id)
+    return { ...a, simpanan: r?.simpanan || {}, total_simpanan: r?.total || 0 }
+  })
+
+  const filteredData = mergedAnggota.filter(a => {
+    const matchSearch = a.nama.toLowerCase().includes(search.toLowerCase()) || 
+                        a.kode_anggota.toLowerCase().includes(search.toLowerCase())
+    const matchStatus = filterStatus === 'ALL' || a.status === filterStatus
+    return matchSearch && matchStatus
+  })
+
+  const sortedData = [...filteredData].sort((a, b) => {
+    let cmp = 0
+    if (sortOrder === 'kode') cmp = a.kode_anggota.localeCompare(b.kode_anggota)
+    else if (sortOrder === 'nama') cmp = a.nama.localeCompare(b.nama)
+    else if (sortOrder === 'status') cmp = a.status.localeCompare(b.status)
+    else if (sortOrder === 'total') cmp = a.total_simpanan - b.total_simpanan
+    return sortDir === 'asc' ? cmp : -cmp
+  })
+
+  const itemsPerPage = 10
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage) || 1
+  const paginatedData = sortedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, filterStatus, sortOrder, sortDir])
 
   function openBukuTabungan(a: KojasmatAnggota) {
     setBukuAnggota(a)
@@ -2811,7 +3004,7 @@ function TabSimpanan({ orgId, anggota, setoranPending }: {
       const res = await catatSimpananMutasi({
         org_id: orgId,
         anggota_id: selectedAnggota.id,
-        jenis_simpanan: form.jenis_simpanan as 'POKOK' | 'WAJIB' | 'SUKARELA',
+        jenis_simpanan: form.jenis_simpanan as 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP',
         jenis_mutasi: form.jenis_mutasi as 'SETOR' | 'TARIK' | 'KOREKSI',
         jumlah: Number(form.jumlah),
         keterangan: form.keterangan || undefined,
@@ -2830,8 +3023,95 @@ function TabSimpanan({ orgId, anggota, setoranPending }: {
     })
   }
 
+  const COLORS = ['#059669', '#2563eb', '#d97706', '#7c3aed', '#dc2626', '#db2777', '#0d9488', '#ea580c']
+
   return (
     <div className="space-y-4">
+      {/* ─── SUMMARY GRAFIK & TABEL ─── */}
+      {!report ? (
+        <div className="py-20 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+      ) : chartData.length > 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-semibold text-gray-900">Distribusi Saldo & Hibah</h3>
+              <div className="relative flex items-center">
+                <CalendarClock className="absolute left-2.5 h-3.5 w-3.5 text-gray-400" />
+                <select 
+                  value={dateFilter}
+                  onChange={e => setDateFilter(e.target.value)}
+                  className="rounded-lg border border-gray-200 bg-gray-50/50 py-1.5 pl-8 pr-6 text-xs outline-none focus:border-emerald-500 appearance-none cursor-pointer text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  <option value="SEMUA">Semua Waktu</option>
+                  <option value="HARI_INI">Hari Ini</option>
+                  <option value="KEMARIN">Kemarin</option>
+                  <option value="7_HARI">7 Hari Terakhir</option>
+                  <option value="30_HARI">30 Hari Terakhir</option>
+                  <option value="BULAN_INI">Bulan Ini</option>
+                  <option value="BULAN_LALU">Bulan Lalu</option>
+                  <option value="TAHUN_INI">Tahun Ini</option>
+                  <option value="TAHUN_LALU">Tahun Lalu</option>
+                </select>
+              </div>
+            </div>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="total"
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(val: any) => [`Rp ${Number(val).toLocaleString('id-ID')}`, 'Total']}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+              <h3 className="text-sm font-semibold text-gray-900">Rincian Nominal</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-gray-100">
+                  {chartData.map((d, i) => (
+                    <tr key={i} className="hover:bg-gray-50/50">
+                      <td className="py-2.5 px-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
+                          <span className="text-gray-600">{d.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-semibold text-gray-900 tabular-nums">
+                        Rp {d.total.toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-emerald-50/50 font-bold">
+                    <td className="py-3 px-4 text-emerald-800">TOTAL KESELURUHAN</td>
+                    <td className="py-3 px-4 text-right text-emerald-800 tabular-nums">
+                      Rp {chartData.reduce((acc, curr) => acc + curr.total, 0).toLocaleString('id-ID')}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {setoranList.length > 0 && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50/60 overflow-hidden">
           <div className="px-4 py-3 border-b border-amber-200 bg-amber-100/60">
@@ -2882,13 +3162,54 @@ function TabSimpanan({ orgId, anggota, setoranPending }: {
         </div>
       )}
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-          placeholder="Cari anggota..."
-          value={search} onChange={e => setSearch(e.target.value)}
-        />
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex flex-1 w-full flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              placeholder="Cari anggota..."
+              value={search} onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            <div className="relative flex items-center">
+              <Filter className="absolute left-3 h-4 w-4 text-gray-400" />
+              <select 
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value)}
+                className="rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-8 text-sm outline-none focus:border-emerald-500 appearance-none cursor-pointer"
+              >
+                <option value="ALL">Semua Status</option>
+                <option value="CALON">Calon</option>
+                <option value="AKTIF">Aktif</option>
+                <option value="TIDAK_AKTIF">Tidak Aktif</option>
+                <option value="DIBEKUKAN">Dibekukan</option>
+              </select>
+            </div>
+
+            <div className="flex rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <select
+                value={sortOrder}
+                onChange={e => setSortOrder(e.target.value as any)}
+                className="border-none py-2 pl-3 pr-8 text-sm outline-none focus:ring-0 bg-transparent appearance-none cursor-pointer"
+              >
+                <option value="kode">Urut Kode</option>
+                <option value="nama">Urut Nama</option>
+                <option value="status">Urut Status</option>
+                <option value="total">Urut Total Saldo</option>
+              </select>
+              <button 
+                onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                className="px-2 border-l border-gray-200 hover:bg-gray-50 text-gray-500 cursor-pointer flex items-center justify-center"
+                title={`Urut ${sortDir === 'asc' ? 'Menaik' : 'Menurun'}`}
+              >
+                <ArrowUpDown className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {mutasiSuccess && (
@@ -2905,23 +3226,33 @@ function TabSimpanan({ orgId, anggota, setoranPending }: {
               <tr>
                 <th className="px-4 py-3 text-left font-medium">Anggota</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
+                <th className="px-4 py-3 text-right font-medium">Total Simpanan</th>
                 <th className="px-4 py-3 text-right font-medium">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.length === 0 && (
-                <tr><td colSpan={3} className="py-10 text-center text-gray-400">Tidak ada anggota</td></tr>
+              {paginatedData.length === 0 && (
+                <tr><td colSpan={9} className="py-10 text-center text-gray-400">Tidak ada anggota</td></tr>
               )}
-              {filtered.map(a => (
+              {paginatedData.map(a => {
+                const sPokok = (a as any).simpanan?.POKOK || 0
+                const sWajib = (a as any).simpanan?.WAJIB || 0
+                const sSuka = (a as any).simpanan?.SUKARELA || 0
+                const sProyek = (a as any).simpanan?.PROYEK || 0
+                const sHibah = Object.entries((a as any).simpanan || {}).filter(([k]) => k.startsWith('HIBAH_')).reduce((acc, [_, v]) => acc + Number(v), 0)
+                const total = (a as any).total_simpanan || 0
+
+                return (
                 <tr key={a.id} className="hover:bg-gray-50/60 transition-colors">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{a.nama}</p>
+                    <p className="font-medium text-gray-900 whitespace-nowrap">{a.nama}</p>
                     <p className="text-xs text-gray-400 font-mono">{a.kode_anggota}</p>
                   </td>
                   <td className="px-4 py-3">
                     <Badge text={a.status}
                       cls={a.status === 'AKTIF' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'} />
                   </td>
+                  <td className="px-4 py-3 text-right tabular-nums font-semibold text-emerald-700">{fmt(total)}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => openBukuTabungan(a)}
@@ -2935,10 +3266,39 @@ function TabSimpanan({ orgId, anggota, setoranPending }: {
                     </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/50 px-4 py-3">
+            <span className="text-sm text-gray-500">
+              Menampilkan <span className="font-medium text-gray-900">{paginatedData.length}</span> dari <span className="font-medium text-gray-900">{filteredData.length}</span> data
+            </span>
+            <div className="flex items-center gap-1">
+              <button 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-200 disabled:opacity-50 cursor-pointer flex items-center justify-center"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="px-2 text-sm font-medium text-gray-700 min-w-[3rem] text-center">
+                {currentPage} / {totalPages}
+              </span>
+              <button 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-200 disabled:opacity-50 cursor-pointer flex items-center justify-center"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal Tolak Setoran */}
@@ -3005,6 +3365,11 @@ function TabSimpanan({ orgId, anggota, setoranPending }: {
                 <option value="POKOK">Simpanan Pokok</option>
                 <option value="WAJIB">Simpanan Wajib</option>
                 <option value="SUKARELA">Simpanan Sukarela</option>
+                <option value="PROYEK">Simpanan Proyek</option>
+                <option value="HIBAH_NAMETAG">Hibah Name Tag</option>
+                <option value="HIBAH_MEMBERCARD">Hibah Member Card</option>
+                <option value="HIBAH_KAJIAN">Hibah Kajian</option>
+                <option value="HIBAH_BOP">Hibah BOP</option>
               </select>
             </div>
             <div>
@@ -4448,6 +4813,41 @@ export default function KojasmatClient({
   accountMapping, chartOfAccounts,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(true)
+
+  const checkScroll = useCallback(() => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current
+      setCanScrollLeft(scrollLeft > 0)
+      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth)
+    }
+  }, [])
+
+  useEffect(() => {
+    checkScroll()
+    window.addEventListener('resize', checkScroll)
+    return () => window.removeEventListener('resize', checkScroll)
+  }, [checkScroll])
+
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.replace('#', '') as ActiveTab
+      const validTabs = ['dashboard', 'permohonan', 'anggota', 'proyek', 'simpanan', 'pelatihan', 'laporan', 'tindakan', 'soal', 'akun']
+      if (validTabs.includes(hash)) {
+        setActiveTab(hash)
+      }
+    }
+    handleHash()
+    window.addEventListener('hashchange', handleHash)
+    return () => window.removeEventListener('hashchange', handleHash)
+  }, [])
+
+  const handleTabClick = (key: ActiveTab) => {
+    setActiveTab(key)
+    window.history.replaceState(null, '', `#${key}`)
+  }
 
   const pendingPendaftaran = stats.antrian_pendaftaran ?? 0
   const tindakanAktif = tindakan.filter(t => t.status === 'AKTIF').length
@@ -4479,25 +4879,49 @@ export default function KojasmatClient({
           </div>
         </div>
 
-        <div className="mt-5 flex gap-1 overflow-x-auto">
-          {tabs.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={cn(
-                'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap cursor-pointer',
-                activeTab === t.key
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              )}>
-              <t.icon className="h-4 w-4" />
-              {t.label}
-              {t.badge !== undefined && t.badge > 0 && (
-                <span className={cn('rounded-full px-1.5 py-0.5 text-xs font-semibold',
-                  t.badgeColor ?? 'bg-gray-100 text-gray-600')}>
-                  {t.badge}
-                </span>
-              )}
+        <div className="relative mt-5 -mx-6 px-6 sm:mx-0 sm:px-0 group">
+          <div 
+            ref={scrollRef}
+            onScroll={checkScroll}
+            className="flex gap-1 overflow-x-auto snap-x snap-mandatory [&::-webkit-scrollbar]:hidden" 
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {tabs.map(t => (
+              <button key={t.key} onClick={() => handleTabClick(t.key)}
+                className={cn(
+                  'snap-start flex-none flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap cursor-pointer',
+                  activeTab === t.key
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                )}>
+                <t.icon className="h-4 w-4" />
+                {t.label}
+                {t.badge !== undefined && t.badge > 0 && (
+                  <span className={cn('rounded-full px-1.5 py-0.5 text-xs font-semibold',
+                    t.badgeColor ?? 'bg-gray-100 text-gray-600')}>
+                    {t.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          {/* Scroll Fade Indicators with Chevron */}
+          {canScrollLeft && (
+            <button 
+              onClick={() => scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
+              className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-white via-white/80 to-transparent flex items-center justify-start pl-1 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+            >
+              <ChevronLeft className="h-5 w-5 drop-shadow-sm" />
             </button>
-          ))}
+          )}
+          {canScrollRight && (
+            <button 
+              onClick={() => scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
+              className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white via-white/80 to-transparent flex items-center justify-end pr-1 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+            >
+              <ChevronRight className="h-5 w-5 drop-shadow-sm" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -4506,7 +4930,7 @@ export default function KojasmatClient({
         {activeTab === 'permohonan' && <TabPermohonan orgId={orgId} pendaftaran={pendaftaran} />}
         {activeTab === 'anggota'    && <TabAnggota orgId={orgId} anggota={anggota} />}
         {activeTab === 'proyek'     && <TabProyek orgId={orgId} proyek={proyek} anggota={anggota} />}
-        {activeTab === 'simpanan'   && <TabSimpanan orgId={orgId} anggota={anggota} setoranPending={setoranPending} />}
+        {activeTab === 'simpanan'   && <TabSimpanan orgId={orgId} anggota={anggota} setoranPending={setoranPending} stats={stats} />}
         {activeTab === 'pelatihan'  && <TabPelatihan orgId={orgId} pelatihan={pelatihan} anggota={anggota} />}
         {activeTab === 'laporan'    && <TabLaporan laporan={laporan} />}
         {activeTab === 'tindakan'   && <TabTindakan orgId={orgId} anggota={anggota} proyek={proyek} tindakan={tindakan} />}

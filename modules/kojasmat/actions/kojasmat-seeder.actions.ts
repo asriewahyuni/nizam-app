@@ -84,7 +84,7 @@ export async function seedKojasmatDummyData(orgId: string) {
   // ─── 2. SIMPANAN + MUTASI ──────────────────────────────────────────────────
 
   // Data simpanan: [kode_anggota, jenis, setoran[], keterangan]
-  const simpananData: { kode: string; jenis: 'POKOK' | 'WAJIB' | 'SUKARELA'; setoran: { jumlah: number; tgl: string; ket: string }[] }[] = [
+  const simpananData: { kode: string; jenis: 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP'; setoran: { jumlah: number; tgl: string; ket: string }[] }[] = [
     // Ahmad Fauzi — Anggota tertua, simpanan banyak
     { kode: 'KJM-001', jenis: 'POKOK',    setoran: [{ jumlah: 500_000, tgl: daysAgo(300), ket: 'Simpanan pokok perdana' }] },
     { kode: 'KJM-001', jenis: 'WAJIB',    setoran: [

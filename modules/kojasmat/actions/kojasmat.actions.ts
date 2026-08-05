@@ -46,7 +46,7 @@ export type KojasmatAnggota = {
 export type KojasmatSimpanan = {
   id: string
   anggota_id: string
-  jenis: 'POKOK' | 'WAJIB' | 'SUKARELA'
+  jenis: 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP'
   saldo: number
 }
 
@@ -453,7 +453,7 @@ export async function getMutasiByAnggota(anggotaId: string): Promise<KojasmatSim
 export async function postSimpananMutasi(payload: {
   org_id: string
   anggota_id: string
-  jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA'
+  jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP'
   jenis_mutasi: 'SETOR' | 'TARIK' | 'BAGI_HASIL' | 'KOREKSI'
   jumlah: number
   keterangan?: string
@@ -514,7 +514,7 @@ export async function postSimpananMutasi(payload: {
 export async function catatSimpananMutasi(payload: {
   org_id: string
   anggota_id: string
-  jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA'
+  jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP'
   jenis_mutasi: 'SETOR' | 'TARIK' | 'KOREKSI'
   jumlah: number
   keterangan?: string
@@ -541,7 +541,7 @@ export async function catatSimpananMutasi(payload: {
 export type KojasmatSetoranPending = KojasmatSimpananMutasi & {
   anggota_nama: string
   kode_anggota: string
-  jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA'
+  jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP'
   bukti_file_key: string | null
   bukti_nama_file: string | null
 }
@@ -550,7 +550,7 @@ export type KojasmatSetoranPending = KojasmatSimpananMutasi & {
 export async function ajukanSetoranSimpanan(payload: {
   org_id: string
   anggota_id: string
-  jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA'
+  jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP'
   jumlah: number
   metode_bayar?: 'TRANSFER' | 'QRIS'
   keterangan?: string
@@ -712,7 +712,7 @@ export async function setujuiSetoranSimpanan(mutasiId: string) {
   client.release()
 
   try {
-    await jurnalSetorSimpanan(check.org_id, committed!.jenisSimpanan as 'POKOK' | 'WAJIB' | 'SUKARELA', committed!.jumlah, mutasiId)
+    await jurnalSetorSimpanan(check.org_id, committed!.jenisSimpanan as 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP', committed!.jumlah, mutasiId)
   } catch (_) { /* jurnal non-fatal */ }
 
   await notifikasiSetoranSimpanan({
@@ -1594,6 +1594,7 @@ export type KojasmatStats = {
   antrian_dps: number
   antrian_pendaftaran: number
   total_simpanan: number
+  simpanan_breakdown?: { jenis: string; total: number }[]
   total_pembiayaan: number
 }
 
@@ -1746,6 +1747,8 @@ export async function getKojasmatStats(orgId: string): Promise<KojasmatStats> {
        (SELECT COALESCE(SUM(s.saldo),0)
         FROM kojasmat_simpanan s JOIN kojasmat_anggota a ON a.id=s.anggota_id
         WHERE a.org_id=$1)::numeric AS total_simpanan,
+       (SELECT COALESCE(json_agg(json_build_object('jenis', s.jenis, 'total', s.saldo)), '[]'::json) 
+        FROM (SELECT s2.jenis, SUM(s2.saldo) as saldo FROM kojasmat_simpanan s2 JOIN kojasmat_anggota a2 ON a2.id=s2.anggota_id WHERE a2.org_id=$1 GROUP BY s2.jenis) s) AS simpanan_breakdown,
        (SELECT COALESCE(SUM(modal_terkumpul),0)
         FROM kojasmat_proyek WHERE org_id=$1 AND status IN ('BERJALAN','FUNDING_DITUTUP'))::numeric AS total_pembiayaan`,
     [orgId]
@@ -1753,8 +1756,76 @@ export async function getKojasmatStats(orgId: string): Promise<KojasmatStats> {
   return (rows[0] ?? {
     total_anggota: 0, anggota_aktif: 0, total_proyek: 0,
     proyek_berjalan: 0, antrian_dmr: 0, antrian_dps: 0, antrian_pendaftaran: 0,
-    total_simpanan: 0, total_pembiayaan: 0,
+    total_simpanan: 0, simpanan_breakdown: [], total_pembiayaan: 0,
   }) as KojasmatStats
+}
+
+export type KojasmatSimpananReport = {
+  breakdown_per_jenis: { jenis: string; total: number }[]
+  breakdown_per_anggota: {
+    anggota_id: string;
+    kode_anggota: string;
+    nama: string;
+    simpanan: Record<string, number>;
+    total: number;
+  }[]
+}
+
+export async function getSimpananReport(orgId: string, startDate?: string, endDate?: string): Promise<KojasmatSimpananReport> {
+  const params: (string | number)[] = [orgId]
+  let dateFilter = ''
+  
+  if (startDate) {
+    params.push(startDate)
+    dateFilter += ` AND m.tanggal >= $${params.length}`
+  }
+  if (endDate) {
+    params.push(endDate)
+    dateFilter += ` AND m.tanggal <= $${params.length}`
+  }
+
+  const { rows: jenisRows } = await queryPostgres(`
+    SELECT s.jenis, SUM(CASE WHEN m.jenis_mutasi = 'TARIK' THEN -m.jumlah ELSE m.jumlah END) as total
+    FROM kojasmat_simpanan_mutasi m
+    JOIN kojasmat_simpanan s ON s.id = m.simpanan_id
+    WHERE m.org_id = $1 AND m.status = 'DISETUJUI' ${dateFilter}
+    GROUP BY s.jenis
+  `, params)
+
+  const { rows: aggRows } = await queryPostgres(`
+    SELECT m.anggota_id, s.jenis, SUM(CASE WHEN m.jenis_mutasi = 'TARIK' THEN -m.jumlah ELSE m.jumlah END) as total
+    FROM kojasmat_simpanan_mutasi m
+    JOIN kojasmat_simpanan s ON s.id = m.simpanan_id
+    WHERE m.org_id = $1 AND m.status = 'DISETUJUI' ${dateFilter}
+    GROUP BY m.anggota_id, s.jenis
+  `, params)
+
+  const { rows: anggotaRows } = await queryPostgres(
+    `SELECT id, kode_anggota, nama FROM kojasmat_anggota WHERE org_id = $1 ORDER BY kode_anggota ASC`, 
+    [orgId]
+  )
+
+  const breakdown_per_anggota = anggotaRows.map(a => {
+    const mutasi = aggRows.filter(m => m.anggota_id === a.id)
+    const simpanan: Record<string, number> = {}
+    let total = 0
+    for (const m of mutasi) {
+      simpanan[m.jenis] = Number(m.total)
+      total += Number(m.total)
+    }
+    return {
+      anggota_id: a.id,
+      kode_anggota: a.kode_anggota,
+      nama: a.nama,
+      simpanan,
+      total
+    }
+  })
+
+  return {
+    breakdown_per_jenis: jenisRows.map(r => ({ jenis: r.jenis, total: Number(r.total) })),
+    breakdown_per_anggota
+  }
 }
 
 // ─── DISKUSI PROYEK ─────────────────────────────────────────────────────────
