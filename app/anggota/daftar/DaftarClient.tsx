@@ -714,7 +714,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                     <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-purple-600"
                       checked={topupSukarelaChecked} onChange={e => { setTopupSukarelaChecked(e.target.checked); if (!e.target.checked) setTopupSukarelaAmount('') }} />
                     <span className="text-gray-700">
-                      Saya juga ingin menabung Simpanan Sukarela tambahan (opsional, minimal {fmtIdr(infoBayar.ijarah_sukarela_opsional_minimal)}) sebagai bekal tagihan ijarah berikutnya.
+                      Saya juga ingin menabung Simpanan Sukarela tambahan (opsional, minimal {fmtIdr(infoBayar.ijarah_sukarela_opsional_minimal)}).
                     </span>
                   </label>
 
