@@ -1361,26 +1361,79 @@ export async function tandatanganiAkad(akadId: string, proyekId: string) {
   if (!session) return { error: 'Tidak terautentikasi' }
 
   const actorId = getInternalUserId(session)
-  await queryPostgres(
-    `UPDATE kojasmat_akad SET status='DITANDATANGANI', finalized_by=$2, finalized_at=NOW(), updated_at=NOW() WHERE id=$1`,
-    [akadId, actorId]
-  )
+  const client = await connectPostgresClient()
+  let proyek: KojasmatProyek | null = null
 
-  const { rows } = await queryPostgres(
-    `UPDATE kojasmat_proyek SET status='BERJALAN', updated_at=NOW() WHERE id=$1 AND status='MENUNGGU_AKAD' RETURNING *`,
-    [proyekId]
-  )
-  if (!rows[0]) return { error: 'Proyek tidak dalam status Menunggu Akad' }
-  await queryPostgres(
-    `UPDATE kojasmat_proyek SET tanggal_mulai=CURRENT_DATE WHERE id=$1 AND tanggal_mulai IS NULL`,
-    [proyekId]
-  )
+  try {
+    await client.query('BEGIN')
 
-  const proyek = rows[0] as KojasmatProyek
-  await recordProyekHistory({
-    org_id: proyek.org_id, proyek_id: proyekId, status_dari: 'MENUNGGU_AKAD', status_ke: 'BERJALAN',
-    aksi: 'TANDATANGANI_AKAD', actor_id: actorId, actor_role: await getActorRole(actorId, proyek.org_id),
-  })
+    const { rows: proyekRows } = await client.query(
+      `SELECT * FROM kojasmat_proyek WHERE id=$1 FOR UPDATE`,
+      [proyekId]
+    )
+    proyek = proyekRows[0]
+    if (!proyek) throw new Error('Proyek tidak ditemukan')
+    if (proyek.status !== 'MENUNGGU_AKAD') throw new Error('Proyek tidak dalam status Menunggu Akad')
+
+    await client.query(
+      `UPDATE kojasmat_akad SET status='DITANDATANGANI', finalized_by=$2, finalized_at=NOW(), updated_at=NOW() WHERE id=$1`,
+      [akadId, actorId]
+    )
+
+    await client.query(
+      `UPDATE kojasmat_proyek SET status='BERJALAN', tanggal_mulai=COALESCE(tanggal_mulai, CURRENT_DATE), updated_at=NOW() WHERE id=$1`,
+      [proyekId]
+    )
+
+    const { rows: pembiayaanRows } = await client.query(
+      `SELECT * FROM kojasmat_pembiayaan WHERE proyek_id=$1 AND status='AKTIF'`,
+      [proyekId]
+    )
+
+    for (const pb of pembiayaanRows) {
+      const { rows: [simpananProyek] } = await client.query(
+        `SELECT id, saldo FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='PROYEK' FOR UPDATE`,
+        [pb.pemodal_id]
+      )
+      
+      let simpananId = simpananProyek?.id
+      const saldoSebelum = Number(simpananProyek?.saldo ?? 0)
+      const saldoSesudah = saldoSebelum + Number(pb.jumlah)
+
+      if (simpananId) {
+        await client.query(
+          `UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`,
+          [simpananId, saldoSesudah]
+        )
+      } else {
+        const { rows: [newSimpanan] } = await client.query(
+          `INSERT INTO kojasmat_simpanan (org_id, anggota_id, jenis, saldo) VALUES ($1, $2, 'PROYEK', $3) RETURNING id`,
+          [pb.org_id, pb.pemodal_id, pb.jumlah]
+        )
+        simpananId = newSimpanan.id
+      }
+
+      await client.query(
+        `INSERT INTO kojasmat_simpanan_mutasi (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, status)
+         VALUES ($1, $2, $3, 'SETOR', $4, $5, $6, $7, 'DISETUJUI')`,
+        [pb.org_id, simpananId, pb.pemodal_id, pb.jumlah, saldoSebelum, saldoSesudah, `Pembiayaan proyek ${proyek.nama_proyek ?? proyek.kode_proyek} mulai berjalan`]
+      )
+    }
+
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    client.release()
+    return { error: error instanceof Error ? error.message : 'Terjadi kesalahan sistem' }
+  }
+  client.release()
+
+  if (proyek) {
+    await recordProyekHistory({
+      org_id: proyek.org_id, proyek_id: proyekId, status_dari: 'MENUNGGU_AKAD', status_ke: 'BERJALAN',
+      aksi: 'TANDATANGANI_AKAD', actor_id: actorId, actor_role: await getActorRole(actorId, proyek.org_id),
+    })
+  }
 
   revalidatePath('/kojasmat')
   return { data: proyek }
@@ -1474,13 +1527,32 @@ export async function createPembiayaan(payload: {
     // Pembiayaan hanya boleh memakai simpanan SUKARELA — simpanan pokok/wajib
     // adalah setoran keanggotaan, bukan dana yang boleh diinvestasikan ke proyek.
     const { rows: [simpananSukarela] } = await client.query(
-      `SELECT saldo FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='SUKARELA'`,
+      `SELECT id, saldo FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='SUKARELA' FOR UPDATE`,
       [payload.pemodal_id]
     )
-    const saldoSukarela = Number(simpananSukarela?.saldo ?? 0)
+    if (!simpananSukarela) throw new Error('Rekening simpanan sukarela tidak ditemukan')
+
+    const saldoSukarela = Number(simpananSukarela.saldo)
     if (payload.jumlah > saldoSukarela) {
-      throw new Error(`Melebihi saldo simpanan sukarela Anda (Rp ${saldoSukarela.toLocaleString('id-ID')})`)
+      await client.query('ROLLBACK')
+      client.release()
+      return { error: `Melebihi saldo simpanan sukarela Anda (Rp ${saldoSukarela.toLocaleString('id-ID')})` }
     }
+
+    const saldoSesudahSukarela = saldoSukarela - payload.jumlah
+
+    // Potong saldo sukarela (Hold)
+    await client.query(
+      `UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`,
+      [simpananSukarela.id, saldoSesudahSukarela]
+    )
+    
+    // Catat mutasi penarikan
+    await client.query(
+      `INSERT INTO kojasmat_simpanan_mutasi (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, status)
+       VALUES ($1, $2, $3, 'TARIK', $4, $5, $6, $7, 'DISETUJUI')`,
+      [payload.org_id, simpananSukarela.id, payload.pemodal_id, payload.jumlah, saldoSukarela, saldoSesudahSukarela, `Hold dana untuk pembiayaan proyek ${proyekData.nama_proyek ?? proyekData.kode_proyek}`]
+    )
 
     // Hanya blokir kalau masih ada pembiayaan AKTIF ke proyek ini — pendanaan yang
     // sudah dibatalkan (GAGAL) tidak menghalangi investasi ulang (lihat migrasi 1401).
@@ -1575,6 +1647,22 @@ export async function batalkanPembiayaan(pembiayaanId: string) {
       `UPDATE kojasmat_proyek SET modal_terkumpul=$2, status=$3, updated_at=NOW() WHERE id=$1`,
       [pb.proyek_id, newModal, newStatus]
     )
+    
+    // Kembalikan dana ke Simpanan Sukarela
+    const { rows: [simpananSukarela] } = await client.query(
+      `SELECT id, saldo FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='SUKARELA' FOR UPDATE`,
+      [pb.pemodal_id]
+    )
+    if (simpananSukarela) {
+      const saldoSebelum = Number(simpananSukarela.saldo)
+      const saldoSesudah = saldoSebelum + Number(pb.jumlah)
+      await client.query(`UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`, [simpananSukarela.id, saldoSesudah])
+      await client.query(
+        `INSERT INTO kojasmat_simpanan_mutasi (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, status)
+         VALUES ($1, $2, $3, 'SETOR', $4, $5, $6, $7, 'DISETUJUI')`,
+        [pb.org_id, simpananSukarela.id, pb.pemodal_id, pb.jumlah, saldoSebelum, saldoSesudah, `Pengembalian dana pembatalan proyek ${proyek.kode_proyek}`]
+      )
+    }
     
     await client.query('COMMIT')
     
