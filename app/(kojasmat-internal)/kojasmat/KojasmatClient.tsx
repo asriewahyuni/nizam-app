@@ -10,7 +10,7 @@ import {
   AlertTriangle, ClipboardList, Eye, Link2, ExternalLink,
   BookOpen, ArrowDownCircle, X, Copy, Check, Pencil, Trash2, Upload, FolderOpen,
   TrendingDown, Scale, Loader2, CalendarClock, FileSignature, History, Lock, MessageCircle,
-  Download, FileSpreadsheet,
+  Download, FileSpreadsheet, Landmark,
 } from 'lucide-react'
 import {
   createAnggota, updateAnggota, deleteAnggota,
@@ -48,6 +48,11 @@ import {
   simpanBankSoal, hapusBankSoal, updateModuleSettings, getTestMasukByPendaftaran,
   type KojasmatBankSoal, type ApresiasiTier, type KojasmatTestMasukRingkas,
 } from '@/modules/kojasmat/actions/kojasmat-test.actions'
+import { saveKojasmatAccountMappingAction } from '@/modules/kojasmat/actions/kojasmat-account-mapping.actions'
+import {
+  KOJASMAT_ACCOUNT_ROLES, KOJASMAT_ACCOUNT_ROLE_LABEL,
+  type KojasmatAccountMapping, type KojasmatAccountOption, type KojasmatAccountRole,
+} from '@/modules/kojasmat/lib/kojasmat-account-mapping.shared'
 
 const KATEGORI_PENDAPATAN = ['Penjualan', 'Jasa', 'Pendapatan Lain'] as const
 const KATEGORI_BEBAN = ['Bahan Baku', 'Operasional', 'Gaji/Upah', 'Sewa', 'Transportasi', 'Beban Lain'] as const
@@ -77,6 +82,8 @@ type Props = {
   bankAccounts: { id: string; bank_name: string; account_number: string }[]
   qrisPreviewUrl: string | null
   setoranPending: KojasmatSetoranPending[]
+  accountMapping: KojasmatAccountMapping
+  chartOfAccounts: KojasmatAccountOption[]
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -4275,13 +4282,141 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
   )
 }
 
+// ─── TAB: PENGATURAN AKUN ─────────────────────────────────────────────────────
+
+const ACCOUNT_TYPE_LABEL: Record<KojasmatAccountOption['type'], string> = {
+  ASSET: 'Aset',
+  LIABILITY: 'Liabilitas',
+  EQUITY: 'Ekuitas',
+  REVENUE: 'Pendapatan',
+  EXPENSE: 'Beban',
+}
+
+const ACCOUNT_ROLE_GROUPS: { title: string; roles: KojasmatAccountRole[] }[] = [
+  { title: 'Umum', roles: ['kas'] },
+  { title: 'Simpanan Anggota', roles: ['simpanan_pokok', 'simpanan_wajib', 'simpanan_sukarela'] },
+  { title: 'Pembiayaan Proyek', roles: ['dst_murabahah', 'dst_mudharabah', 'piutang_pembiayaan', 'bagi_hasil'] },
+  { title: 'Ujrah Wakalah', roles: ['ujrah_murabahah', 'ujrah_mudharabah'] },
+  { title: 'Administrasi & Proyek', roles: ['pendapatan_admin', 'pendapatan_proyek', 'beban_proyek'] },
+]
+
+function AccountRoleSelect({
+  role, value, accounts, onChange,
+}: {
+  role: KojasmatAccountRole
+  value: string
+  accounts: KojasmatAccountOption[]
+  onChange: (role: KojasmatAccountRole, value: string) => void
+}) {
+  const grouped = new Map<KojasmatAccountOption['type'], KojasmatAccountOption[]>()
+  for (const account of accounts) {
+    const list = grouped.get(account.type) || []
+    list.push(account)
+    grouped.set(account.type, list)
+  }
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-semibold text-gray-700">{KOJASMAT_ACCOUNT_ROLE_LABEL[role]}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(role, e.target.value)}
+        className="w-full cursor-pointer rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500"
+      >
+        <option value="">— Tidak dipetakan —</option>
+        {Array.from(grouped.entries()).map(([type, list]) => (
+          <optgroup key={type} label={ACCOUNT_TYPE_LABEL[type]}>
+            {list.map((account) => (
+              <option key={account.id} value={account.id}>{account.code} · {account.name}</option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+function TabPengaturanAkun({ orgId, accountMapping, accounts }: {
+  orgId: string; accountMapping: KojasmatAccountMapping; accounts: KojasmatAccountOption[]
+}) {
+  const [pending, startTransition] = useTransition()
+  const [draft, setDraft] = useState<KojasmatAccountMapping>(accountMapping)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const completedCount = KOJASMAT_ACCOUNT_ROLES.filter((role) => draft[role]).length
+
+  function handleChange(role: KojasmatAccountRole, value: string) {
+    setDraft((prev) => ({ ...prev, [role]: value || null }))
+  }
+
+  function handleSave() {
+    setMessage(null)
+    startTransition(async () => {
+      const res = await saveKojasmatAccountMappingAction(orgId, draft)
+      if (!res.success) {
+        setMessage({ type: 'error', text: res.error || 'Pemetaan akun gagal disimpan.' })
+        return
+      }
+      setMessage({ type: 'success', text: 'Pemetaan akun berhasil disimpan.' })
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3">
+        <p className="text-sm font-semibold text-blue-900">
+          Pemetaan Akun COA ({completedCount}/{KOJASMAT_ACCOUNT_ROLES.length} terisi)
+        </p>
+        <p className="text-xs text-blue-700 mt-0.5">
+          Tentukan akun mana dari Chart of Account koperasi ini yang dipakai tiap jenis jurnal.
+          Peran yang belum dipetakan akan dilewati (transaksi tetap tercatat di modul,
+          hanya belum masuk buku besar akuntansi).
+        </p>
+      </div>
+
+      {message && (
+        <div className={cn(
+          'rounded-xl border px-4 py-3 text-sm font-semibold',
+          message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'
+        )}>
+          {message.text}
+        </div>
+      )}
+
+      {ACCOUNT_ROLE_GROUPS.map((group) => (
+        <div key={group.title} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <p className="mb-3 text-sm font-bold text-gray-900">{group.title}</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {group.roles.map((role) => (
+              <AccountRoleSelect
+                key={role}
+                role={role}
+                value={draft[role] || ''}
+                accounts={accounts}
+                onChange={handleChange}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div className="flex justify-end">
+        <button onClick={handleSave} disabled={pending}
+          className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+          {pending ? 'Menyimpan...' : 'Simpan Pemetaan Akun'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── ROOT CLIENT ──────────────────────────────────────────────────────────────
 
-type ActiveTab = 'dashboard' | 'permohonan' | 'anggota' | 'proyek' | 'simpanan' | 'pelatihan' | 'laporan' | 'tindakan' | 'soal'
+type ActiveTab = 'dashboard' | 'permohonan' | 'anggota' | 'proyek' | 'simpanan' | 'pelatihan' | 'laporan' | 'tindakan' | 'soal' | 'akun'
 
 export default function KojasmatClient({
   orgId, stats, anggota, proyek, pelatihan, pendaftaran, laporan, tindakan,
   bankSoal, moduleSettings, bankAccounts, qrisPreviewUrl, setoranPending,
+  accountMapping, chartOfAccounts,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
 
@@ -4298,6 +4433,7 @@ export default function KojasmatClient({
     { key: 'laporan',     label: 'Laporan',         icon: FileText,      badge: laporan.filter(l => l.status === 'DIKIRIM').length || undefined },
     { key: 'tindakan',    label: 'Tindakan',        icon: AlertTriangle, badge: tindakanAktif || undefined, badgeColor: 'bg-red-100 text-red-700' },
     { key: 'soal',        label: 'Bank Soal',       icon: BookOpen,      badge: bankSoal.filter(s => s.is_active).length < 20 ? bankSoal.filter(s => s.is_active).length : undefined, badgeColor: 'bg-red-100 text-red-700' },
+    { key: 'akun',        label: 'Pengaturan Akun', icon: Landmark,      badge: (KOJASMAT_ACCOUNT_ROLES.length - KOJASMAT_ACCOUNT_ROLES.filter(r => accountMapping[r]).length) || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
   ]
 
   return (
@@ -4346,6 +4482,7 @@ export default function KojasmatClient({
         {activeTab === 'laporan'    && <TabLaporan laporan={laporan} />}
         {activeTab === 'tindakan'   && <TabTindakan orgId={orgId} anggota={anggota} proyek={proyek} tindakan={tindakan} />}
         {activeTab === 'soal'       && <TabBankSoal orgId={orgId} bankSoal={bankSoal} moduleSettings={moduleSettings} bankAccounts={bankAccounts} qrisPreviewUrl={qrisPreviewUrl} />}
+        {activeTab === 'akun'       && <TabPengaturanAkun orgId={orgId} accountMapping={accountMapping} accounts={chartOfAccounts} />}
       </div>
     </div>
   )
