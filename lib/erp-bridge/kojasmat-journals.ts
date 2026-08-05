@@ -3,26 +3,31 @@
 // Kojasmat ERP Bridge — jurnal akuntansi syariah yang benar per jenis transaksi.
 // Semua mapping CoA mengacu pada PSAK 105/106 dan IAI Koperasi Syariah.
 //
-// CoA Reference:
-//   1101       — Kas Besar (ASET)
-//   11-4001    — Piutang Mudharabah — Pembiayaan Aktif (ASET)
-//   21-5001    — DST Murabahah (LIABILITAS)
-//   21-5002    — DST Mudharabah (LIABILITAS)
-//   21-6000    — Simpanan Sukarela / Wadiah (LIABILITAS)
-//   22-1000    — Utang Bagi Hasil Belum Dibagikan (LIABILITAS)
-//   31-1000    — Simpanan Pokok / Wadiah (LIABILITAS) — titipan anggota, bukan modal permanen
-//   31-2000    — Simpanan Wajib / Wadiah (LIABILITAS) — titipan anggota, bukan modal permanen
-//   32-1000    — Cadangan Koperasi (EKUITAS)
-//   41-6001    — Ujrah Wakalah Murabahah (PENDAPATAN)
-//   41-6002    — Ujrah Wakalah Mudharabah (PENDAPATAN)
+// CoA Reference (kode aktual yang dipakai koperasi ini — lihat catatan di bawah):
+//   1101 — Kas dan Setara Kas (ASET)
+//   1201 — Piutang Muamalah (ASET) — dipakai untuk piutang pembiayaan mudharabah
+//   2102 — Simpanan Investasi/Projek (LIABILITAS) — Dana Syirkah Temporer (Murabahah & Mudharabah)
+//   2101 — Simpanan Sukarela (LIABILITAS)
+//   3001 — Simpanan Pokok (EKUITAS)
+//   3002 — Simpanan Wajib (EKUITAS)
+//   4005 — Ujrah Projek (PENDAPATAN) — ujrah wakalah Murabahah & Mudharabah
+//   4006 — Admin Projek (PENDAPATAN) — biaya admin pendaftaran & pendapatan usaha proyek
+//
+// CATATAN: kode-kode di atas (mis. 21-6000, 31-1000) adalah skema CoA yang semula
+// diasumsikan modul ini, TAPI CoA koperasi ini (satu-satunya org yang memakai modul
+// kojasmat saat ini) sudah dibuat lebih dulu dengan skema kode 4-digit berbeda.
+// Konstanta di bawah sudah diarahkan ke kode yang BENAR-BENAR ADA supaya jurnal
+// tidak silently di-skip (lihat postJurnal — kalau akun tidak ketemu, di-skip diam-diam).
+// Kalau kelak ada organisasi kojasmat kedua dengan skema CoA berbeda, konstanta ini
+// perlu dibuat per-org (bukan modul-level) — bukan di-hardcode ulang begini.
 
 import { ERPBridge } from './finances'
 import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
 
 const SIMPANAN_COA: Record<string, string> = {
-  POKOK:    '31-1000',
-  WAJIB:    '31-2000',
-  SUKARELA: '21-6000',
+  POKOK:    '3001',
+  WAJIB:    '3002',
+  SUKARELA: '2101',
 }
 
 const DST_COA: Record<string, string> = {
