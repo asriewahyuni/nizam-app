@@ -180,3 +180,19 @@ export async function kirimTransferSimpanan(payload: {
   revalidatePath(`/anggota/${tujuan.kode_anggota}`)
   return { success: true }
 }
+
+export async function getAnggotaTransferPreviewByKode(kodeAnggota: string): Promise<{ data: KojasmatTransferPreview } | { error: string }> {
+  const pengirim = await getAnggotaBySession()
+  if (!pengirim) return { error: 'Sesi login tidak ditemukan. Silakan login ulang.' }
+
+  const { rows: [tujuan] } = await queryPostgres(
+    `SELECT id, org_id, nama, kode_anggota, status FROM kojasmat_anggota WHERE kode_anggota = $1 LIMIT 1`,
+    [kodeAnggota]
+  )
+  if (!tujuan) return { error: 'Kode anggota tidak ditemukan.' }
+  if (tujuan.org_id !== pengirim.org_id) return { error: 'Anggota tujuan bukan dari koperasi yang sama.' }
+  if (tujuan.id === pengirim.id) return { error: 'Tidak bisa transfer ke diri sendiri.' }
+  if (tujuan.status === 'DIBEKUKAN') return { error: 'Anggota tujuan sedang dibekukan dan tidak bisa menerima transfer.' }
+
+  return { data: { id: tujuan.id, nama: tujuan.nama, kode_anggota: tujuan.kode_anggota } }
+}

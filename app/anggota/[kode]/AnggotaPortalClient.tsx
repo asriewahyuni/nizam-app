@@ -22,7 +22,7 @@ import {
   type KojasmatSimpananMutasi, type KojasmatAkad,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
-  getAnggotaTransferPreview, kirimTransferSimpanan, type KojasmatTransferPreview,
+  getAnggotaTransferPreview, getAnggotaTransferPreviewByKode, kirimTransferSimpanan, type KojasmatTransferPreview,
 } from '@/modules/kojasmat/actions/kojasmat-transfer.actions'
 import {
   kirimLaporanProyek, simpanDokumen, hapusDokumen, getDokumenByRef,
@@ -460,6 +460,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
   const [transferView, setTransferView] = useState<'kirim' | 'terima'>('kirim')
   const [scannerOpen, setScannerOpen] = useState(false)
   const [transferTarget, setTransferTarget] = useState<KojasmatTransferPreview | null>(null)
+  const [transferInputKode, setTransferInputKode] = useState('')
   const [nominalTransfer, setNominalTransfer] = useState('')
   const [catatanTransfer, setCatatanTransfer] = useState('')
   const [passwordTransfer, setPasswordTransfer] = useState('')
@@ -485,6 +486,16 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
     setTransferError(null)
     startTransition(async () => {
       const res = await getAnggotaTransferPreview(parsed.anggotaId)
+      if ('error' in res) { setTransferError(res.error); return }
+      setTransferTarget(res.data)
+    })
+  }
+
+  function handleCariAnggota() {
+    if (!transferInputKode.trim()) return
+    setTransferError(null)
+    startTransition(async () => {
+      const res = await getAnggotaTransferPreviewByKode(transferInputKode.trim())
       if ('error' in res) { setTransferError(res.error); return }
       setTransferTarget(res.data)
     })
@@ -516,6 +527,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
 
   function resetTransferTarget() {
     setTransferTarget(null)
+    setTransferInputKode('')
     setNominalTransfer('')
     setPasswordTransfer('')
     setTransferError(null)
@@ -1010,11 +1022,32 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
                 </div>
 
                 {!transferTarget ? (
-                  <button type="button" onClick={() => setScannerOpen(true)}
-                    className="w-full flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/60 py-8 text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer">
-                    <ScanLine className="h-8 w-8" />
-                    <span className="text-sm font-semibold">Scan QR Anggota Tujuan</span>
-                  </button>
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Nomor Anggota Tujuan</label>
+                    <div className="flex gap-2">
+                      <input type="text"
+                        className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-emerald-500 text-sm font-medium uppercase"
+                        placeholder="Contoh: KJ-0001"
+                        value={transferInputKode}
+                        onChange={e => setTransferInputKode(e.target.value.toUpperCase())}
+                        onKeyDown={e => e.key === 'Enter' && handleCariAnggota()}
+                      />
+                      <button type="button" onClick={handleCariAnggota} disabled={pending || !transferInputKode.trim()}
+                        className="rounded-2xl bg-emerald-700 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors disabled:opacity-50 cursor-pointer">
+                        {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Cari'}
+                      </button>
+                    </div>
+                    <div className="relative flex items-center py-2">
+                      <div className="flex-grow border-t border-gray-200"></div>
+                      <span className="mx-4 flex-shrink-0 text-xs font-semibold text-gray-400 uppercase tracking-widest">ATAU</span>
+                      <div className="flex-grow border-t border-gray-200"></div>
+                    </div>
+                    <button type="button" onClick={() => setScannerOpen(true)}
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/60 py-4 text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer">
+                      <ScanLine className="h-5 w-5" />
+                      <span className="text-sm font-semibold">Scan QR Anggota</span>
+                    </button>
+                  </div>
                 ) : (
                   <>
                     <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
