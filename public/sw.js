@@ -1,6 +1,6 @@
 const CACHE_NAME = 'nizam-v2'
 const OFFLINE_URL = '/offline.html'
-const NETWORK_TIMEOUT_MS = 6000
+const NETWORK_TIMEOUT_MS = 15000
 
 const STATIC_ASSETS = [
   '/',
@@ -32,23 +32,6 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
-// Network fetch dengan timeout, supaya jaringan lemot tidak menggantung
-// tanpa batas sebelum jatuh ke cache/fallback.
-function fetchWithTimeout(request, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('network-timeout')), timeoutMs)
-    fetch(request).then(
-      (response) => {
-        clearTimeout(timer)
-        resolve(response)
-      },
-      (error) => {
-        clearTimeout(timer)
-        reject(error)
-      }
-    )
-  })
-}
 
 // Fetch — network-first, fallback ke cache, fallback ke halaman offline khusus navigasi
 self.addEventListener('fetch', (event) => {
@@ -66,9 +49,9 @@ self.addEventListener('fetch', (event) => {
   const isNavigation = request.mode === 'navigate'
 
   event.respondWith(
-    fetchWithTimeout(request, NETWORK_TIMEOUT_MS)
+    fetch(request)
       .then((response) => {
-        // Cache successful responses
+        // Simpan ke cache jika sukses (untuk fallback nanti)
         if (response.status === 200) {
           const clone = response.clone()
           caches.open(CACHE_NAME).then((cache) => {
@@ -77,18 +60,23 @@ self.addEventListener('fetch', (event) => {
         }
         return response
       })
-      .catch(async () => {
+      .catch(async (error) => {
+        // Request akan masuk ke .catch() JIKA koneksi internet benar-benar terputus/offline,
+        // bukan karena server lambat merespons.
+        
+        // Coba cari di cache terlebih dahulu
         const cached = await caches.match(request)
         if (cached) return cached
 
-        // Hanya request navigasi (buka halaman) yang mendapat halaman offline;
-        // request aset (JS/CSS/gambar) dibiarkan gagal secara alami.
+        // Jika tidak ada di cache dan ini adalah request navigasi (pindah halaman),
+        // barulah kita tampilkan halaman offline.html
         if (isNavigation) {
           const offlinePage = await caches.match(OFFLINE_URL)
           if (offlinePage) return offlinePage
         }
 
-        return new Response('Offline', { status: 503 })
+        // Jika aset lain (gambar/js/css) gagal dan tidak ada di cache, biarkan error alami
+        throw error
       })
   )
 })
