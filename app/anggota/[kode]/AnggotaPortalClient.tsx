@@ -184,7 +184,7 @@ function TabBeranda({
         </div>
         <div className="rounded-2xl border border-gray-100 bg-white p-4 text-center shadow-sm">
           <TrendingUp className="h-5 w-5 text-emerald-500 mx-auto mb-1" />
-          <p className="text-xl font-bold text-gray-900">{pembiayaan.length}</p>
+          <p className="text-xl font-bold text-gray-900">{pembiayaan.filter(p => p.status === 'AKTIF').length}</p>
           <p className="text-xs text-gray-400 mt-0.5">Dibiayai</p>
         </div>
         <div className="rounded-2xl border border-gray-100 bg-white p-4 text-center shadow-sm relative">
@@ -1878,7 +1878,8 @@ function TabInvestasi({
             proyek_id?: string; nama_proyek?: string; jenis_akad?: string; proyek_status?: string
           }) => {
             const isOpen = expandedPembiayaan === pm.id
-            const bisaBatalkan = pm.proyek_status === 'FUNDING_AKTIF' || pm.proyek_status === 'FUNDING_DITUTUP'
+            const pembiayaanAktif = pm.status === 'AKTIF'
+            const bisaBatalkan = pembiayaanAktif && (pm.proyek_status === 'FUNDING_AKTIF' || pm.proyek_status === 'FUNDING_DITUTUP')
             return (
               <div key={pm.id} className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
                 <button
@@ -1893,7 +1894,12 @@ function TabInvestasi({
                     <div className="text-right flex items-center gap-2">
                       <div>
                         <p className="font-bold text-gray-900 text-sm">{fmt(Number(pm.jumlah))}</p>
-                        {pm.proyek_status && (
+                        {!pembiayaanAktif ? (
+                          <Badge
+                            text={pm.status === 'GAGAL' ? 'Dibatalkan' : pm.status === 'SELESAI' ? 'Selesai' : pm.status}
+                            cls={pm.status === 'GAGAL' ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'}
+                          />
+                        ) : pm.proyek_status && (
                           <Badge text={STATUS_LABEL[pm.proyek_status]?.label ?? pm.proyek_status}
                             cls={STATUS_LABEL[pm.proyek_status]?.color ?? 'bg-gray-100 text-gray-600'} />
                         )}
@@ -1904,6 +1910,15 @@ function TabInvestasi({
                 </button>
                 {isOpen && pm.proyek_id && (
                   <div className="px-4 pb-4 border-t border-gray-50 pt-3 space-y-3">
+                    {!pembiayaanAktif && (
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                        <p className="text-xs text-gray-500">
+                          {pm.status === 'GAGAL'
+                            ? 'Pendanaan ini sudah Anda batalkan — tidak lagi dihitung sebagai investasi aktif.'
+                            : 'Pendanaan ini sudah selesai.'}
+                        </p>
+                      </div>
+                    )}
                     {bisaBatalkan && (
                       <div className="rounded-xl border border-rose-100 bg-rose-50 p-3">
                         <p className="text-xs text-rose-700">
