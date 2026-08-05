@@ -604,10 +604,10 @@ export async function syncActivePackageMemberships(
         `INSERT INTO public.learning_enrollments (
            org_id, user_id, course_id, access_grant_id, status, started_at
          )
-         SELECT $1::uuid, $2::uuid, $3::uuid, grant.id, 'IN_PROGRESS', NOW()
-         FROM public.learning_access_grants grant
-         WHERE grant.org_id = $1::uuid
-           AND grant.idempotency_key = $4
+         SELECT $1::uuid, $2::uuid, $3::uuid, access_grant.id, 'IN_PROGRESS', NOW()
+         FROM public.learning_access_grants access_grant
+         WHERE access_grant.org_id = $1::uuid
+           AND access_grant.idempotency_key = $4
          ON CONFLICT (org_id, user_id, course_id) DO UPDATE
          SET updated_at = NOW()`,
         [

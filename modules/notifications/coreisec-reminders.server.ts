@@ -89,7 +89,7 @@ export async function enqueueCoreisecReminders(limit = 250) {
     queryPostgres<ReminderCandidate>(
       `SELECT
          session.org_id::text,
-         grant.user_id::text,
+         access_grant.user_id::text,
          COALESCE(internal_user.login_email, identity_user.email) AS email,
          COALESCE(identity_user.raw_user_meta_data->>'phone',
                   identity_user.raw_user_meta_data->>'phone_number') AS phone,
@@ -105,16 +105,16 @@ export async function enqueueCoreisecReminders(limit = 250) {
        CROSS JOIN LATERAL unnest(session.reminder_offsets_minutes) reminder(offset_minutes)
        JOIN public.lms_course_batches batch
          ON batch.id = session.batch_id AND batch.org_id = session.org_id
-       JOIN public.learning_access_grants grant
-         ON grant.org_id = batch.org_id
-        AND grant.course_id = batch.course_id
-        AND (grant.batch_id IS NULL OR grant.batch_id = batch.id)
-        AND grant.status = 'ACTIVE'
-        AND grant.starts_at <= NOW()
-        AND (grant.expires_at IS NULL OR grant.expires_at > NOW())
+       JOIN public.learning_access_grants access_grant
+         ON access_grant.org_id = batch.org_id
+        AND access_grant.course_id = batch.course_id
+        AND (access_grant.batch_id IS NULL OR access_grant.batch_id = batch.id)
+        AND access_grant.status = 'ACTIVE'
+        AND access_grant.starts_at <= NOW()
+        AND (access_grant.expires_at IS NULL OR access_grant.expires_at > NOW())
        LEFT JOIN public.internal_auth_users internal_user
-         ON COALESCE(internal_user.legacy_user_id, internal_user.id) = grant.user_id
-       LEFT JOIN auth.users identity_user ON identity_user.id = grant.user_id
+         ON COALESCE(internal_user.legacy_user_id, internal_user.id) = access_grant.user_id
+       LEFT JOIN auth.users identity_user ON identity_user.id = access_grant.user_id
        WHERE session.start_time - make_interval(mins => reminder.offset_minutes)
          BETWEEN NOW() - INTERVAL '5 minutes' AND NOW() + INTERVAL '5 minutes'
        ORDER BY session.start_time
@@ -124,7 +124,7 @@ export async function enqueueCoreisecReminders(limit = 250) {
     queryPostgres<ReminderCandidate>(
       `SELECT
          assignment.org_id::text,
-         grant.user_id::text,
+         access_grant.user_id::text,
          COALESCE(internal_user.login_email, identity_user.email) AS email,
          COALESCE(identity_user.raw_user_meta_data->>'phone',
                   identity_user.raw_user_meta_data->>'phone_number') AS phone,
@@ -137,22 +137,22 @@ export async function enqueueCoreisecReminders(limit = 250) {
          ) AS variables
        FROM public.learning_assignments assignment
        CROSS JOIN (VALUES (4320), (1440)) reminder(offset_minutes)
-       JOIN public.learning_access_grants grant
-         ON grant.org_id = assignment.org_id
-        AND grant.course_id = assignment.course_id
-        AND grant.status = 'ACTIVE'
-        AND grant.starts_at <= NOW()
-        AND (grant.expires_at IS NULL OR grant.expires_at > NOW())
+       JOIN public.learning_access_grants access_grant
+         ON access_grant.org_id = assignment.org_id
+        AND access_grant.course_id = assignment.course_id
+        AND access_grant.status = 'ACTIVE'
+        AND access_grant.starts_at <= NOW()
+        AND (access_grant.expires_at IS NULL OR access_grant.expires_at > NOW())
        LEFT JOIN public.internal_auth_users internal_user
-         ON COALESCE(internal_user.legacy_user_id, internal_user.id) = grant.user_id
-       LEFT JOIN auth.users identity_user ON identity_user.id = grant.user_id
+         ON COALESCE(internal_user.legacy_user_id, internal_user.id) = access_grant.user_id
+       LEFT JOIN auth.users identity_user ON identity_user.id = access_grant.user_id
        WHERE assignment.status = 'PUBLISHED'
          AND assignment.due_at - make_interval(mins => reminder.offset_minutes)
            BETWEEN NOW() - INTERVAL '5 minutes' AND NOW() + INTERVAL '5 minutes'
          AND NOT EXISTS (
            SELECT 1 FROM public.learning_assignment_submissions submission
            WHERE submission.assignment_id = assignment.id
-             AND submission.user_id = grant.user_id
+             AND submission.user_id = access_grant.user_id
              AND submission.status IN ('SUBMITTED', 'UNDER_REVIEW', 'GRADED')
          )
        ORDER BY assignment.due_at
@@ -190,12 +190,12 @@ export async function enqueueCoreisecReminders(limit = 250) {
     queryPostgres<ReminderCandidate>(
       `SELECT
          lesson.org_id::text,
-         grant.user_id::text,
+         access_grant.user_id::text,
          COALESCE(internal_user.login_email, identity_user.email) AS email,
          COALESCE(identity_user.raw_user_meta_data->>'phone',
                   identity_user.raw_user_meta_data->>'phone_number') AS phone,
          'LESSON_AVAILABLE' AS event_type,
-         lesson.id::text || ':' || grant.id::text AS event_id,
+         lesson.id::text || ':' || access_grant.id::text AS event_id,
          0 AS offset_minutes,
          jsonb_build_object(
            'lesson_title', lesson.title,
@@ -204,16 +204,16 @@ export async function enqueueCoreisecReminders(limit = 250) {
        FROM public.learning_lessons lesson
        JOIN public.learning_courses course
          ON course.id = lesson.course_id AND course.org_id = lesson.org_id
-       JOIN public.learning_access_grants grant
-         ON grant.org_id = lesson.org_id
-        AND grant.course_id = lesson.course_id
-        AND grant.status = 'ACTIVE'
-        AND (grant.expires_at IS NULL OR grant.expires_at > NOW())
+       JOIN public.learning_access_grants access_grant
+         ON access_grant.org_id = lesson.org_id
+        AND access_grant.course_id = lesson.course_id
+        AND access_grant.status = 'ACTIVE'
+        AND (access_grant.expires_at IS NULL OR access_grant.expires_at > NOW())
        LEFT JOIN public.internal_auth_users internal_user
-         ON COALESCE(internal_user.legacy_user_id, internal_user.id) = grant.user_id
-       LEFT JOIN auth.users identity_user ON identity_user.id = grant.user_id
+         ON COALESCE(internal_user.legacy_user_id, internal_user.id) = access_grant.user_id
+       LEFT JOIN auth.users identity_user ON identity_user.id = access_grant.user_id
        CROSS JOIN LATERAL (
-         SELECT grant.starts_at + CASE upper(COALESCE(lesson.drip_unit, 'HOUR'))
+         SELECT access_grant.starts_at + CASE upper(COALESCE(lesson.drip_unit, 'HOUR'))
            WHEN 'HOUR' THEN make_interval(hours => COALESCE(lesson.drip_value, 0))
            WHEN 'DAY' THEN make_interval(days => COALESCE(lesson.drip_value, 0))
            WHEN 'WEEK' THEN make_interval(weeks => COALESCE(lesson.drip_value, 0))
