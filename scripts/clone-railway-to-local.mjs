@@ -560,7 +560,7 @@ async function restoreDatabase({ dumpImage, restoreImage, sourceDbUrl, targetDbU
       '--quote-all-identifiers',
       '--verbose',
     ]),
-    restoreArgs: dockerArgs(restoreImage, 'psql', targetDbUrl, ['-v', 'ON_ERROR_STOP=1']),
+    restoreArgs: dockerArgs(restoreImage, 'psql', targetDbUrl, ['-v', 'ON_ERROR_STOP=0']),
     verbose,
   })
 
@@ -578,7 +578,7 @@ async function restoreDatabase({ dumpImage, restoreImage, sourceDbUrl, targetDbU
       '--quote-all-identifiers',
       '--verbose',
     ]),
-    restoreArgs: dockerArgs(restoreImage, 'psql', targetDbUrl, ['-v', 'ON_ERROR_STOP=1']),
+    restoreArgs: dockerArgs(restoreImage, 'psql', targetDbUrl, ['-v', 'ON_ERROR_STOP=0']),
     verbose,
   })
 }

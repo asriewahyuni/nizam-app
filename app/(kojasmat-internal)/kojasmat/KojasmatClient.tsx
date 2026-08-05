@@ -1175,7 +1175,7 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
                     <div className="flex items-center gap-1.5">
                       <a href={`/anggota/${a.kode_anggota}?org=${orgId}`} target="_blank"
                         className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer whitespace-nowrap">
-                        <ExternalLink className="h-3.5 w-3.5" /> Portal
+                        <ExternalLink className="h-3.5 w-3.5" />
                       </a>
                       <button onClick={() => openEdit(a)}
                         className="rounded-lg p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer">
