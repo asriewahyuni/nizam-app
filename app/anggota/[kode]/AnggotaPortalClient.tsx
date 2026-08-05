@@ -4,32 +4,54 @@ import { useState, useTransition, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import {
   Wallet, Briefcase, Bell, LogOut, TrendingUp,
-  CheckCircle, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, Search, Scan, QrCode, Camera,
+  CheckCircle, ArrowUpCircle, ArrowDownCircle,
   Star, GraduationCap, FileText, Send, Upload, XCircle,
   ChevronDown, ChevronUp, ChevronRight, AlertCircle, Home,
   Heart, Coins, Clock, Users, BadgeCheck, Scale, Banknote, TrendingDown,
   Loader2, MessageCircle, FileSignature, KeyRound, Eye, EyeOff,
+  QrCode, ScanLine, ArrowLeftRight,
 } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
+import { BarcodeScanner } from '@/components/shared/BarcodeScanner'
 import { updateMyPassword } from '@/modules/auth/actions/auth.actions'
 import {
   createProyek, updateStatusPenawaran, createPembiayaan, toggleMinatProyek, batalkanPembiayaan,
   getProyekDiskusi, kirimPesanDiskusi, ajukanSetoranSimpanan, ajukanTarikSimpanan, getAkadByProyek,
-  transferSaldoSukarela, getAnggotaNameByKode,
   type KojasmatAnggota, type KojasmatProyek, type KojasmatSimpanan,
   type KojasmatPenawaran, type KojasmatPembiayaan, type KojasmatPelatihanTerjadwal, type KojasmatProyekDiskusi,
   type KojasmatSimpananMutasi, type KojasmatAkad,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
+  getAnggotaTransferPreview, kirimTransferSimpanan, type KojasmatTransferPreview,
+} from '@/modules/kojasmat/actions/kojasmat-transfer.actions'
+import {
   kirimLaporanProyek, simpanDokumen, hapusDokumen, getDokumenByRef,
   type KojasmatLaporanProyek, type KojasmatDokumen,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
-import { QRCodeSVG } from 'qrcode.react'
-import { QRScanner } from './QRScanner'
 import {
   getLaporanKeuanganProyek, catatTransaksiProyek, getTransaksiByProyek, getPemodalDenganPotensi,
   type KojasmatLaporanKeuanganProyek, type KojasmatProyekTransaksi, type KojasmatPemodalDenganPotensi,
 } from '@/modules/kojasmat/actions/kojasmat-keuangan.actions'
 import { getInfoPembayaran } from '@/modules/kojasmat/actions/kojasmat-test.actions'
+
+// Payload QR internal anggota — dipindai anggota lain untuk mengirim transfer simpanan.
+const KOJASMAT_QR_TAG = 'kojasmat_member'
+type KojasmatMemberQrPayload = { t: typeof KOJASMAT_QR_TAG; org_id: string; anggota_id: string }
+
+function buildMemberQrPayload(orgId: string, anggotaId: string): string {
+  const payload: KojasmatMemberQrPayload = { t: KOJASMAT_QR_TAG, org_id: orgId, anggota_id: anggotaId }
+  return JSON.stringify(payload)
+}
+
+function parseMemberQrPayload(raw: string): { anggotaId: string } | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<KojasmatMemberQrPayload>
+    if (parsed.t !== KOJASMAT_QR_TAG || typeof parsed.anggota_id !== 'string' || !parsed.anggota_id) return null
+    return { anggotaId: parsed.anggota_id }
+  } catch {
+    return null
+  }
+}
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -352,6 +374,11 @@ const SETORAN_STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   DITOLAK:   { label: 'Ditolak',             cls: 'bg-rose-100 text-rose-700' },
 }
 
+const MUTASI_DEBIT_TYPES = new Set(['TARIK', 'TRANSFER_KELUAR'])
+const MUTASI_LABEL: Record<string, string> = {
+  SETOR: 'Setor', TARIK: 'Tarik', TRANSFER_KELUAR: 'Transfer Keluar', TRANSFER_MASUK: 'Transfer Masuk',
+}
+
 async function uploadBuktiSetoran(
   file: File, orgId: string
 ): Promise<{ key: string; name: string; size: number } | { error: string }> {
@@ -393,69 +420,11 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
   const [detailSetoran, setDetailSetoran] = useState<KojasmatSimpananMutasi | null>(null)
 
   const saldoSukarela = Number(simpanan.find(s => s.jenis === 'SUKARELA')?.saldo ?? 0)
-
-  // ─── Transfer Saldo State ───
-  const [transferOpen, setTransferOpen] = useState(false)
-  const [transferKode, setTransferKode] = useState('')
-  const [transferNominal, setTransferNominal] = useState('')
-  const [transferError, setTransferError] = useState<string | null>(null)
-  const [transferSuccess, setTransferSuccess] = useState<{ nama: string; jumlah: number; newSaldo: number } | null>(null)
-  const [transferRecipient, setTransferRecipient] = useState<{ nama: string; id: string } | null>(null)
-  const [transferLookupPending, setTransferLookupPending] = useState(false)
-  const [transferConfirm, setTransferConfirm] = useState(false)
-
-  // ─── QR Code States ───
-  const [qrScannerOpen, setQrScannerOpen] = useState(false)
-  const [myQrOpen, setMyQrOpen] = useState(false)
-
-  // ─── Tarik Saldo State ───
   const [tarikSheetOpen, setTarikSheetOpen] = useState(false)
   const [nominalTarik, setNominalTarik] = useState('')
   const [tujuanTarik, setTujuanTarik] = useState('')
   const [tarikError, setTarikError] = useState<string | null>(null)
   const [tarikSuccess, setTarikSuccess] = useState(false)
-
-  function openTransfer() {
-    setTransferOpen(true)
-    setTransferKode('')
-    setTransferNominal('')
-    setTransferError(null)
-    setTransferSuccess(null)
-    setTransferRecipient(null)
-    setTransferConfirm(false)
-  }
-
-  function lookupRecipient(kode = transferKode) {
-    if (!kode.trim()) return
-    setTransferError(null)
-    setTransferLookupPending(true)
-    startTransition(async () => {
-      const result = await getAnggotaNameByKode(anggota.org_id, kode.trim().toUpperCase())
-      setTransferLookupPending(false)
-      if (!result) { setTransferError(`Anggota dengan kode "${kode}" tidak ditemukan atau tidak aktif`); return }
-      setTransferRecipient(result)
-    })
-  }
-
-  function submitTransfer() {
-    if (!transferRecipient || !transferNominal) return
-    const jumlah = Number(transferNominal)
-    if (jumlah < 1000) { setTransferError('Nominal transfer minimum Rp 1.000'); return }
-    if (jumlah > saldoSukarela) { setTransferError('Saldo simpanan sukarela tidak mencukupi'); return }
-
-    if (!transferConfirm) { setTransferConfirm(true); return }
-
-    setTransferError(null)
-    startTransition(async () => {
-      const res = await transferSaldoSukarela({
-        sender_anggota_id: anggota.id,
-        recipient_kode: transferKode.trim().toUpperCase(),
-        jumlah,
-      })
-      if (res.error) { setTransferError(res.error); setTransferConfirm(false); return }
-      setTransferSuccess({ nama: transferRecipient.nama, jumlah, newSaldo: res.data!.newSaldo })
-    })
-  }
 
   function openTarik() {
     setTarikSheetOpen(true)
@@ -485,6 +454,71 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
       }, ...prev])
       setTarikSuccess(true)
     })
+  }
+
+  const [transferSheetOpen, setTransferSheetOpen] = useState(false)
+  const [transferView, setTransferView] = useState<'kirim' | 'terima'>('kirim')
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [transferTarget, setTransferTarget] = useState<KojasmatTransferPreview | null>(null)
+  const [nominalTransfer, setNominalTransfer] = useState('')
+  const [catatanTransfer, setCatatanTransfer] = useState('')
+  const [passwordTransfer, setPasswordTransfer] = useState('')
+  const [showPasswordTransfer, setShowPasswordTransfer] = useState(false)
+  const [transferError, setTransferError] = useState<string | null>(null)
+  const [transferSuccess, setTransferSuccess] = useState(false)
+
+  function openTransfer() {
+    setTransferSheetOpen(true)
+    setTransferView('kirim')
+    setTransferTarget(null)
+    setNominalTransfer('')
+    setCatatanTransfer('')
+    setPasswordTransfer('')
+    setTransferError(null)
+    setTransferSuccess(false)
+  }
+
+  function handleScanTransfer(decoded: string) {
+    setScannerOpen(false)
+    const parsed = parseMemberQrPayload(decoded)
+    if (!parsed) { setTransferError('QR tidak dikenali. Pastikan Anda memindai QR anggota Kojasmat.'); return }
+    setTransferError(null)
+    startTransition(async () => {
+      const res = await getAnggotaTransferPreview(parsed.anggotaId)
+      if ('error' in res) { setTransferError(res.error); return }
+      setTransferTarget(res.data)
+    })
+  }
+
+  function submitTransfer() {
+    if (!transferTarget || !nominalTransfer || !passwordTransfer) return
+    setTransferError(null)
+    startTransition(async () => {
+      const res = await kirimTransferSimpanan({
+        ke_anggota_id: transferTarget.id,
+        jumlah: Number(nominalTransfer),
+        password: passwordTransfer,
+        catatan: catatanTransfer || undefined,
+      })
+      if ('error' in res) { setTransferError(res.error); return }
+      setSetoranList(prev => [{
+        id: `local-${Date.now()}`,
+        simpanan_id: simpanan.find(s => s.jenis === 'SUKARELA')?.id ?? '',
+        anggota_id: anggota.id, jenis_mutasi: 'TRANSFER_KELUAR',
+        jumlah: Number(nominalTransfer), saldo_sebelum: null, saldo_sesudah: null,
+        keterangan: `Transfer ke ${transferTarget.nama} (${transferTarget.kode_anggota})${catatanTransfer ? ` — ${catatanTransfer}` : ''}`,
+        metode_bayar: null, bukti_dokumen_id: null,
+        tanggal: new Date().toISOString(), status: 'DISETUJUI', created_at: new Date().toISOString(),
+      }, ...prev])
+      setTransferSuccess(true)
+    })
+  }
+
+  function resetTransferTarget() {
+    setTransferTarget(null)
+    setNominalTransfer('')
+    setPasswordTransfer('')
+    setTransferError(null)
   }
 
   function openSetor() {
@@ -556,30 +590,24 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
         <p className="text-3xl font-bold text-amber-300">{fmt(total)}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2.5">
         <button
           onClick={openSetor}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-emerald-700 py-3 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer"
         >
-          <ArrowUpCircle className="h-4 w-4 shrink-0" /> Setor
+          <ArrowUpCircle className="h-4 w-4" /> Setor
         </button>
         <button
           onClick={openTarik}
-          className="flex items-center justify-center gap-2 rounded-2xl border border-emerald-700 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-emerald-700 py-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
         >
-          <ArrowDownCircle className="h-4 w-4 shrink-0" /> Tarik
+          <ArrowDownCircle className="h-4 w-4" /> Tarik
         </button>
         <button
           onClick={openTransfer}
-          className="flex items-center justify-center gap-2 rounded-2xl border-2 border-emerald-700 bg-emerald-50 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-amber-500 py-3 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
         >
-          <ArrowRightLeft className="h-4 w-4 shrink-0" /> Transfer
-        </button>
-        <button
-          onClick={() => setMyQrOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
-        >
-          <QrCode className="h-4 w-4 shrink-0 text-gray-500" /> QR Saya
+          <ArrowLeftRight className="h-4 w-4" /> Transfer
         </button>
       </div>
 
@@ -612,7 +640,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
           {setoranList.map(m => {
             const badge = SETORAN_STATUS_BADGE[m.status] ?? SETORAN_STATUS_BADGE.DISETUJUI
             const jenisMutasi = simpanan.find(s => s.id === m.simpanan_id)?.jenis ?? 'SUKARELA'
-            const isTarik = m.jenis_mutasi === 'TARIK'
+            const isDebit = MUTASI_DEBIT_TYPES.has(m.jenis_mutasi)
             return (
               <button
                 key={m.id}
@@ -621,16 +649,19 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
                 className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm text-left cursor-pointer transition-colors hover:border-emerald-200 hover:bg-emerald-50/40"
               >
                 <div className="min-w-0 flex items-start gap-2.5">
-                  {isTarik
+                  {isDebit
                     ? <ArrowDownCircle className="h-4 w-4 mt-0.5 shrink-0 text-rose-500" />
                     : <ArrowUpCircle className="h-4 w-4 mt-0.5 shrink-0 text-emerald-500" />}
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900">
-                      {isTarik ? 'Tarik' : 'Setor'} {JENIS_SIMPANAN_INFO[jenisMutasi].label.replace('Simpanan ', '')}
+                      {MUTASI_LABEL[m.jenis_mutasi] ?? m.jenis_mutasi} {JENIS_SIMPANAN_INFO[jenisMutasi].label.replace('Simpanan ', '')}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">{fmtTanggalWaktu(m.created_at)}</p>
                     {m.metode_bayar && (
                       <p className="text-xs text-gray-400 mt-0.5">{METODE_BAYAR_LABEL[m.metode_bayar]}</p>
+                    )}
+                    {m.keterangan && (m.jenis_mutasi === 'TRANSFER_KELUAR' || m.jenis_mutasi === 'TRANSFER_MASUK') && (
+                      <p className="text-xs text-gray-400 mt-0.5">{m.keterangan}</p>
                     )}
                     {m.status === 'DITOLAK' && m.catatan_admin && (
                       <p className="text-xs text-rose-600 mt-1">{m.catatan_admin}</p>
@@ -639,8 +670,8 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
                 </div>
                 <div className="text-right shrink-0 flex items-center gap-2">
                   <div>
-                    <p className={cn('text-sm font-bold', isTarik ? 'text-rose-600' : 'text-gray-900')}>
-                      {isTarik ? '-' : ''}{fmt(Number(m.jumlah))}
+                    <p className={cn('text-sm font-bold', isDebit ? 'text-rose-600' : 'text-gray-900')}>
+                      {isDebit ? '-' : ''}{fmt(Number(m.jumlah))}
                     </p>
                     <Badge text={badge.label} cls={badge.cls} />
                   </div>
@@ -652,16 +683,18 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
         </div>
       )}
 
-      <Sheet open={!!detailSetoran} onClose={() => setDetailSetoran(null)} title={detailSetoran?.jenis_mutasi === 'TARIK' ? 'Detail Penarikan' : 'Detail Setoran'}>
+      <Sheet open={!!detailSetoran} onClose={() => setDetailSetoran(null)} title={`Detail ${detailSetoran ? (MUTASI_LABEL[detailSetoran.jenis_mutasi] ?? detailSetoran.jenis_mutasi) : ''}`}>
         {detailSetoran && (() => {
           const badge = SETORAN_STATUS_BADGE[detailSetoran.status] ?? SETORAN_STATUS_BADGE.DISETUJUI
           const jenisMutasi = simpanan.find(s => s.id === detailSetoran.simpanan_id)?.jenis ?? 'SUKARELA'
+          const isDebit = MUTASI_DEBIT_TYPES.has(detailSetoran.jenis_mutasi)
           const isTarik = detailSetoran.jenis_mutasi === 'TARIK'
+          const isTransfer = detailSetoran.jenis_mutasi === 'TRANSFER_KELUAR' || detailSetoran.jenis_mutasi === 'TRANSFER_MASUK'
           return (
             <div className="space-y-4">
-              <div className={cn('rounded-2xl border p-4 text-center', isTarik ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100')}>
-                <p className={cn('text-xs mb-1', isTarik ? 'text-rose-600' : 'text-emerald-600')}>{JENIS_SIMPANAN_INFO[jenisMutasi].label}</p>
-                <p className={cn('text-2xl font-bold', isTarik ? 'text-rose-700' : 'text-emerald-800')}>{fmt(Number(detailSetoran.jumlah))}</p>
+              <div className={cn('rounded-2xl border p-4 text-center', isDebit ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100')}>
+                <p className={cn('text-xs mb-1', isDebit ? 'text-rose-600' : 'text-emerald-600')}>{JENIS_SIMPANAN_INFO[jenisMutasi].label}</p>
+                <p className={cn('text-2xl font-bold', isDebit ? 'text-rose-700' : 'text-emerald-800')}>{fmt(Number(detailSetoran.jumlah))}</p>
                 <div className="mt-2 flex justify-center">
                   <Badge text={badge.label} cls={badge.cls} />
                 </div>
@@ -669,7 +702,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
 
               <div className="rounded-xl border border-gray-100 divide-y divide-gray-100">
                 <div className="flex items-center justify-between px-4 py-3">
-                  <span className="text-xs text-gray-400">Waktu Pengajuan</span>
+                  <span className="text-xs text-gray-400">Waktu</span>
                   <span className="text-sm font-medium text-gray-800 text-right">{fmtTanggalWaktu(detailSetoran.created_at)}</span>
                 </div>
                 {detailSetoran.metode_bayar && (
@@ -680,7 +713,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
                 )}
                 {detailSetoran.keterangan && (
                   <div className="flex items-center justify-between px-4 py-3 gap-3">
-                    <span className="text-xs text-gray-400 shrink-0">{isTarik ? 'Tujuan Transfer' : 'Catatan'}</span>
+                    <span className="text-xs text-gray-400 shrink-0">{isTarik ? 'Tujuan Transfer' : isTransfer ? 'Keterangan' : 'Catatan'}</span>
                     <span className="text-sm font-medium text-gray-800 text-right">{detailSetoran.keterangan}</span>
                   </div>
                 )}
@@ -862,127 +895,6 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
         )}
       </Sheet>
 
-      {/* ─── Transfer Sheet ─── */}
-      <Sheet open={transferOpen} onClose={() => setTransferOpen(false)} title="Transfer Saldo Sukarela">
-        {transferSuccess ? (
-          <div className="space-y-4 text-center py-4">
-            <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
-              <CheckCircle className="h-7 w-7 text-emerald-600" />
-            </div>
-            <div>
-              <p className="font-semibold text-gray-900">Transfer Berhasil!</p>
-              <p className="text-sm text-gray-500 mt-1">
-                {fmt(transferSuccess.jumlah)} telah dikirim ke <span className="font-semibold text-gray-700">{transferSuccess.nama}</span>
-              </p>
-            </div>
-            <div className="rounded-xl border border-gray-100 p-4">
-              <p className="text-xs text-gray-400">Sisa Saldo Sukarela Anda</p>
-              <p className="text-xl font-bold text-gray-900 tabular-nums mt-1">{fmt(transferSuccess.newSaldo)}</p>
-            </div>
-            <button onClick={() => setTransferOpen(false)}
-              className="w-full rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
-              Selesai
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Saldo Info */}
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-emerald-600">Saldo Sukarela</p>
-                <p className="text-lg font-bold text-emerald-800 tabular-nums">{fmt(saldoSukarela)}</p>
-              </div>
-              <Wallet className="h-8 w-8 text-emerald-300" />
-            </div>
-
-            {/* Kode Penerima */}
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Kode Anggota Penerima *</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 uppercase"
-                  placeholder="Contoh: KJM-002"
-                  value={transferKode}
-                  onChange={e => { setTransferKode(e.target.value); setTransferRecipient(null); setTransferConfirm(false) }}
-                  onKeyDown={e => { if (e.key === 'Enter') lookupRecipient(transferKode) }}
-                />
-                <button onClick={() => setQrScannerOpen(true)}
-                  className="shrink-0 rounded-2xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
-                  title="Scan QR"
-                >
-                  <Scan className="h-4 w-4" />
-                </button>
-                <button onClick={() => lookupRecipient(transferKode)} disabled={!transferKode.trim() || transferLookupPending}
-                  className="shrink-0 rounded-2xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50">
-                  {transferLookupPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Penerima terverifikasi */}
-            {transferRecipient && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 font-bold text-sm">
-                  {transferRecipient.nama.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">{transferRecipient.nama}</p>
-                  <p className="text-xs text-emerald-600">{transferKode.trim().toUpperCase()}</p>
-                </div>
-                <CheckCircle className="h-5 w-5 text-emerald-500 ml-auto shrink-0" />
-              </div>
-            )}
-
-            {/* Nominal */}
-            {transferRecipient && (
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">Nominal Transfer (Rp) *</label>
-                <input type="text" inputMode="numeric"
-                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-emerald-500 text-lg font-semibold tabular-nums"
-                  placeholder="100.000"
-                  value={transferNominal ? new Intl.NumberFormat('id-ID').format(Number(transferNominal)) : ''}
-                  onChange={e => { setTransferNominal(e.target.value.replace(/\D/g, '')); setTransferConfirm(false) }} />
-                <p className="text-xs text-gray-400 mt-1">Minimum Rp 1.000</p>
-              </div>
-            )}
-
-            {/* Konfirmasi */}
-            {transferConfirm && transferRecipient && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
-                <p className="text-sm font-semibold text-amber-800">Konfirmasi Transfer</p>
-                <div className="text-sm text-amber-700 space-y-1">
-                  <p>Kepada: <span className="font-semibold">{transferRecipient.nama}</span> ({transferKode.trim().toUpperCase()})</p>
-                  <p>Nominal: <span className="font-bold tabular-nums">{fmt(Number(transferNominal))}</span></p>
-                </div>
-                <p className="text-xs text-amber-600">Tekan tombol di bawah sekali lagi untuk mengeksekusi transfer.</p>
-              </div>
-            )}
-
-            {transferError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {transferError}
-              </div>
-            )}
-
-            <button
-              onClick={submitTransfer}
-              disabled={!transferRecipient || !transferNominal || pending}
-              className={cn(
-                'w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50',
-                transferConfirm
-                  ? 'bg-amber-600 text-white hover:bg-amber-700'
-                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
-              )}
-            >
-              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRightLeft className="h-4 w-4" />}
-              {pending ? 'Memproses...' : transferConfirm ? 'Ya, Transfer Sekarang' : 'Transfer'}
-            </button>
-          </div>
-        )}
-      </Sheet>
-
-      {/* ─── Tarik Saldo Sheet ─── */}
       <Sheet open={tarikSheetOpen} onClose={() => setTarikSheetOpen(false)} title="Tarik Simpanan">
         {tarikSuccess ? (
           <div className="space-y-4 text-center py-4">
@@ -1047,64 +959,134 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
         )}
       </Sheet>
 
-      {/* ─── QR Scanner Sheet ─── */}
-      <Sheet open={qrScannerOpen} onClose={() => setQrScannerOpen(false)} title="Scan QR Code">
-        {qrScannerOpen && (
+      <Sheet open={transferSheetOpen} onClose={() => setTransferSheetOpen(false)} title="Transfer Simpanan">
+        {transferSuccess ? (
+          <div className="space-y-4 text-center py-4">
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
+              <CheckCircle className="h-7 w-7 text-emerald-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">Transfer Berhasil</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {fmt(Number(nominalTransfer))} sudah dikirim ke {transferTarget?.nama} ({transferTarget?.kode_anggota}).
+              </p>
+            </div>
+            <button onClick={() => setTransferSheetOpen(false)}
+              className="w-full rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
+              Tutup
+            </button>
+          </div>
+        ) : (
           <div className="space-y-4">
-            <QRScanner
-              onClose={() => setQrScannerOpen(false)}
-              onScan={(decodedText) => {
-                let code = decodedText
-                try {
-                  const url = new URL(decodedText)
-                  if (url.protocol === 'nizam:' && url.searchParams.has('kode')) {
-                    code = url.searchParams.get('kode')!
-                  }
-                } catch {
-                  // Not a valid URL, treat as raw code
-                }
-                
-                setQrScannerOpen(false)
-                setTransferKode(code)
-                lookupRecipient(code)
-              }}
-            />
+            <div className="flex gap-2 rounded-xl bg-gray-100 p-1">
+              <button type="button" onClick={() => setTransferView('kirim')}
+                className={cn('flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+                  transferView === 'kirim' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+                Kirim
+              </button>
+              <button type="button" onClick={() => setTransferView('terima')}
+                className={cn('flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+                  transferView === 'terima' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+                Terima
+              </button>
+            </div>
+
+            {transferView === 'terima' ? (
+              <div className="space-y-3 text-center py-2">
+                <p className="text-sm text-gray-500">Tunjukkan QR ini ke sesama anggota untuk menerima transfer simpanan sukarela.</p>
+                <div className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-white p-5">
+                  <QRCodeSVG value={buildMemberQrPayload(anggota.org_id, anggota.id)} size={200} />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">{anggota.nama}</p>
+                  <p className="text-xs font-mono text-gray-400">{anggota.kode_anggota}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+                  <p className="text-gray-500">Saldo Simpanan Sukarela</p>
+                  <p className="font-semibold text-gray-900">{fmt(saldoSukarela)}</p>
+                </div>
+
+                {!transferTarget ? (
+                  <button type="button" onClick={() => setScannerOpen(true)}
+                    className="w-full flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/60 py-8 text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer">
+                    <ScanLine className="h-8 w-8" />
+                    <span className="text-sm font-semibold">Scan QR Anggota Tujuan</span>
+                  </button>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                      <div>
+                        <p className="text-xs text-emerald-600">Transfer ke</p>
+                        <p className="text-sm font-semibold text-emerald-900">{transferTarget.nama}</p>
+                        <p className="text-xs font-mono text-emerald-600">{transferTarget.kode_anggota}</p>
+                      </div>
+                      <button type="button" onClick={resetTransferTarget}
+                        className="text-xs font-medium text-emerald-700 hover:text-emerald-900 cursor-pointer">
+                        Ganti
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700">Jumlah Transfer (Rp) *</label>
+                      <input type="text" inputMode="numeric"
+                        className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-emerald-500 text-lg font-semibold tabular-nums"
+                        placeholder="100.000"
+                        value={nominalTransfer ? new Intl.NumberFormat('id-ID').format(Number(nominalTransfer)) : ''}
+                        onChange={e => setNominalTransfer(e.target.value.replace(/\D/g, ''))} />
+                      {nominalTransfer && Number(nominalTransfer) > saldoSukarela && (
+                        <p className="text-xs text-rose-600 mt-1.5">Jumlah melebihi saldo simpanan sukarela Anda.</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700">Catatan (opsional)</label>
+                      <input type="text"
+                        className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
+                        placeholder="Contoh: bayar arisan"
+                        value={catatanTransfer} onChange={e => setCatatanTransfer(e.target.value)} />
+                    </div>
+
+                    <PasswordField label="Konfirmasi Password Anda *" value={passwordTransfer} onChange={setPasswordTransfer}
+                      show={showPasswordTransfer} onToggleShow={() => setShowPasswordTransfer(v => !v)} />
+
+                    {transferError && (
+                      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {transferError}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={submitTransfer}
+                      disabled={!nominalTransfer || !passwordTransfer || Number(nominalTransfer) > saldoSukarela || pending}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 transition-colors cursor-pointer"
+                    >
+                      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      {pending ? 'Memproses...' : 'Kirim Transfer'}
+                    </button>
+                  </>
+                )}
+
+                {!transferTarget && transferError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {transferError}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </Sheet>
 
-      {/* ─── My QR Sheet ─── */}
-      <Sheet open={myQrOpen} onClose={() => setMyQrOpen(false)} title="QR Code Saya">
-        <div className="flex flex-col items-center justify-center py-6 space-y-6">
-          <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
-            <QRCodeSVG
-              value={`nizam:kojasmat:transfer?kode=${anggota.kode_anggota}`}
-              size={240}
-              level="H"
-              includeMargin={false}
-            />
-          </div>
-          
-          <div className="text-center space-y-1">
-            <p className="text-xl font-bold text-gray-900">{anggota.nama}</p>
-            <div className="inline-flex items-center gap-2 bg-gray-50 px-4 py-1.5 rounded-full border border-gray-200">
-              <p className="text-sm font-medium text-gray-600">{anggota.kode_anggota}</p>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(anggota.kode_anggota)
-                }}
-                className="text-emerald-600 hover:text-emerald-700 text-xs font-semibold uppercase tracking-wider cursor-pointer"
-              >
-                Salin
-              </button>
-            </div>
-          </div>
-          
-          <p className="text-sm text-gray-500 text-center px-4">
-            Tunjukkan kode QR ini kepada anggota lain untuk menerima transfer saldo simpanan sukarela.
-          </p>
-        </div>
-      </Sheet>
+      {scannerOpen && (
+        <BarcodeScanner
+          title="Scan QR Anggota"
+          onScan={handleScanTransfer}
+          onClose={() => setScannerOpen(false)}
+        />
+      )}
     </div>
   )
 }

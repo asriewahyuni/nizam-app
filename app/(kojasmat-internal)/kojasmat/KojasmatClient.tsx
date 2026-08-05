@@ -247,6 +247,11 @@ function BukuTabunganPanel({
   const MUTASI_COLOR: Record<string, string> = {
     SETOR: 'text-emerald-600', BAGI_HASIL: 'text-blue-600',
     TARIK: 'text-red-600', KOREKSI: 'text-amber-600',
+    TRANSFER_MASUK: 'text-emerald-600', TRANSFER_KELUAR: 'text-red-600',
+  }
+  const MUTASI_LABEL: Record<string, string> = {
+    SETOR: 'Setor', TARIK: 'Tarik', BAGI_HASIL: 'Bagi Hasil', KOREKSI: 'Koreksi',
+    TRANSFER_MASUK: 'Transfer Masuk', TRANSFER_KELUAR: 'Transfer Keluar',
   }
 
   return (
@@ -338,7 +343,7 @@ function BukuTabunganPanel({
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {mutasiFilt.map(m => {
-                    const isKredit = m.jenis_mutasi === 'SETOR' || m.jenis_mutasi === 'BAGI_HASIL'
+                    const isKredit = m.jenis_mutasi === 'SETOR' || m.jenis_mutasi === 'BAGI_HASIL' || m.jenis_mutasi === 'TRANSFER_MASUK'
                     const jenisLabel = simpanan.find(s => s.id === m.simpanan_id)?.jenis
                     return (
                       <tr key={m.id} className="hover:bg-gray-50/60 transition-colors">
@@ -352,10 +357,7 @@ function BukuTabunganPanel({
                               : <ArrowUpCircle className="h-3.5 w-3.5 text-red-500" />
                             }
                             <span className={cn('text-xs font-medium', MUTASI_COLOR[m.jenis_mutasi])}>
-                              {m.jenis_mutasi === 'BAGI_HASIL' ? 'Bagi Hasil'
-                                : m.jenis_mutasi === 'SETOR' ? 'Setor'
-                                : m.jenis_mutasi === 'TARIK' ? 'Tarik'
-                                : 'Koreksi'}
+                              {MUTASI_LABEL[m.jenis_mutasi] ?? m.jenis_mutasi}
                             </span>
                             {jenisLabel && (
                               <span className="text-xs text-gray-400">({JENIS_LABEL[jenisLabel]})</span>
