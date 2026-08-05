@@ -1332,8 +1332,10 @@ export async function createPembiayaan(payload: {
       throw new Error(`Melebihi saldo simpanan sukarela Anda (Rp ${saldoSukarela.toLocaleString('id-ID')})`)
     }
 
+    // Hanya blokir kalau masih ada pembiayaan AKTIF ke proyek ini — pendanaan yang
+    // sudah dibatalkan (GAGAL) tidak menghalangi investasi ulang (lihat migrasi 1401).
     const { rows: [existing] } = await client.query(
-      `SELECT id FROM kojasmat_pembiayaan WHERE proyek_id=$1 AND pemodal_id=$2`,
+      `SELECT id FROM kojasmat_pembiayaan WHERE proyek_id=$1 AND pemodal_id=$2 AND status='AKTIF'`,
       [payload.proyek_id, payload.pemodal_id]
     )
     if (existing) throw new Error('Anda sudah membiayai proyek ini sebelumnya.')
