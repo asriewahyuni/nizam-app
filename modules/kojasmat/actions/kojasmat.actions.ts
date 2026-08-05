@@ -651,7 +651,7 @@ async function notifikasiSetoranSimpanan(input: {
   if (anggota.phone) {
     await enqueueNotification({
       orgId: input.orgId, userId: anggota.user_id, eventType: 'kojasmat_setoran_simpanan',
-      channel: 'WHATSAPP', recipient: anggota.phone,
+      channel: 'WHATSAPP', providerCode: 'DRIPSENDER', recipient: anggota.phone,
       body, idempotencyKey: `${idempotencyKey}:whatsapp`,
     }).catch(() => null)
   }
