@@ -14,12 +14,35 @@ import { resolveInternalUserId } from '@/lib/auth/internal-auth.shared'
 import { revalidatePath } from 'next/cache'
 import { enqueueNotification } from '@/modules/notifications/outbox.server'
 
-async function getAnggotaBySession(): Promise<{ id: string; org_id: string; nama: string; kode_anggota: string } | { error: string }> {
+async function getAuthorizedPengirim(dariAnggotaId?: string): Promise<{ id: string; org_id: string; nama: string; kode_anggota: string } | { error: string }> {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Sesi login tidak ditemukan.' }
+  const userId = resolveInternalUserId(session)
+
+  if (dariAnggotaId) {
+    const { rows: [anggota] } = await queryPostgres(
+      `SELECT id, org_id, nama, kode_anggota, user_id FROM kojasmat_anggota WHERE id = $1::uuid LIMIT 1`,
+      [dariAnggotaId]
+    )
+    if (!anggota) return { error: 'Data anggota pengirim tidak ditemukan.' }
+    
+    if (anggota.user_id === userId) {
+      return { id: anggota.id, org_id: anggota.org_id, nama: anggota.nama, kode_anggota: anggota.kode_anggota }
+    }
+    
+    const { rows: [orgMember] } = await queryPostgres(
+      `SELECT role FROM org_members WHERE org_id = $1::uuid AND user_id = $2::uuid LIMIT 1`,
+      [anggota.org_id, userId]
+    )
+    if (orgMember && ['owner', 'admin'].includes(orgMember.role)) {
+      return { id: anggota.id, org_id: anggota.org_id, nama: anggota.nama, kode_anggota: anggota.kode_anggota }
+    }
+    return { error: 'Anda tidak memiliki akses untuk mentransfer saldo anggota ini.' }
+  }
+
   const { rows: [anggota] } = await queryPostgres(
     `SELECT id, org_id, nama, kode_anggota FROM kojasmat_anggota WHERE user_id = $1::uuid LIMIT 1`,
-    [resolveInternalUserId(session)]
+    [userId]
   )
   if (!anggota) return { error: 'Akun Anda bukan Anggota Koperasi.' }
   return anggota as { id: string; org_id: string; nama: string; kode_anggota: string }
@@ -32,8 +55,8 @@ export type KojasmatTransferPreview = {
 }
 
 // Dipanggil setelah scan QR — validasi target sebelum menampilkan form nominal.
-export async function getAnggotaTransferPreview(keAnggotaId: string): Promise<{ data: KojasmatTransferPreview } | { error: string }> {
-  const pengirim = await getAnggotaBySession()
+export async function getAnggotaTransferPreview(keAnggotaId: string, dariAnggotaId?: string): Promise<{ data: KojasmatTransferPreview } | { error: string }> {
+  const pengirim = await getAuthorizedPengirim(dariAnggotaId)
   if ('error' in pengirim) return { error: pengirim.error }
 
   const { rows: [tujuan] } = await queryPostgres(
@@ -80,6 +103,7 @@ async function notifikasiTransferSimpanan(input: {
 }
 
 export async function kirimTransferSimpanan(payload: {
+  dari_anggota_id?: string
   ke_anggota_id: string
   jumlah: number
   password: string
@@ -94,11 +118,9 @@ export async function kirimTransferSimpanan(payload: {
   const passwordValid = await verifyPasswordByUserId(internalUserId, payload.password)
   if (!passwordValid) return { error: 'Password tidak sesuai.' }
 
-  const { rows: [pengirim] } = await queryPostgres(
-    `SELECT id, org_id, nama, kode_anggota FROM kojasmat_anggota WHERE user_id = $1::uuid LIMIT 1`,
-    [internalUserId]
-  )
-  if (!pengirim) return { error: 'Data anggota tidak ditemukan.' }
+  const pengirimRes = await getAuthorizedPengirim(payload.dari_anggota_id)
+  if ('error' in pengirimRes) return { error: pengirimRes.error }
+  const pengirim = pengirimRes
 
   const { rows: [tujuan] } = await queryPostgres(
     `SELECT id, org_id, nama, kode_anggota, status FROM kojasmat_anggota WHERE id = $1::uuid LIMIT 1`,
@@ -180,8 +202,8 @@ export async function kirimTransferSimpanan(payload: {
   return { success: true }
 }
 
-export async function getAnggotaTransferPreviewByKode(kodeAnggota: string): Promise<{ data: KojasmatTransferPreview } | { error: string }> {
-  const pengirim = await getAnggotaBySession()
+export async function getAnggotaTransferPreviewByKode(kodeAnggota: string, dariAnggotaId?: string): Promise<{ data: KojasmatTransferPreview } | { error: string }> {
+  const pengirim = await getAuthorizedPengirim(dariAnggotaId)
   if ('error' in pengirim) return { error: pengirim.error }
 
   const { rows: [tujuan] } = await queryPostgres(

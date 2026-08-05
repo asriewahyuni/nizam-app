@@ -485,7 +485,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
     if (!parsed) { setTransferError('QR tidak dikenali. Pastikan Anda memindai QR anggota Kojasmat.'); return }
     setTransferError(null)
     startTransition(async () => {
-      const res = await getAnggotaTransferPreview(parsed.anggotaId)
+      const res = await getAnggotaTransferPreview(parsed.anggotaId, anggota.id)
       if ('error' in res) { setTransferError(res.error); return }
       setTransferTarget(res.data)
     })
@@ -495,7 +495,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
     if (!transferInputKode.trim()) return
     setTransferError(null)
     startTransition(async () => {
-      const res = await getAnggotaTransferPreviewByKode(transferInputKode.trim())
+      const res = await getAnggotaTransferPreviewByKode(transferInputKode.trim(), anggota.id)
       if ('error' in res) { setTransferError(res.error); return }
       setTransferTarget(res.data)
     })
@@ -506,6 +506,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
     setTransferError(null)
     startTransition(async () => {
       const res = await kirimTransferSimpanan({
+        dari_anggota_id: anggota.id,
         ke_anggota_id: transferTarget.id,
         jumlah: Number(nominalTransfer),
         password: passwordTransfer,
