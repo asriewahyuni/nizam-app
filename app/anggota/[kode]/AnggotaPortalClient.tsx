@@ -319,10 +319,15 @@ function TabBeranda({
 
 // ─── TAB: SIMPANAN ────────────────────────────────────────────────────────────
 
-const JENIS_SIMPANAN_INFO = {
+const JENIS_SIMPANAN_INFO: Record<string, { label: string; desc: string; color: string; bg: string }> = {
   POKOK:    { label: 'Simpanan Pokok',    desc: 'Dibayarkan sekali saat bergabung', color: 'from-blue-500 to-blue-600', bg: 'bg-blue-50 border-blue-100' },
   WAJIB:    { label: 'Simpanan Wajib',    desc: 'Rutin setiap bulan', color: 'from-emerald-500 to-emerald-600', bg: 'bg-emerald-50 border-emerald-100' },
   SUKARELA: { label: 'Simpanan Sukarela', desc: 'Tabungan bebas', color: 'from-purple-500 to-purple-600', bg: 'bg-purple-50 border-purple-100' },
+  PROYEK:   { label: 'Simpanan Proyek',   desc: 'Tabungan mengikat untuk proyek', color: 'from-amber-500 to-amber-600', bg: 'bg-amber-50 border-amber-100' },
+  HIBAH_NAMETAG: { label: 'Hibah Name Tag', desc: 'Administrasi Name Tag', color: 'from-indigo-500 to-indigo-600', bg: 'bg-indigo-50 border-indigo-100' },
+  HIBAH_MEMBERCARD: { label: 'Hibah Member Card', desc: 'Administrasi Member Card', color: 'from-indigo-500 to-indigo-600', bg: 'bg-indigo-50 border-indigo-100' },
+  HIBAH_KAJIAN: { label: 'Hibah Kajian', desc: 'Administrasi Kajian', color: 'from-indigo-500 to-indigo-600', bg: 'bg-indigo-50 border-indigo-100' },
+  HIBAH_BOP: { label: 'Hibah BOP', desc: 'Administrasi BOP', color: 'from-indigo-500 to-indigo-600', bg: 'bg-indigo-50 border-indigo-100' },
 }
 
 const SETORAN_STATUS_BADGE: Record<string, { label: string; cls: string }> = {
@@ -355,7 +360,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
   const total = simpanan.reduce((s, x) => s + Number(x.saldo), 0)
 
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [jenisSetor, setJenisSetor] = useState<'POKOK' | 'WAJIB' | 'SUKARELA'>('SUKARELA')
+  const [jenisSetor, setJenisSetor] = useState<'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP'>('SUKARELA')
   const [nominal, setNominal] = useState('')
   const [keterangan, setKeterangan] = useState('')
   const [infoBayar, setInfoBayar] = useState<{
@@ -2184,6 +2189,24 @@ export default function AnggotaPortalClient(props: Props) {
   const { anggota, simpanan, setoran, proyekDiajukan, pembiayaan, penawaran, laporan, proyekTersedia, orgNama } = props
   const [activeTab, setActiveTab] = useState<ActiveTab>('beranda')
 
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.replace('#', '') as ActiveTab
+      const validTabs = ['beranda', 'simpanan', 'proyek', 'investasi', 'penawaran', 'laporan']
+      if (validTabs.includes(hash)) {
+        setActiveTab(hash)
+      }
+    }
+    handleHash()
+    window.addEventListener('hashchange', handleHash)
+    return () => window.removeEventListener('hashchange', handleHash)
+  }, [])
+
+  const handleTabClick = (key: ActiveTab) => {
+    setActiveTab(key)
+    window.history.replaceState(null, '', `#${key}`)
+  }
+
   const proyekBerjalan = proyekDiajukan.filter(p => p.status === 'BERJALAN')
   const penawaranBaru = penawaran.filter(p => p.status === 'TERKIRIM').length
 
@@ -2224,7 +2247,7 @@ export default function AnggotaPortalClient(props: Props) {
 
       {/* Content */}
       <div className="mx-auto max-w-lg px-4 py-5 pb-28">
-        {activeTab === 'beranda'   && <TabBeranda {...props} onLihatSemuaProyek={() => setActiveTab('investasi')} />}
+        {activeTab === 'beranda'   && <TabBeranda {...props} onLihatSemuaProyek={() => handleTabClick('investasi')} />}
         {activeTab === 'simpanan'  && <TabSimpanan anggota={anggota} simpanan={simpanan} setoran={setoran} />}
         {activeTab === 'proyek'    && <TabProyek anggota={anggota} proyekDiajukan={proyekDiajukan} />}
         {activeTab === 'investasi' && <TabInvestasi anggota={anggota} simpanan={simpanan} proyekTersedia={proyekTersedia} pembiayaan={pembiayaan} />}
@@ -2234,24 +2257,28 @@ export default function AnggotaPortalClient(props: Props) {
 
       {/* Bottom Nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-sm border-t border-amber-200/60 safe-area-pb">
-        <div className="mx-auto flex max-w-lg px-2">
-          {tabs.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={cn('relative flex flex-1 flex-col items-center gap-1 py-3 transition-colors cursor-pointer',
-                activeTab === t.key ? 'text-emerald-700' : 'text-gray-400 hover:text-gray-600')}>
-              <div className={cn('relative p-1.5 rounded-xl transition-colors', activeTab === t.key && 'bg-emerald-50')}>
-                <t.icon className="h-5 w-5" />
-                {t.badge !== undefined && t.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
-                    {t.badge}
-                  </span>
-                )}
-              </div>
-              <span className={cn('text-[10px] font-medium', activeTab === t.key ? 'text-emerald-700' : 'text-gray-400')}>
-                {t.label}
-              </span>
-            </button>
-          ))}
+        <div className="relative mx-auto max-w-lg">
+          <div className="flex overflow-x-auto snap-x snap-mandatory px-2 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {tabs.map(t => (
+              <button key={t.key} onClick={() => handleTabClick(t.key)}
+                className={cn('relative flex flex-1 min-w-[76px] flex-col items-center gap-1 py-3 transition-colors cursor-pointer snap-start',
+                  activeTab === t.key ? 'text-emerald-700' : 'text-gray-400 hover:text-gray-600')}>
+                <div className={cn('relative p-1.5 rounded-xl transition-colors', activeTab === t.key && 'bg-emerald-50')}>
+                  <t.icon className="h-5 w-5" />
+                  {t.badge !== undefined && t.badge > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+                      {t.badge}
+                    </span>
+                  )}
+                </div>
+                <span className={cn('text-[10px] font-medium', activeTab === t.key ? 'text-emerald-700' : 'text-gray-400')}>
+                  {t.label}
+                </span>
+              </button>
+            ))}
+          </div>
+          {/* Scroll Fade Indicator */}
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/90 to-transparent pointer-events-none" />
         </div>
       </nav>
     </div>
