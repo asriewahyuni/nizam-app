@@ -531,10 +531,11 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Jumlah Setoran (Rp) *</label>
-              <input type="number"
-                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 text-lg font-semibold"
-                placeholder="100000"
-                value={nominal} onChange={e => setNominal(e.target.value)} />
+              <input type="text" inputMode="numeric"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-emerald-500 text-lg font-semibold tabular-nums"
+                placeholder="100.000"
+                value={nominal ? new Intl.NumberFormat('id-ID').format(Number(nominal)) : ''}
+                onChange={e => setNominal(e.target.value.replace(/\D/g, ''))} />
             </div>
 
             <div>
@@ -1067,9 +1068,10 @@ function ProyekKeuanganPengelolaPanel({ proyekId, orgId, status }: {
               {kategoriOptions.map(k => <option key={k} value={k}>{k}</option>)}
             </select>
           </div>
-          <input type="number" placeholder="Jumlah (Rp)" value={form.jumlah}
-            onChange={e => setForm(f => ({ ...f, jumlah: e.target.value }))}
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-emerald-500 bg-white" />
+          <input type="text" inputMode="numeric" placeholder="Jumlah (Rp)"
+            value={form.jumlah ? new Intl.NumberFormat('id-ID').format(Number(form.jumlah)) : ''}
+            onChange={e => setForm(f => ({ ...f, jumlah: e.target.value.replace(/\D/g, '') }))}
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-emerald-500 bg-white tabular-nums" />
           <input type="text" placeholder="Keterangan (opsional)" value={form.keterangan}
             onChange={e => setForm(f => ({ ...f, keterangan: e.target.value }))}
             className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-emerald-500 bg-white" />
@@ -1294,9 +1296,10 @@ function TabProyek({ anggota, proyekDiajukan }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Modal (Rp) *</label>
-              <input type="number" className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
-                placeholder="5000000"
-                value={form.kebutuhan_modal} onChange={e => setForm(f => ({ ...f, kebutuhan_modal: e.target.value }))} />
+              <input type="text" inputMode="numeric" className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 tabular-nums"
+                placeholder="5.000.000"
+                value={form.kebutuhan_modal ? new Intl.NumberFormat('id-ID').format(Number(form.kebutuhan_modal)) : ''}
+                onChange={e => setForm(f => ({ ...f, kebutuhan_modal: e.target.value.replace(/\D/g, '') }))} />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Durasi (bulan)</label>
@@ -1309,11 +1312,11 @@ function TabProyek({ anggota, proyekDiajukan }: {
               Min. Investasi per Pemodal (Rp)
               <span className="ml-1 font-normal text-gray-400 text-xs">— kosongkan jika tidak ada batas</span>
             </label>
-            <input type="number" min="0" step="50000"
-              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
-              placeholder="Contoh: 500000"
-              value={(form as { min_investasi?: string }).min_investasi ?? ''}
-              onChange={e => setForm(f => ({ ...f, min_investasi: e.target.value }))} />
+            <input type="text" inputMode="numeric"
+              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 tabular-nums"
+              placeholder="Contoh: 500.000"
+              value={(form as { min_investasi?: string }).min_investasi ? new Intl.NumberFormat('id-ID').format(Number((form as { min_investasi?: string }).min_investasi)) : ''}
+              onChange={e => setForm(f => ({ ...f, min_investasi: e.target.value.replace(/\D/g, '') }))} />
           </div>
 
           {/* Nisbah Syirkah */}
@@ -1532,11 +1535,11 @@ function TabPenawaran({ anggota, penawaran, simpanan }: {
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Jumlah Pembiayaan (Rp) *</label>
-              <input type="number"
-                max={saldoSukarela}
-                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 text-lg font-semibold"
-                placeholder="1000000"
-                value={jumlah} onChange={e => setJumlah(e.target.value)} />
+              <input type="text" inputMode="numeric"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-emerald-500 text-lg font-semibold tabular-nums"
+                placeholder="1.000.000"
+                value={jumlah ? new Intl.NumberFormat('id-ID').format(Number(jumlah)) : ''}
+                onChange={e => setJumlah(e.target.value.replace(/\D/g, ''))} />
               <p className="mt-1.5 text-xs text-gray-400">
                 Maks. {fmt(saldoSukarela)} (saldo simpanan sukarela Anda)
               </p>
@@ -1731,9 +1734,10 @@ function TabLaporan({ anggota, proyekDiajukan, laporan }: {
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">Omzet Minggu Ini (Rp) *</label>
-            <input type="number" className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 text-lg font-semibold"
+            <input type="text" inputMode="numeric" className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-emerald-500 text-lg font-semibold tabular-nums"
               placeholder="0"
-              value={form.omzet_periode} onChange={e => setForm(f => ({ ...f, omzet_periode: e.target.value }))} />
+              value={form.omzet_periode ? new Intl.NumberFormat('id-ID').format(Number(form.omzet_periode)) : ''}
+              onChange={e => setForm(f => ({ ...f, omzet_periode: e.target.value.replace(/\D/g, '') }))} />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">Ringkasan Kegiatan *</label>
@@ -2094,11 +2098,11 @@ function TabInvestasi({
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Jumlah Pembiayaan (Rp) *</label>
-              <input type="number"
-                max={saldoSukarela}
-                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 text-lg font-semibold"
-                placeholder="1000000"
-                value={jumlah} onChange={e => setJumlah(e.target.value)} />
+              <input type="text" inputMode="numeric"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-emerald-500 text-lg font-semibold tabular-nums"
+                placeholder="1.000.000"
+                value={jumlah ? new Intl.NumberFormat('id-ID').format(Number(jumlah)) : ''}
+                onChange={e => setJumlah(e.target.value.replace(/\D/g, ''))} />
               <p className="mt-1.5 text-xs text-gray-400">
                 Maks. {fmt(saldoSukarela)} (saldo simpanan sukarela Anda)
               </p>
