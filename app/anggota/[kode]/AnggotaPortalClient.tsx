@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import {
   Wallet, Briefcase, Bell, LogOut, TrendingUp,
-  CheckCircle, ArrowUpCircle, ArrowDownCircle,
+  CheckCircle, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, Search,
   Star, GraduationCap, FileText, Send, Upload, XCircle,
   ChevronDown, ChevronUp, ChevronRight, AlertCircle, Home,
   Heart, Coins, Clock, Users, BadgeCheck, Scale, Banknote, TrendingDown,
@@ -13,6 +13,7 @@ import {
 import {
   createProyek, updateStatusPenawaran, createPembiayaan, toggleMinatProyek, batalkanPembiayaan,
   getProyekDiskusi, kirimPesanDiskusi, ajukanSetoranSimpanan, getAkadByProyek,
+  transferSaldoSukarela, getAnggotaNameByKode,
   type KojasmatAnggota, type KojasmatProyek, type KojasmatSimpanan,
   type KojasmatPenawaran, type KojasmatPembiayaan, type KojasmatPelatihanTerjadwal, type KojasmatProyekDiskusi,
   type KojasmatSimpananMutasi, type KojasmatAkad,
@@ -388,6 +389,60 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
   const [setoranList, setSetoranList] = useState(setoran)
   const [detailSetoran, setDetailSetoran] = useState<KojasmatSimpananMutasi | null>(null)
 
+  // ─── Transfer Saldo State ───
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [transferKode, setTransferKode] = useState('')
+  const [transferNominal, setTransferNominal] = useState('')
+  const [transferError, setTransferError] = useState<string | null>(null)
+  const [transferSuccess, setTransferSuccess] = useState<{ nama: string; jumlah: number; newSaldo: number } | null>(null)
+  const [transferRecipient, setTransferRecipient] = useState<{ nama: string; id: string } | null>(null)
+  const [transferLookupPending, setTransferLookupPending] = useState(false)
+  const [transferConfirm, setTransferConfirm] = useState(false)
+
+  const saldoSukarela = Number(simpanan.find(s => s.jenis === 'SUKARELA')?.saldo ?? 0)
+
+  function openTransfer() {
+    setTransferOpen(true)
+    setTransferKode('')
+    setTransferNominal('')
+    setTransferError(null)
+    setTransferSuccess(null)
+    setTransferRecipient(null)
+    setTransferConfirm(false)
+  }
+
+  function lookupRecipient() {
+    if (!transferKode.trim()) return
+    setTransferError(null)
+    setTransferLookupPending(true)
+    startTransition(async () => {
+      const result = await getAnggotaNameByKode(anggota.org_id, transferKode.trim().toUpperCase())
+      setTransferLookupPending(false)
+      if (!result) { setTransferError(`Anggota dengan kode "${transferKode}" tidak ditemukan atau tidak aktif`); return }
+      setTransferRecipient(result)
+    })
+  }
+
+  function submitTransfer() {
+    if (!transferRecipient || !transferNominal) return
+    const jumlah = Number(transferNominal)
+    if (jumlah < 1000) { setTransferError('Nominal transfer minimum Rp 1.000'); return }
+    if (jumlah > saldoSukarela) { setTransferError('Saldo simpanan sukarela tidak mencukupi'); return }
+
+    if (!transferConfirm) { setTransferConfirm(true); return }
+
+    setTransferError(null)
+    startTransition(async () => {
+      const res = await transferSaldoSukarela({
+        sender_anggota_id: anggota.id,
+        recipient_kode: transferKode.trim().toUpperCase(),
+        jumlah,
+      })
+      if (res.error) { setTransferError(res.error); setTransferConfirm(false); return }
+      setTransferSuccess({ nama: transferRecipient.nama, jumlah, newSaldo: res.data!.newSaldo })
+    })
+  }
+
   function openSetor() {
     setSheetOpen(true)
     setSetorError(null)
@@ -457,12 +512,20 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
         <p className="text-3xl font-bold text-amber-300">{fmt(total)}</p>
       </div>
 
-      <button
-        onClick={openSetor}
-        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer"
-      >
-        <ArrowUpCircle className="h-4 w-4" /> Setor Simpanan
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={openSetor}
+          className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer"
+        >
+          <ArrowUpCircle className="h-4 w-4" /> Setor
+        </button>
+        <button
+          onClick={openTransfer}
+          className="flex-1 flex items-center justify-center gap-2 rounded-2xl border-2 border-emerald-700 py-3.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+        >
+          <ArrowRightLeft className="h-4 w-4" /> Transfer
+        </button>
+      </div>
 
       <div className="space-y-3">
         {(['POKOK', 'WAJIB', 'SUKARELA'] as const).map(jenis => {
@@ -728,6 +791,120 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
                 </button>
               </>
             )}
+          </div>
+        )}
+      </Sheet>
+
+      {/* ─── Transfer Sheet ─── */}
+      <Sheet open={transferOpen} onClose={() => setTransferOpen(false)} title="Transfer Saldo Sukarela">
+        {transferSuccess ? (
+          <div className="space-y-4 text-center py-4">
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
+              <CheckCircle className="h-7 w-7 text-emerald-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">Transfer Berhasil!</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {fmt(transferSuccess.jumlah)} telah dikirim ke <span className="font-semibold text-gray-700">{transferSuccess.nama}</span>
+              </p>
+            </div>
+            <div className="rounded-xl border border-gray-100 p-4">
+              <p className="text-xs text-gray-400">Sisa Saldo Sukarela Anda</p>
+              <p className="text-xl font-bold text-gray-900 tabular-nums mt-1">{fmt(transferSuccess.newSaldo)}</p>
+            </div>
+            <button onClick={() => setTransferOpen(false)}
+              className="w-full rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
+              Selesai
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Saldo Info */}
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-emerald-600">Saldo Sukarela</p>
+                <p className="text-lg font-bold text-emerald-800 tabular-nums">{fmt(saldoSukarela)}</p>
+              </div>
+              <Wallet className="h-8 w-8 text-emerald-300" />
+            </div>
+
+            {/* Kode Penerima */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Kode Anggota Penerima *</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 uppercase"
+                  placeholder="Contoh: KJM-002"
+                  value={transferKode}
+                  onChange={e => { setTransferKode(e.target.value); setTransferRecipient(null); setTransferConfirm(false) }}
+                  onKeyDown={e => { if (e.key === 'Enter') lookupRecipient() }}
+                />
+                <button onClick={lookupRecipient} disabled={!transferKode.trim() || transferLookupPending}
+                  className="shrink-0 rounded-2xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50">
+                  {transferLookupPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Penerima terverifikasi */}
+            {transferRecipient && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 font-bold text-sm">
+                  {transferRecipient.nama.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900 text-sm">{transferRecipient.nama}</p>
+                  <p className="text-xs text-emerald-600">{transferKode.trim().toUpperCase()}</p>
+                </div>
+                <CheckCircle className="h-5 w-5 text-emerald-500 ml-auto shrink-0" />
+              </div>
+            )}
+
+            {/* Nominal */}
+            {transferRecipient && (
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Nominal Transfer (Rp) *</label>
+                <input type="text" inputMode="numeric"
+                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-emerald-500 text-lg font-semibold tabular-nums"
+                  placeholder="100.000"
+                  value={transferNominal ? new Intl.NumberFormat('id-ID').format(Number(transferNominal)) : ''}
+                  onChange={e => { setTransferNominal(e.target.value.replace(/\D/g, '')); setTransferConfirm(false) }} />
+                <p className="text-xs text-gray-400 mt-1">Minimum Rp 1.000</p>
+              </div>
+            )}
+
+            {/* Konfirmasi */}
+            {transferConfirm && transferRecipient && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+                <p className="text-sm font-semibold text-amber-800">Konfirmasi Transfer</p>
+                <div className="text-sm text-amber-700 space-y-1">
+                  <p>Kepada: <span className="font-semibold">{transferRecipient.nama}</span> ({transferKode.trim().toUpperCase()})</p>
+                  <p>Nominal: <span className="font-bold tabular-nums">{fmt(Number(transferNominal))}</span></p>
+                </div>
+                <p className="text-xs text-amber-600">Tekan tombol di bawah sekali lagi untuk mengeksekusi transfer.</p>
+              </div>
+            )}
+
+            {transferError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {transferError}
+              </div>
+            )}
+
+            <button
+              onClick={submitTransfer}
+              disabled={!transferRecipient || !transferNominal || pending}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50',
+                transferConfirm
+                  ? 'bg-amber-600 text-white hover:bg-amber-700'
+                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
+              )}
+            >
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRightLeft className="h-4 w-4" />}
+              {pending ? 'Memproses...' : transferConfirm ? 'Ya, Transfer Sekarang' : 'Transfer'}
+            </button>
           </div>
         )}
       </Sheet>

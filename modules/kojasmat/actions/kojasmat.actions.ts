@@ -2002,3 +2002,97 @@ export async function kirimPesanDiskusi(payload: { org_id: string; proyek_id: st
   return { data: rows[0] as KojasmatProyekDiskusi }
 }
 // [DUMMY IMPORT FIX UP] 
+
+// ─── TRANSFER SALDO ─────────────────────────────────────────────────────────
+
+export async function getAnggotaNameByKode(orgId: string, kode: string): Promise<{ nama: string, id: string } | null> {
+  const { rows } = await queryPostgres(
+    `SELECT id, nama FROM kojasmat_anggota WHERE org_id=$1 AND kode_anggota=$2 AND status='AKTIF'`,
+    [orgId, kode]
+  )
+  if (rows[0]) return { nama: rows[0].nama as string, id: rows[0].id as string }
+  return null
+}
+
+export async function transferSaldoSukarela(payload: { sender_anggota_id: string, recipient_kode: string, jumlah: number }) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  if (payload.jumlah < 1000) return { error: 'Nominal transfer minimum Rp 1.000' }
+
+  const client = await connectPostgresClient()
+  try {
+    await client.query('BEGIN')
+
+    const { rows: [sender] } = await client.query(
+      `SELECT id, org_id, nama, kode_anggota, status FROM kojasmat_anggota WHERE id=$1`,
+      [payload.sender_anggota_id]
+    )
+    if (!sender) throw new Error('Anggota pengirim tidak ditemukan')
+    if (sender.status !== 'AKTIF') throw new Error('Status pengirim tidak aktif')
+
+    const { rows: [recipient] } = await client.query(
+      `SELECT id, nama, kode_anggota, status FROM kojasmat_anggota WHERE org_id=$1 AND kode_anggota=$2`,
+      [sender.org_id, payload.recipient_kode]
+    )
+    if (!recipient) throw new Error(`Penerima dengan kode ${payload.recipient_kode} tidak ditemukan`)
+    if (recipient.status !== 'AKTIF') throw new Error('Status penerima tidak aktif')
+    if (sender.id === recipient.id) throw new Error('Tidak bisa transfer ke diri sendiri')
+
+    // Lock in consistent order to prevent deadlock
+    const lockFirst = sender.id < recipient.id ? sender.id : recipient.id
+    const lockSecond = sender.id < recipient.id ? recipient.id : sender.id
+    
+    await client.query(`SELECT id FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='SUKARELA' FOR UPDATE`, [lockFirst])
+    await client.query(`SELECT id FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='SUKARELA' FOR UPDATE`, [lockSecond])
+
+    const { rows: [senderSimpanan] } = await client.query(
+      `SELECT id, saldo FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='SUKARELA'`,
+      [sender.id]
+    )
+    if (!senderSimpanan) throw new Error('Rekening simpanan sukarela Anda tidak ditemukan')
+    
+    const senderSaldo = Number(senderSimpanan.saldo)
+    if (payload.jumlah > senderSaldo) throw new Error('Saldo simpanan sukarela Anda tidak mencukupi')
+
+    let { rows: [recipientSimpanan] } = await client.query(
+      `SELECT id, saldo FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='SUKARELA'`,
+      [recipient.id]
+    )
+    if (!recipientSimpanan) {
+      const { rows: [newSimpanan] } = await client.query(
+        `INSERT INTO kojasmat_simpanan (org_id, anggota_id, jenis, saldo) VALUES ($1, $2, 'SUKARELA', 0) RETURNING id, saldo`,
+        [sender.org_id, recipient.id]
+      )
+      recipientSimpanan = newSimpanan
+    }
+
+    const recipientSaldo = Number(recipientSimpanan.saldo)
+
+    const newSenderSaldo = senderSaldo - payload.jumlah
+    await client.query(`UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`, [senderSimpanan.id, newSenderSaldo])
+    await client.query(
+      `INSERT INTO kojasmat_simpanan_mutasi (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, status)
+       VALUES ($1, $2, $3, 'TARIK', $4, $5, $6, $7, 'DISETUJUI')`,
+      [sender.org_id, senderSimpanan.id, sender.id, payload.jumlah, senderSaldo, newSenderSaldo, `Transfer Saldo ke ${recipient.nama} (${recipient.kode_anggota})`]
+    )
+
+    const newRecipientSaldo = recipientSaldo + payload.jumlah
+    await client.query(`UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`, [recipientSimpanan.id, newRecipientSaldo])
+    await client.query(
+      `INSERT INTO kojasmat_simpanan_mutasi (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, status)
+       VALUES ($1, $2, $3, 'SETOR', $4, $5, $6, $7, 'DISETUJUI')`,
+      [sender.org_id, recipientSimpanan.id, recipient.id, payload.jumlah, recipientSaldo, newRecipientSaldo, `Terima Transfer dari ${sender.nama} (${sender.kode_anggota})`]
+    )
+
+    await client.query('COMMIT')
+    client.release()
+
+    revalidatePath('/kojasmat')
+    return { data: { success: true, newSaldo: newSenderSaldo } }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    client.release()
+    return { error: error instanceof Error ? error.message : 'Terjadi kesalahan sistem saat transfer' }
+  }
+}
