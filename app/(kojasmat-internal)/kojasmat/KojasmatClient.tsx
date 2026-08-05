@@ -1730,9 +1730,6 @@ function DetailProyekPanel({ proyek }: { proyek: KojasmatProyek }) {
 
       <DaftarPemodalPanel proyekId={proyek.id} />
       <RiwayatProyekPanel proyekId={proyek.id} />
-      {proyek.status !== 'DRAFT' && proyek.status !== 'DISETUJUI' && (
-        <DiskusiPanel orgId={proyek.org_id} proyekId={proyek.id} />
-      )}
     </div>
   )
 }
@@ -1767,51 +1764,6 @@ function DiskusiPanel({ orgId, proyekId }: { orgId: string; proyekId: string }) 
     }
     setSending(false)
   }
-
-  if (loading) return <div className="py-6 text-center text-xs text-gray-400">Memuat diskusi...</div>
-
-  return (
-    <div className="rounded-2xl border border-gray-200 overflow-hidden flex flex-col bg-white">
-      <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
-        <MessageCircle className="h-4 w-4 text-gray-500" />
-        <span className="text-sm font-semibold text-gray-700">Ruang Diskusi (Pemodal & Pengurus)</span>
-      </div>
-      <div className="p-4 bg-white max-h-80 overflow-y-auto space-y-4">
-        {diskusi.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-6">Belum ada diskusi.</p>
-        ) : (
-          diskusi.map(d => (
-            <div key={d.id} className="text-sm">
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="font-semibold text-gray-800 text-sm">{d.actor_name}</span>
-                <span className="text-xs text-gray-400">
-                  {new Date(d.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-              <p className="text-gray-700 bg-gray-50 p-3 rounded-2xl rounded-tl-none inline-block border border-gray-100">{d.pesan}</p>
-            </div>
-          ))
-        )}
-      </div>
-      <div className="p-3 bg-gray-50 border-t border-gray-200 flex gap-2">
-        <input 
-          type="text" 
-          value={pesan} 
-          onChange={e => setPesan(e.target.value)} 
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
-          placeholder="Tulis balasan (sebagai Admin/Pengurus)..." 
-          className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 bg-white"
-        />
-        <button 
-          onClick={handleSend} 
-          disabled={!pesan.trim() || sending}
-          className="rounded-xl bg-sky-600 px-4 py-2 text-white hover:bg-sky-700 disabled:opacity-50 transition-colors"
-        >
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </button>
-      </div>
-    </div>
-  )
 }
 
 function KeuanganProyekPanel({ proyek, orgId }: { proyek: KojasmatProyek; orgId: string }) {
@@ -2013,6 +1965,8 @@ function TabProyek({ orgId, proyek, anggota }: {
   const [form, setForm] = useState<ProyekForm>(emptyProyekForm)
   const [editForm, setEditForm] = useState<ProyekForm>(emptyProyekForm)
   const [penawaranIds, setPenawaranIds] = useState<string[]>([])
+  const [searchAnggotaNew, setSearchAnggotaNew] = useState('')
+  const [showAnggotaDropdown, setShowAnggotaDropdown] = useState(false)
 
   const antrianDmr = proyek.filter(p => p.status === 'MENUNGGU_DMR')
   const antrianDps = proyek.filter(p => p.status === 'MENUNGGU_DPS')
@@ -2514,12 +2468,47 @@ function TabProyek({ orgId, proyek, anggota }: {
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Pengaju Anggota *</label>
-            <select
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              value={form.pengaju_id} onChange={e => setForm(f => ({ ...f, pengaju_id: e.target.value }))}>
-              <option value="">— pilih anggota —</option>
-              {anggota.map(a => <option key={a.id} value={a.id}>{a.kode_anggota} · {a.nama}</option>)}
-            </select>
+            {!form.pengaju_id ? (
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Cari nama atau kode anggota..."
+                  className="w-full rounded-xl border border-gray-200 pl-9 pr-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  value={searchAnggotaNew}
+                  onChange={e => { setSearchAnggotaNew(e.target.value); setShowAnggotaDropdown(true) }}
+                  onFocus={() => setShowAnggotaDropdown(true)}
+                />
+                {showAnggotaDropdown && searchAnggotaNew.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-xl border border-gray-100 bg-white shadow-lg">
+                    {anggota.filter(a => a.nama.toLowerCase().includes(searchAnggotaNew.toLowerCase()) || a.kode_anggota.toLowerCase().includes(searchAnggotaNew.toLowerCase())).slice(0, 10).map(a => (
+                      <div key={a.id} className="cursor-pointer px-4 py-2 hover:bg-emerald-50 transition-colors"
+                        onClick={() => {
+                          setForm(f => ({ ...f, pengaju_id: a.id }));
+                          setSearchAnggotaNew('');
+                          setShowAnggotaDropdown(false);
+                        }}>
+                        <p className="text-sm font-medium text-gray-900">{a.nama}</p>
+                        <p className="text-xs text-gray-500">{a.kode_anggota}</p>
+                      </div>
+                    ))}
+                    {anggota.filter(a => a.nama.toLowerCase().includes(searchAnggotaNew.toLowerCase()) || a.kode_anggota.toLowerCase().includes(searchAnggotaNew.toLowerCase())).length === 0 && (
+                      <div className="px-4 py-3 text-sm text-gray-500 text-center">Anggota tidak ditemukan</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium text-emerald-900">{anggota.find(a => a.id === form.pengaju_id)?.nama}</p>
+                  <p className="text-xs text-emerald-600">{anggota.find(a => a.id === form.pengaju_id)?.kode_anggota}</p>
+                </div>
+                <button onClick={() => setForm(f => ({ ...f, pengaju_id: '' }))} className="text-emerald-600 hover:text-emerald-800 cursor-pointer">
+                  <XCircle className="h-5 w-5" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Nisbah Bagi Hasil */}
@@ -2575,11 +2564,15 @@ function TabProyek({ orgId, proyek, anggota }: {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Kebutuhan Modal (Rp) *</label>
-              <input type="number"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                placeholder="5000000"
-                value={form.kebutuhan_modal} onChange={e => setForm(f => ({ ...f, kebutuhan_modal: e.target.value }))} />
+              <label className="mb-1 block text-sm font-medium text-gray-700">Kebutuhan Modal *</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-gray-500 text-sm font-medium">Rp</span>
+                <input type="text" inputMode="numeric"
+                  className="w-full rounded-xl border border-gray-200 pl-9 pr-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  placeholder="5.000.000"
+                  value={form.kebutuhan_modal ? Number(form.kebutuhan_modal).toLocaleString('id-ID') : ''}
+                  onChange={e => setForm(f => ({ ...f, kebutuhan_modal: e.target.value.replace(/\D/g, '') }))} />
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Durasi (bulan)</label>
@@ -2590,28 +2583,34 @@ function TabProyek({ orgId, proyek, anggota }: {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Ujrah Wakalah (Rp, nominal tetap)
+              Ujrah Wakalah (Nominal Tetap)
               <span className="ml-1 font-normal text-gray-400 text-xs">— fee nominal koperasi untuk pendampingan syirkah, bukan nisbah bagi hasil</span>
             </label>
-            <input type="number" min="0" step="1000"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              placeholder="Contoh: 150000"
-              value={form.ujrah_nominal}
-              onChange={e => setForm(f => ({ ...f, ujrah_nominal: e.target.value }))} />
+            <div className="relative">
+              <span className="absolute left-3 top-2 text-gray-500 text-sm font-medium">Rp</span>
+              <input type="text" inputMode="numeric"
+                className="w-full rounded-xl border border-gray-200 pl-9 pr-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                placeholder="150.000"
+                value={form.ujrah_nominal ? Number(form.ujrah_nominal).toLocaleString('id-ID') : ''}
+                onChange={e => setForm(f => ({ ...f, ujrah_nominal: e.target.value.replace(/\D/g, '') }))} />
+            </div>
             <p className="mt-1 text-xs text-gray-400">
               Seluruh keuntungan proyek menjadi hak pemodal. Koperasi hanya menerima ujrah nominal ini sebagai biaya layanan wakalah.
             </p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Ujrah Diwakilkan Akad (Rp)
+              Ujrah Diwakilkan Akad
               <span className="ml-1 font-normal text-gray-400 text-xs">— jika pemodal pilih diwakilkan koperasi saat akad</span>
             </label>
-            <input type="number" min="0" step="1000"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              placeholder="Contoh: 50000"
-              value={form.ujrah_wakalah_akad}
-              onChange={e => setForm(f => ({ ...f, ujrah_wakalah_akad: e.target.value }))} />
+            <div className="relative">
+              <span className="absolute left-3 top-2 text-gray-500 text-sm font-medium">Rp</span>
+              <input type="text" inputMode="numeric"
+                className="w-full rounded-xl border border-gray-200 pl-9 pr-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                placeholder="50.000"
+                value={form.ujrah_wakalah_akad ? Number(form.ujrah_wakalah_akad).toLocaleString('id-ID') : ''}
+                onChange={e => setForm(f => ({ ...f, ujrah_wakalah_akad: e.target.value.replace(/\D/g, '') }))} />
+            </div>
             <p className="mt-1 text-xs text-gray-400">
               Ditentukan koperasi sebagai biaya jasa menghadiri presentasi & menandatangani akad atas nama pemodal yang memilih diwakilkan.
             </p>
