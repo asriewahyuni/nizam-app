@@ -3,11 +3,18 @@
 // Pencatatan cash flow proyek (pendapatan/beban) + laporan Laba/Rugi, Neraca,
 // dan Cashflow per proyek pembiayaan — termasuk perhitungan potensi bagi hasil.
 
-import { queryPostgres } from '@/lib/db/postgres'
+import { queryPostgres, connectPostgresClient } from '@/lib/db/postgres'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
-import { jurnalPendapatanProyek, jurnalBebanProyek } from '@/lib/erp-bridge/kojasmat-journals'
-import { postSimpananMutasi } from './kojasmat.actions'
+import { jurnalPendapatanProyek, jurnalBebanProyek, jurnalDistribusiBagiHasil } from '@/lib/erp-bridge/kojasmat-journals'
+
+// session.user.id bisa berisi legacy_user_id (Supabase UUID), bukan internal_auth_users.id.
+// Gunakan fungsi ini untuk FK yang merujuk ke internal_auth_users(id) — mis. kolom
+// created_by di kojasmat_simpanan_mutasi (yang lain tidak ada FK, tapi tetap dipakai
+// di sini demi konsistensi data).
+function getInternalUserId(session: { user: { id: string; user_metadata: Record<string, unknown> } }): string {
+  return (session.user.user_metadata['internal_user_id'] as string | null) ?? session.user.id
+}
 
 export type KojasmatPemodalDenganPotensi = {
   id: string
@@ -59,7 +66,7 @@ export async function catatTransaksiProyek(payload: {
     [
       payload.org_id, payload.proyek_id, payload.laporan_id ?? null,
       payload.tanggal, payload.jenis, payload.kategori,
-      payload.keterangan ?? null, payload.jumlah, session.user.id,
+      payload.keterangan ?? null, payload.jumlah, getInternalUserId(session),
     ]
   )
   const trx = rows[0] as KojasmatProyekTransaksi
@@ -247,9 +254,11 @@ export async function getPemodalDenganPotensi(proyekId: string): Promise<Kojasma
 export async function distribusikanBagiHasil(proyekId: string) {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
+  const actorId = getInternalUserId(session)
 
   const { rows: [proyek] } = await queryPostgres(`SELECT * FROM kojasmat_proyek WHERE id=$1`, [proyekId])
   if (!proyek) return { error: 'Proyek tidak ditemukan' }
+  if (proyek.status === 'BAGI_HASIL') return { error: 'Bagi hasil untuk proyek ini sudah pernah diproses.' }
 
   const laporan = await getLaporanKeuanganProyek(proyekId)
   if (!laporan || laporan.labaRugi.labaBersih <= 0) {
@@ -266,46 +275,85 @@ export async function distribusikanBagiHasil(proyekId: string) {
   const totalPemodal = laporan.bagiHasil.potensiBagiHasilPemodal
   const totalDibagikan = totalPemodal + laporan.bagiHasil.potensiBagiHasilPengaju
 
-  for (const pb of pembiayaan) {
-    const hak = totalPemodal * Number(pb.porsi_pct) / 100
-    await queryPostgres(
-      `INSERT INTO kojasmat_bagi_hasil
-         (org_id, proyek_id, pemodal_id, periode, laba_proyek, porsi_pct, hak_pemodal, ujrah_koperasi, status, dibayar_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,0,'DIBAYAR',NOW())`,
-      [proyek.org_id, proyekId, pb.pemodal_id, periode, laporan.labaRugi.labaBersih, pb.porsi_pct, hak]
+  // Seluruh proses dibungkus satu transaksi supaya atomik — kalau satu pemodal
+  // gagal di tengah loop (mis. rekening simpanan tidak ada), TIDAK ada baris
+  // bagi_hasil/kredit saldo yang tersisa setengah jalan seperti yang sempat
+  // terjadi sebelumnya (created_by dulu memakai session.user.id mentah, yang
+  // bukan internal_auth_users.id, sehingga INSERT kojasmat_simpanan_mutasi
+  // gagal FK setelah UPDATE saldo-nya sendiri sudah ter-commit).
+  const client = await connectPostgresClient()
+  let trxId: string | null = null
+  try {
+    await client.query('BEGIN')
+
+    const { rows: [proyekLocked] } = await client.query(
+      `SELECT status FROM kojasmat_proyek WHERE id=$1 FOR UPDATE`, [proyekId]
     )
-
-    // Kredit hak bagi hasil ke simpanan SUKARELA pemodal — tanpa ini status
-    // 'DIBAYAR' di kojasmat_bagi_hasil tercatat tapi saldo anggota tidak pernah bertambah.
-    if (hak > 0) {
-      await postSimpananMutasi({
-        org_id: proyek.org_id,
-        anggota_id: pb.pemodal_id,
-        jenis_simpanan: 'SUKARELA',
-        jenis_mutasi: 'BAGI_HASIL',
-        jumlah: hak,
-        keterangan: `Bagi hasil proyek ${proyek.kode_proyek} periode ${periode}`,
-        created_by: session.user.id,
-      })
+    if (proyekLocked?.status === 'BAGI_HASIL') {
+      throw new Error('Bagi hasil untuk proyek ini sudah pernah diproses.')
     }
-  }
 
-  const { rows: trxRows } = await queryPostgres(
-    `INSERT INTO kojasmat_proyek_transaksi
-       (org_id, proyek_id, tanggal, jenis, kategori, keterangan, jumlah, created_by)
-     VALUES ($1,$2,CURRENT_DATE,'BEBAN','Distribusi Bagi Hasil',$3,$4,$5) RETURNING id`,
-    [
-      proyek.org_id, proyekId,
-      `Distribusi bagi hasil periode ${periode} ke ${pembiayaan.length} pemodal & pengaju`,
-      totalDibagikan, session.user.id,
-    ]
-  )
+    for (const pb of pembiayaan) {
+      const hak = totalPemodal * Number(pb.porsi_pct) / 100
+      await client.query(
+        `INSERT INTO kojasmat_bagi_hasil
+           (org_id, proyek_id, pemodal_id, periode, laba_proyek, porsi_pct, hak_pemodal, ujrah_koperasi, status, dibayar_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,0,'DIBAYAR',NOW())`,
+        [proyek.org_id, proyekId, pb.pemodal_id, periode, laporan.labaRugi.labaBersih, pb.porsi_pct, hak]
+      )
+
+      // Kredit hak bagi hasil ke simpanan SUKARELA pemodal — tanpa ini status
+      // 'DIBAYAR' di kojasmat_bagi_hasil tercatat tapi saldo anggota tidak pernah bertambah.
+      if (hak > 0) {
+        const { rows: [simpanan] } = await client.query(
+          `SELECT id, saldo FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='SUKARELA' FOR UPDATE`,
+          [pb.pemodal_id]
+        )
+        if (!simpanan) throw new Error('Rekening simpanan sukarela salah satu pemodal tidak ditemukan')
+
+        const sebelum = Number(simpanan.saldo)
+        const sesudah = sebelum + hak
+        await client.query(
+          `UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`,
+          [simpanan.id, sesudah]
+        )
+        await client.query(
+          `INSERT INTO kojasmat_simpanan_mutasi
+             (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, tanggal, status, created_by)
+           VALUES ($1,$2,$3,'BAGI_HASIL',$4,$5,$6,$7,CURRENT_DATE,'DISETUJUI',$8)`,
+          [
+            proyek.org_id, simpanan.id, pb.pemodal_id, hak, sebelum, sesudah,
+            `Bagi hasil proyek ${proyek.kode_proyek} periode ${periode}`, actorId,
+          ]
+        )
+      }
+    }
+
+    const trx = await client.query(
+      `INSERT INTO kojasmat_proyek_transaksi
+         (org_id, proyek_id, tanggal, jenis, kategori, keterangan, jumlah, created_by)
+       VALUES ($1,$2,CURRENT_DATE,'BEBAN','Distribusi Bagi Hasil',$3,$4,$5) RETURNING id::text`,
+      [
+        proyek.org_id, proyekId,
+        `Distribusi bagi hasil periode ${periode} ke ${pembiayaan.length} pemodal & pengaju`,
+        totalDibagikan, actorId,
+      ]
+    )
+    trxId = trx.rows[0].id
+
+    await client.query(`UPDATE kojasmat_proyek SET status='BAGI_HASIL', updated_at=NOW() WHERE id=$1`, [proyekId])
+
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    client.release()
+    return { error: error instanceof Error ? error.message : 'Gagal memproses bagi hasil' }
+  }
+  client.release()
 
   try {
-    await jurnalBebanProyek(proyek.org_id, totalDibagikan, String(trxRows[0].id), String(proyek.kode_proyek), 'Distribusi Bagi Hasil')
+    await jurnalDistribusiBagiHasil(proyek.org_id, totalDibagikan, trxId!, String(proyek.kode_proyek))
   } catch (_) { /* jurnal non-fatal */ }
-
-  await queryPostgres(`UPDATE kojasmat_proyek SET status='BAGI_HASIL', updated_at=NOW() WHERE id=$1`, [proyekId])
 
   revalidatePath('/kojasmat')
   return { data: { totalDibagikan, jumlahPemodal: pembiayaan.length } }
