@@ -1542,7 +1542,9 @@ function RiwayatProyekPanel({ proyekId }: { proyekId: string }) {
             <FileSignature className="h-3.5 w-3.5" /> Akad — {akadAktif.status === 'DITANDATANGANI' ? 'Sudah ditandatangani' : 'Menunggu tanda tangan'}
           </p>
           {akadAktif.jadwal_akad && <p className="mt-1">Jadwal: {String(akadAktif.jadwal_akad).split('T')[0]}</p>}
-          {akadAktif.saksi_nama && <p>Saksi: {akadAktif.saksi_nama}</p>}
+          {(akadAktif.saksi_nama || akadAktif.saksi_2_nama) && (
+            <p>Saksi: {[akadAktif.saksi_nama, akadAktif.saksi_2_nama].filter(Boolean).join(', ')}</p>
+          )}
         </div>
       )}
       {history === null ? (
@@ -1915,7 +1917,7 @@ function TabProyek({ orgId, proyek, anggota }: {
   const [fundingForm, setFundingForm] = useState<{ funding_mulai: string; funding_selesai: string; funding_instruksi: string; target_modal_awal: string; published_at: string }>({
     funding_mulai: new Date().toISOString().slice(0, 10), funding_selesai: '', funding_instruksi: '', target_modal_awal: '', published_at: ''
   })
-  const [akadForm, setAkadForm] = useState<{ jadwal_akad: string; saksi_nama: string }>({ jadwal_akad: '', saksi_nama: '' })
+  const [akadForm, setAkadForm] = useState<{ jadwal_akad: string; saksi_nama: string; saksi_2_nama: string }>({ jadwal_akad: '', saksi_nama: '', saksi_2_nama: '' })
   const [form, setForm] = useState<ProyekForm>(emptyProyekForm)
   const [editForm, setEditForm] = useState<ProyekForm>(emptyProyekForm)
   const [penawaranIds, setPenawaranIds] = useState<string[]>([])
@@ -1996,6 +1998,7 @@ function TabProyek({ orgId, proyek, anggota }: {
         proyek_id: modalAkad.id,
         jadwal_akad: akadForm.jadwal_akad,
         saksi_nama: akadForm.saksi_nama || undefined,
+        saksi_2_nama: akadForm.saksi_2_nama || undefined,
       })
       setModalAkad(null)
     })
@@ -2226,7 +2229,7 @@ function TabProyek({ orgId, proyek, anggota }: {
                   </>
                 )}
                 {p.status === 'FUNDING_DITUTUP' && (
-                  <button onClick={() => { setModalAkad(p); setAkadForm({ jadwal_akad: '', saksi_nama: '' }) }}
+                  <button onClick={() => { setModalAkad(p); setAkadForm({ jadwal_akad: '', saksi_nama: '', saksi_2_nama: '' }) }}
                     className="flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors cursor-pointer">
                     <FileSignature className="h-3.5 w-3.5" /> Jadwalkan Akad
                   </button>
@@ -2665,10 +2668,16 @@ function TabProyek({ orgId, proyek, anggota }: {
                 value={akadForm.jadwal_akad} onChange={e => setAkadForm(f => ({ ...f, jadwal_akad: e.target.value }))} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Nama Saksi</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Nama Saksi 1</label>
               <input
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                 value={akadForm.saksi_nama} onChange={e => setAkadForm(f => ({ ...f, saksi_nama: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Nama Saksi 2</label>
+              <input
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={akadForm.saksi_2_nama} onChange={e => setAkadForm(f => ({ ...f, saksi_2_nama: e.target.value }))} />
             </div>
             <div className="flex gap-3 pt-1">
               <button onClick={() => setModalAkad(null)}

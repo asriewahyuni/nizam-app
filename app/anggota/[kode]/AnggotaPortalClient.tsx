@@ -8,14 +8,14 @@ import {
   Star, GraduationCap, FileText, Send, Upload, XCircle,
   ChevronDown, ChevronUp, ChevronRight, AlertCircle, Home,
   Heart, Coins, Clock, Users, BadgeCheck, Scale, Banknote, TrendingDown,
-  Loader2, MessageCircle,
+  Loader2, MessageCircle, FileSignature,
 } from 'lucide-react'
 import {
   createProyek, updateStatusPenawaran, createPembiayaan, toggleMinatProyek, batalkanPembiayaan,
-  getProyekDiskusi, kirimPesanDiskusi, ajukanSetoranSimpanan,
+  getProyekDiskusi, kirimPesanDiskusi, ajukanSetoranSimpanan, getAkadByProyek,
   type KojasmatAnggota, type KojasmatProyek, type KojasmatSimpanan,
   type KojasmatPenawaran, type KojasmatPembiayaan, type KojasmatPelatihanTerjadwal, type KojasmatProyekDiskusi,
-  type KojasmatSimpananMutasi,
+  type KojasmatSimpananMutasi, type KojasmatAkad,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
   kirimLaporanProyek, simpanDokumen, hapusDokumen, getDokumenByRef,
@@ -936,6 +936,52 @@ function LaporanKeuanganCards({ laporan, personalLabel, personalAmount, personal
           </ul>
         </div>
       )}
+    </div>
+  )
+}
+
+const AKAD_STATUS_INFO: Record<string, { label: string; cls: string }> = {
+  MENUNGGU_TTD:    { label: 'Menunggu Tanda Tangan', cls: 'bg-amber-100 text-amber-700' },
+  DITANDATANGANI:  { label: 'Sudah Ditandatangani',  cls: 'bg-emerald-100 text-emerald-700' },
+  BATAL:           { label: 'Dibatalkan',            cls: 'bg-gray-100 text-gray-500' },
+}
+
+function JadwalAkadPanel({ proyekId }: { proyekId: string }) {
+  const [akad, setAkad] = useState<KojasmatAkad | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getAkadByProyek(proyekId).then(list => {
+      if (cancelled) return
+      setAkad(list.find(a => a.status !== 'BATAL') ?? list[0] ?? null)
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [proyekId])
+
+  if (loading || !akad) return null
+
+  const statusInfo = AKAD_STATUS_INFO[akad.status] ?? AKAD_STATUS_INFO.MENUNGGU_TTD
+  const saksiList = [akad.saksi_nama, akad.saksi_2_nama].filter(Boolean)
+
+  return (
+    <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-violet-900 flex items-center gap-1.5">
+          <FileSignature className="h-4 w-4" /> Jadwal Akad
+        </p>
+        <Badge text={statusInfo.label} cls={statusInfo.cls} />
+      </div>
+      <div className="mt-2.5 space-y-1 text-xs text-violet-700">
+        {akad.jadwal_akad && (
+          <p>Tanggal: <strong>{fmtTanggal(akad.jadwal_akad)}</strong></p>
+        )}
+        {saksiList.length > 0 && (
+          <p>Saksi: {saksiList.join(', ')}</p>
+        )}
+      </div>
     </div>
   )
 }
@@ -2035,6 +2081,7 @@ function TabInvestasi({
                         </button>
                       </div>
                     )}
+                    {pembiayaanAktif && <JadwalAkadPanel proyekId={pm.proyek_id} />}
                     <LaporanInvestorPanel proyekId={pm.proyek_id} porsiPct={Number(pm.porsi_pct)} />
                     <DiskusiPanel orgId={anggota.org_id} proyekId={pm.proyek_id} anggotaNama={anggota.nama} />
                   </div>

@@ -152,6 +152,7 @@ export type KojasmatAkad = {
   jadwal_akad?: string
   saksi_koperasi_id?: string
   saksi_nama?: string
+  saksi_2_nama?: string
   pihak_hadir?: unknown
   catatan?: string
   status: 'MENUNGGU_TTD' | 'DITANDATANGANI' | 'BATAL'
@@ -1183,6 +1184,7 @@ export async function jadwalkanAkad(payload: {
   proyek_id: string
   jadwal_akad: string
   saksi_nama?: string
+  saksi_2_nama?: string
 }) {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
@@ -1194,9 +1196,9 @@ export async function jadwalkanAkad(payload: {
   if (proyek.status !== 'FUNDING_DITUTUP') return { error: 'Proyek tidak dalam status Funding Ditutup' }
 
   const { rows } = await queryPostgres(
-    `INSERT INTO kojasmat_akad (org_id, proyek_id, jadwal_akad, saksi_nama, status)
-     VALUES ($1,$2,$3,$4,'MENUNGGU_TTD') RETURNING *`,
-    [payload.org_id, payload.proyek_id, payload.jadwal_akad, payload.saksi_nama ?? null]
+    `INSERT INTO kojasmat_akad (org_id, proyek_id, jadwal_akad, saksi_nama, saksi_2_nama, status)
+     VALUES ($1,$2,$3,$4,$5,'MENUNGGU_TTD') RETURNING *`,
+    [payload.org_id, payload.proyek_id, payload.jadwal_akad, payload.saksi_nama ?? null, payload.saksi_2_nama ?? null]
   )
 
   await queryPostgres(
