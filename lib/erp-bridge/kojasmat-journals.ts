@@ -98,6 +98,23 @@ export async function jurnalPendapatanBiayaAdmin(
 }
 
 /**
+ * Tagihan ijarah platform (berkala, tiap N hari): Dr Simpanan Sukarela → Cr Pendapatan Ijarah.
+ * Dipakai baik untuk siklus pertama (dipotong dari sukarela segera setelah aktivasi)
+ * maupun siklus berkala berikutnya (dipotong oleh cron) — jalur jurnal yang sama.
+ */
+export async function jurnalTagihanIjarah(
+  orgId: string,
+  jumlah: number,
+  akadId: string,
+) {
+  await postJurnal(
+    orgId, 'simpanan_sukarela', 'pendapatan_ijarah', jumlah,
+    'Tagihan ijarah platform',
+    'KOJASMAT_IJARAH_TAGIHAN', akadId,
+  )
+}
+
+/**
  * Penarikan simpanan: Dr Simpanan Anggota → Cr Kas
  */
 export async function jurnalTarikSimpanan(

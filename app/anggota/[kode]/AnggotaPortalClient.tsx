@@ -24,6 +24,7 @@ import {
 import {
   getAnggotaTransferPreview, getAnggotaTransferPreviewByKode, kirimTransferSimpanan, type KojasmatTransferPreview,
 } from '@/modules/kojasmat/actions/kojasmat-transfer.actions'
+import { type KojasmatAkadIjarah } from '@/modules/kojasmat/actions/kojasmat-ijarah.actions'
 import {
   kirimLaporanProyek, simpanDokumen, hapusDokumen, getDokumenByRef,
   type KojasmatLaporanProyek, type KojasmatDokumen,
@@ -65,6 +66,7 @@ type Props = {
   laporan: KojasmatLaporanProyek[]
   proyekTersedia: KojasmatProyek[]
   pelatihan: KojasmatPelatihanTerjadwal[]
+  akadIjarah: KojasmatAkadIjarah | null
   orgNama: string
 }
 
@@ -374,9 +376,10 @@ const SETORAN_STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   DITOLAK:   { label: 'Ditolak',             cls: 'bg-rose-100 text-rose-700' },
 }
 
-const MUTASI_DEBIT_TYPES = new Set(['TARIK', 'TRANSFER_KELUAR'])
+const MUTASI_DEBIT_TYPES = new Set(['TARIK', 'TRANSFER_KELUAR', 'IJARAH'])
 const MUTASI_LABEL: Record<string, string> = {
   SETOR: 'Setor', TARIK: 'Tarik', TRANSFER_KELUAR: 'Transfer Keluar', TRANSFER_MASUK: 'Transfer Masuk',
+  IJARAH: 'Biaya Platform (Ijarah)',
 }
 
 async function uploadBuktiSetoran(
@@ -396,8 +399,8 @@ async function uploadBuktiSetoran(
   }
 }
 
-function TabSimpanan({ anggota, simpanan, setoran }: {
-  anggota: KojasmatAnggota; simpanan: KojasmatSimpanan[]; setoran: KojasmatSimpananMutasi[]
+function TabSimpanan({ anggota, simpanan, setoran, akadIjarah }: {
+  anggota: KojasmatAnggota; simpanan: KojasmatSimpanan[]; setoran: KojasmatSimpananMutasi[]; akadIjarah: KojasmatAkadIjarah | null
 }) {
   const [pending, startTransition] = useTransition()
   const total = simpanan.reduce((s, x) => s + Number(x.saldo), 0)
@@ -623,6 +626,33 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
           <ArrowLeftRight className="h-4 w-4" /> Transfer
         </button>
       </div>
+
+      {akadIjarah && akadIjarah.status !== 'BERHENTI' && (
+        <div className={cn(
+          'rounded-2xl border p-4',
+          akadIjarah.status === 'DIBEKUKAN' ? 'border-rose-200 bg-rose-50' : 'border-purple-200 bg-purple-50/60'
+        )}>
+          <div className="flex items-center justify-between">
+            <p className={cn('text-sm font-semibold', akadIjarah.status === 'DIBEKUKAN' ? 'text-rose-800' : 'text-purple-800')}>
+              Ijarah Platform
+            </p>
+            <Badge
+              text={akadIjarah.status === 'DIBEKUKAN' ? 'Akun Dibekukan' : 'Aktif'}
+              cls={akadIjarah.status === 'DIBEKUKAN' ? 'bg-rose-100 text-rose-700' : 'bg-purple-100 text-purple-700'}
+            />
+          </div>
+          <p className={cn('text-xs mt-1', akadIjarah.status === 'DIBEKUKAN' ? 'text-rose-600' : 'text-purple-600')}>
+            {fmt(akadIjarah.nominal_fee)} setiap {akadIjarah.periode_hari} hari, dipotong otomatis dari Simpanan Sukarela.
+          </p>
+          {akadIjarah.status === 'DIBEKUKAN' ? (
+            <p className="text-xs text-rose-600 mt-1">
+              Saldo sukarela tidak cukup untuk tagihan terakhir. Top-up simpanan sukarela untuk mengaktifkan kembali akun Anda.
+            </p>
+          ) : (
+            <p className="text-xs text-purple-600 mt-1">Tagihan berikutnya: {fmtTanggal(akadIjarah.tagihan_berikutnya)}</p>
+          )}
+        </div>
+      )}
 
       <div className="space-y-3">
         {(['POKOK', 'WAJIB', 'SUKARELA'] as const).map(jenis => {
@@ -2778,7 +2808,7 @@ function GantiPasswordSheet({ open, onClose }: { open: boolean; onClose: () => v
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 
 export default function AnggotaPortalClient(props: Props) {
-  const { anggota, simpanan, setoran, proyekDiajukan, pembiayaan, penawaran, laporan, proyekTersedia, orgNama } = props
+  const { anggota, simpanan, setoran, proyekDiajukan, pembiayaan, penawaran, laporan, proyekTersedia, akadIjarah, orgNama } = props
   const [activeTab, setActiveTab] = useState<ActiveTab>('beranda')
   const [gantiPasswordOpen, setGantiPasswordOpen] = useState(false)
 
@@ -2845,7 +2875,7 @@ export default function AnggotaPortalClient(props: Props) {
       {/* Content */}
       <div className="mx-auto max-w-lg px-4 py-5 pb-28">
         {activeTab === 'beranda'   && <TabBeranda {...props} onLihatSemuaProyek={() => handleTabClick('investasi')} />}
-        {activeTab === 'simpanan'  && <TabSimpanan anggota={anggota} simpanan={simpanan} setoran={setoran} />}
+        {activeTab === 'simpanan'  && <TabSimpanan anggota={anggota} simpanan={simpanan} setoran={setoran} akadIjarah={akadIjarah} />}
         {activeTab === 'proyek'    && <TabProyek anggota={anggota} proyekDiajukan={proyekDiajukan} />}
         {activeTab === 'investasi' && <TabInvestasi anggota={anggota} simpanan={simpanan} proyekTersedia={proyekTersedia} pembiayaan={pembiayaan} />}
         {activeTab === 'penawaran' && <TabPenawaran anggota={anggota} penawaran={penawaran} simpanan={simpanan} />}
