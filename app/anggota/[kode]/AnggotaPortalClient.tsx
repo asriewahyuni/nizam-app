@@ -9,7 +9,7 @@ import {
   ChevronDown, ChevronUp, ChevronRight, AlertCircle, Home,
   Heart, Coins, Clock, Users, BadgeCheck, Scale, Banknote, TrendingDown,
   Loader2, MessageCircle, FileSignature, KeyRound, Eye, EyeOff,
-  QrCode, ScanLine, ArrowLeftRight,
+  QrCode, ScanLine, ArrowLeftRight, Lock,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { BarcodeScanner } from '@/components/shared/BarcodeScanner'
@@ -25,6 +25,9 @@ import {
   getAnggotaTransferPreview, getAnggotaTransferPreviewByKode, kirimTransferSimpanan, type KojasmatTransferPreview,
 } from '@/modules/kojasmat/actions/kojasmat-transfer.actions'
 import { type KojasmatAkadIjarah } from '@/modules/kojasmat/actions/kojasmat-ijarah.actions'
+import {
+  mulaiTestSahabat, submitTestSahabat, type KojasmatTestSahabat,
+} from '@/modules/kojasmat/actions/kojasmat-sahabat.actions'
 import {
   kirimLaporanProyek, simpanDokumen, hapusDokumen, getDokumenByRef,
   type KojasmatLaporanProyek, type KojasmatDokumen,
@@ -67,6 +70,7 @@ type Props = {
   proyekTersedia: KojasmatProyek[]
   pelatihan: KojasmatPelatihanTerjadwal[]
   akadIjarah: KojasmatAkadIjarah | null
+  testSahabat: KojasmatTestSahabat | null
   orgNama: string
 }
 
@@ -399,9 +403,11 @@ async function uploadBuktiSetoran(
   }
 }
 
-function TabSimpanan({ anggota, simpanan, setoran, akadIjarah }: {
+function TabSimpanan({ anggota, simpanan, setoran, akadIjarah, onRequestUpgrade }: {
   anggota: KojasmatAnggota; simpanan: KojasmatSimpanan[]; setoran: KojasmatSimpananMutasi[]; akadIjarah: KojasmatAkadIjarah | null
+  onRequestUpgrade: () => void
 }) {
+  const isSahabat = anggota.tingkat === 'SAHABAT'
   const [pending, startTransition] = useTransition()
   const total = simpanan.reduce((s, x) => s + Number(x.saldo), 0)
 
@@ -620,10 +626,10 @@ function TabSimpanan({ anggota, simpanan, setoran, akadIjarah }: {
           <ArrowDownCircle className="h-4 w-4" /> Tarik
         </button>
         <button
-          onClick={openTransfer}
+          onClick={isSahabat ? openTransfer : onRequestUpgrade}
           className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-amber-500 py-3 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
         >
-          <ArrowLeftRight className="h-4 w-4" /> Transfer
+          {isSahabat ? <ArrowLeftRight className="h-4 w-4" /> : <Lock className="h-4 w-4" />} Transfer
         </button>
       </div>
 
@@ -1648,9 +1654,10 @@ function ProyekKeuanganPengelolaPanel({ proyekId, orgId, status }: {
   )
 }
 
-function TabProyek({ anggota, proyekDiajukan }: {
-  anggota: KojasmatAnggota; proyekDiajukan: KojasmatProyek[]
+function TabProyek({ anggota, proyekDiajukan, onRequestUpgrade }: {
+  anggota: KojasmatAnggota; proyekDiajukan: KojasmatProyek[]; onRequestUpgrade: () => void
 }) {
+  const isSahabat = anggota.tingkat === 'SAHABAT'
   const [pending, startTransition] = useTransition()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [uploadingDok, setUploadingDok] = useState(false)
@@ -1693,8 +1700,8 @@ function TabProyek({ anggota, proyekDiajukan }: {
         nisbah_pengaju: form.nisbah_pengaju,
         nisbah_pemodal: nisbah_pemodal,
       })
-      if (res.data && 'id' in res.data && uploadedDoks.length > 0) {
-        const proyekId = (res.data as { id: string }).id
+      if ((res as any).data && 'id' in (res as any).data && uploadedDoks.length > 0) {
+        const proyekId = ((res as any).data as { id: string }).id
         for (const dok of uploadedDoks) {
           await simpanDokumen({
             org_id: anggota.org_id,
@@ -1715,10 +1722,17 @@ function TabProyek({ anggota, proyekDiajukan }: {
       <div className="flex items-center justify-between">
         <p className="font-semibold text-gray-900">Proyek Saya</p>
         {anggota.is_verified && (
-          <button onClick={() => setSheetOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
-            + Ajukan Proyek
-          </button>
+          isSahabat ? (
+            <button onClick={() => setSheetOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
+              + Ajukan Proyek
+            </button>
+          ) : (
+            <button onClick={onRequestUpgrade}
+              className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer">
+              <Lock className="h-3.5 w-3.5" /> Upgrade untuk Ajukan
+            </button>
+          )
         )}
       </div>
 
@@ -1938,15 +1952,23 @@ function TabProyek({ anggota, proyekDiajukan }: {
 
 // ─── TAB: PENAWARAN ───────────────────────────────────────────────────────────
 
-function TabPenawaran({ anggota, penawaran, simpanan }: {
-  anggota: KojasmatAnggota; penawaran: KojasmatPenawaran[]; simpanan: KojasmatSimpanan[]
+function TabPenawaran({ anggota, penawaran, simpanan, onRequestUpgrade }: {
+  anggota: KojasmatAnggota; penawaran: KojasmatPenawaran[]; simpanan: KojasmatSimpanan[]; onRequestUpgrade: () => void
 }) {
+  const isSahabat = anggota.tingkat === 'SAHABAT'
   const [pending, startTransition] = useTransition()
   const [sheetBiayai, setSheetBiayai] = useState<KojasmatPenawaran | null>(null)
   const [jumlah, setJumlah] = useState('')
   const [kehadiranAkad, setKehadiranAkad] = useState<'SENDIRI' | 'DIWAKILKAN'>('SENDIRI')
   const [biayaiError, setBiayaiError] = useState<string | null>(null)
   const saldoSukarela = Number(simpanan.find(s => s.jenis === 'SUKARELA')?.saldo ?? 0)
+
+  function openBiayai(p: KojasmatPenawaran) {
+    setSheetBiayai(p)
+    setJumlah('')
+    setKehadiranAkad('SENDIRI')
+    setBiayaiError(null)
+  }
 
   function handleTandai(id: string, status: string) {
     startTransition(async () => { await updateStatusPenawaran(id, status) })
@@ -2018,11 +2040,11 @@ function TabPenawaran({ anggota, penawaran, simpanan }: {
 
                 {(p.status === 'TERKIRIM' || p.status === 'DIBACA') && p.proyek_status === 'FUNDING_AKTIF' && (
                   <div className="mt-3 flex gap-2">
-                    <button onClick={() => { setSheetBiayai(p); setJumlah(''); setKehadiranAkad('SENDIRI'); setBiayaiError(null) }}
+                    <button onClick={() => isSahabat ? openBiayai(p) : onRequestUpgrade()}
                       className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2.5 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
-                      <ArrowUpCircle className="h-3.5 w-3.5" /> Biayai
+                      {isSahabat ? <ArrowUpCircle className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />} Biayai
                     </button>
-                    <button onClick={() => handleTandai(p.id, 'DIABAIKAN')} disabled={pending}
+                    <button onClick={() => isSahabat ? handleTandai(p.id, 'DIABAIKAN') : onRequestUpgrade()} disabled={pending}
                       className="flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors cursor-pointer">
                       <ArrowDownCircle className="h-3.5 w-3.5" /> Lewat
                     </button>
@@ -2314,8 +2336,9 @@ const AKAD_LABEL_INV: Record<string, string> = {
 }
 
 function TabInvestasi({
-  anggota, simpanan, proyekTersedia, pembiayaan,
-}: { anggota: KojasmatAnggota; simpanan: KojasmatSimpanan[]; proyekTersedia: KojasmatProyek[]; pembiayaan: KojasmatPembiayaan[] }) {
+  anggota, simpanan, proyekTersedia, pembiayaan, onRequestUpgrade,
+}: { anggota: KojasmatAnggota; simpanan: KojasmatSimpanan[]; proyekTersedia: KojasmatProyek[]; pembiayaan: KojasmatPembiayaan[]; onRequestUpgrade: () => void }) {
+  const isSahabat = anggota.tingkat === 'SAHABAT'
   const [list, setList] = useState(proyekTersedia)
   const [pending, startTransition] = useTransition()
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -2341,6 +2364,13 @@ function TabInvestasi({
       if (res.error) { setBatalkanError({ id: pembiayaanId, message: res.error }); return }
       setPembiayaanList(prev => prev.filter(x => x.id !== pembiayaanId))
     })
+  }
+
+  function openBiayai(p: KojasmatProyek) {
+    setSheetBiayai(p)
+    setJumlah('')
+    setKehadiranAkad('SENDIRI')
+    setBiayaiError(null)
   }
 
   function handleBiayai() {
@@ -2370,9 +2400,9 @@ function TabInvestasi({
           ? { ...x, modal_terkumpul: Number(x.modal_terkumpul) + jumlahNum, sudah_dibiayai: true }
           : x
       ))
-      if (res.data) {
+      if ((res as any).data) {
         setPembiayaanList(prev => [{
-          ...res.data,
+          ...(res as any).data,
           nama_proyek: sheetBiayai.nama_proyek,
           jenis_akad: sheetBiayai.jenis_akad,
           proyek_status: sheetBiayai.status,
@@ -2392,12 +2422,13 @@ function TabInvestasi({
         proyek_id: p.id,
         anggota_id: anggota.id,
       })
+      setTogglingId(null)
+      if ('error' in res) return
       setList(prev => prev.map(x =>
         x.id === p.id
           ? { ...x, is_berminat: res.is_berminat, jumlah_minat: (Number(x.jumlah_minat) || 0) + (res.is_berminat ? 1 : -1) }
           : x
       ).sort((a, b) => Number(b.is_berminat) - Number(a.is_berminat)))
-      setTogglingId(null)
     })
   }
 
@@ -2538,7 +2569,7 @@ function TabInvestasi({
 
                 {/* Tombol minat */}
                 <button
-                  onClick={() => handleMinat(p)}
+                  onClick={() => isSahabat ? handleMinat(p) : onRequestUpgrade()}
                   disabled={!!togglingId || pending}
                   className={cn(
                     'flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer disabled:opacity-60 shrink-0',
@@ -2578,12 +2609,12 @@ function TabInvestasi({
               </div>
 
               <button
-                onClick={() => { setSheetBiayai(p); setJumlah(''); setKehadiranAkad('SENDIRI'); setBiayaiError(null) }}
+                onClick={() => isSahabat ? openBiayai(p) : onRequestUpgrade()}
                 disabled={p.sudah_dibiayai}
                 className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2.5 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <ArrowUpCircle className="h-3.5 w-3.5" />
-                {p.sudah_dibiayai ? 'Sudah Anda Biayai' : 'Biayai Proyek Ini'}
+                {isSahabat ? <ArrowUpCircle className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                {p.sudah_dibiayai ? 'Sudah Anda Biayai' : isSahabat ? 'Biayai Proyek Ini' : 'Upgrade untuk Membiayai'}
               </button>
             </div>
 
@@ -2805,12 +2836,167 @@ function GantiPasswordSheet({ open, onClose }: { open: boolean; onClose: () => v
   )
 }
 
+// Tombol pengganti untuk fitur yang dikunci sampai anggota naik tingkat Sahabat —
+// dipakai menggantikan tombol eksekusi (Ajukan Proyek, Biayai, Transfer, dll)
+// di tab manapun ketika anggota masih TEMAN.
+function UpgradePrompt({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="w-full flex items-center justify-center gap-2 rounded-2xl border border-dashed border-amber-300 bg-amber-50/60 py-3 text-sm font-semibold text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer">
+      <Lock className="h-4 w-4" /> {label}
+    </button>
+  )
+}
+
+function SahabatUpgradeSheet({ open, onClose, testSahabat, onUpdated }: {
+  open: boolean; onClose: () => void; testSahabat: KojasmatTestSahabat | null
+  onUpdated: (t: KojasmatTestSahabat | null) => void
+}) {
+  const [pending, startTransition] = useTransition()
+  const [test, setTest] = useState(testSahabat)
+  const [testId, setTestId] = useState<string | null>(null)
+  const [soal, setSoal] = useState<{ id: string; pertanyaan: string; pilihan_a: string; pilihan_b: string; pilihan_c: string; pilihan_d: string }[]>([])
+  const [jawaban, setJawaban] = useState<Record<string, string>>({})
+  const [qIndex, setQIndex] = useState(0)
+  const [result, setResult] = useState<{ skor: number; jumlah_benar: number; total_soal: number; status: 'LULUS' | 'GAGAL'; passing_threshold: number } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => { if (open) { setTest(testSahabat); setTestId(null); setSoal([]); setResult(null); setError(null) } }, [open, testSahabat])
+
+  function handleMulai() {
+    setError(null)
+    startTransition(async () => {
+      const res = await mulaiTestSahabat()
+      if ('error' in res) { setError(res.error); return }
+      setTestId(res.data.test_id)
+      setSoal(res.data.soal)
+      setJawaban({})
+      setQIndex(0)
+    })
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Upgrade ke Sahabat">
+      <div className="space-y-4">
+        {!soal.length && !result && (
+          <>
+            {test?.status === 'LULUS' && test.status_approval === 'BELUM' ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center">
+                <Clock className="h-6 w-6 text-amber-600 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-amber-800">Menunggu Persetujuan Pengurus</p>
+                <p className="text-xs text-amber-600 mt-1">Anda sudah lulus test kedua (skor {test.skor}%). Status Sahabat akan aktif setelah disetujui pengurus.</p>
+              </div>
+            ) : test?.status_approval === 'DITOLAK' ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                <p className="text-sm font-semibold text-rose-800">Pengajuan Sebelumnya Ditolak</p>
+                {test.catatan_admin && <p className="text-xs text-rose-600 mt-1">{test.catatan_admin}</p>}
+                <p className="text-xs text-rose-600 mt-1">Anda bisa mencoba lagi.</p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">
+                Sebagai Teman, Anda hanya bisa menabung dan tarik simpanan. Untuk mengajukan/membiayai proyek, transfer antar anggota, dan fitur lainnya, ikuti test kedua untuk naik ke tingkat Sahabat.
+              </p>
+            )}
+            {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+            {!(test?.status === 'LULUS' && test.status_approval === 'BELUM') && (
+              <button onClick={handleMulai} disabled={pending}
+                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-amber-600 py-3 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50 transition-colors cursor-pointer">
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <GraduationCap className="h-4 w-4" />}
+                {pending ? 'Memuat...' : 'Mulai Test Kedua'}
+              </button>
+            )}
+          </>
+        )}
+
+        {soal.length > 0 && !result && (() => {
+          const s = soal[qIndex]
+          const answered = !!jawaban[s.id]
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs text-gray-400">
+                <span>Soal {qIndex + 1} dari {soal.length}</span>
+                <span>{Object.keys(jawaban).length}/{soal.length} terjawab</span>
+              </div>
+              <p className="font-medium text-gray-900">{s.pertanyaan}</p>
+              <div className="space-y-2">
+                {(['a', 'b', 'c', 'd'] as const).map(opt => (
+                  <label key={opt} className={cn(
+                    'flex items-center gap-2 rounded-xl border p-3 text-sm cursor-pointer transition-colors',
+                    jawaban[s.id] === opt.toUpperCase() ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'
+                  )}>
+                    <input type="radio" name={`soal-${s.id}`} className="accent-amber-600"
+                      checked={jawaban[s.id] === opt.toUpperCase()}
+                      onChange={() => setJawaban(j => ({ ...j, [s.id]: opt.toUpperCase() }))} />
+                    <span className="text-gray-700">{(s as any)[`pilihan_${opt}`]}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setQIndex(i => Math.max(0, i - 1))} disabled={qIndex === 0}
+                  className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 disabled:opacity-40 cursor-pointer">
+                  Sebelumnya
+                </button>
+                {qIndex < soal.length - 1 ? (
+                  <button type="button" onClick={() => setQIndex(i => Math.min(soal.length - 1, i + 1))} disabled={!answered}
+                    className="flex-1 rounded-xl bg-amber-600 py-2.5 text-sm font-semibold text-white disabled:opacity-40 cursor-pointer">
+                    Berikutnya
+                  </button>
+                ) : (
+                  <button type="button" onClick={handleSubmitTest} disabled={Object.keys(jawaban).length < soal.length || pending}
+                    className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white disabled:opacity-40 cursor-pointer">
+                    {pending ? 'Mengirim...' : 'Submit Test'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+
+          function handleSubmitTest() {
+            setError(null)
+            startTransition(async () => {
+              if (!testId) return
+              const res = await submitTestSahabat(testId, jawaban)
+              if ('error' in res) { setError(res.error); return }
+              setResult(res.data)
+              setSoal([])
+            })
+          }
+        })()}
+
+        {result && (
+          <div className="space-y-4 text-center py-2">
+            <div className={cn('inline-flex h-14 w-14 items-center justify-center rounded-full', result.status === 'LULUS' ? 'bg-emerald-100' : 'bg-rose-100')}>
+              {result.status === 'LULUS' ? <CheckCircle className="h-7 w-7 text-emerald-600" /> : <XCircle className="h-7 w-7 text-rose-600" />}
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">Skor Anda {result.skor.toFixed(0)}% ({result.jumlah_benar}/{result.total_soal} benar)</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {result.status === 'LULUS'
+                  ? 'Selamat, Anda lulus! Menunggu persetujuan pengurus untuk aktif sebagai Sahabat.'
+                  : `Minimal ${result.passing_threshold}% untuk lulus. Anda bisa mencoba lagi.`}
+              </p>
+            </div>
+            <button onClick={() => { onUpdated(null); onClose() }}
+              className="w-full rounded-2xl bg-gray-100 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer">
+              Tutup
+            </button>
+          </div>
+        )}
+      </div>
+    </Sheet>
+  )
+}
+
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 
 export default function AnggotaPortalClient(props: Props) {
-  const { anggota, simpanan, setoran, proyekDiajukan, pembiayaan, penawaran, laporan, proyekTersedia, akadIjarah, orgNama } = props
+  const { anggota, simpanan, setoran, proyekDiajukan, pembiayaan, penawaran, laporan, proyekTersedia, akadIjarah, testSahabat, orgNama } = props
   const [activeTab, setActiveTab] = useState<ActiveTab>('beranda')
   const [gantiPasswordOpen, setGantiPasswordOpen] = useState(false)
+  const [sahabatSheetOpen, setSahabatSheetOpen] = useState(false)
+  const [testSahabatState, setTestSahabatState] = useState(testSahabat)
+  const isSahabat = anggota.tingkat === 'SAHABAT'
+  const openUpgradeSheet = () => setSahabatSheetOpen(true)
 
   useEffect(() => {
     const handleHash = () => {
@@ -2852,10 +3038,15 @@ export default function AnggotaPortalClient(props: Props) {
             <h1 className="font-bold text-gray-900 text-base leading-tight">{anggota.nama}</h1>
           </div>
           <div className="flex items-center gap-2">
-            {anggota.is_verified && (
+            {isSahabat ? (
               <span className="hidden sm:flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                <CheckCircle className="h-3 w-3" /> Terverifikasi
+                <GraduationCap className="h-3 w-3" /> Sahabat
               </span>
+            ) : (
+              <button type="button" onClick={openUpgradeSheet}
+                className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-200 transition-colors cursor-pointer">
+                <Lock className="h-3 w-3" /> Teman <span className="hidden sm:inline">— Upgrade</span>
+              </button>
             )}
             <span className="font-mono text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
               {anggota.kode_anggota}
@@ -2875,10 +3066,10 @@ export default function AnggotaPortalClient(props: Props) {
       {/* Content */}
       <div className="mx-auto max-w-lg px-4 py-5 pb-28">
         {activeTab === 'beranda'   && <TabBeranda {...props} onLihatSemuaProyek={() => handleTabClick('investasi')} />}
-        {activeTab === 'simpanan'  && <TabSimpanan anggota={anggota} simpanan={simpanan} setoran={setoran} akadIjarah={akadIjarah} />}
-        {activeTab === 'proyek'    && <TabProyek anggota={anggota} proyekDiajukan={proyekDiajukan} />}
-        {activeTab === 'investasi' && <TabInvestasi anggota={anggota} simpanan={simpanan} proyekTersedia={proyekTersedia} pembiayaan={pembiayaan} />}
-        {activeTab === 'penawaran' && <TabPenawaran anggota={anggota} penawaran={penawaran} simpanan={simpanan} />}
+        {activeTab === 'simpanan'  && <TabSimpanan anggota={anggota} simpanan={simpanan} setoran={setoran} akadIjarah={akadIjarah} onRequestUpgrade={openUpgradeSheet} />}
+        {activeTab === 'proyek'    && <TabProyek anggota={anggota} proyekDiajukan={proyekDiajukan} onRequestUpgrade={openUpgradeSheet} />}
+        {activeTab === 'investasi' && <TabInvestasi anggota={anggota} simpanan={simpanan} proyekTersedia={proyekTersedia} pembiayaan={pembiayaan} onRequestUpgrade={openUpgradeSheet} />}
+        {activeTab === 'penawaran' && <TabPenawaran anggota={anggota} penawaran={penawaran} simpanan={simpanan} onRequestUpgrade={openUpgradeSheet} />}
         {activeTab === 'laporan'   && <TabLaporan anggota={anggota} proyekDiajukan={proyekDiajukan} laporan={laporan} />}
       </div>
 
@@ -2910,6 +3101,12 @@ export default function AnggotaPortalClient(props: Props) {
       </nav>
 
       <GantiPasswordSheet open={gantiPasswordOpen} onClose={() => setGantiPasswordOpen(false)} />
+      <SahabatUpgradeSheet
+        open={sahabatSheetOpen}
+        onClose={() => setSahabatSheetOpen(false)}
+        testSahabat={testSahabatState}
+        onUpdated={setTestSahabatState}
+      />
     </div>
   )
 }

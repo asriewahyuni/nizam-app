@@ -18,6 +18,7 @@ export type KojasmatBankSoal = {
   pilihan_c: string
   pilihan_d: string
   jawaban_benar: 'A' | 'B' | 'C' | 'D'
+  jenis: 'MASUK' | 'SAHABAT'
   is_active: boolean
   created_at: string
   updated_at: string
@@ -73,6 +74,7 @@ export async function simpanBankSoal(payload: {
   pilihan_c: string
   pilihan_d: string
   jawaban_benar: 'A' | 'B' | 'C' | 'D'
+  jenis?: 'MASUK' | 'SAHABAT'
   is_active?: boolean
 }) {
   const session = await getInternalAuthSession()
@@ -83,23 +85,23 @@ export async function simpanBankSoal(payload: {
       await queryPostgres(
         `UPDATE kojasmat_bank_soal
          SET pertanyaan=$2, pilihan_a=$3, pilihan_b=$4, pilihan_c=$5, pilihan_d=$6,
-             jawaban_benar=$7, is_active=$8, updated_at=NOW()
-         WHERE id=$1 AND org_id=$9`,
+             jawaban_benar=$7, is_active=$8, jenis=$9, updated_at=NOW()
+         WHERE id=$1 AND org_id=$10`,
         [
           payload.id, payload.pertanyaan, payload.pilihan_a, payload.pilihan_b,
           payload.pilihan_c, payload.pilihan_d, payload.jawaban_benar,
-          payload.is_active ?? true, payload.org_id,
+          payload.is_active ?? true, payload.jenis ?? 'MASUK', payload.org_id,
         ]
       )
     } else {
       await queryPostgres(
         `INSERT INTO kojasmat_bank_soal
-           (org_id, pertanyaan, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar, is_active)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+           (org_id, pertanyaan, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar, is_active, jenis)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [
           payload.org_id, payload.pertanyaan, payload.pilihan_a, payload.pilihan_b,
           payload.pilihan_c, payload.pilihan_d, payload.jawaban_benar,
-          payload.is_active ?? true,
+          payload.is_active ?? true, payload.jenis ?? 'MASUK',
         ]
       )
     }
@@ -191,7 +193,7 @@ export async function mulaiTestMasuk(orgId: string, pendaftaranId: string) {
     }
 
     const { rows: countRows } = await queryPostgres(
-      `SELECT COUNT(*)::int AS n FROM kojasmat_bank_soal WHERE org_id=$1 AND is_active=TRUE`,
+      `SELECT COUNT(*)::int AS n FROM kojasmat_bank_soal WHERE org_id=$1 AND is_active=TRUE AND jenis='MASUK'`,
       [orgId]
     )
     if ((countRows[0]?.n ?? 0) < SOAL_PER_TEST) {
@@ -203,7 +205,7 @@ export async function mulaiTestMasuk(orgId: string, pendaftaranId: string) {
     const { rows: soalRows } = await queryPostgres(
       `SELECT id, pertanyaan, pilihan_a, pilihan_b, pilihan_c, pilihan_d
        FROM kojasmat_bank_soal
-       WHERE org_id=$1 AND is_active=TRUE
+       WHERE org_id=$1 AND is_active=TRUE AND jenis='MASUK'
        ORDER BY RANDOM() LIMIT $2`,
       [orgId, SOAL_PER_TEST]
     )

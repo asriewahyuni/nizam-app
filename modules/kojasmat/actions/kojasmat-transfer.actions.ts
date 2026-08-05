@@ -13,6 +13,7 @@ import { getInternalAuthSession, verifyPasswordByUserId } from '@/lib/auth/inter
 import { resolveInternalUserId } from '@/lib/auth/internal-auth.shared'
 import { revalidatePath } from 'next/cache'
 import { enqueueNotification } from '@/modules/notifications/outbox.server'
+import { requireSahabatOrStaff } from './kojasmat.actions'
 
 async function getAuthorizedPengirim(dariAnggotaId?: string): Promise<{ id: string; org_id: string; nama: string; kode_anggota: string } | { error: string }> {
   const session = await getInternalAuthSession()
@@ -121,6 +122,9 @@ export async function kirimTransferSimpanan(payload: {
   const pengirimRes = await getAuthorizedPengirim(payload.dari_anggota_id)
   if ('error' in pengirimRes) return { error: pengirimRes.error }
   const pengirim = pengirimRes
+
+  const gate = await requireSahabatOrStaff(pengirim.id, pengirim.org_id, session.user.id)
+  if ('error' in gate) return gate
 
   const { rows: [tujuan] } = await queryPostgres(
     `SELECT id, org_id, nama, kode_anggota, status FROM kojasmat_anggota WHERE id = $1::uuid LIMIT 1`,

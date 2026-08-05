@@ -5,7 +5,7 @@
 import { queryPostgres } from '@/lib/db/postgres'
 import { getInternalAuthSession, createInternalAuthUser } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
-import { postSimpananMutasi } from './kojasmat.actions'
+import { postSimpananMutasi, requireSahabatOrStaff } from './kojasmat.actions'
 import { jurnalPendapatanBiayaAdmin } from '@/lib/erp-bridge/kojasmat-journals'
 import { generateTempPassword } from '../lib/temp-password'
 import { enqueueNotification } from '@/modules/notifications/outbox.server'
@@ -582,6 +582,9 @@ export async function kirimLaporanProyek(payload: {
   try {
     const session = await getInternalAuthSession()
     if (!session) return { error: 'Tidak terautentikasi' }
+
+    const gate = await requireSahabatOrStaff(payload.pengaju_id, payload.org_id, session.user.id)
+    if ('error' in gate) return gate
 
     // Cek keterlambatan: laporan wajib dikirim tiap minggu
     const { rows: [lastLaporan] } = await queryPostgres(

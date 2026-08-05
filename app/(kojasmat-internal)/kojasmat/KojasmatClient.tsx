@@ -62,6 +62,9 @@ import type { TenantWhatsappConfig } from '@/modules/notifications/whatsapp-sett
 import {
   getAkadIjarahByAnggota, setAkadIjarahOverride, buatAkadIjarahManual, type KojasmatAkadIjarah,
 } from '@/modules/kojasmat/actions/kojasmat-ijarah.actions'
+import {
+  getTestSahabatPendingByOrg, setujuiTestSahabat, tolakTestSahabat, type KojasmatTestSahabatPending,
+} from '@/modules/kojasmat/actions/kojasmat-sahabat.actions'
 
 const KATEGORI_PENDAPATAN = ['Penjualan', 'Jasa', 'Pendapatan Lain'] as const
 const KATEGORI_BEBAN = ['Bahan Baku', 'Operasional', 'Gaji/Upah', 'Sewa', 'Transportasi', 'Beban Lain'] as const
@@ -3932,6 +3935,111 @@ type KredensialAnggota = {
   temp_password: string | null
 }
 
+// Antrean anggota TEMAN yang sudah lulus test kedua dan menunggu persetujuan
+// staf untuk naik ke tingkat Sahabat.
+function SahabatApprovalPanel({ orgId }: { orgId: string }) {
+  const [pending, startTransition] = useTransition()
+  const [list, setList] = useState<KojasmatTestSahabatPending[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionId, setActionId] = useState<string | null>(null)
+  const [tolakTarget, setTolakTarget] = useState<KojasmatTestSahabatPending | null>(null)
+  const [catatanTolak, setCatatanTolak] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    getTestSahabatPendingByOrg(orgId).then(rows => { if (!cancelled) { setList(rows); setLoading(false) } })
+    return () => { cancelled = true }
+  }, [orgId])
+
+  function handleSetujui(id: string) {
+    setActionId(id)
+    startTransition(async () => {
+      const res = await setujuiTestSahabat(id)
+      setActionId(null)
+      if ('error' in res) return
+      setList(prev => prev.filter(t => t.id !== id))
+    })
+  }
+
+  function handleTolak() {
+    if (!tolakTarget || !catatanTolak.trim()) return
+    setActionId(tolakTarget.id)
+    startTransition(async () => {
+      const res = await tolakTestSahabat(tolakTarget.id, catatanTolak)
+      setActionId(null)
+      if ('error' in res) return
+      setList(prev => prev.filter(t => t.id !== tolakTarget.id))
+      setTolakTarget(null)
+      setCatatanTolak('')
+    })
+  }
+
+  if (loading || list.length === 0) return null
+
+  return (
+    <>
+      <div className="rounded-2xl border border-purple-200 bg-purple-50/60 overflow-hidden">
+        <div className="px-4 py-3 border-b border-purple-200 bg-purple-100/60">
+          <p className="text-sm font-semibold text-purple-900">
+            Upgrade Sahabat Menunggu Persetujuan ({list.length})
+          </p>
+          <p className="text-xs text-purple-700 mt-0.5">
+            Anggota sudah lulus test kedua — setujui untuk membuka akses eksekusi proyek, transfer, dan fitur lainnya.
+          </p>
+        </div>
+        <div className="divide-y divide-purple-100">
+          {list.map(t => (
+            <div key={t.id} className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium text-gray-900 text-sm">{t.anggota_nama} <span className="text-gray-400 font-mono text-xs">· {t.kode_anggota}</span></p>
+                <p className="text-xs text-gray-500 mt-0.5">Skor {t.skor}% ({t.jumlah_benar}/{t.soal_ids.length} benar)</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => { setTolakTarget(t); setCatatanTolak('') }}
+                  disabled={pending && actionId === t.id}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50">
+                  <XCircle className="h-3.5 w-3.5" /> Tolak
+                </button>
+                <button onClick={() => handleSetujui(t.id)}
+                  disabled={pending && actionId === t.id}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700 transition-colors cursor-pointer disabled:opacity-50">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  {pending && actionId === t.id ? 'Memproses...' : 'Setujui'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Modal open={!!tolakTarget} onClose={() => { setTolakTarget(null); setCatatanTolak('') }}
+        title={`Tolak Upgrade Sahabat — ${tolakTarget?.anggota_nama ?? ''}`}>
+        {tolakTarget && (
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Alasan penolakan *</label>
+              <textarea rows={3}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                placeholder="Contoh: perlu wawancara tambahan"
+                value={catatanTolak} onChange={e => setCatatanTolak(e.target.value)} />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => { setTolakTarget(null); setCatatanTolak('') }}
+                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Batal
+              </button>
+              <button onClick={handleTolak} disabled={!catatanTolak.trim() || pending}
+                className="flex-1 rounded-xl bg-rose-600 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50 transition-colors cursor-pointer">
+                {pending ? 'Memproses...' : 'Tolak Upgrade'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </>
+  )
+}
+
 function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: KojasmatPendaftaran[] }) {
   const [pending, startTransition] = useTransition()
   const [selected, setSelected] = useState<KojasmatPendaftaran | null>(null)
@@ -4048,6 +4156,8 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
           <Link2 className="h-3.5 w-3.5" /> Link Daftar
         </a>
       </div>
+
+      <SahabatApprovalPanel orgId={orgId} />
 
       {actionResult && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center justify-between">
@@ -4578,9 +4688,10 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
 }) {
   const [pending, startTransition] = useTransition()
   const [modalSoal, setModalSoal] = useState<KojasmatBankSoal | 'new' | null>(null)
+  const [jenisFilter, setJenisFilter] = useState<'MASUK' | 'SAHABAT'>('MASUK')
   const [form, setForm] = useState({
     pertanyaan: '', pilihan_a: '', pilihan_b: '', pilihan_c: '', pilihan_d: '',
-    jawaban_benar: 'A' as 'A' | 'B' | 'C' | 'D', is_active: true,
+    jawaban_benar: 'A' as 'A' | 'B' | 'C' | 'D', jenis: 'MASUK' as 'MASUK' | 'SAHABAT', is_active: true,
   })
   const [settingsForm, setSettingsForm] = useState({
     passing_threshold: String(moduleSettings.passing_threshold),
@@ -4599,7 +4710,8 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
   const [qrisPreview, setQrisPreview] = useState(qrisPreviewUrl)
   const [qrisName, setQrisName] = useState(moduleSettings.qris_image_name)
 
-  const aktifCount = bankSoal.filter(s => s.is_active).length
+  const bankSoalFiltered = bankSoal.filter(s => s.jenis === jenisFilter)
+  const aktifCount = bankSoalFiltered.filter(s => s.is_active).length
 
   async function handleQrisUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -4631,14 +4743,15 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
   }
 
   function openNew() {
-    setForm({ pertanyaan: '', pilihan_a: '', pilihan_b: '', pilihan_c: '', pilihan_d: '', jawaban_benar: 'A', is_active: true })
+    setForm({ pertanyaan: '', pilihan_a: '', pilihan_b: '', pilihan_c: '', pilihan_d: '', jawaban_benar: 'A', jenis: jenisFilter, is_active: true })
     setModalSoal('new')
   }
 
   function openEdit(s: KojasmatBankSoal) {
     setForm({
       pertanyaan: s.pertanyaan, pilihan_a: s.pilihan_a, pilihan_b: s.pilihan_b,
-      pilihan_c: s.pilihan_c, pilihan_d: s.pilihan_d, jawaban_benar: s.jawaban_benar, is_active: s.is_active,
+      pilihan_c: s.pilihan_c, pilihan_d: s.pilihan_d, jawaban_benar: s.jawaban_benar,
+      jenis: s.jenis, is_active: s.is_active,
     })
     setModalSoal(s)
   }
@@ -4856,9 +4969,22 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
         </div>
       </div>
 
+      <div className="flex gap-2 rounded-xl bg-gray-100 p-1 max-w-sm">
+        <button type="button" onClick={() => setJenisFilter('MASUK')}
+          className={cn('flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+            jenisFilter === 'MASUK' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+          Test Masuk
+        </button>
+        <button type="button" onClick={() => setJenisFilter('SAHABAT')}
+          className={cn('flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+            jenisFilter === 'SAHABAT' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+          Test Sahabat
+        </button>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-gray-900">Bank Soal Test Masuk</h3>
+          <h3 className="font-semibold text-gray-900">Bank Soal {jenisFilter === 'MASUK' ? 'Test Masuk' : 'Test Sahabat (Upgrade)'}</h3>
           <p className={cn('text-sm', aktifCount < 20 ? 'text-red-600 font-medium' : 'text-gray-500')}>
             {aktifCount} soal aktif {aktifCount < 20 && '— minimal 20 soal aktif dibutuhkan agar test bisa dimulai'}
           </p>
@@ -4870,12 +4996,12 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
       </div>
 
       <div className="space-y-3">
-        {bankSoal.length === 0 && (
+        {bankSoalFiltered.length === 0 && (
           <div className="rounded-2xl border border-gray-100 bg-white py-12 text-center text-gray-400">
             Belum ada soal di bank soal
           </div>
         )}
-        {bankSoal.map(s => (
+        {bankSoalFiltered.map(s => (
           <div key={s.id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
@@ -4910,6 +5036,21 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
 
       <Modal open={!!modalSoal} onClose={() => setModalSoal(null)} title={modalSoal === 'new' ? 'Tambah Soal Baru' : 'Edit Soal'}>
         <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Jenis Test *</label>
+            <div className="flex gap-2 rounded-xl bg-gray-100 p-1">
+              <button type="button" onClick={() => setForm(f => ({ ...f, jenis: 'MASUK' }))}
+                className={cn('flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+                  form.jenis === 'MASUK' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+                Test Masuk
+              </button>
+              <button type="button" onClick={() => setForm(f => ({ ...f, jenis: 'SAHABAT' }))}
+                className={cn('flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+                  form.jenis === 'SAHABAT' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+                Test Sahabat
+              </button>
+            </div>
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Pertanyaan *</label>
             <textarea rows={2}
@@ -5246,7 +5387,7 @@ export default function KojasmatClient({
     { key: 'pelatihan',   label: 'Pelatihan',      icon: GraduationCap },
     { key: 'laporan',     label: 'Laporan',         icon: FileText,      badge: laporan.filter(l => l.status === 'DIKIRIM').length || undefined },
     { key: 'tindakan',    label: 'Tindakan',        icon: AlertTriangle, badge: tindakanAktif || undefined, badgeColor: 'bg-red-100 text-red-700' },
-    { key: 'soal',        label: 'Bank Soal',       icon: BookOpen,      badge: bankSoal.filter(s => s.is_active).length < 20 ? bankSoal.filter(s => s.is_active).length : undefined, badgeColor: 'bg-red-100 text-red-700' },
+    { key: 'soal',        label: 'Bank Soal',       icon: BookOpen,      badge: bankSoal.filter(s => s.is_active && s.jenis === 'MASUK').length < 20 ? bankSoal.filter(s => s.is_active && s.jenis === 'MASUK').length : undefined, badgeColor: 'bg-red-100 text-red-700' },
     { key: 'akun',        label: 'Pengaturan Akun', icon: Landmark,      badge: (KOJASMAT_ACCOUNT_ROLES.length - KOJASMAT_ACCOUNT_ROLES.filter(r => accountMapping[r]).length) || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
     { key: 'notifikasi',  label: 'Notifikasi',      icon: MessageCircle, badge: whatsappSettings.enabled ? undefined : 1, badgeColor: 'bg-amber-100 text-amber-700' },
   ]

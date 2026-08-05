@@ -36,6 +36,7 @@ export type KojasmatAnggota = {
   alamat?: string
   pekerjaan?: string
   status: 'CALON' | 'AKTIF' | 'TIDAK_AKTIF' | 'DIBEKUKAN'
+  tingkat: 'TEMAN' | 'SAHABAT'
   is_verified: boolean
   user_id?: string
   joined_at?: string
@@ -276,6 +277,20 @@ export async function isOrgAdminOrManajemen(userId: string, orgId: string): Prom
   )
   const role = String(rows[0]?.role || '').toLowerCase()
   return role === 'owner' || role === 'admin' || role === 'manager'
+}
+
+// Anggota tingkat TEMAN hanya boleh menabung/tarik simpanan + lihat konten dasar —
+// eksekusi proyek, transfer, dan fitur lain baru terbuka setelah naik ke SAHABAT
+// (test kedua + approval staf). Staf/admin organisasi selalu boleh bertindak
+// atas nama anggota manapun (mis. entri manual, testing).
+export async function requireSahabatOrStaff(anggotaId: string, orgId: string, actingUserId: string): Promise<{ ok: true } | { error: string }> {
+  if (await isOrgAdminOrManajemen(actingUserId, orgId)) return { ok: true }
+  const { rows: [anggota] } = await queryPostgres(`SELECT tingkat FROM kojasmat_anggota WHERE id=$1`, [anggotaId])
+  if (!anggota) return { error: 'Anggota tidak ditemukan' }
+  if (anggota.tingkat !== 'SAHABAT') {
+    return { error: 'Fitur ini khusus anggota tingkat Sahabat. Upgrade dulu lewat menu Simpanan.' }
+  }
+  return { ok: true }
 }
 
 export async function createAnggota(payload: {
@@ -947,6 +962,9 @@ export async function createProyek(payload: {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 
+  const gate = await requireSahabatOrStaff(payload.pengaju_id, payload.org_id, session.user.id)
+  if ('error' in gate) return gate
+
   const { rows: last } = await queryPostgres(
     `SELECT kode_proyek FROM kojasmat_proyek WHERE org_id=$1 ORDER BY created_at DESC LIMIT 1`,
     [payload.org_id]
@@ -1497,6 +1515,9 @@ export async function createPembiayaan(payload: {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 
+  const gate = await requireSahabatOrStaff(payload.pemodal_id, payload.org_id, session.user.id)
+  if ('error' in gate) return gate
+
   const client = await connectPostgresClient()
   let resultRow: any = null
   let proyekData: any = null
@@ -1828,6 +1849,18 @@ export async function getPenawaranByAnggota(anggotaId: string): Promise<Kojasmat
 }
 
 export async function updateStatusPenawaran(id: string, status: string) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const { rows: [pen] } = await queryPostgres(
+    `SELECT anggota_id, org_id FROM kojasmat_penawaran WHERE id=$1`,
+    [id]
+  )
+  if (!pen) return { error: 'Penawaran tidak ditemukan' }
+
+  const gate = await requireSahabatOrStaff(pen.anggota_id, pen.org_id, session.user.id)
+  if ('error' in gate) return gate
+
   await queryPostgres(
     `UPDATE kojasmat_penawaran SET status=$2 WHERE id=$1`,
     [id, status]
@@ -1896,7 +1929,13 @@ export async function toggleMinatProyek(payload: {
   org_id: string
   proyek_id: string
   anggota_id: string
-}): Promise<{ is_berminat: boolean }> {
+}): Promise<{ is_berminat: boolean } | { error: string }> {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const gate = await requireSahabatOrStaff(payload.anggota_id, payload.org_id, session.user.id)
+  if ('error' in gate) return gate
+
   const { rows: [existing] } = await queryPostgres(
     `SELECT id FROM kojasmat_minat WHERE proyek_id=$1 AND anggota_id=$2`,
     [payload.proyek_id, payload.anggota_id]

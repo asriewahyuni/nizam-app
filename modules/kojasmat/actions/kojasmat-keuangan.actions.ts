@@ -7,6 +7,7 @@ import { queryPostgres, connectPostgresClient } from '@/lib/db/postgres'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
 import { jurnalPendapatanProyek, jurnalBebanProyek, jurnalDistribusiBagiHasil } from '@/lib/erp-bridge/kojasmat-journals'
+import { requireSahabatOrStaff } from './kojasmat.actions'
 
 // session.user.id bisa berisi legacy_user_id (Supabase UUID), bukan internal_auth_users.id.
 // Gunakan fungsi ini untuk FK yang merujuk ke internal_auth_users(id) — mis. kolom
@@ -54,10 +55,13 @@ export async function catatTransaksiProyek(payload: {
   if (!payload.jumlah || payload.jumlah <= 0) return { error: 'Jumlah harus lebih dari 0' }
 
   const { rows: [proyek] } = await queryPostgres(
-    `SELECT kode_proyek FROM kojasmat_proyek WHERE id=$1`,
+    `SELECT kode_proyek, pengaju_id FROM kojasmat_proyek WHERE id=$1`,
     [payload.proyek_id]
   )
   if (!proyek) return { error: 'Proyek tidak ditemukan' }
+
+  const gate = await requireSahabatOrStaff(proyek.pengaju_id, payload.org_id, session.user.id)
+  if ('error' in gate) return gate
 
   const { rows } = await queryPostgres(
     `INSERT INTO kojasmat_proyek_transaksi
