@@ -13,7 +13,7 @@ import {
   type KojasmatDokumen,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
 import {
-  mulaiTestMasuk, submitTestMasuk, getInfoPembayaran, submitPembayaranPendaftaran,
+  mulaiTestMasuk, submitTestMasuk, forceLulusTestMasuk, getInfoPembayaran, submitPembayaranPendaftaran,
 } from '@/modules/kojasmat/actions/kojasmat-test.actions'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -233,6 +233,20 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
       setTestResult(res.data!)
     })
   }
+
+  // Bypass admin untuk testing — ?forcequizz di URL langsung meluluskan test 100%
+  // tanpa menjawab soal apapun.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!new URLSearchParams(window.location.search).has('forcequizz')) return
+    if (!testMasukId || testResult) return
+    startTransition(async () => {
+      const res = await forceLulusTestMasuk(testMasukId)
+      if (res.error) { setError(res.error); return }
+      setTestResult(res.data!)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [testMasukId, testResult])
 
   // ── Pembayaran ──
   const [infoBayar, setInfoBayar] = useState<{

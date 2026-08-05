@@ -285,6 +285,51 @@ export async function submitTestMasuk(testMasukId: string, jawaban: Record<strin
   }
 }
 
+// Bypass admin — tandai test LULUS 100% tanpa menjawab soal apapun. Dipicu lewat
+// query param rahasia (?forcequizz) di wizard pendaftaran publik untuk kebutuhan
+// testing internal. Tidak ada barrier auth tambahan (wizard ini memang publik/
+// anonim by design) — blast radius rendah karena aktivasi akun tetap wajib
+// approval manual staf lewat setujuiPendaftaran(); bypass ini cuma melewati
+// tahap kuis, bukan verifikasi pembayaran.
+export async function forceLulusTestMasuk(testMasukId: string) {
+  try {
+    const { rows: [testMasuk] } = await queryPostgres(
+      `SELECT * FROM kojasmat_test_masuk WHERE id=$1`,
+      [testMasukId]
+    )
+    if (!testMasuk) return { error: 'Sesi test tidak ditemukan' }
+    if (testMasuk.status !== 'BERLANGSUNG') {
+      return { error: 'Test ini sudah pernah disubmit' }
+    }
+
+    const soalIds: string[] = testMasuk.soal_ids
+    const totalSoal = soalIds.length
+
+    await queryPostgres(
+      `UPDATE kojasmat_test_masuk
+       SET jawaban=$2, jumlah_benar=$3, skor=100, status='LULUS', submitted_at=NOW()
+       WHERE id=$1`,
+      [testMasukId, JSON.stringify({ __forced_by_admin: true }), totalSoal]
+    )
+
+    const settings = await getModuleSettings(testMasuk.org_id)
+    const apresiasi = resolveApresiasi(100, settings.apresiasi_tiers)
+
+    return {
+      data: {
+        skor: 100,
+        jumlah_benar: totalSoal,
+        total_soal: totalSoal,
+        status: 'LULUS' as const,
+        passing_threshold: testMasuk.passing_threshold as number,
+        apresiasi,
+      }
+    }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Gagal memproses' }
+  }
+}
+
 // ─── PEMBAYARAN PENDAFTARAN (publik — bagian wizard pendaftaran) ─────────────
 
 // Tidak butuh auth — bagian dari wizard publik pendaftaran
