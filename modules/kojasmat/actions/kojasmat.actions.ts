@@ -607,12 +607,13 @@ export async function getSetoranPendingByOrg(orgId: string): Promise<KojasmatSet
   return rows as KojasmatSetoranPending[]
 }
 
-async function notifikasiSetoranSimpanan(input: {
+async function notifikasiMutasiSimpanan(input: {
   orgId: string
   anggotaId: string
   mutasiId: string
   jumlah: number
   jenisSimpanan: string
+  jenisMutasi: 'SETOR' | 'TARIK'
   disetujui: boolean
   catatan?: string | null
 }) {
@@ -622,19 +623,24 @@ async function notifikasiSetoranSimpanan(input: {
   )
   if (!anggota) return
 
-  const judul = input.disetujui ? 'Setoran Simpanan Disetujui' : 'Setoran Simpanan Ditolak'
+  const aksiLabel = input.jenisMutasi === 'TARIK' ? 'Penarikan' : 'Setoran'
+  const judul = input.disetujui ? `${aksiLabel} Simpanan Disetujui` : `${aksiLabel} Simpanan Ditolak`
   const jenisLabel = { POKOK: 'Pokok', WAJIB: 'Wajib', SUKARELA: 'Sukarela' }[input.jenisSimpanan] ?? input.jenisSimpanan
   const nominal = `Rp ${input.jumlah.toLocaleString('id-ID')}`
-  const body = input.disetujui
-    ? `Halo ${anggota.nama}, setoran simpanan ${jenisLabel} sebesar ${nominal} sudah diverifikasi dan masuk ke saldo Anda.`
-    : `Halo ${anggota.nama}, setoran simpanan ${jenisLabel} sebesar ${nominal} ditolak pengurus.${input.catatan ? ` Alasan: ${input.catatan}` : ''} Silakan hubungi pengurus koperasi.`
+  const body = input.jenisMutasi === 'TARIK'
+    ? (input.disetujui
+        ? `Halo ${anggota.nama}, penarikan simpanan ${jenisLabel} sebesar ${nominal} sudah disetujui dan diproses pengurus.`
+        : `Halo ${anggota.nama}, penarikan simpanan ${jenisLabel} sebesar ${nominal} ditolak pengurus.${input.catatan ? ` Alasan: ${input.catatan}` : ''} Silakan hubungi pengurus koperasi.`)
+    : (input.disetujui
+        ? `Halo ${anggota.nama}, setoran simpanan ${jenisLabel} sebesar ${nominal} sudah diverifikasi dan masuk ke saldo Anda.`
+        : `Halo ${anggota.nama}, setoran simpanan ${jenisLabel} sebesar ${nominal} ditolak pengurus.${input.catatan ? ` Alasan: ${input.catatan}` : ''} Silakan hubungi pengurus koperasi.`)
 
-  const idempotencyKey = `kojasmat-setoran:${input.mutasiId}:${input.disetujui ? 'disetujui' : 'ditolak'}`
+  const idempotencyKey = `kojasmat-${input.jenisMutasi.toLowerCase()}:${input.mutasiId}:${input.disetujui ? 'disetujui' : 'ditolak'}`
 
   // IN_APP selalu berhasil (tidak butuh provider eksternal) — status setoran
   // juga langsung terlihat di portal anggota begitu login.
   await enqueueNotification({
-    orgId: input.orgId, userId: anggota.user_id, eventType: 'kojasmat_setoran_simpanan',
+    orgId: input.orgId, userId: anggota.user_id, eventType: 'kojasmat_mutasi_simpanan',
     channel: 'IN_APP', recipient: anggota.user_id || input.anggotaId,
     subject: judul, body, idempotencyKey: `${idempotencyKey}:in_app`,
   }).catch(() => null)
@@ -643,14 +649,14 @@ async function notifikasiSetoranSimpanan(input: {
   // Mailketing) disetel org ini; sebelum itu cuma antre di outbox tanpa error.
   if (anggota.email) {
     await enqueueNotification({
-      orgId: input.orgId, userId: anggota.user_id, eventType: 'kojasmat_setoran_simpanan',
+      orgId: input.orgId, userId: anggota.user_id, eventType: 'kojasmat_mutasi_simpanan',
       channel: 'EMAIL', recipient: anggota.email,
       subject: judul, body, idempotencyKey: `${idempotencyKey}:email`,
     }).catch(() => null)
   }
   if (anggota.phone) {
     await enqueueNotification({
-      orgId: input.orgId, userId: anggota.user_id, eventType: 'kojasmat_setoran_simpanan',
+      orgId: input.orgId, userId: anggota.user_id, eventType: 'kojasmat_mutasi_simpanan',
       channel: 'WHATSAPP', providerCode: 'DRIPSENDER', recipient: anggota.phone,
       body, idempotencyKey: `${idempotencyKey}:whatsapp`,
     }).catch(() => null)
@@ -715,9 +721,9 @@ export async function setujuiSetoranSimpanan(mutasiId: string) {
     await jurnalSetorSimpanan(check.org_id, committed!.jenisSimpanan as 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP', committed!.jumlah, mutasiId)
   } catch (_) { /* jurnal non-fatal */ }
 
-  await notifikasiSetoranSimpanan({
+  await notifikasiMutasiSimpanan({
     orgId: check.org_id, anggotaId: committed!.anggotaId, mutasiId,
-    jumlah: committed!.jumlah, jenisSimpanan: committed!.jenisSimpanan, disetujui: true,
+    jumlah: committed!.jumlah, jenisSimpanan: committed!.jenisSimpanan, jenisMutasi: 'SETOR', disetujui: true,
   }).catch(() => null)
 
   revalidatePath('/kojasmat')
@@ -747,9 +753,9 @@ export async function tolakSetoranSimpanan(mutasiId: string, catatan: string) {
   if (!mutasi) return { error: 'Setoran tidak ditemukan atau sudah diproses' }
 
   const { rows: [simpanan] } = await queryPostgres(`SELECT jenis FROM kojasmat_simpanan WHERE id=$1`, [mutasi.simpanan_id])
-  await notifikasiSetoranSimpanan({
+  await notifikasiMutasiSimpanan({
     orgId: check.org_id, anggotaId: mutasi.anggota_id, mutasiId,
-    jumlah: Number(mutasi.jumlah), jenisSimpanan: simpanan?.jenis ?? '', disetujui: false, catatan,
+    jumlah: Number(mutasi.jumlah), jenisSimpanan: simpanan?.jenis ?? '', jenisMutasi: 'SETOR', disetujui: false, catatan,
   }).catch(() => null)
 
   revalidatePath('/kojasmat')
@@ -762,6 +768,140 @@ export async function getSetoranByAnggota(anggotaId: string): Promise<KojasmatSi
     [anggotaId]
   )
   return rows as KojasmatSimpananMutasi[]
+}
+
+// ─── TARIK SIMPANAN SELF-SERVICE (anggota) ────────────────────────────────────
+// Sama seperti setoran: anggota mengajukan, saldo TIDAK langsung berubah sampai
+// pengurus menyetujui secara manual. Dibatasi ke simpanan SUKARELA saja — pokok
+// dan wajib adalah setoran keanggotaan, bukan dana yang boleh ditarik bebas
+// (pola sama dengan pembatasan investasi di createPembiayaan).
+
+export async function ajukanTarikSimpanan(payload: {
+  org_id: string
+  anggota_id: string
+  jumlah: number
+  keterangan: string
+}) {
+  if (payload.jumlah <= 0) return { error: 'Jumlah penarikan harus lebih dari nol' }
+  if (!payload.keterangan.trim()) return { error: 'Tujuan/rekening tujuan penarikan wajib diisi' }
+
+  const { rows: [simpanan] } = await queryPostgres(
+    `SELECT id, saldo FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='SUKARELA'`,
+    [payload.anggota_id]
+  )
+  if (!simpanan) return { error: 'Rekening simpanan sukarela tidak ditemukan' }
+  if (Number(simpanan.saldo) < payload.jumlah) return { error: 'Saldo simpanan sukarela tidak mencukupi' }
+
+  const { rows: [mutasi] } = await queryPostgres(
+    `INSERT INTO kojasmat_simpanan_mutasi
+       (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, keterangan, status)
+     VALUES ($1,$2,$3,'TARIK',$4,$5,'PENDING')
+     RETURNING id, created_at`,
+    [payload.org_id, simpanan.id, payload.anggota_id, payload.jumlah, payload.keterangan]
+  )
+
+  revalidatePath('/kojasmat')
+  return { data: { id: mutasi.id as string, created_at: mutasi.created_at as string } }
+}
+
+export async function setujuiTarikSimpanan(mutasiId: string) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const { rows: [check] } = await queryPostgres(
+    `SELECT org_id FROM kojasmat_simpanan_mutasi WHERE id=$1`,
+    [mutasiId]
+  )
+  if (!check) return { error: 'Penarikan tidak ditemukan' }
+  if (!(await isOrgAdminOrManajemen(session.user.id, check.org_id))) {
+    return { error: 'Hanya owner/admin/manager yang dapat menyetujui penarikan.' }
+  }
+
+  const client = await connectPostgresClient()
+  let committed: { anggotaId: string; jumlah: number; jenisSimpanan: string } | null = null
+  try {
+    await client.query('BEGIN')
+
+    const { rows: [mutasi] } = await client.query(
+      `UPDATE kojasmat_simpanan_mutasi
+       SET status='DISETUJUI', direview_oleh=$2, direview_at=NOW()
+       WHERE id=$1 AND status='PENDING' AND jenis_mutasi='TARIK'
+       RETURNING *`,
+      [mutasiId, getInternalUserId(session)]
+    )
+    if (!mutasi) throw new Error('Penarikan tidak ditemukan atau sudah diproses')
+
+    const { rows: [simpanan] } = await client.query(
+      `SELECT * FROM kojasmat_simpanan WHERE id=$1 FOR UPDATE`,
+      [mutasi.simpanan_id]
+    )
+    if (!simpanan) throw new Error('Rekening simpanan tidak ditemukan')
+
+    const sebelum = Number(simpanan.saldo)
+    if (sebelum < Number(mutasi.jumlah)) throw new Error('Saldo simpanan tidak lagi mencukupi untuk penarikan ini')
+    const sesudah = sebelum - Number(mutasi.jumlah)
+
+    await client.query(
+      `UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`,
+      [simpanan.id, sesudah]
+    )
+    await client.query(
+      `UPDATE kojasmat_simpanan_mutasi SET saldo_sebelum=$2, saldo_sesudah=$3 WHERE id=$1`,
+      [mutasiId, sebelum, sesudah]
+    )
+
+    await client.query('COMMIT')
+    committed = { anggotaId: mutasi.anggota_id, jumlah: Number(mutasi.jumlah), jenisSimpanan: simpanan.jenis }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    client.release()
+    return { error: error instanceof Error ? error.message : 'Gagal menyetujui penarikan' }
+  }
+  client.release()
+
+  try {
+    await jurnalTarikSimpanan(check.org_id, committed!.jenisSimpanan as 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP', committed!.jumlah, mutasiId)
+  } catch (_) { /* jurnal non-fatal */ }
+
+  await notifikasiMutasiSimpanan({
+    orgId: check.org_id, anggotaId: committed!.anggotaId, mutasiId,
+    jumlah: committed!.jumlah, jenisSimpanan: committed!.jenisSimpanan, jenisMutasi: 'TARIK', disetujui: true,
+  }).catch(() => null)
+
+  revalidatePath('/kojasmat')
+  return { success: true }
+}
+
+export async function tolakTarikSimpanan(mutasiId: string, catatan: string) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const { rows: [check] } = await queryPostgres(
+    `SELECT org_id FROM kojasmat_simpanan_mutasi WHERE id=$1`,
+    [mutasiId]
+  )
+  if (!check) return { error: 'Penarikan tidak ditemukan' }
+  if (!(await isOrgAdminOrManajemen(session.user.id, check.org_id))) {
+    return { error: 'Hanya owner/admin/manager yang dapat menolak penarikan.' }
+  }
+
+  const { rows: [mutasi] } = await queryPostgres(
+    `UPDATE kojasmat_simpanan_mutasi
+     SET status='DITOLAK', catatan_admin=$2, direview_oleh=$3, direview_at=NOW()
+     WHERE id=$1 AND status='PENDING' AND jenis_mutasi='TARIK'
+     RETURNING *`,
+    [mutasiId, catatan, getInternalUserId(session)]
+  )
+  if (!mutasi) return { error: 'Penarikan tidak ditemukan atau sudah diproses' }
+
+  const { rows: [simpanan] } = await queryPostgres(`SELECT jenis FROM kojasmat_simpanan WHERE id=$1`, [mutasi.simpanan_id])
+  await notifikasiMutasiSimpanan({
+    orgId: check.org_id, anggotaId: mutasi.anggota_id, mutasiId,
+    jumlah: Number(mutasi.jumlah), jenisSimpanan: simpanan?.jenis ?? '', jenisMutasi: 'TARIK', disetujui: false, catatan,
+  }).catch(() => null)
+
+  revalidatePath('/kojasmat')
+  return { data: mutasi as KojasmatSimpananMutasi }
 }
 
 // ─── PROYEK ───────────────────────────────────────────────────────────────────
