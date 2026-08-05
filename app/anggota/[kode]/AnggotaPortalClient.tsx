@@ -184,7 +184,7 @@ function TabBeranda({
         </div>
         <div className="rounded-2xl border border-gray-100 bg-white p-4 text-center shadow-sm">
           <TrendingUp className="h-5 w-5 text-emerald-500 mx-auto mb-1" />
-          <p className="text-xl font-bold text-gray-900">{pembiayaan.length}</p>
+          <p className="text-xl font-bold text-gray-900">{pembiayaan.filter(p => p.status === 'AKTIF').length}</p>
           <p className="text-xs text-gray-400 mt-0.5">Dibiayai</p>
         </div>
         <div className="rounded-2xl border border-gray-100 bg-white p-4 text-center shadow-sm relative">
