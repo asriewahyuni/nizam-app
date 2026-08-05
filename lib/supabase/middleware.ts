@@ -123,29 +123,6 @@ export async function updateSession(request: NextRequest) {
       request.cookies.get(INTERNAL_AUTH_SESSION_COOKIE)?.value?.trim()
     )
 
-    if (authPage && hasInternalSession) {
-      const redirectFromQuery = normalizeRedirectTarget(request.nextUrl.searchParams.get('redirectTo'))
-      let redirectFromReferer: string | null = null
-
-      const referer = request.headers.get('referer')
-      if (referer) {
-        try {
-          const refererUrl = new URL(referer)
-          if (refererUrl.origin === request.nextUrl.origin) {
-            redirectFromReferer = normalizeRedirectTarget(`${refererUrl.pathname}${refererUrl.search}`)
-          }
-        } catch {
-          // Ignore malformed referer
-        }
-      }
-
-      const redirectTarget = new URL(redirectFromQuery || redirectFromReferer || '/dashboard', request.url)
-      if (serverActionRequest) {
-        return createServerActionRedirectResponse(redirectTarget)
-      }
-      return NextResponse.redirect(redirectTarget)
-    }
-
     if (protectedPage && !hasInternalSession) {
       const redirectUrl = new URL('/login', request.url)
       redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`)
