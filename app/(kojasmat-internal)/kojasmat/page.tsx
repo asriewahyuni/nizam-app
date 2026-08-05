@@ -8,6 +8,7 @@ import {
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
 import { getBankSoal, getModuleSettings, getInfoPembayaran } from '@/modules/kojasmat/actions/kojasmat-test.actions'
 import { getBankAccounts } from '@/modules/cash/actions/bank.actions'
+import { getKojasmatAccountMappingData } from '@/modules/kojasmat/lib/kojasmat-account-mapping.server'
 import KojasmatClient from './KojasmatClient'
 
 export const revalidate = 0
@@ -30,6 +31,7 @@ export default async function KojasmatPage() {
   const bankAccounts   = await getBankAccounts(orgId)
   const infoBayar      = await getInfoPembayaran(orgId)
   const setoranPending = await getSetoranPendingByOrg(orgId)
+  const { mapping: accountMapping, accounts: chartOfAccounts } = await getKojasmatAccountMappingData(orgId)
 
   return (
     <KojasmatClient
@@ -46,6 +48,8 @@ export default async function KojasmatPage() {
       bankAccounts={bankAccounts.map(b => ({ id: b.id, bank_name: b.bank_name, account_number: b.account_number ?? '' }))}
       qrisPreviewUrl={infoBayar.data.qris_image_url}
       setoranPending={setoranPending}
+      accountMapping={accountMapping}
+      chartOfAccounts={chartOfAccounts}
     />
   )
 }

@@ -3,59 +3,33 @@
 // Kojasmat ERP Bridge — jurnal akuntansi syariah yang benar per jenis transaksi.
 // Semua mapping CoA mengacu pada PSAK 105/106 dan IAI Koperasi Syariah.
 //
-// CoA Reference (kode aktual yang dipakai koperasi ini — lihat catatan di bawah):
-//   1101 — Kas dan Setara Kas (ASET)
-//   1201 — Piutang Muamalah (ASET) — dipakai untuk piutang pembiayaan mudharabah
-//   2102 — Simpanan Investasi/Projek (LIABILITAS) — Dana Syirkah Temporer (Murabahah & Mudharabah)
-//   2101 — Simpanan Sukarela (LIABILITAS)
-//   3001 — Simpanan Pokok (EKUITAS)
-//   3002 — Simpanan Wajib (EKUITAS)
-//   4005 — Ujrah Projek (PENDAPATAN) — ujrah wakalah Murabahah & Mudharabah
-//   4006 — Admin Projek (PENDAPATAN) — biaya admin pendaftaran & pendapatan usaha proyek
-//
-// CATATAN: kode-kode di atas (mis. 21-6000, 31-1000) adalah skema CoA yang semula
-// diasumsikan modul ini, TAPI CoA koperasi ini (satu-satunya org yang memakai modul
-// kojasmat saat ini) sudah dibuat lebih dulu dengan skema kode 4-digit berbeda.
-// Konstanta di bawah sudah diarahkan ke kode yang BENAR-BENAR ADA supaya jurnal
-// tidak silently di-skip (lihat postJurnal — kalau akun tidak ketemu, di-skip diam-diam).
-// Kalau kelak ada organisasi kojasmat kedua dengan skema CoA berbeda, konstanta ini
-// perlu dibuat per-org (bukan modul-level) — bukan di-hardcode ulang begini.
+// Kode akun TIDAK di-hardcode di sini — setiap koperasi bisa punya skema CoA
+// berbeda. Akun untuk tiap peran (kas, simpanan pokok/wajib/sukarela, dana
+// syirkah temporer, piutang pembiayaan, ujrah wakalah, dst) diambil dari
+// kojasmat_account_mapping (satu baris per org), yang diatur sendiri oleh
+// admin koperasi lewat UI Pengaturan Akun. Kalau suatu peran belum dipetakan,
+// jurnal untuk peran itu di-skip non-fatal — transaksi tetap tercatat di
+// modul Kojasmat, hanya belum masuk buku besar sampai admin melengkapi
+// pemetaannya.
 
-import { ERPBridge } from './finances'
 import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
-
-const SIMPANAN_COA: Record<string, string> = {
-  POKOK:    '3001',
-  WAJIB:    '3002',
-  SUKARELA: '2101',
-}
-
-const DST_COA: Record<string, string> = {
-  MUDHARABAH: '21-5002',
-  MURABAHAH:  '21-5001',
-  INAN:       '21-5002',
-}
-
-async function getAcct(orgId: string, code: string): Promise<string | null> {
-  return ERPBridge.getDefaultAccount(orgId, code)
-}
+import { getKojasmatAccountMapping, type KojasmatAccountRole } from '@/modules/kojasmat/lib/kojasmat-account-mapping.server'
 
 async function postJurnal(
   orgId: string,
-  debitCode: string,
-  creditCode: string,
+  debitRole: KojasmatAccountRole,
+  creditRole: KojasmatAccountRole,
   amount: number,
   description: string,
   refType: string,
   refId: string,
 ) {
   if (amount <= 0) return
-  const [debitId, creditId] = await Promise.all([
-    getAcct(orgId, debitCode),
-    getAcct(orgId, creditCode),
-  ])
+  const mapping = await getKojasmatAccountMapping(orgId)
+  const debitId = mapping[debitRole]
+  const creditId = mapping[creditRole]
   if (!debitId || !creditId) {
-    // CoA belum diinject untuk org ini — skip non-fatal
+    // Peran akun belum dipetakan admin — skip non-fatal
     return
   }
   await createJournalEntry({
@@ -72,10 +46,22 @@ async function postJurnal(
   })
 }
 
+const SIMPANAN_ROLE: Record<'POKOK' | 'WAJIB' | 'SUKARELA', KojasmatAccountRole> = {
+  POKOK:    'simpanan_pokok',
+  WAJIB:    'simpanan_wajib',
+  SUKARELA: 'simpanan_sukarela',
+}
+
+const DST_ROLE: Record<'MUDHARABAH' | 'MURABAHAH' | 'INAN', KojasmatAccountRole> = {
+  MUDHARABAH: 'dst_mudharabah',
+  MURABAHAH:  'dst_murabahah',
+  INAN:       'dst_mudharabah',
+}
+
 // ─── SIMPANAN ─────────────────────────────────────────────────────────────────
 
 /**
- * Setoran simpanan: Dr Kas (1101) → Cr Wadiah Anggota (31-1000/31-2000/21-6000 — semua LIABILITAS)
+ * Setoran simpanan: Dr Kas → Cr Wadiah Anggota (Pokok/Wajib/Sukarela)
  */
 export async function jurnalSetorSimpanan(
   orgId: string,
@@ -84,17 +70,15 @@ export async function jurnalSetorSimpanan(
   simpananId: string,
   keteranganExtra?: string,
 ) {
-  const creditCode = SIMPANAN_COA[jenis]
-  if (!creditCode) return
   await postJurnal(
-    orgId, '1101', creditCode, jumlah,
+    orgId, 'kas', SIMPANAN_ROLE[jenis], jumlah,
     `Setoran simpanan ${jenis}${keteranganExtra ? ` — ${keteranganExtra}` : ''}`,
     'KOJASMAT_SIMPANAN_SETOR', simpananId,
   )
 }
 
 /**
- * Biaya admin pendaftaran anggota baru: Dr Kas (1101) → Cr Pendapatan Administrasi (41-7000)
+ * Biaya admin pendaftaran anggota baru: Dr Kas → Cr Pendapatan Administrasi
  */
 export async function jurnalPendapatanBiayaAdmin(
   orgId: string,
@@ -102,14 +86,14 @@ export async function jurnalPendapatanBiayaAdmin(
   pendaftaranId: string,
 ) {
   await postJurnal(
-    orgId, '1101', '41-7000', jumlah,
+    orgId, 'kas', 'pendapatan_admin', jumlah,
     'Biaya admin pendaftaran anggota baru',
     'KOJASMAT_PENDAFTARAN_BAYAR', pendaftaranId,
   )
 }
 
 /**
- * Penarikan simpanan: Dr Simpanan Anggota → Cr Kas (1101)
+ * Penarikan simpanan: Dr Simpanan Anggota → Cr Kas
  */
 export async function jurnalTarikSimpanan(
   orgId: string,
@@ -118,10 +102,8 @@ export async function jurnalTarikSimpanan(
   simpananId: string,
   keteranganExtra?: string,
 ) {
-  const debitCode = SIMPANAN_COA[jenis]
-  if (!debitCode) return
   await postJurnal(
-    orgId, debitCode, '1101', jumlah,
+    orgId, SIMPANAN_ROLE[jenis], 'kas', jumlah,
     `Penarikan simpanan ${jenis}${keteranganExtra ? ` — ${keteranganExtra}` : ''}`,
     'KOJASMAT_SIMPANAN_TARIK', simpananId,
   )
@@ -130,8 +112,7 @@ export async function jurnalTarikSimpanan(
 // ─── PEMBIAYAAN PROYEK ────────────────────────────────────────────────────────
 
 /**
- * Pemodal menyetor dana ke proyek:
- *   Dr Kas (1101) → Cr Dana Syirkah Temporer (21-5002 Mudharabah / 21-5001 Murabahah)
+ * Pemodal menyetor dana ke proyek: Dr Kas → Cr Dana Syirkah Temporer
  */
 export async function jurnalPenerimaanDanaPemodal(
   orgId: string,
@@ -140,9 +121,8 @@ export async function jurnalPenerimaanDanaPemodal(
   pembiayaanId: string,
   kodeProyek: string,
 ) {
-  const creditCode = DST_COA[jenisAkad] ?? '21-5002'
   await postJurnal(
-    orgId, '1101', creditCode, jumlah,
+    orgId, 'kas', DST_ROLE[jenisAkad], jumlah,
     `Penerimaan dana pemodal proyek ${kodeProyek} (${jenisAkad})`,
     'KOJASMAT_PEMBIAYAAN', pembiayaanId,
   )
@@ -150,8 +130,7 @@ export async function jurnalPenerimaanDanaPemodal(
 
 /**
  * Pembatalan pendanaan oleh pemodal sebelum proyek berjalan — reversal dari
- * jurnalPenerimaanDanaPemodal:
- *   Dr Dana Syirkah Temporer → Cr Kas (1101)
+ * jurnalPenerimaanDanaPemodal: Dr Dana Syirkah Temporer → Cr Kas
  */
 export async function jurnalPembatalanPembiayaan(
   orgId: string,
@@ -160,9 +139,8 @@ export async function jurnalPembatalanPembiayaan(
   pembiayaanId: string,
   kodeProyek: string,
 ) {
-  const debitCode = DST_COA[jenisAkad] ?? '21-5002'
   await postJurnal(
-    orgId, debitCode, '1101', jumlah,
+    orgId, DST_ROLE[jenisAkad], 'kas', jumlah,
     `Pembatalan pendanaan proyek ${kodeProyek} (${jenisAkad})`,
     'KOJASMAT_PEMBIAYAAN_BATAL', pembiayaanId,
   )
@@ -170,7 +148,7 @@ export async function jurnalPembatalanPembiayaan(
 
 /**
  * Pembatalan ujrah diwakilkan akad — reversal dari jurnalUjrahMudharabah/Murabahah:
- *   Dr Ujrah Wakalah → Cr Kas (1101)
+ * Dr Ujrah Wakalah → Cr Kas
  */
 export async function jurnalPembatalanUjrah(
   orgId: string,
@@ -179,9 +157,9 @@ export async function jurnalPembatalanUjrah(
   refId: string,
   kodeProyek: string,
 ) {
-  const debitCode = jenisAkad === 'MURABAHAH' ? '41-6001' : '41-6002'
+  const debitRole: KojasmatAccountRole = jenisAkad === 'MURABAHAH' ? 'ujrah_murabahah' : 'ujrah_mudharabah'
   await postJurnal(
-    orgId, debitCode, '1101', jumlah,
+    orgId, debitRole, 'kas', jumlah,
     `Pembatalan ujrah wakalah diwakilkan akad proyek ${kodeProyek}`,
     'KOJASMAT_UJRAH_BATAL', refId,
   )
@@ -189,7 +167,7 @@ export async function jurnalPembatalanUjrah(
 
 /**
  * Penyaluran modal ke mudharib (koperasi bayar ke pengaju proyek):
- *   Dr Piutang Mudharabah (11-4001) → Cr Kas (1101)
+ * Dr Piutang Pembiayaan → Cr Kas
  */
 export async function jurnalPenyaluranModalMudharib(
   orgId: string,
@@ -198,7 +176,7 @@ export async function jurnalPenyaluranModalMudharib(
   kodeProyek: string,
 ) {
   await postJurnal(
-    orgId, '11-4001', '1101', jumlah,
+    orgId, 'piutang_pembiayaan', 'kas', jumlah,
     `Penyaluran modal ke mudharib proyek ${kodeProyek}`,
     'KOJASMAT_PENYALURAN', proyekId,
   )
@@ -207,8 +185,7 @@ export async function jurnalPenyaluranModalMudharib(
 // ─── UJRAH KOPERASI ───────────────────────────────────────────────────────────
 
 /**
- * Penerimaan ujrah wakalah dari mudharib:
- *   Dr Kas (1101) → Cr Ujrah Wakalah Mudharabah (41-6002)
+ * Penerimaan ujrah wakalah dari mudharib: Dr Kas → Cr Ujrah Wakalah Mudharabah
  */
 export async function jurnalUjrahMudharabah(
   orgId: string,
@@ -217,15 +194,14 @@ export async function jurnalUjrahMudharabah(
   kodeProyek: string,
 ) {
   await postJurnal(
-    orgId, '1101', '41-6002', jumlah,
+    orgId, 'kas', 'ujrah_mudharabah', jumlah,
     `Ujrah wakalah mudharabah proyek ${kodeProyek}`,
     'KOJASMAT_UJRAH', refId,
   )
 }
 
 /**
- * Penerimaan ujrah wakalah dari akad murabahah:
- *   Dr Kas (1101) → Cr Ujrah Wakalah Murabahah (41-6001)
+ * Penerimaan ujrah wakalah dari akad murabahah: Dr Kas → Cr Ujrah Wakalah Murabahah
  */
 export async function jurnalUjrahMurabahah(
   orgId: string,
@@ -234,7 +210,7 @@ export async function jurnalUjrahMurabahah(
   kodeProyek: string,
 ) {
   await postJurnal(
-    orgId, '1101', '41-6001', jumlah,
+    orgId, 'kas', 'ujrah_murabahah', jumlah,
     `Ujrah wakalah murabahah proyek ${kodeProyek}`,
     'KOJASMAT_UJRAH', refId,
   )
@@ -243,8 +219,7 @@ export async function jurnalUjrahMurabahah(
 // ─── BAGI HASIL ───────────────────────────────────────────────────────────────
 
 /**
- * Distribusi bagi hasil ke pemodal (shahibul maal):
- *   Dr Dana Syirkah Temporer (21-5002) → Cr Kas (1101)
+ * Distribusi bagi hasil ke pemodal (shahibul maal): Dr Bagi Hasil → Cr Kas
  */
 export async function jurnalDistribusiBagiHasil(
   orgId: string,
@@ -253,7 +228,7 @@ export async function jurnalDistribusiBagiHasil(
   kodeProyek: string,
 ) {
   await postJurnal(
-    orgId, '21-5002', '1101', jumlah,
+    orgId, 'bagi_hasil', 'kas', jumlah,
     `Distribusi bagi hasil proyek ${kodeProyek}`,
     'KOJASMAT_BAGI_HASIL', bagiHasilId,
   )
@@ -263,7 +238,7 @@ export async function jurnalDistribusiBagiHasil(
 
 /**
  * Pendapatan usaha dari proyek pembiayaan (dicatat mudharib di laporan perkembangan):
- *   Dr Kas (1101) → Cr Pendapatan Usaha Proyek (41-7000)
+ * Dr Kas → Cr Pendapatan Usaha Proyek
  */
 export async function jurnalPendapatanProyek(
   orgId: string,
@@ -273,7 +248,7 @@ export async function jurnalPendapatanProyek(
   kategori: string,
 ) {
   await postJurnal(
-    orgId, '1101', '41-7000', jumlah,
+    orgId, 'kas', 'pendapatan_proyek', jumlah,
     `Pendapatan proyek ${kodeProyek} — ${kategori}`,
     'KOJASMAT_PROYEK_PENDAPATAN', transaksiId,
   )
@@ -281,7 +256,7 @@ export async function jurnalPendapatanProyek(
 
 /**
  * Beban usaha dari proyek pembiayaan (dicatat mudharib di laporan perkembangan):
- *   Dr Beban Usaha Proyek (51-7000) → Cr Kas (1101)
+ * Dr Beban Usaha Proyek → Cr Kas
  */
 export async function jurnalBebanProyek(
   orgId: string,
@@ -291,7 +266,7 @@ export async function jurnalBebanProyek(
   kategori: string,
 ) {
   await postJurnal(
-    orgId, '51-7000', '1101', jumlah,
+    orgId, 'beban_proyek', 'kas', jumlah,
     `Beban proyek ${kodeProyek} — ${kategori}`,
     'KOJASMAT_PROYEK_BEBAN', transaksiId,
   )
