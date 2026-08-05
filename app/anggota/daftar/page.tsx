@@ -10,7 +10,7 @@ export default async function DaftarPage({
 }) {
   const { org } = await searchParams
 
-  if (!org) {
+  if (!org || !/^[0-9a-f-]{36}$/i.test(org)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm max-w-md">

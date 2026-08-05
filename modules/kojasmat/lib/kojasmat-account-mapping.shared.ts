@@ -20,6 +20,7 @@ export const KOJASMAT_ACCOUNT_ROLES = [
   'pendapatan_proyek',
   'beban_proyek',
   'bagi_hasil',
+  'pendapatan_ijarah',
 ] as const
 
 export type KojasmatAccountRole = typeof KOJASMAT_ACCOUNT_ROLES[number]
@@ -43,6 +44,7 @@ export const KOJASMAT_ACCOUNT_ROLE_LABEL: Record<KojasmatAccountRole, string> = 
   pendapatan_proyek: 'Pendapatan Usaha Proyek',
   beban_proyek: 'Beban Usaha Proyek',
   bagi_hasil: 'Distribusi Bagi Hasil ke Pemodal',
+  pendapatan_ijarah: 'Pendapatan Ijarah Platform (Ujrah Layanan)',
 }
 
 export type KojasmatAccountMapping = Record<KojasmatAccountRole, string | null>

@@ -59,6 +59,9 @@ import {
   saveKojasmatWhatsappSettingsAction, sendKojasmatTestWhatsappAction,
 } from '@/modules/kojasmat/actions/kojasmat-notifikasi.actions'
 import type { TenantWhatsappConfig } from '@/modules/notifications/whatsapp-settings.server'
+import {
+  getAkadIjarahByAnggota, setAkadIjarahOverride, buatAkadIjarahManual, type KojasmatAkadIjarah,
+} from '@/modules/kojasmat/actions/kojasmat-ijarah.actions'
 
 const KATEGORI_PENDAPATAN = ['Penjualan', 'Jasa', 'Pendapatan Lain'] as const
 const KATEGORI_BEBAN = ['Bahan Baku', 'Operasional', 'Gaji/Upah', 'Sewa', 'Transportasi', 'Beban Lain'] as const
@@ -84,6 +87,9 @@ type Props = {
     apresiasi_tiers: ApresiasiTier[]
     qris_image_key: string | null
     qris_image_name: string | null
+    ijarah_platform_fee: number
+    ijarah_platform_periode_hari: number
+    ijarah_sukarela_opsional_minimal: number
   }
   bankAccounts: { id: string; bank_name: string; account_number: string }[]
   qrisPreviewUrl: string | null
@@ -198,6 +204,119 @@ function Drawer({ open, onClose, title, children }: {
   )
 }
 
+// ─── IJARAH PLATFORM OVERRIDE PANEL ────────────────────────────────────────────
+// Admin bisa memberi harga custom per anggota atau menonaktifkan tagihan ijarah
+// untuk anggota tertentu — terms disimpan per-akad, tidak memengaruhi anggota lain.
+
+function IjarahOverridePanel({ anggotaId, orgId }: { anggotaId: string; orgId: string }) {
+  const [pending, startTransition] = useTransition()
+  const [loading, setLoading] = useState(true)
+  const [akad, setAkad] = useState<KojasmatAkadIjarah | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [nominalFee, setNominalFee] = useState('')
+  const [status, setStatus] = useState<'AKTIF' | 'BERHENTI'>('AKTIF')
+  const [catatan, setCatatan] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getAkadIjarahByAnggota(anggotaId).then(a => {
+      if (cancelled) return
+      setAkad(a)
+      if (a) { setNominalFee(String(a.nominal_fee)); setStatus(a.status === 'BERHENTI' ? 'BERHENTI' : 'AKTIF') }
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [anggotaId])
+
+  function handleSave() {
+    if (!nominalFee || Number(nominalFee) <= 0) { setError('Nominal fee harus lebih dari nol'); return }
+    setError(null)
+    startTransition(async () => {
+      const res = akad
+        ? await setAkadIjarahOverride(akad.id, { nominal_fee: Number(nominalFee), status, catatan: catatan || undefined })
+        : await buatAkadIjarahManual(orgId, anggotaId, { nominal_fee: Number(nominalFee) })
+      if ('error' in res) { setError(res.error); return }
+      const refreshed = await getAkadIjarahByAnggota(anggotaId)
+      setAkad(refreshed)
+      setEditing(false)
+      setCatatan('')
+    })
+  }
+
+  if (loading) {
+    return <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-400">Memuat akad ijarah...</div>
+  }
+
+  return (
+    <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-purple-900">Ijarah Platform</p>
+        {akad && (
+          <Badge
+            text={akad.status === 'BERHENTI' ? 'Nonaktif' : akad.status === 'DIBEKUKAN' ? 'Anggota Dibekukan' : 'Aktif'}
+            cls={akad.status === 'AKTIF' ? 'bg-purple-100 text-purple-700' : akad.status === 'DIBEKUKAN' ? 'bg-rose-100 text-rose-700' : 'bg-gray-200 text-gray-600'}
+          />
+        )}
+      </div>
+
+      {!editing ? (
+        <>
+          {akad ? (
+            <div className="mt-2 text-xs text-purple-700 space-y-0.5">
+              <p>Tarif: <span className="font-semibold">{fmt(akad.nominal_fee)}</span> / {akad.periode_hari} hari</p>
+              <p>Tagihan berikutnya: {new Date(akad.tagihan_berikutnya).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+              {akad.catatan_admin && <p className="text-gray-500">Catatan: {akad.catatan_admin}</p>}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-purple-700">Anggota ini belum memiliki akad ijarah.</p>
+          )}
+          <button onClick={() => setEditing(true)}
+            className="mt-3 text-xs font-medium text-purple-700 hover:text-purple-900 cursor-pointer underline underline-offset-2">
+            {akad ? 'Ubah tarif / status' : 'Buat akad ijarah'}
+          </button>
+        </>
+      ) : (
+        <div className="mt-3 space-y-2">
+          <div>
+            <label className="text-xs font-medium text-gray-700">Tarif (Rp)</label>
+            <input type="text" inputMode="numeric"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-500"
+              value={nominalFee} onChange={e => setNominalFee(e.target.value.replace(/\D/g, ''))} />
+          </div>
+          {akad && (
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setStatus('AKTIF')}
+                className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium cursor-pointer', status === 'AKTIF' ? 'bg-purple-600 text-white' : 'bg-white border border-gray-200 text-gray-600')}>
+                Aktif
+              </button>
+              <button type="button" onClick={() => setStatus('BERHENTI')}
+                className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium cursor-pointer', status === 'BERHENTI' ? 'bg-gray-600 text-white' : 'bg-white border border-gray-200 text-gray-600')}>
+                Nonaktifkan
+              </button>
+            </div>
+          )}
+          <input type="text" placeholder="Catatan (opsional)"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-purple-500"
+            value={catatan} onChange={e => setCatatan(e.target.value)} />
+          {error && <p className="text-xs text-rose-600">{error}</p>}
+          <div className="flex gap-2">
+            <button onClick={() => { setEditing(false); setError(null) }}
+              className="flex-1 rounded-lg border border-gray-200 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 cursor-pointer">
+              Batal
+            </button>
+            <button onClick={handleSave} disabled={pending}
+              className="flex-1 rounded-lg bg-purple-600 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50 cursor-pointer">
+              {pending ? 'Menyimpan...' : 'Simpan'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── BUKU TABUNGAN PANEL ──────────────────────────────────────────────────────
 
 function BukuTabunganPanel({
@@ -248,10 +367,12 @@ function BukuTabunganPanel({
     SETOR: 'text-emerald-600', BAGI_HASIL: 'text-blue-600',
     TARIK: 'text-red-600', KOREKSI: 'text-amber-600',
     TRANSFER_MASUK: 'text-emerald-600', TRANSFER_KELUAR: 'text-red-600',
+    IJARAH: 'text-red-600',
   }
   const MUTASI_LABEL: Record<string, string> = {
     SETOR: 'Setor', TARIK: 'Tarik', BAGI_HASIL: 'Bagi Hasil', KOREKSI: 'Koreksi',
     TRANSFER_MASUK: 'Transfer Masuk', TRANSFER_KELUAR: 'Transfer Keluar',
+    IJARAH: 'Ijarah Platform',
   }
 
   return (
@@ -270,6 +391,8 @@ function BukuTabunganPanel({
           <p className="font-bold text-gray-900">{fmt(totalSaldo)}</p>
         </div>
       </div>
+
+      <IjarahOverridePanel anggotaId={anggota.id} orgId={orgId} />
 
       {/* 3 saldo cards */}
       {loading ? (
@@ -4465,6 +4588,9 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
     nominal_simpanan_pokok: String(moduleSettings.nominal_simpanan_pokok),
     nominal_simpanan_wajib: String(moduleSettings.nominal_simpanan_wajib),
     bank_account_id: moduleSettings.bank_account_id ?? '',
+    ijarah_platform_fee: String(moduleSettings.ijarah_platform_fee),
+    ijarah_platform_periode_hari: String(moduleSettings.ijarah_platform_periode_hari),
+    ijarah_sukarela_opsional_minimal: String(moduleSettings.ijarah_sukarela_opsional_minimal),
   })
   const [tierForm, setTierForm] = useState(
     moduleSettings.apresiasi_tiers.map(t => ({ min_score: String(t.min_score), label: t.label }))
@@ -4540,6 +4666,9 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
         nominal_simpanan_pokok: Number(settingsForm.nominal_simpanan_pokok) || 0,
         nominal_simpanan_wajib: Number(settingsForm.nominal_simpanan_wajib) || 0,
         bank_account_id: settingsForm.bank_account_id || null,
+        ijarah_platform_fee: Number(settingsForm.ijarah_platform_fee) || 0,
+        ijarah_platform_periode_hari: Number(settingsForm.ijarah_platform_periode_hari) || 30,
+        ijarah_sukarela_opsional_minimal: Number(settingsForm.ijarah_sukarela_opsional_minimal) || 0,
         apresiasi_tiers: tierForm
           .filter(t => t.label.trim())
           .map(t => ({ min_score: Number(t.min_score) || 0, label: t.label.trim() })),
@@ -4609,6 +4738,37 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
                 <option key={b.id} value={b.id}>{b.bank_name} · {b.account_number}</option>
               ))}
             </select>
+          </div>
+        </div>
+
+        <div className="mt-5 pt-5 border-t border-gray-100">
+          <h4 className="text-sm font-semibold text-gray-900 mb-1">Akad Ijarah Platform</h4>
+          <p className="text-xs text-gray-500 mb-3">
+            Tarif default akad ijarah anggota baru — nilai ini di-snapshot per anggota saat pendaftaran disetujui,
+            perubahan di sini tidak mengubah akad anggota yang sudah berjalan.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Tarif Ijarah (Rp)</label>
+              <input type="number" min={0}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                value={settingsForm.ijarah_platform_fee}
+                onChange={e => setSettingsForm(f => ({ ...f, ijarah_platform_fee: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Periode Tagihan (hari)</label>
+              <input type="number" min={1}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                value={settingsForm.ijarah_platform_periode_hari}
+                onChange={e => setSettingsForm(f => ({ ...f, ijarah_platform_periode_hari: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Minimal Tabungan Opsional (Rp)</label>
+              <input type="number" min={0}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                value={settingsForm.ijarah_sukarela_opsional_minimal}
+                onChange={e => setSettingsForm(f => ({ ...f, ijarah_sukarela_opsional_minimal: e.target.value }))} />
+            </div>
           </div>
         </div>
 
@@ -4801,6 +4961,7 @@ const ACCOUNT_ROLE_GROUPS: { title: string; roles: KojasmatAccountRole[] }[] = [
   { title: 'Pembiayaan Proyek', roles: ['dst_murabahah', 'dst_mudharabah', 'piutang_pembiayaan', 'bagi_hasil'] },
   { title: 'Ujrah Wakalah', roles: ['ujrah_murabahah', 'ujrah_mudharabah'] },
   { title: 'Administrasi & Proyek', roles: ['pendapatan_admin', 'pendapatan_proyek', 'beban_proyek'] },
+  { title: 'Ijarah Platform', roles: ['pendapatan_ijarah'] },
 ]
 
 function AccountRoleSelect({

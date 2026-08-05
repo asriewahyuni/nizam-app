@@ -32,7 +32,7 @@ const DEFAULT_APRESIASI_TIERS: ApresiasiTier[] = [
   { min_score: 60, label: 'Maqbul' },
 ]
 
-type KojasmatModuleSettings = {
+export type KojasmatModuleSettings = {
   passing_threshold: number
   biaya_admin_pendaftaran: number
   nominal_simpanan_pokok: number
@@ -41,6 +41,9 @@ type KojasmatModuleSettings = {
   apresiasi_tiers: ApresiasiTier[]
   qris_image_key: string | null
   qris_image_name: string | null
+  ijarah_platform_fee: number
+  ijarah_platform_periode_hari: number
+  ijarah_sukarela_opsional_minimal: number
 }
 
 function resolveApresiasi(skor: number, tiers: ApresiasiTier[]): string | null {
@@ -149,6 +152,9 @@ export async function getModuleSettings(orgId: string): Promise<KojasmatModuleSe
       : DEFAULT_APRESIASI_TIERS,
     qris_image_key: (settings.qris_image_key as string) ?? null,
     qris_image_name: (settings.qris_image_name as string) ?? null,
+    ijarah_platform_fee: Number(settings.ijarah_platform_fee ?? 25000),
+    ijarah_platform_periode_hari: Number(settings.ijarah_platform_periode_hari ?? 30),
+    ijarah_sukarela_opsional_minimal: Number(settings.ijarah_sukarela_opsional_minimal ?? 20000),
   }
 }
 
@@ -279,6 +285,51 @@ export async function submitTestMasuk(testMasukId: string, jawaban: Record<strin
   }
 }
 
+// Bypass admin — tandai test LULUS 100% tanpa menjawab soal apapun. Dipicu lewat
+// query param rahasia (?forcequizz) di wizard pendaftaran publik untuk kebutuhan
+// testing internal. Tidak ada barrier auth tambahan (wizard ini memang publik/
+// anonim by design) — blast radius rendah karena aktivasi akun tetap wajib
+// approval manual staf lewat setujuiPendaftaran(); bypass ini cuma melewati
+// tahap kuis, bukan verifikasi pembayaran.
+export async function forceLulusTestMasuk(testMasukId: string) {
+  try {
+    const { rows: [testMasuk] } = await queryPostgres(
+      `SELECT * FROM kojasmat_test_masuk WHERE id=$1`,
+      [testMasukId]
+    )
+    if (!testMasuk) return { error: 'Sesi test tidak ditemukan' }
+    if (testMasuk.status !== 'BERLANGSUNG') {
+      return { error: 'Test ini sudah pernah disubmit' }
+    }
+
+    const soalIds: string[] = testMasuk.soal_ids
+    const totalSoal = soalIds.length
+
+    await queryPostgres(
+      `UPDATE kojasmat_test_masuk
+       SET jawaban=$2, jumlah_benar=$3, skor=100, status='LULUS', submitted_at=NOW()
+       WHERE id=$1`,
+      [testMasukId, JSON.stringify({ __forced_by_admin: true }), totalSoal]
+    )
+
+    const settings = await getModuleSettings(testMasuk.org_id)
+    const apresiasi = resolveApresiasi(100, settings.apresiasi_tiers)
+
+    return {
+      data: {
+        skor: 100,
+        jumlah_benar: totalSoal,
+        total_soal: totalSoal,
+        status: 'LULUS' as const,
+        passing_threshold: testMasuk.passing_threshold as number,
+        apresiasi,
+      }
+    }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Gagal memproses' }
+  }
+}
+
 // ─── PEMBAYARAN PENDAFTARAN (publik — bagian wizard pendaftaran) ─────────────
 
 // Tidak butuh auth — bagian dari wizard publik pendaftaran
@@ -304,6 +355,9 @@ export async function getInfoPembayaran(orgId: string) {
       biaya_admin_pendaftaran: settings.biaya_admin_pendaftaran,
       nominal_simpanan_pokok: settings.nominal_simpanan_pokok,
       nominal_simpanan_wajib: settings.nominal_simpanan_wajib,
+      ijarah_platform_fee: settings.ijarah_platform_fee,
+      ijarah_platform_periode_hari: settings.ijarah_platform_periode_hari,
+      ijarah_sukarela_opsional_minimal: settings.ijarah_sukarela_opsional_minimal,
       bank_account: bankAccount,
       qris_image_url: qrisImageUrl,
     }
@@ -316,6 +370,8 @@ export async function submitPembayaranPendaftaran(pendaftaranId: string, payload
   biaya_admin: number
   simpanan_pokok: number
   simpanan_wajib: number
+  ijarah_fee: number
+  sukarela_topup: number
   file_key: string
   nama_file: string
   file_size?: number
@@ -340,6 +396,11 @@ export async function submitPembayaranPendaftaran(pendaftaranId: string, payload
       return { error: 'Test masuk belum lulus, tidak dapat melanjutkan pembayaran' }
     }
 
+    const settings = await getModuleSettings(payload.org_id)
+    if (payload.sukarela_topup > 0 && payload.sukarela_topup < settings.ijarah_sukarela_opsional_minimal) {
+      return { error: `Tabungan sukarela tambahan minimal Rp ${settings.ijarah_sukarela_opsional_minimal.toLocaleString('id-ID')}` }
+    }
+
     const { rows: [dokumen] } = await queryPostgres(
       `INSERT INTO kojasmat_dokumen
          (org_id, referensi_type, referensi_id, jenis_dokumen, nama_file, file_key, file_size, mime_type)
@@ -350,10 +411,12 @@ export async function submitPembayaranPendaftaran(pendaftaranId: string, payload
 
     await queryPostgres(
       `UPDATE kojasmat_pendaftaran
-       SET biaya_admin_dibayar=$2, simpanan_pokok_dibayar=$3, simpanan_wajib_dibayar=$4, bukti_bayar_dokumen_id=$5,
+       SET biaya_admin_dibayar=$2, simpanan_pokok_dibayar=$3, simpanan_wajib_dibayar=$4,
+           ijarah_fee_dibayar=$5, simpanan_sukarela_dibayar=$6, bukti_bayar_dokumen_id=$7,
            status_bayar='SUDAH', dibayar_at=NOW(), updated_at=NOW()
        WHERE id=$1`,
-      [pendaftaranId, payload.biaya_admin, payload.simpanan_pokok, payload.simpanan_wajib, dokumen.id]
+      [pendaftaranId, payload.biaya_admin, payload.simpanan_pokok, payload.simpanan_wajib,
+        payload.ijarah_fee, payload.sukarela_topup, dokumen.id]
     )
 
     // Status pendaftaran TETAP MENUNGGU — aktivasi anggota (termasuk posting

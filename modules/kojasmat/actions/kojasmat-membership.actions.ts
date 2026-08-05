@@ -9,6 +9,8 @@ import { postSimpananMutasi } from './kojasmat.actions'
 import { jurnalPendapatanBiayaAdmin } from '@/lib/erp-bridge/kojasmat-journals'
 import { generateTempPassword } from '../lib/temp-password'
 import { enqueueNotification } from '@/modules/notifications/outbox.server'
+import { getModuleSettings } from './kojasmat-test.actions'
+import { tagihIjarah } from './kojasmat-ijarah.actions'
 
 function buildPendaftaranDisetujuiWaText(input: {
   nama: string
@@ -222,7 +224,10 @@ export async function buatPendaftaran(payload: {
 // Inti pembuatan anggota dari pendaftaran — dipakai baik oleh staf yang approve manual
 // (status awal CALON) maupun alur otomatis test+bayar (status langsung AKTIF).
 async function createAnggotaFromPendaftaran(
-  pend: KojasmatPendaftaran & { simpanan_pokok_dibayar?: number | null; simpanan_wajib_dibayar?: number | null; biaya_admin_dibayar?: number | null },
+  pend: KojasmatPendaftaran & {
+    simpanan_pokok_dibayar?: number | null; simpanan_wajib_dibayar?: number | null; biaya_admin_dibayar?: number | null
+    ijarah_fee_dibayar?: number | null; simpanan_sukarela_dibayar?: number | null
+  },
   opts: { status: 'CALON' | 'AKTIF' }
 ) {
   // Buat nomor anggota baru
@@ -325,6 +330,41 @@ async function createAnggotaFromPendaftaran(
       try {
         await jurnalPendapatanBiayaAdmin(pend.org_id, nominalAdmin, pend.id)
       } catch (_) { /* jurnal non-fatal */ }
+    }
+
+    // Akad ijarah platform — siklus pertama dibayar tunai bersama pokok/wajib
+    // (dikreditkan ke Sukarela dulu, lalu dipotong sekali lewat tagihIjarah()
+    // yang sama persis dipakai cron untuk siklus-siklus berikutnya).
+    const nominalIjarah = Number(pend.ijarah_fee_dibayar || 0)
+    const nominalTopupSukarela = Number(pend.simpanan_sukarela_dibayar || 0)
+    if (nominalIjarah > 0 || nominalTopupSukarela > 0) {
+      const creditAmount = nominalIjarah + nominalTopupSukarela
+      await postSimpananMutasi({
+        org_id: pend.org_id,
+        anggota_id: anggota.id,
+        jenis_simpanan: 'SUKARELA',
+        jenis_mutasi: 'SETOR',
+        jumlah: creditAmount,
+        keterangan: 'Setoran awal simpanan sukarela — siklus ijarah pertama' + (nominalTopupSukarela > 0 ? ' + tabungan sukarela' : ''),
+        created_by: pend.user_id ?? null,
+      })
+
+      // Validasi server-side terhadap tarif saat ini — jangan percaya nominal dari
+      // client wizard begitu saja, supaya anggota baru tidak langsung dibekukan
+      // di hari pertama gara-gara form basi/race dengan perubahan tarif admin.
+      const settings = await getModuleSettings(pend.org_id)
+      if (nominalIjarah + 0.005 >= settings.ijarah_platform_fee) {
+        const { rows: [akad] } = await queryPostgres(
+          `INSERT INTO kojasmat_akad_ijarah (org_id, anggota_id, nominal_fee, periode_hari, tanggal_mulai, tagihan_berikutnya)
+           VALUES ($1,$2,$3,$4,CURRENT_DATE,CURRENT_DATE)
+           ON CONFLICT (anggota_id) DO NOTHING
+           RETURNING id`,
+          [pend.org_id, anggota.id, settings.ijarah_platform_fee, settings.ijarah_platform_periode_hari]
+        )
+        if (akad) {
+          await tagihIjarah(akad.id).catch(() => null)
+        }
+      }
     }
   }
 
