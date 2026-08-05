@@ -34,7 +34,7 @@ async function getAuthorizedPengirim(dariAnggotaId?: string): Promise<{ id: stri
       `SELECT role FROM org_members WHERE org_id = $1::uuid AND user_id = $2::uuid LIMIT 1`,
       [anggota.org_id, userId]
     )
-    if (orgMember && ['owner', 'admin'].includes(orgMember.role)) {
+    if (orgMember && ['owner', 'admin', 'staff'].includes(orgMember.role)) {
       return { id: anggota.id, org_id: anggota.org_id, nama: anggota.nama, kode_anggota: anggota.kode_anggota }
     }
     return { error: 'Anda tidak memiliki akses untuk mentransfer saldo anggota ini.' }
