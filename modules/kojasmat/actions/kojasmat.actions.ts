@@ -1759,8 +1759,8 @@ export async function getProyekDiskusi(proyekId: string): Promise<KojasmatProyek
 
   // Ambil data anggota atau fallback ke info user admin
   const { rows } = await queryPostgres(
-    `SELECT d.*, 
-            COALESCE(a.nama, u.email) AS actor_name
+    `SELECT d.*,
+            COALESCE(a.nama, u.login_email) AS actor_name
      FROM kojasmat_proyek_diskusi d
      LEFT JOIN internal_auth_users u ON u.id = d.actor_id
      LEFT JOIN kojasmat_anggota a ON a.user_id = u.id
