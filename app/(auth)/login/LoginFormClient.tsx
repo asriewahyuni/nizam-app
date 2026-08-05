@@ -208,20 +208,22 @@ function LoginFormInner({ orgContext, tenantContext }: LoginFormProps) {
               </button>
             </form>
 
-            {!tenantContext && <div className="mt-8 pt-6 border-t border-white/5 space-y-4 text-center">
+            <div className="mt-8 pt-6 border-t border-white/5 space-y-4 text-center">
               <p className="text-sm text-slate-500 font-medium">
                 Belum punya akun?{' '}
-                <Link href="/register" className="text-white font-semibold hover:text-blue-400 transition-colors">
+                <Link href={tenantContext ? "/register-member" : "/register"} className="text-white font-semibold hover:text-blue-400 transition-colors">
                   Daftar Sekarang
                 </Link>
               </p>
-              <Link
-                href="/demo"
-                className="inline-flex w-full justify-center items-center gap-2 px-5 py-3 bg-slate-800/50 text-slate-300 text-sm font-medium rounded-xl hover:bg-slate-700/50 hover:text-white transition-all border border-white/5"
-              >
-                Coba Demo Gratis
-              </Link>
-            </div>}
+              {!tenantContext && (
+                <Link
+                  href="/demo"
+                  className="inline-flex w-full justify-center items-center gap-2 px-5 py-3 bg-slate-800/50 text-slate-300 text-sm font-medium rounded-xl hover:bg-slate-700/50 hover:text-white transition-all border border-white/5"
+                >
+                  Coba Demo Gratis
+                </Link>
+              )}
+            </div>
           </motion.div>
         ) : (
           <motion.div
