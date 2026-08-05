@@ -61,6 +61,7 @@ export type KojasmatSimpananMutasi = {
   keterangan?: string
   tanggal: string
   status: 'PENDING' | 'DISETUJUI' | 'DITOLAK'
+  metode_bayar?: 'TRANSFER' | 'QRIS' | null
   bukti_dokumen_id?: string | null
   catatan_admin?: string | null
   direview_oleh?: string | null
@@ -151,6 +152,7 @@ export type KojasmatAkad = {
   jadwal_akad?: string
   saksi_koperasi_id?: string
   saksi_nama?: string
+  saksi_2_nama?: string
   pihak_hadir?: unknown
   catatan?: string
   status: 'MENUNGGU_TTD' | 'DITANDATANGANI' | 'BATAL'
@@ -550,6 +552,7 @@ export async function ajukanSetoranSimpanan(payload: {
   anggota_id: string
   jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP'
   jumlah: number
+  metode_bayar?: 'TRANSFER' | 'QRIS'
   keterangan?: string
   file_key: string
   nama_file: string
@@ -566,10 +569,10 @@ export async function ajukanSetoranSimpanan(payload: {
 
   const { rows: [mutasi] } = await queryPostgres(
     `INSERT INTO kojasmat_simpanan_mutasi
-       (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, keterangan, status)
-     VALUES ($1,$2,$3,'SETOR',$4,$5,'PENDING')
-     RETURNING id`,
-    [payload.org_id, simpanan.id, payload.anggota_id, payload.jumlah, payload.keterangan ?? null]
+       (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, keterangan, status, metode_bayar)
+     VALUES ($1,$2,$3,'SETOR',$4,$5,'PENDING',$6)
+     RETURNING id, created_at`,
+    [payload.org_id, simpanan.id, payload.anggota_id, payload.jumlah, payload.keterangan ?? null, payload.metode_bayar ?? null]
   )
 
   const { rows: [dokumen] } = await queryPostgres(
@@ -586,7 +589,7 @@ export async function ajukanSetoranSimpanan(payload: {
   )
 
   revalidatePath('/kojasmat')
-  return { data: { id: mutasi.id as string } }
+  return { data: { id: mutasi.id as string, created_at: mutasi.created_at as string } }
 }
 
 export async function getSetoranPendingByOrg(orgId: string): Promise<KojasmatSetoranPending[]> {
@@ -1181,6 +1184,7 @@ export async function jadwalkanAkad(payload: {
   proyek_id: string
   jadwal_akad: string
   saksi_nama?: string
+  saksi_2_nama?: string
 }) {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
@@ -1192,9 +1196,9 @@ export async function jadwalkanAkad(payload: {
   if (proyek.status !== 'FUNDING_DITUTUP') return { error: 'Proyek tidak dalam status Funding Ditutup' }
 
   const { rows } = await queryPostgres(
-    `INSERT INTO kojasmat_akad (org_id, proyek_id, jadwal_akad, saksi_nama, status)
-     VALUES ($1,$2,$3,$4,'MENUNGGU_TTD') RETURNING *`,
-    [payload.org_id, payload.proyek_id, payload.jadwal_akad, payload.saksi_nama ?? null]
+    `INSERT INTO kojasmat_akad (org_id, proyek_id, jadwal_akad, saksi_nama, saksi_2_nama, status)
+     VALUES ($1,$2,$3,$4,$5,'MENUNGGU_TTD') RETURNING *`,
+    [payload.org_id, payload.proyek_id, payload.jadwal_akad, payload.saksi_nama ?? null, payload.saksi_2_nama ?? null]
   )
 
   await queryPostgres(
@@ -1332,8 +1336,10 @@ export async function createPembiayaan(payload: {
       throw new Error(`Melebihi saldo simpanan sukarela Anda (Rp ${saldoSukarela.toLocaleString('id-ID')})`)
     }
 
+    // Hanya blokir kalau masih ada pembiayaan AKTIF ke proyek ini — pendanaan yang
+    // sudah dibatalkan (GAGAL) tidak menghalangi investasi ulang (lihat migrasi 1401).
     const { rows: [existing] } = await client.query(
-      `SELECT id FROM kojasmat_pembiayaan WHERE proyek_id=$1 AND pemodal_id=$2`,
+      `SELECT id FROM kojasmat_pembiayaan WHERE proyek_id=$1 AND pemodal_id=$2 AND status='AKTIF'`,
       [payload.proyek_id, payload.pemodal_id]
     )
     if (existing) throw new Error('Anda sudah membiayai proyek ini sebelumnya.')

@@ -6,16 +6,16 @@ import {
   Wallet, Briefcase, Bell, LogOut, TrendingUp,
   CheckCircle, ArrowUpCircle, ArrowDownCircle,
   Star, GraduationCap, FileText, Send, Upload, XCircle,
-  ChevronDown, ChevronUp, AlertCircle, Home,
+  ChevronDown, ChevronUp, ChevronRight, AlertCircle, Home,
   Heart, Coins, Clock, Users, BadgeCheck, Scale, Banknote, TrendingDown,
-  Loader2, MessageCircle,
+  Loader2, MessageCircle, FileSignature,
 } from 'lucide-react'
 import {
   createProyek, updateStatusPenawaran, createPembiayaan, toggleMinatProyek, batalkanPembiayaan,
-  getProyekDiskusi, kirimPesanDiskusi, ajukanSetoranSimpanan,
+  getProyekDiskusi, kirimPesanDiskusi, ajukanSetoranSimpanan, getAkadByProyek,
   type KojasmatAnggota, type KojasmatProyek, type KojasmatSimpanan,
   type KojasmatPenawaran, type KojasmatPembiayaan, type KojasmatPelatihanTerjadwal, type KojasmatProyekDiskusi,
-  type KojasmatSimpananMutasi,
+  type KojasmatSimpananMutasi, type KojasmatAkad,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
   kirimLaporanProyek, simpanDokumen, hapusDokumen, getDokumenByRef,
@@ -58,6 +58,18 @@ function fmtShort(n: number) {
 
 function fmtTanggal(d: string) {
   return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(d))
+}
+
+function fmtTanggalWaktu(d: string) {
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).format(new Date(d)) + ' WIB'
+}
+
+const METODE_BAYAR_LABEL: Record<string, string> = {
+  TRANSFER: 'Transfer Bank',
+  QRIS: 'QRIS',
 }
 
 const AKAD_LABEL: Record<string, string> = {
@@ -374,6 +386,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
   const [setorError, setSetorError] = useState<string | null>(null)
   const [setorSuccess, setSetorSuccess] = useState(false)
   const [setoranList, setSetoranList] = useState(setoran)
+  const [detailSetoran, setDetailSetoran] = useState<KojasmatSimpananMutasi | null>(null)
 
   function openSetor() {
     setSheetOpen(true)
@@ -418,6 +431,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
         anggota_id: anggota.id,
         jenis_simpanan: jenisSetor,
         jumlah: Number(nominal),
+        metode_bayar: metodeBayar,
         keterangan: keterangan || undefined,
         file_key: buktiFile.key,
         nama_file: buktiFile.name,
@@ -428,7 +442,8 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
       setSetoranList(prev => [{
         id: res.data!.id, simpanan_id: targetSimpananId, anggota_id: anggota.id, jenis_mutasi: 'SETOR',
         jumlah: Number(nominal), saldo_sebelum: null, saldo_sesudah: null, keterangan,
-        tanggal: new Date().toISOString(), status: 'PENDING', created_at: new Date().toISOString(),
+        metode_bayar: metodeBayar, bukti_dokumen_id: null,
+        tanggal: res.data!.created_at, status: 'PENDING', created_at: res.data!.created_at,
       }, ...prev])
       setSetorSuccess(true)
     })
@@ -479,25 +494,105 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
             const badge = SETORAN_STATUS_BADGE[m.status] ?? SETORAN_STATUS_BADGE.DISETUJUI
             const jenisMutasi = simpanan.find(s => s.id === m.simpanan_id)?.jenis ?? 'SUKARELA'
             return (
-              <div key={m.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
-                <div>
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setDetailSetoran(m)}
+                className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm text-left cursor-pointer transition-colors hover:border-emerald-200 hover:bg-emerald-50/40"
+              >
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900">
                     {JENIS_SIMPANAN_INFO[jenisMutasi].label}
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5">{fmtTanggal(m.tanggal)}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{fmtTanggalWaktu(m.created_at)}</p>
+                  {m.metode_bayar && (
+                    <p className="text-xs text-gray-400 mt-0.5">{METODE_BAYAR_LABEL[m.metode_bayar]}</p>
+                  )}
                   {m.status === 'DITOLAK' && m.catatan_admin && (
                     <p className="text-xs text-rose-600 mt-1">{m.catatan_admin}</p>
                   )}
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-gray-900">{fmt(Number(m.jumlah))}</p>
-                  <Badge text={badge.label} cls={badge.cls} />
+                <div className="text-right shrink-0 flex items-center gap-2">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{fmt(Number(m.jumlah))}</p>
+                    <Badge text={badge.label} cls={badge.cls} />
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-300" />
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>
       )}
+
+      <Sheet open={!!detailSetoran} onClose={() => setDetailSetoran(null)} title="Detail Setoran">
+        {detailSetoran && (() => {
+          const badge = SETORAN_STATUS_BADGE[detailSetoran.status] ?? SETORAN_STATUS_BADGE.DISETUJUI
+          const jenisMutasi = simpanan.find(s => s.id === detailSetoran.simpanan_id)?.jenis ?? 'SUKARELA'
+          return (
+            <div className="space-y-4">
+              <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4 text-center">
+                <p className="text-xs text-emerald-600 mb-1">{JENIS_SIMPANAN_INFO[jenisMutasi].label}</p>
+                <p className="text-2xl font-bold text-emerald-800">{fmt(Number(detailSetoran.jumlah))}</p>
+                <div className="mt-2 flex justify-center">
+                  <Badge text={badge.label} cls={badge.cls} />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-100 divide-y divide-gray-100">
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-xs text-gray-400">Waktu Pengajuan</span>
+                  <span className="text-sm font-medium text-gray-800 text-right">{fmtTanggalWaktu(detailSetoran.created_at)}</span>
+                </div>
+                {detailSetoran.metode_bayar && (
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="text-xs text-gray-400">Jalur Pembayaran</span>
+                    <span className="text-sm font-medium text-gray-800">{METODE_BAYAR_LABEL[detailSetoran.metode_bayar]}</span>
+                  </div>
+                )}
+                {detailSetoran.keterangan && (
+                  <div className="flex items-center justify-between px-4 py-3 gap-3">
+                    <span className="text-xs text-gray-400 shrink-0">Catatan</span>
+                    <span className="text-sm font-medium text-gray-800 text-right">{detailSetoran.keterangan}</span>
+                  </div>
+                )}
+                {detailSetoran.status !== 'PENDING' && detailSetoran.direview_at && (
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="text-xs text-gray-400">Waktu Diverifikasi</span>
+                    <span className="text-sm font-medium text-gray-800 text-right">{fmtTanggalWaktu(detailSetoran.direview_at)}</span>
+                  </div>
+                )}
+                {detailSetoran.status === 'DISETUJUI' && detailSetoran.saldo_sesudah != null && (
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="text-xs text-gray-400">Saldo Setelah</span>
+                    <span className="text-sm font-medium text-gray-800">{fmt(Number(detailSetoran.saldo_sesudah))}</span>
+                  </div>
+                )}
+              </div>
+
+              {detailSetoran.status === 'DITOLAK' && detailSetoran.catatan_admin && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                  <p className="text-xs font-semibold text-rose-700">Alasan Ditolak</p>
+                  <p className="text-sm text-rose-600 mt-1">{detailSetoran.catatan_admin}</p>
+                </div>
+              )}
+
+              {detailSetoran.status === 'PENDING' && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs text-amber-700">
+                    Setoran ini sedang menunggu verifikasi pengurus. Saldo akan diperbarui setelah disetujui.
+                  </p>
+                </div>
+              )}
+
+              <button onClick={() => setDetailSetoran(null)}
+                className="w-full rounded-2xl border border-gray-200 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Tutup
+              </button>
+            </div>
+          )
+        })()}
+      </Sheet>
 
       <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Setor Simpanan">
         {setorSuccess ? (
@@ -846,6 +941,52 @@ function LaporanKeuanganCards({ laporan, personalLabel, personalAmount, personal
           </ul>
         </div>
       )}
+    </div>
+  )
+}
+
+const AKAD_STATUS_INFO: Record<string, { label: string; cls: string }> = {
+  MENUNGGU_TTD:    { label: 'Menunggu Tanda Tangan', cls: 'bg-amber-100 text-amber-700' },
+  DITANDATANGANI:  { label: 'Sudah Ditandatangani',  cls: 'bg-emerald-100 text-emerald-700' },
+  BATAL:           { label: 'Dibatalkan',            cls: 'bg-gray-100 text-gray-500' },
+}
+
+function JadwalAkadPanel({ proyekId }: { proyekId: string }) {
+  const [akad, setAkad] = useState<KojasmatAkad | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getAkadByProyek(proyekId).then(list => {
+      if (cancelled) return
+      setAkad(list.find(a => a.status !== 'BATAL') ?? list[0] ?? null)
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [proyekId])
+
+  if (loading || !akad) return null
+
+  const statusInfo = AKAD_STATUS_INFO[akad.status] ?? AKAD_STATUS_INFO.MENUNGGU_TTD
+  const saksiList = [akad.saksi_nama, akad.saksi_2_nama].filter(Boolean)
+
+  return (
+    <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-violet-900 flex items-center gap-1.5">
+          <FileSignature className="h-4 w-4" /> Jadwal Akad
+        </p>
+        <Badge text={statusInfo.label} cls={statusInfo.cls} />
+      </div>
+      <div className="mt-2.5 space-y-1 text-xs text-violet-700">
+        {akad.jadwal_akad && (
+          <p>Tanggal: <strong>{fmtTanggal(akad.jadwal_akad)}</strong></p>
+        )}
+        {saksiList.length > 0 && (
+          <p>Saksi: {saksiList.join(', ')}</p>
+        )}
+      </div>
     </div>
   )
 }
@@ -1945,6 +2086,7 @@ function TabInvestasi({
                         </button>
                       </div>
                     )}
+                    {pembiayaanAktif && <JadwalAkadPanel proyekId={pm.proyek_id} />}
                     <LaporanInvestorPanel proyekId={pm.proyek_id} porsiPct={Number(pm.porsi_pct)} />
                     <DiskusiPanel orgId={anggota.org_id} proyekId={pm.proyek_id} anggotaNama={anggota.nama} />
                   </div>
