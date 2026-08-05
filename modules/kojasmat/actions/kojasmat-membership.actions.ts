@@ -8,6 +8,29 @@ import { revalidatePath } from 'next/cache'
 import { postSimpananMutasi } from './kojasmat.actions'
 import { jurnalPendapatanBiayaAdmin } from '@/lib/erp-bridge/kojasmat-journals'
 import { generateTempPassword } from '../lib/temp-password'
+import { enqueueNotification } from '@/modules/notifications/outbox.server'
+
+function buildPendaftaranDisetujuiWaText(input: {
+  nama: string
+  kodeAnggota: string
+  loginIdentifier: string | null
+  tempPassword: string | null
+}) {
+  const appUrl = String(process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '')
+  return [
+    `Halo ${input.nama},`,
+    ``,
+    `Pendaftaran keanggotaan koperasi Anda telah *DISETUJUI* ✅`,
+    ``,
+    `*Kode Anggota:* ${input.kodeAnggota}`,
+    `*Login di:* ${appUrl}/anggota/login`,
+    input.loginIdentifier ? `*Email/NIK:* ${input.loginIdentifier}` : null,
+    input.tempPassword ? `*Password:* ${input.tempPassword}` : null,
+    ``,
+    `Silakan login dan ganti password setelah masuk pertama kali.`,
+    `Selamat bergabung! 🤝`,
+  ].filter(Boolean).join('\n')
+}
 
 // session.user.id bisa berisi legacy_user_id (Supabase UUID), bukan internal_auth_users.id.
 // Gunakan fungsi ini untuk FK yang merujuk ke internal_auth_users(id).
@@ -353,6 +376,27 @@ export async function setujuiPendaftaran(pendaftaranId: string) {
     const data = await createAnggotaFromPendaftaran(pend as KojasmatPendaftaran, {
       status: pend.status_bayar === 'SUDAH' ? 'AKTIF' : 'CALON',
     })
+
+    // Kirim konfirmasi WA otomatis begitu disetujui — best-effort, tidak boleh
+    // menggagalkan approval kalau nomor tidak ada / provider belum disetel.
+    if (pend.phone) {
+      await enqueueNotification({
+        orgId: pend.org_id,
+        userId: null,
+        eventType: 'kojasmat_pendaftaran_disetujui',
+        channel: 'WHATSAPP',
+        providerCode: 'DRIPSENDER',
+        recipient: pend.phone,
+        body: buildPendaftaranDisetujuiWaText({
+          nama: pend.nama_lengkap,
+          kodeAnggota: data.kode_anggota,
+          loginIdentifier: data.login_identifier,
+          tempPassword: data.temp_password,
+        }),
+        idempotencyKey: `kojasmat-pendaftaran:${pendaftaranId}:disetujui:whatsapp`,
+      }).catch(() => null)
+    }
+
     return { data }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Gagal menyetujui pendaftaran' }

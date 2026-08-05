@@ -11,7 +11,7 @@ import {
   AlertTriangle, ClipboardList, Eye, Link2, ExternalLink,
   BookOpen, ArrowDownCircle, X, Copy, Check, Pencil, Trash2, Upload, FolderOpen,
   TrendingDown, Scale, Loader2, CalendarClock, FileSignature, History, Lock, MessageCircle,
-  Download, FileSpreadsheet, Landmark,
+  Download, FileSpreadsheet, Landmark, Key, ShieldCheck,
 } from 'lucide-react'
 import {
   createAnggota, updateAnggota, deleteAnggota,
@@ -54,6 +54,10 @@ import {
   KOJASMAT_ACCOUNT_ROLES, KOJASMAT_ACCOUNT_ROLE_LABEL,
   type KojasmatAccountMapping, type KojasmatAccountOption, type KojasmatAccountRole,
 } from '@/modules/kojasmat/lib/kojasmat-account-mapping.shared'
+import {
+  saveKojasmatWhatsappSettingsAction, sendKojasmatTestWhatsappAction,
+  type TenantWhatsappConfig,
+} from '@/modules/kojasmat/actions/kojasmat-notifikasi.actions'
 
 const KATEGORI_PENDAPATAN = ['Penjualan', 'Jasa', 'Pendapatan Lain'] as const
 const KATEGORI_BEBAN = ['Bahan Baku', 'Operasional', 'Gaji/Upah', 'Sewa', 'Transportasi', 'Beban Lain'] as const
@@ -85,6 +89,7 @@ type Props = {
   setoranPending: KojasmatSetoranPending[]
   accountMapping: KojasmatAccountMapping
   chartOfAccounts: KojasmatAccountOption[]
+  whatsappSettings: TenantWhatsappConfig
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -3747,7 +3752,7 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
       `Pendaftaran keanggotaan koperasi Anda telah *DISETUJUI* ✅`,
       ``,
       `*Kode Anggota:* ${k.kode_anggota}`,
-      `*Login di:* ${appUrl}/login`,
+      `*Login di:* ${appUrl}/anggota/login`,
       k.login_identifier ? `*Email/NIK:* ${k.login_identifier}` : null,
       k.temp_password ? `*Password:* ${k.temp_password}` : null,
       ``,
@@ -4802,14 +4807,129 @@ function TabPengaturanAkun({ orgId, accountMapping, accounts }: {
   )
 }
 
+// ─── TAB: NOTIFIKASI WHATSAPP ─────────────────────────────────────────────────
+
+function TabNotifikasi({ orgId, whatsappSettings }: { orgId: string; whatsappSettings: TenantWhatsappConfig }) {
+  const [pending, startTransition] = useTransition()
+  const [config, setConfig] = useState<TenantWhatsappConfig>(whatsappSettings)
+  const [testPhone, setTestPhone] = useState('')
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [testMessage, setTestMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  function handleSave() {
+    setMessage(null)
+    startTransition(async () => {
+      const res = await saveKojasmatWhatsappSettingsAction(orgId, config)
+      if (!res.success) { setMessage({ type: 'error', text: res.error || 'Gagal menyimpan pengaturan.' }); return }
+      setMessage({ type: 'success', text: 'Pengaturan notifikasi WhatsApp berhasil disimpan.' })
+    })
+  }
+
+  function handleSendTest() {
+    setTestMessage(null)
+    startTransition(async () => {
+      const res = await sendKojasmatTestWhatsappAction(orgId, testPhone)
+      if (res.error) { setTestMessage({ type: 'error', text: res.error }); return }
+      setTestMessage({ type: 'success', text: `Pesan uji coba berhasil dikirim ke ${testPhone}.` })
+    })
+  }
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-2 text-emerald-700 font-bold mb-1">
+          <MessageCircle size={20} />
+          <h2 className="text-lg text-gray-900">Provider WhatsApp</h2>
+        </div>
+        <p className="text-xs text-gray-500 mb-5">
+          Kojasmat mengirim konfirmasi WhatsApp (pendaftaran disetujui, setoran diverifikasi/ditolak) lewat{' '}
+          <a href="https://dripsender.id" target="_blank" rel="noreferrer" className="text-emerald-700 underline">dripsender.id</a>.
+        </p>
+
+        {message && (
+          <div className={cn(
+            'mb-4 rounded-xl border px-4 py-3 text-sm font-semibold',
+            message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'
+          )}>
+            {message.text}
+          </div>
+        )}
+
+        <label className="flex items-center justify-between p-3.5 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition cursor-pointer mb-5">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck size={18} className="text-emerald-600" />
+            <div>
+              <span className="font-bold text-gray-900 text-sm block">Aktifkan Notifikasi WhatsApp</span>
+              <span className="text-xs text-gray-500">Kalau dimatikan, konfirmasi WA otomatis tidak akan terkirim.</span>
+            </div>
+          </div>
+          <input type="checkbox" checked={config.enabled}
+            onChange={e => setConfig(c => ({ ...c, enabled: e.target.checked }))}
+            className="h-5 w-5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" />
+        </label>
+
+        <div>
+          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+            <Key size={13} /> API Key Dripsender
+          </label>
+          <input type="password"
+            placeholder="Masukkan API key dari dashboard dripsender.id"
+            value={config.dripsenderApiKey}
+            onChange={e => setConfig(c => ({ ...c, dripsenderApiKey: e.target.value }))}
+            className="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm font-mono focus:border-emerald-500 focus:outline-none" />
+          <p className="mt-1.5 text-xs text-gray-400">Disimpan terenkripsi, khusus untuk koperasi ini.</p>
+        </div>
+
+        <div className="flex justify-end mt-5">
+          <button onClick={handleSave} disabled={pending}
+            className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+            {pending ? 'Menyimpan...' : 'Simpan Pengaturan WhatsApp'}
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-800 bg-gray-900 text-white p-6 shadow-xl">
+        <div className="flex items-center gap-2 font-bold mb-1 text-emerald-400">
+          <Send size={18} />
+          <h2 className="text-lg text-white">Uji Coba Pengiriman WhatsApp</h2>
+        </div>
+        <p className="text-xs text-gray-300 mb-4">
+          Simpan pengaturan dulu sebelum uji coba, supaya API key yang dipakai sudah yang terbaru.
+        </p>
+
+        {testMessage && (
+          <div className={cn(
+            'mb-4 p-3.5 rounded-xl border text-xs font-semibold',
+            testMessage.type === 'success' ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300' : 'bg-rose-950 border-rose-500/40 text-rose-300'
+          )}>
+            {testMessage.text}
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input type="tel"
+            placeholder="Nomor WhatsApp tujuan uji coba, mis. 6281234567890"
+            value={testPhone} onChange={e => setTestPhone(e.target.value)}
+            className="flex-1 rounded-xl bg-white/10 border border-white/20 px-4 py-2.5 text-sm text-white placeholder-gray-400 focus:border-emerald-400 focus:outline-none" />
+          <button onClick={handleSendTest} disabled={pending || !testPhone}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-gray-950 hover:bg-emerald-400 transition-colors cursor-pointer disabled:opacity-50 shrink-0">
+            <MessageCircle size={16} />
+            {pending ? 'Mengirim...' : 'Kirim Test WhatsApp'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── ROOT CLIENT ──────────────────────────────────────────────────────────────
 
-type ActiveTab = 'dashboard' | 'permohonan' | 'anggota' | 'proyek' | 'simpanan' | 'pelatihan' | 'laporan' | 'tindakan' | 'soal' | 'akun'
+type ActiveTab = 'dashboard' | 'permohonan' | 'anggota' | 'proyek' | 'simpanan' | 'pelatihan' | 'laporan' | 'tindakan' | 'soal' | 'akun' | 'notifikasi'
 
 export default function KojasmatClient({
   orgId, stats, anggota, proyek, pelatihan, pendaftaran, laporan, tindakan,
   bankSoal, moduleSettings, bankAccounts, qrisPreviewUrl, setoranPending,
-  accountMapping, chartOfAccounts,
+  accountMapping, chartOfAccounts, whatsappSettings,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -4862,6 +4982,7 @@ export default function KojasmatClient({
     { key: 'tindakan',    label: 'Tindakan',        icon: AlertTriangle, badge: tindakanAktif || undefined, badgeColor: 'bg-red-100 text-red-700' },
     { key: 'soal',        label: 'Bank Soal',       icon: BookOpen,      badge: bankSoal.filter(s => s.is_active).length < 20 ? bankSoal.filter(s => s.is_active).length : undefined, badgeColor: 'bg-red-100 text-red-700' },
     { key: 'akun',        label: 'Pengaturan Akun', icon: Landmark,      badge: (KOJASMAT_ACCOUNT_ROLES.length - KOJASMAT_ACCOUNT_ROLES.filter(r => accountMapping[r]).length) || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
+    { key: 'notifikasi',  label: 'Notifikasi',      icon: MessageCircle, badge: whatsappSettings.enabled ? undefined : 1, badgeColor: 'bg-amber-100 text-amber-700' },
   ]
 
   return (
@@ -4935,6 +5056,7 @@ export default function KojasmatClient({
         {activeTab === 'tindakan'   && <TabTindakan orgId={orgId} anggota={anggota} proyek={proyek} tindakan={tindakan} />}
         {activeTab === 'soal'       && <TabBankSoal orgId={orgId} bankSoal={bankSoal} moduleSettings={moduleSettings} bankAccounts={bankAccounts} qrisPreviewUrl={qrisPreviewUrl} />}
         {activeTab === 'akun'       && <TabPengaturanAkun orgId={orgId} accountMapping={accountMapping} accounts={chartOfAccounts} />}
+        {activeTab === 'notifikasi' && <TabNotifikasi orgId={orgId} whatsappSettings={whatsappSettings} />}
       </div>
     </div>
   )
