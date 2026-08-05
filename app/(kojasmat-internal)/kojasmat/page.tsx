@@ -1,7 +1,7 @@
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
 import {
-  getAllAnggota, getAllProyek, getAllPelatihan, getKojasmatStats,
+  getAllAnggota, getAllProyek, getAllPelatihan, getKojasmatStats, getSetoranPendingByOrg,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
   getAllPendaftaran, getAllLaporan, getAllTindakan,
@@ -29,6 +29,7 @@ export default async function KojasmatPage() {
   const moduleSettings = await getModuleSettings(orgId)
   const bankAccounts   = await getBankAccounts(orgId)
   const infoBayar      = await getInfoPembayaran(orgId)
+  const setoranPending = await getSetoranPendingByOrg(orgId)
 
   return (
     <KojasmatClient
@@ -44,6 +45,7 @@ export default async function KojasmatPage() {
       moduleSettings={moduleSettings}
       bankAccounts={bankAccounts.map(b => ({ id: b.id, bank_name: b.bank_name, account_number: b.account_number ?? '' }))}
       qrisPreviewUrl={infoBayar.data.qris_image_url}
+      setoranPending={setoranPending}
     />
   )
 }

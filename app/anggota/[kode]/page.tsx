@@ -6,6 +6,7 @@ import {
   getAnggotaByUserId,
   getAnggotaByKodeOnly,
   getSimpananByAnggota,
+  getSetoranByAnggota,
   getAllProyek,
   getPembiayaanByAnggota,
   getPenawaranByAnggota,
@@ -53,8 +54,9 @@ export default async function AnggotaPortalPage({
     [anggota.org_id]
   )
 
-  const [simpanan, proyekSemua, pembiayaan, penawaran, laporan] = await Promise.all([
+  const [simpanan, setoran, proyekSemua, pembiayaan, penawaran, laporan] = await Promise.all([
     getSimpananByAnggota(anggota.id),
+    getSetoranByAnggota(anggota.id),
     getAllProyek(anggota.org_id),
     getPembiayaanByAnggota(anggota.id),
     getPenawaranByAnggota(anggota.id),
@@ -75,6 +77,7 @@ export default async function AnggotaPortalPage({
     <AnggotaPortalClient
       anggota={anggota}
       simpanan={simpanan}
+      setoran={setoran}
       proyekDiajukan={proyekDiajukan}
       pembiayaan={pembiayaan}
       penawaran={penawaran}

@@ -15,6 +15,7 @@ import {
   jurnalPembatalanUjrah,
 } from '@/lib/erp-bridge/kojasmat-journals'
 import { generateTempPassword } from '../lib/temp-password'
+import { enqueueNotification } from '@/modules/notifications/outbox.server'
 
 // session.user.id bisa berisi legacy_user_id (Supabase UUID), bukan internal_auth_users.id.
 // Gunakan fungsi ini untuk FK yang merujuk ke internal_auth_users(id).
@@ -55,10 +56,15 @@ export type KojasmatSimpananMutasi = {
   anggota_id: string
   jenis_mutasi: 'SETOR' | 'TARIK' | 'BAGI_HASIL' | 'KOREKSI'
   jumlah: number
-  saldo_sebelum: number
-  saldo_sesudah: number
+  saldo_sebelum: number | null
+  saldo_sesudah: number | null
   keterangan?: string
   tanggal: string
+  status: 'PENDING' | 'DISETUJUI' | 'DITOLAK'
+  bukti_dokumen_id?: string | null
+  catatan_admin?: string | null
+  direview_oleh?: string | null
+  direview_at?: string | null
   created_at: string
 }
 
@@ -521,6 +527,238 @@ export async function catatSimpananMutasi(payload: {
     const msg = err instanceof Error ? err.message : 'Terjadi kesalahan server'
     return { error: msg }
   }
+}
+
+// ─── SETORAN SIMPANAN SELF-SERVICE (anggota) ──────────────────────────────────
+// Anggota mengajukan setoran lewat portal member (jenis + nominal + bukti
+// transfer). Saldo TIDAK langsung berubah — baris mutasi tercatat berstatus
+// PENDING dan baru diposting ke saldo + jurnal setelah pengurus memverifikasi
+// bukti transfer secara manual (setujuiSetoranSimpanan), persis pola verifikasi
+// manual yang sudah dipakai di alur pendaftaran anggota baru.
+
+export type KojasmatSetoranPending = KojasmatSimpananMutasi & {
+  anggota_nama: string
+  kode_anggota: string
+  jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA'
+  bukti_file_key: string | null
+  bukti_nama_file: string | null
+}
+
+// Tidak butuh auth staf — dipanggil dari portal member.
+export async function ajukanSetoranSimpanan(payload: {
+  org_id: string
+  anggota_id: string
+  jenis_simpanan: 'POKOK' | 'WAJIB' | 'SUKARELA'
+  jumlah: number
+  keterangan?: string
+  file_key: string
+  nama_file: string
+  file_size?: number
+  mime_type?: string
+}) {
+  if (payload.jumlah <= 0) return { error: 'Jumlah setoran harus lebih dari nol' }
+
+  const { rows: [simpanan] } = await queryPostgres(
+    `SELECT id FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis=$2`,
+    [payload.anggota_id, payload.jenis_simpanan]
+  )
+  if (!simpanan) return { error: 'Rekening simpanan tidak ditemukan' }
+
+  const { rows: [mutasi] } = await queryPostgres(
+    `INSERT INTO kojasmat_simpanan_mutasi
+       (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, keterangan, status)
+     VALUES ($1,$2,$3,'SETOR',$4,$5,'PENDING')
+     RETURNING id`,
+    [payload.org_id, simpanan.id, payload.anggota_id, payload.jumlah, payload.keterangan ?? null]
+  )
+
+  const { rows: [dokumen] } = await queryPostgres(
+    `INSERT INTO kojasmat_dokumen
+       (org_id, referensi_type, referensi_id, jenis_dokumen, nama_file, file_key, file_size, mime_type)
+     VALUES ($1,'SIMPANAN',$2,'BUKTI_SETORAN',$3,$4,$5,$6)
+     RETURNING id`,
+    [payload.org_id, mutasi.id, payload.nama_file, payload.file_key, payload.file_size ?? null, payload.mime_type ?? null]
+  )
+
+  await queryPostgres(
+    `UPDATE kojasmat_simpanan_mutasi SET bukti_dokumen_id=$2 WHERE id=$1`,
+    [mutasi.id, dokumen.id]
+  )
+
+  revalidatePath('/kojasmat')
+  return { data: { id: mutasi.id as string } }
+}
+
+export async function getSetoranPendingByOrg(orgId: string): Promise<KojasmatSetoranPending[]> {
+  const { rows } = await queryPostgres(
+    `SELECT m.*, a.nama AS anggota_nama, a.kode_anggota, s.jenis AS jenis_simpanan,
+            d.file_key AS bukti_file_key, d.nama_file AS bukti_nama_file
+     FROM kojasmat_simpanan_mutasi m
+     JOIN kojasmat_anggota a ON a.id = m.anggota_id
+     JOIN kojasmat_simpanan s ON s.id = m.simpanan_id
+     LEFT JOIN kojasmat_dokumen d ON d.id = m.bukti_dokumen_id
+     WHERE m.org_id=$1 AND m.status='PENDING'
+     ORDER BY m.created_at ASC`,
+    [orgId]
+  )
+  return rows as KojasmatSetoranPending[]
+}
+
+async function notifikasiSetoranSimpanan(input: {
+  orgId: string
+  anggotaId: string
+  mutasiId: string
+  jumlah: number
+  jenisSimpanan: string
+  disetujui: boolean
+  catatan?: string | null
+}) {
+  const { rows: [anggota] } = await queryPostgres(
+    `SELECT nama, email, phone, user_id FROM kojasmat_anggota WHERE id=$1`,
+    [input.anggotaId]
+  )
+  if (!anggota) return
+
+  const judul = input.disetujui ? 'Setoran Simpanan Disetujui' : 'Setoran Simpanan Ditolak'
+  const jenisLabel = { POKOK: 'Pokok', WAJIB: 'Wajib', SUKARELA: 'Sukarela' }[input.jenisSimpanan] ?? input.jenisSimpanan
+  const nominal = `Rp ${input.jumlah.toLocaleString('id-ID')}`
+  const body = input.disetujui
+    ? `Halo ${anggota.nama}, setoran simpanan ${jenisLabel} sebesar ${nominal} sudah diverifikasi dan masuk ke saldo Anda.`
+    : `Halo ${anggota.nama}, setoran simpanan ${jenisLabel} sebesar ${nominal} ditolak pengurus.${input.catatan ? ` Alasan: ${input.catatan}` : ''} Silakan hubungi pengurus koperasi.`
+
+  const idempotencyKey = `kojasmat-setoran:${input.mutasiId}:${input.disetujui ? 'disetujui' : 'ditolak'}`
+
+  // IN_APP selalu berhasil (tidak butuh provider eksternal) — status setoran
+  // juga langsung terlihat di portal anggota begitu login.
+  await enqueueNotification({
+    orgId: input.orgId, userId: anggota.user_id, eventType: 'kojasmat_setoran_simpanan',
+    channel: 'IN_APP', recipient: anggota.user_id || input.anggotaId,
+    subject: judul, body, idempotencyKey: `${idempotencyKey}:in_app`,
+  }).catch(() => null)
+
+  // WA/Email best-effort — akan benar-benar terkirim begitu provider (Dripsender/
+  // Mailketing) disetel org ini; sebelum itu cuma antre di outbox tanpa error.
+  if (anggota.email) {
+    await enqueueNotification({
+      orgId: input.orgId, userId: anggota.user_id, eventType: 'kojasmat_setoran_simpanan',
+      channel: 'EMAIL', recipient: anggota.email,
+      subject: judul, body, idempotencyKey: `${idempotencyKey}:email`,
+    }).catch(() => null)
+  }
+  if (anggota.phone) {
+    await enqueueNotification({
+      orgId: input.orgId, userId: anggota.user_id, eventType: 'kojasmat_setoran_simpanan',
+      channel: 'WHATSAPP', recipient: anggota.phone,
+      body, idempotencyKey: `${idempotencyKey}:whatsapp`,
+    }).catch(() => null)
+  }
+}
+
+export async function setujuiSetoranSimpanan(mutasiId: string) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const { rows: [check] } = await queryPostgres(
+    `SELECT org_id FROM kojasmat_simpanan_mutasi WHERE id=$1`,
+    [mutasiId]
+  )
+  if (!check) return { error: 'Setoran tidak ditemukan' }
+  if (!(await isOrgAdminOrManajemen(session.user.id, check.org_id))) {
+    return { error: 'Hanya owner/admin/manager yang dapat menyetujui setoran.' }
+  }
+
+  const client = await connectPostgresClient()
+  let committed: { anggotaId: string; jumlah: number; jenisSimpanan: string } | null = null
+  try {
+    await client.query('BEGIN')
+
+    const { rows: [mutasi] } = await client.query(
+      `UPDATE kojasmat_simpanan_mutasi
+       SET status='DISETUJUI', direview_oleh=$2, direview_at=NOW()
+       WHERE id=$1 AND status='PENDING'
+       RETURNING *`,
+      [mutasiId, getInternalUserId(session)]
+    )
+    if (!mutasi) throw new Error('Setoran tidak ditemukan atau sudah diproses')
+
+    const { rows: [simpanan] } = await client.query(
+      `SELECT * FROM kojasmat_simpanan WHERE id=$1 FOR UPDATE`,
+      [mutasi.simpanan_id]
+    )
+    if (!simpanan) throw new Error('Rekening simpanan tidak ditemukan')
+
+    const sebelum = Number(simpanan.saldo)
+    const sesudah = sebelum + Number(mutasi.jumlah)
+
+    await client.query(
+      `UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`,
+      [simpanan.id, sesudah]
+    )
+    await client.query(
+      `UPDATE kojasmat_simpanan_mutasi SET saldo_sebelum=$2, saldo_sesudah=$3 WHERE id=$1`,
+      [mutasiId, sebelum, sesudah]
+    )
+
+    await client.query('COMMIT')
+    committed = { anggotaId: mutasi.anggota_id, jumlah: Number(mutasi.jumlah), jenisSimpanan: simpanan.jenis }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    client.release()
+    return { error: error instanceof Error ? error.message : 'Gagal menyetujui setoran' }
+  }
+  client.release()
+
+  try {
+    await jurnalSetorSimpanan(check.org_id, committed!.jenisSimpanan as 'POKOK' | 'WAJIB' | 'SUKARELA', committed!.jumlah, mutasiId)
+  } catch (_) { /* jurnal non-fatal */ }
+
+  await notifikasiSetoranSimpanan({
+    orgId: check.org_id, anggotaId: committed!.anggotaId, mutasiId,
+    jumlah: committed!.jumlah, jenisSimpanan: committed!.jenisSimpanan, disetujui: true,
+  }).catch(() => null)
+
+  revalidatePath('/kojasmat')
+  return { success: true }
+}
+
+export async function tolakSetoranSimpanan(mutasiId: string, catatan: string) {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi' }
+
+  const { rows: [check] } = await queryPostgres(
+    `SELECT org_id FROM kojasmat_simpanan_mutasi WHERE id=$1`,
+    [mutasiId]
+  )
+  if (!check) return { error: 'Setoran tidak ditemukan' }
+  if (!(await isOrgAdminOrManajemen(session.user.id, check.org_id))) {
+    return { error: 'Hanya owner/admin/manager yang dapat menolak setoran.' }
+  }
+
+  const { rows: [mutasi] } = await queryPostgres(
+    `UPDATE kojasmat_simpanan_mutasi
+     SET status='DITOLAK', catatan_admin=$2, direview_oleh=$3, direview_at=NOW()
+     WHERE id=$1 AND status='PENDING'
+     RETURNING *`,
+    [mutasiId, catatan, getInternalUserId(session)]
+  )
+  if (!mutasi) return { error: 'Setoran tidak ditemukan atau sudah diproses' }
+
+  const { rows: [simpanan] } = await queryPostgres(`SELECT jenis FROM kojasmat_simpanan WHERE id=$1`, [mutasi.simpanan_id])
+  await notifikasiSetoranSimpanan({
+    orgId: check.org_id, anggotaId: mutasi.anggota_id, mutasiId,
+    jumlah: Number(mutasi.jumlah), jenisSimpanan: simpanan?.jenis ?? '', disetujui: false, catatan,
+  }).catch(() => null)
+
+  revalidatePath('/kojasmat')
+  return { data: mutasi as KojasmatSimpananMutasi }
+}
+
+export async function getSetoranByAnggota(anggotaId: string): Promise<KojasmatSimpananMutasi[]> {
+  const { rows } = await queryPostgres(
+    `SELECT * FROM kojasmat_simpanan_mutasi WHERE anggota_id=$1 ORDER BY created_at DESC LIMIT 20`,
+    [anggotaId]
+  )
+  return rows as KojasmatSimpananMutasi[]
 }
 
 // ─── PROYEK ───────────────────────────────────────────────────────────────────

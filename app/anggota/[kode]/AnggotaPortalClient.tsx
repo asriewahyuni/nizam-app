@@ -12,9 +12,10 @@ import {
 } from 'lucide-react'
 import {
   createProyek, updateStatusPenawaran, createPembiayaan, toggleMinatProyek, batalkanPembiayaan,
-  getProyekDiskusi, kirimPesanDiskusi,
+  getProyekDiskusi, kirimPesanDiskusi, ajukanSetoranSimpanan,
   type KojasmatAnggota, type KojasmatProyek, type KojasmatSimpanan,
   type KojasmatPenawaran, type KojasmatPembiayaan, type KojasmatPelatihanTerjadwal, type KojasmatProyekDiskusi,
+  type KojasmatSimpananMutasi,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
   kirimLaporanProyek, simpanDokumen, hapusDokumen, getDokumenByRef,
@@ -24,12 +25,14 @@ import {
   getLaporanKeuanganProyek, catatTransaksiProyek, getTransaksiByProyek, getPemodalDenganPotensi,
   type KojasmatLaporanKeuanganProyek, type KojasmatProyekTransaksi, type KojasmatPemodalDenganPotensi,
 } from '@/modules/kojasmat/actions/kojasmat-keuangan.actions'
+import { getInfoPembayaran } from '@/modules/kojasmat/actions/kojasmat-test.actions'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 type Props = {
   anggota: KojasmatAnggota
   simpanan: KojasmatSimpanan[]
+  setoran: KojasmatSimpananMutasi[]
   proyekDiajukan: KojasmatProyek[]
   pembiayaan: KojasmatPembiayaan[]
   penawaran: KojasmatPenawaran[]
@@ -316,14 +319,115 @@ function TabBeranda({
 
 // ─── TAB: SIMPANAN ────────────────────────────────────────────────────────────
 
-function TabSimpanan({ simpanan }: { simpanan: KojasmatSimpanan[] }) {
-  const jenisInfo = {
-    POKOK:    { label: 'Simpanan Pokok',    desc: 'Dibayarkan sekali saat bergabung', color: 'from-blue-500 to-blue-600', bg: 'bg-blue-50 border-blue-100' },
-    WAJIB:    { label: 'Simpanan Wajib',    desc: 'Rutin setiap bulan', color: 'from-emerald-500 to-emerald-600', bg: 'bg-emerald-50 border-emerald-100' },
-    SUKARELA: { label: 'Simpanan Sukarela', desc: 'Tabungan bebas', color: 'from-purple-500 to-purple-600', bg: 'bg-purple-50 border-purple-100' },
+const JENIS_SIMPANAN_INFO = {
+  POKOK:    { label: 'Simpanan Pokok',    desc: 'Dibayarkan sekali saat bergabung', color: 'from-blue-500 to-blue-600', bg: 'bg-blue-50 border-blue-100' },
+  WAJIB:    { label: 'Simpanan Wajib',    desc: 'Rutin setiap bulan', color: 'from-emerald-500 to-emerald-600', bg: 'bg-emerald-50 border-emerald-100' },
+  SUKARELA: { label: 'Simpanan Sukarela', desc: 'Tabungan bebas', color: 'from-purple-500 to-purple-600', bg: 'bg-purple-50 border-purple-100' },
+}
+
+const SETORAN_STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+  PENDING:   { label: 'Menunggu Verifikasi', cls: 'bg-amber-100 text-amber-700' },
+  DISETUJUI: { label: 'Disetujui',           cls: 'bg-emerald-100 text-emerald-700' },
+  DITOLAK:   { label: 'Ditolak',             cls: 'bg-rose-100 text-rose-700' },
+}
+
+async function uploadBuktiSetoran(
+  file: File, orgId: string
+): Promise<{ key: string; name: string; size: number } | { error: string }> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('org_id', orgId)
+  fd.append('ref_type', 'SIMPANAN')
+  try {
+    const res = await fetch('/api/kojasmat/upload', { method: 'POST', body: fd })
+    const json = await res.json() as { key?: string; name?: string; size?: number; error?: string }
+    if (!res.ok || json.error) return { error: json.error ?? 'Upload gagal. Coba lagi.' }
+    return { key: json.key!, name: json.name!, size: json.size! }
+  } catch {
+    return { error: 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.' }
+  }
+}
+
+function TabSimpanan({ anggota, simpanan, setoran }: {
+  anggota: KojasmatAnggota; simpanan: KojasmatSimpanan[]; setoran: KojasmatSimpananMutasi[]
+}) {
+  const [pending, startTransition] = useTransition()
+  const total = simpanan.reduce((s, x) => s + Number(x.saldo), 0)
+
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [jenisSetor, setJenisSetor] = useState<'POKOK' | 'WAJIB' | 'SUKARELA'>('SUKARELA')
+  const [nominal, setNominal] = useState('')
+  const [keterangan, setKeterangan] = useState('')
+  const [infoBayar, setInfoBayar] = useState<{
+    bank_account: { bank_name: string; account_number: string; account_holder: string } | null
+    qris_image_url: string | null
+  } | null>(null)
+  const [infoBayarLoading, setInfoBayarLoading] = useState(false)
+  const [metodeBayar, setMetodeBayar] = useState<'TRANSFER' | 'QRIS'>('TRANSFER')
+  const [buktiFile, setBuktiFile] = useState<{ key: string; name: string; size: number } | null>(null)
+  const [buktiUploading, setBuktiUploading] = useState(false)
+  const [setorError, setSetorError] = useState<string | null>(null)
+  const [setorSuccess, setSetorSuccess] = useState(false)
+  const [setoranList, setSetoranList] = useState(setoran)
+
+  function openSetor() {
+    setSheetOpen(true)
+    setSetorError(null)
+    setSetorSuccess(false)
+    setJenisSetor('SUKARELA')
+    setNominal('')
+    setKeterangan('')
+    setBuktiFile(null)
+    if (!infoBayar) {
+      setInfoBayarLoading(true)
+      startTransition(async () => {
+        const res = await getInfoPembayaran(anggota.org_id)
+        if (!res.data.bank_account && res.data.qris_image_url) setMetodeBayar('QRIS')
+        setInfoBayar(res.data)
+        setInfoBayarLoading(false)
+      })
+    }
   }
 
-  const total = simpanan.reduce((s, x) => s + Number(x.saldo), 0)
+  async function handleBuktiUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setSetorError(null)
+    setBuktiUploading(true)
+    try {
+      const result = await uploadBuktiSetoran(file, anggota.org_id)
+      if ('error' in result) { setSetorError(result.error); return }
+      setBuktiFile(result)
+    } finally {
+      setBuktiUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  function submitSetor() {
+    if (!nominal || !buktiFile) return
+    setSetorError(null)
+    startTransition(async () => {
+      const res = await ajukanSetoranSimpanan({
+        org_id: anggota.org_id,
+        anggota_id: anggota.id,
+        jenis_simpanan: jenisSetor,
+        jumlah: Number(nominal),
+        keterangan: keterangan || undefined,
+        file_key: buktiFile.key,
+        nama_file: buktiFile.name,
+        file_size: buktiFile.size,
+      })
+      if (res.error) { setSetorError(res.error); return }
+      const targetSimpananId = simpanan.find(s => s.jenis === jenisSetor)?.id ?? ''
+      setSetoranList(prev => [{
+        id: res.data!.id, simpanan_id: targetSimpananId, anggota_id: anggota.id, jenis_mutasi: 'SETOR',
+        jumlah: Number(nominal), saldo_sebelum: null, saldo_sesudah: null, keterangan,
+        tanggal: new Date().toISOString(), status: 'PENDING', created_at: new Date().toISOString(),
+      }, ...prev])
+      setSetorSuccess(true)
+    })
+  }
 
   return (
     <div className="space-y-4">
@@ -333,10 +437,17 @@ function TabSimpanan({ simpanan }: { simpanan: KojasmatSimpanan[] }) {
         <p className="text-3xl font-bold text-amber-300">{fmt(total)}</p>
       </div>
 
+      <button
+        onClick={openSetor}
+        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer"
+      >
+        <ArrowUpCircle className="h-4 w-4" /> Setor Simpanan
+      </button>
+
       <div className="space-y-3">
         {(['POKOK', 'WAJIB', 'SUKARELA'] as const).map(jenis => {
           const s = simpanan.find(x => x.jenis === jenis)
-          const info = jenisInfo[jenis]
+          const info = JENIS_SIMPANAN_INFO[jenis]
           const pct = total > 0 ? (Number(s?.saldo ?? 0) / total * 100) : 0
           return (
             <div key={jenis} className={cn('rounded-2xl border p-5', info.bg)}>
@@ -355,9 +466,170 @@ function TabSimpanan({ simpanan }: { simpanan: KojasmatSimpanan[] }) {
           )
         })}
       </div>
-      <p className="text-xs text-gray-400 text-center">
-        Untuk setoran atau penarikan, hubungi pengurus koperasi.
-      </p>
+
+      {setoranList.length > 0 && (
+        <div className="space-y-2">
+          <p className="font-semibold text-gray-900 text-sm">Riwayat Setoran</p>
+          {setoranList.map(m => {
+            const badge = SETORAN_STATUS_BADGE[m.status] ?? SETORAN_STATUS_BADGE.DISETUJUI
+            const jenisMutasi = simpanan.find(s => s.id === m.simpanan_id)?.jenis ?? 'SUKARELA'
+            return (
+              <div key={m.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {JENIS_SIMPANAN_INFO[jenisMutasi].label}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">{fmtTanggal(m.tanggal)}</p>
+                  {m.status === 'DITOLAK' && m.catatan_admin && (
+                    <p className="text-xs text-rose-600 mt-1">{m.catatan_admin}</p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-bold text-gray-900">{fmt(Number(m.jumlah))}</p>
+                  <Badge text={badge.label} cls={badge.cls} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Setor Simpanan">
+        {setorSuccess ? (
+          <div className="space-y-4 text-center py-4">
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
+              <CheckCircle className="h-7 w-7 text-emerald-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">Setoran Diajukan</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Bukti transfer Anda sudah kami terima. Pengurus akan memverifikasi
+                sebelum setoran masuk ke saldo Anda.
+              </p>
+            </div>
+            <button onClick={() => setSheetOpen(false)}
+              className="w-full rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
+              Tutup
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Jenis Simpanan *</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['POKOK', 'WAJIB', 'SUKARELA'] as const).map(jenis => (
+                  <button key={jenis} type="button" onClick={() => setJenisSetor(jenis)}
+                    className={cn(
+                      'rounded-xl border px-2 py-2.5 text-xs font-semibold transition-colors cursor-pointer',
+                      jenisSetor === jenis ? 'border-emerald-700 bg-emerald-50 text-emerald-800' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                    )}>
+                    {JENIS_SIMPANAN_INFO[jenis].label.replace('Simpanan ', '')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Jumlah Setoran (Rp) *</label>
+              <input type="number"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 text-lg font-semibold"
+                placeholder="100000"
+                value={nominal} onChange={e => setNominal(e.target.value)} />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Catatan (opsional)</label>
+              <input type="text"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
+                placeholder="Contoh: setoran bulan Agustus"
+                value={keterangan} onChange={e => setKeterangan(e.target.value)} />
+            </div>
+
+            {infoBayarLoading && (
+              <div className="flex items-center justify-center py-6 text-sm text-gray-400">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" /> Memuat info pembayaran...
+              </div>
+            )}
+
+            {infoBayar && (
+              <>
+                {infoBayar.bank_account && infoBayar.qris_image_url ? (
+                  <div className="flex gap-2 rounded-xl bg-gray-100 p-1">
+                    <button type="button" onClick={() => setMetodeBayar('TRANSFER')}
+                      className={cn(
+                        'flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+                        metodeBayar === 'TRANSFER' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+                      )}>
+                      Transfer Bank
+                    </button>
+                    <button type="button" onClick={() => setMetodeBayar('QRIS')}
+                      className={cn(
+                        'flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+                        metodeBayar === 'QRIS' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+                      )}>
+                      QRIS
+                    </button>
+                  </div>
+                ) : null}
+
+                {metodeBayar === 'TRANSFER' && (
+                  infoBayar.bank_account ? (
+                    <div className="rounded-xl border border-gray-200 p-4 text-sm space-y-1">
+                      <p className="text-gray-500">Transfer ke rekening:</p>
+                      <p className="font-semibold text-gray-900">{infoBayar.bank_account.bank_name} — {infoBayar.bank_account.account_number}</p>
+                      <p className="text-gray-600">a.n. {infoBayar.bank_account.account_holder}</p>
+                    </div>
+                  ) : infoBayar.qris_image_url ? null : (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                      Rekening tujuan belum diatur oleh pengurus. Hubungi pengurus koperasi untuk info rekening.
+                    </div>
+                  )
+                )}
+
+                {metodeBayar === 'QRIS' && infoBayar.qris_image_url && (
+                  <div className="rounded-xl border border-gray-200 p-4 text-center">
+                    <p className="text-sm text-gray-500 mb-3">Scan QRIS berikut untuk membayar:</p>
+                    <img src={infoBayar.qris_image_url} alt="QRIS" className="mx-auto h-56 w-56 object-contain" />
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Upload Bukti Transfer *</label>
+                  <label className={cn(
+                    'flex items-center justify-between rounded-xl border p-4 transition-colors cursor-pointer',
+                    buktiFile ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+                  )}>
+                    <span className="flex items-center gap-2 text-sm">
+                      {buktiFile ? <CheckCircle className="h-5 w-5 text-emerald-500" /> : <FileText className="h-5 w-5 text-gray-400" />}
+                      {buktiFile ? buktiFile.name : 'Pilih file bukti transfer (JPG/PNG/PDF)'}
+                    </span>
+                    <span className="shrink-0 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600">
+                      {buktiUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Pilih File'}
+                    </span>
+                    <input type="file" className="sr-only" accept=".jpg,.jpeg,.png,.webp,.pdf"
+                      onChange={handleBuktiUpload} disabled={buktiUploading} />
+                  </label>
+                </div>
+
+                {setorError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {setorError}
+                  </div>
+                )}
+
+                <button
+                  onClick={submitSetor}
+                  disabled={!nominal || !buktiFile || pending}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {pending ? 'Memproses...' : 'Ajukan Setoran'}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </Sheet>
     </div>
   )
 }
@@ -1890,7 +2162,7 @@ function TabInvestasi({
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 
 export default function AnggotaPortalClient(props: Props) {
-  const { anggota, simpanan, proyekDiajukan, pembiayaan, penawaran, laporan, proyekTersedia, orgNama } = props
+  const { anggota, simpanan, setoran, proyekDiajukan, pembiayaan, penawaran, laporan, proyekTersedia, orgNama } = props
   const [activeTab, setActiveTab] = useState<ActiveTab>('beranda')
 
   const proyekBerjalan = proyekDiajukan.filter(p => p.status === 'BERJALAN')
@@ -1934,7 +2206,7 @@ export default function AnggotaPortalClient(props: Props) {
       {/* Content */}
       <div className="mx-auto max-w-lg px-4 py-5 pb-28">
         {activeTab === 'beranda'   && <TabBeranda {...props} onLihatSemuaProyek={() => setActiveTab('investasi')} />}
-        {activeTab === 'simpanan'  && <TabSimpanan simpanan={simpanan} />}
+        {activeTab === 'simpanan'  && <TabSimpanan anggota={anggota} simpanan={simpanan} setoran={setoran} />}
         {activeTab === 'proyek'    && <TabProyek anggota={anggota} proyekDiajukan={proyekDiajukan} />}
         {activeTab === 'investasi' && <TabInvestasi anggota={anggota} simpanan={simpanan} proyekTersedia={proyekTersedia} pembiayaan={pembiayaan} />}
         {activeTab === 'penawaran' && <TabPenawaran anggota={anggota} penawaran={penawaran} simpanan={simpanan} />}

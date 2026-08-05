@@ -46,12 +46,13 @@ export type KojasmatPendaftaran = {
 export type KojasmatDokumen = {
   id: string
   org_id: string
-  referensi_type: 'PENDAFTARAN' | 'ANGGOTA' | 'PROYEK' | 'LAPORAN'
+  referensi_type: 'PENDAFTARAN' | 'ANGGOTA' | 'PROYEK' | 'LAPORAN' | 'SIMPANAN'
   referensi_id: string
   jenis_dokumen: 'KTP' | 'PASSPORT' | 'SURAT_USAHA' | 'FOTO_USAHA' |
     'PROYEKSI_KEUANGAN' | 'ANALISA_BISNIS' | 'PENAWARAN_SYIRKAH' |
     'LAPORAN_MINGGUAN' | 'AKAD' | 'LAINNYA' |
-    'KELAYAKAN_USAHA' | 'PROPOSAL' | 'PENAWARAN_HARGA'
+    'KELAYAKAN_USAHA' | 'PROPOSAL' | 'PENAWARAN_HARGA' |
+    'BUKTI_BAYAR' | 'BUKTI_SETORAN'
   nama_file: string
   file_key: string
   file_size?: number

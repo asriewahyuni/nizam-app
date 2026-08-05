@@ -14,8 +14,9 @@ import {
 } from 'lucide-react'
 import {
   createAnggota, updateAnggota, deleteAnggota,
-  catatSimpananMutasi,
+  catatSimpananMutasi, getSetoranPendingByOrg, setujuiSetoranSimpanan, tolakSetoranSimpanan,
   getSimpananByAnggota, getMutasiByAnggota,
+  type KojasmatSetoranPending,
   createProyek, updateProyek, deleteProyek, updateProyekStatus,
   submitProyekKeDMR, resubmitProyek, submitProyekReview,
   jadwalkanFunding, bukaFunding, tutupFunding,
@@ -75,6 +76,7 @@ type Props = {
   }
   bankAccounts: { id: string; bank_name: string; account_number: string }[]
   qrisPreviewUrl: string | null
+  setoranPending: KojasmatSetoranPending[]
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -2705,7 +2707,9 @@ function TabProyek({ orgId, proyek, anggota }: {
 
 // ─── TAB: SIMPANAN ────────────────────────────────────────────────────────────
 
-function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggota[] }) {
+function TabSimpanan({ orgId, anggota, setoranPending }: {
+  orgId: string; anggota: KojasmatAnggota[]; setoranPending: KojasmatSetoranPending[]
+}) {
   const [pending, startTransition] = useTransition()
   const [selectedAnggota, setSelectedAnggota] = useState<KojasmatAnggota | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -2718,6 +2722,37 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
     jenis_simpanan: 'WAJIB', jenis_mutasi: 'SETOR',
     jumlah: '', keterangan: '', tanggal: new Date().toISOString().split('T')[0]
   })
+
+  const [setoranList, setSetoranList] = useState(setoranPending)
+  const [setoranActionId, setSetoranActionId] = useState<string | null>(null)
+  const [setoranError, setSetoranError] = useState<{ id: string; message: string } | null>(null)
+  const [tolakSetoran, setTolakSetoran] = useState<KojasmatSetoranPending | null>(null)
+  const [catatanTolak, setCatatanTolak] = useState('')
+
+  function handleSetujuiSetoran(id: string) {
+    setSetoranActionId(id)
+    setSetoranError(null)
+    startTransition(async () => {
+      const res = await setujuiSetoranSimpanan(id)
+      setSetoranActionId(null)
+      if (res.error) { setSetoranError({ id, message: res.error }); return }
+      setSetoranList(prev => prev.filter(s => s.id !== id))
+      setMutasiSuccess('Setoran berhasil diverifikasi dan masuk ke saldo anggota')
+    })
+  }
+
+  function handleTolakSetoran() {
+    if (!tolakSetoran || !catatanTolak.trim()) return
+    setSetoranActionId(tolakSetoran.id)
+    startTransition(async () => {
+      const res = await tolakSetoranSimpanan(tolakSetoran.id, catatanTolak)
+      setSetoranActionId(null)
+      if (res.error) { setSetoranError({ id: tolakSetoran.id, message: res.error }); setTolakSetoran(null); return }
+      setSetoranList(prev => prev.filter(s => s.id !== tolakSetoran.id))
+      setTolakSetoran(null)
+      setCatatanTolak('')
+    })
+  }
 
   const filtered = anggota.filter(a =>
     a.nama.toLowerCase().includes(search.toLowerCase()) ||
@@ -2763,6 +2798,54 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
 
   return (
     <div className="space-y-4">
+      {setoranList.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 overflow-hidden">
+          <div className="px-4 py-3 border-b border-amber-200 bg-amber-100/60">
+            <p className="text-sm font-semibold text-amber-900">
+              Setoran Menunggu Verifikasi ({setoranList.length})
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Anggota mengajukan setoran lewat portal member — periksa bukti transfer sebelum menyetujui.
+            </p>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {setoranList.map(s => (
+              <div key={s.id} className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">{s.anggota_nama} <span className="text-gray-400 font-mono text-xs">· {s.kode_anggota}</span></p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Simpanan {s.jenis_simpanan} · {fmt(Number(s.jumlah))} · {String(s.tanggal).split('T')[0]}
+                  </p>
+                  {s.keterangan && <p className="text-xs text-gray-400 mt-0.5">{s.keterangan}</p>}
+                  {s.bukti_file_key && (
+                    <a href={`/api/kojasmat/file?key=${encodeURIComponent(s.bukti_file_key)}`} target="_blank"
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 mt-1.5 cursor-pointer">
+                      <Eye className="h-3 w-3" /> Lihat Bukti Transfer
+                    </a>
+                  )}
+                  {setoranError?.id === s.id && (
+                    <p className="text-xs text-rose-600 mt-1.5">{setoranError.message}</p>
+                  )}
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button onClick={() => { setTolakSetoran(s); setCatatanTolak('') }}
+                    disabled={pending && setoranActionId === s.id}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50">
+                    <XCircle className="h-3.5 w-3.5" /> Tolak
+                  </button>
+                  <button onClick={() => handleSetujuiSetoran(s.id)}
+                    disabled={pending && setoranActionId === s.id}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer disabled:opacity-50">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    {pending && setoranActionId === s.id ? 'Memproses...' : 'Setujui'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
         <input
@@ -2821,6 +2904,36 @@ function TabSimpanan({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggo
           </table>
         </div>
       </div>
+
+      {/* Modal Tolak Setoran */}
+      <Modal open={!!tolakSetoran} onClose={() => { setTolakSetoran(null); setCatatanTolak('') }}
+        title={`Tolak Setoran — ${tolakSetoran?.anggota_nama ?? ''}`}>
+        {tolakSetoran && (
+          <div className="space-y-3">
+            <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-sm">
+              <p className="font-medium text-gray-900">Simpanan {tolakSetoran.jenis_simpanan}</p>
+              <p className="text-gray-500 mt-0.5">{fmt(Number(tolakSetoran.jumlah))}</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Alasan penolakan *</label>
+              <textarea rows={3}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                placeholder="Contoh: bukti transfer tidak jelas / nominal tidak sesuai"
+                value={catatanTolak} onChange={e => setCatatanTolak(e.target.value)} />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => { setTolakSetoran(null); setCatatanTolak('') }}
+                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Batal
+              </button>
+              <button onClick={handleTolakSetoran} disabled={!catatanTolak.trim() || pending}
+                className="flex-1 rounded-xl bg-rose-600 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50 transition-colors cursor-pointer">
+                {pending ? 'Memproses...' : 'Tolak Setoran'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Buku Tabungan Drawer */}
       <Drawer
@@ -4168,7 +4281,7 @@ type ActiveTab = 'dashboard' | 'permohonan' | 'anggota' | 'proyek' | 'simpanan' 
 
 export default function KojasmatClient({
   orgId, stats, anggota, proyek, pelatihan, pendaftaran, laporan, tindakan,
-  bankSoal, moduleSettings, bankAccounts, qrisPreviewUrl,
+  bankSoal, moduleSettings, bankAccounts, qrisPreviewUrl, setoranPending,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
 
@@ -4180,7 +4293,7 @@ export default function KojasmatClient({
     { key: 'permohonan',  label: 'Permohonan',   icon: ClipboardList,  badge: pendingPendaftaran || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
     { key: 'anggota',     label: 'Anggota',       icon: Users,          badge: stats.total_anggota },
     { key: 'proyek',      label: 'Proyek',         icon: Briefcase,      badge: (stats.antrian_dmr + stats.antrian_dps) || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
-    { key: 'simpanan',    label: 'Simpanan',       icon: Wallet },
+    { key: 'simpanan',    label: 'Simpanan',       icon: Wallet,        badge: setoranPending.length || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
     { key: 'pelatihan',   label: 'Pelatihan',      icon: GraduationCap },
     { key: 'laporan',     label: 'Laporan',         icon: FileText,      badge: laporan.filter(l => l.status === 'DIKIRIM').length || undefined },
     { key: 'tindakan',    label: 'Tindakan',        icon: AlertTriangle, badge: tindakanAktif || undefined, badgeColor: 'bg-red-100 text-red-700' },
@@ -4228,7 +4341,7 @@ export default function KojasmatClient({
         {activeTab === 'permohonan' && <TabPermohonan orgId={orgId} pendaftaran={pendaftaran} />}
         {activeTab === 'anggota'    && <TabAnggota orgId={orgId} anggota={anggota} />}
         {activeTab === 'proyek'     && <TabProyek orgId={orgId} proyek={proyek} anggota={anggota} />}
-        {activeTab === 'simpanan'   && <TabSimpanan orgId={orgId} anggota={anggota} />}
+        {activeTab === 'simpanan'   && <TabSimpanan orgId={orgId} anggota={anggota} setoranPending={setoranPending} />}
         {activeTab === 'pelatihan'  && <TabPelatihan orgId={orgId} pelatihan={pelatihan} anggota={anggota} />}
         {activeTab === 'laporan'    && <TabLaporan laporan={laporan} />}
         {activeTab === 'tindakan'   && <TabTindakan orgId={orgId} anggota={anggota} proyek={proyek} tindakan={tindakan} />}
