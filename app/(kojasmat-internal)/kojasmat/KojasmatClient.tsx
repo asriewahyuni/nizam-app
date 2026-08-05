@@ -16,6 +16,7 @@ import {
 import {
   createAnggota, updateAnggota, deleteAnggota,
   catatSimpananMutasi, getSetoranPendingByOrg, setujuiSetoranSimpanan, tolakSetoranSimpanan,
+  setujuiTarikSimpanan, tolakTarikSimpanan,
   getSimpananByAnggota, getMutasiByAnggota,
   type KojasmatSetoranPending,
   createProyek, updateProyek, deleteProyek, updateProyekStatus,
@@ -56,8 +57,8 @@ import {
 } from '@/modules/kojasmat/lib/kojasmat-account-mapping.shared'
 import {
   saveKojasmatWhatsappSettingsAction, sendKojasmatTestWhatsappAction,
-  type TenantWhatsappConfig,
 } from '@/modules/kojasmat/actions/kojasmat-notifikasi.actions'
+import type { TenantWhatsappConfig } from '@/modules/notifications/whatsapp-settings.server'
 
 const KATEGORI_PENDAPATAN = ['Penjualan', 'Jasa', 'Pendapatan Lain'] as const
 const KATEGORI_BEBAN = ['Bahan Baku', 'Operasional', 'Gaji/Upah', 'Sewa', 'Transportasi', 'Beban Lain'] as const
@@ -2920,10 +2921,14 @@ function TabSimpanan({ orgId, anggota, setoranPending, stats }: {
   })
 
   const [setoranList, setSetoranList] = useState(setoranPending)
+  const setoranOnly = setoranList.filter(s => s.jenis_mutasi === 'SETOR')
+  const tarikOnly = setoranList.filter(s => s.jenis_mutasi === 'TARIK')
   const [setoranActionId, setSetoranActionId] = useState<string | null>(null)
   const [setoranError, setSetoranError] = useState<{ id: string; message: string } | null>(null)
   const [tolakSetoran, setTolakSetoran] = useState<KojasmatSetoranPending | null>(null)
   const [catatanTolak, setCatatanTolak] = useState('')
+  const [tolakTarik, setTolakTarik] = useState<KojasmatSetoranPending | null>(null)
+  const [catatanTolakTarik, setCatatanTolakTarik] = useState('')
 
   function handleSetujuiSetoran(id: string) {
     setSetoranActionId(id)
@@ -2947,6 +2952,31 @@ function TabSimpanan({ orgId, anggota, setoranPending, stats }: {
       setSetoranList(prev => prev.filter(s => s.id !== tolakSetoran.id))
       setTolakSetoran(null)
       setCatatanTolak('')
+    })
+  }
+
+  function handleSetujuiTarik(id: string) {
+    setSetoranActionId(id)
+    setSetoranError(null)
+    startTransition(async () => {
+      const res = await setujuiTarikSimpanan(id)
+      setSetoranActionId(null)
+      if (res.error) { setSetoranError({ id, message: res.error }); return }
+      setSetoranList(prev => prev.filter(s => s.id !== id))
+      setMutasiSuccess('Penarikan berhasil disetujui dan saldo anggota berkurang')
+    })
+  }
+
+  function handleTolakTarik() {
+    if (!tolakTarik || !catatanTolakTarik.trim()) return
+    setSetoranActionId(tolakTarik.id)
+    startTransition(async () => {
+      const res = await tolakTarikSimpanan(tolakTarik.id, catatanTolakTarik)
+      setSetoranActionId(null)
+      if (res.error) { setSetoranError({ id: tolakTarik.id, message: res.error }); setTolakTarik(null); return }
+      setSetoranList(prev => prev.filter(s => s.id !== tolakTarik.id))
+      setTolakTarik(null)
+      setCatatanTolakTarik('')
     })
   }
 
@@ -3116,18 +3146,18 @@ function TabSimpanan({ orgId, anggota, setoranPending, stats }: {
         </div>
       ) : null}
 
-      {setoranList.length > 0 && (
+      {setoranOnly.length > 0 && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50/60 overflow-hidden">
           <div className="px-4 py-3 border-b border-amber-200 bg-amber-100/60">
             <p className="text-sm font-semibold text-amber-900">
-              Setoran Menunggu Verifikasi ({setoranList.length})
+              Setoran Menunggu Verifikasi ({setoranOnly.length})
             </p>
             <p className="text-xs text-amber-700 mt-0.5">
               Anggota mengajukan setoran lewat portal member — periksa bukti transfer sebelum menyetujui.
             </p>
           </div>
           <div className="divide-y divide-amber-100">
-            {setoranList.map(s => (
+            {setoranOnly.map(s => (
               <div key={s.id} className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-medium text-gray-900 text-sm">{s.anggota_nama} <span className="text-gray-400 font-mono text-xs">· {s.kode_anggota}</span></p>
@@ -3154,6 +3184,49 @@ function TabSimpanan({ orgId, anggota, setoranPending, stats }: {
                     <XCircle className="h-3.5 w-3.5" /> Tolak
                   </button>
                   <button onClick={() => handleSetujuiSetoran(s.id)}
+                    disabled={pending && setoranActionId === s.id}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer disabled:opacity-50">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    {pending && setoranActionId === s.id ? 'Memproses...' : 'Setujui'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tarikOnly.length > 0 && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50/60 overflow-hidden">
+          <div className="px-4 py-3 border-b border-rose-200 bg-rose-100/60">
+            <p className="text-sm font-semibold text-rose-900">
+              Penarikan Menunggu Verifikasi ({tarikOnly.length})
+            </p>
+            <p className="text-xs text-rose-700 mt-0.5">
+              Anggota mengajukan penarikan simpanan sukarela — pastikan saldo cukup dan transfer dana sebelum menyetujui.
+            </p>
+          </div>
+          <div className="divide-y divide-rose-100">
+            {tarikOnly.map(s => (
+              <div key={s.id} className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">{s.anggota_nama} <span className="text-gray-400 font-mono text-xs">· {s.kode_anggota}</span></p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Simpanan {s.jenis_simpanan} · {fmt(Number(s.jumlah))}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">{fmtWaktu(s.created_at)}</p>
+                  {s.keterangan && <p className="text-xs text-gray-600 mt-0.5">Tujuan: {s.keterangan}</p>}
+                  {setoranError?.id === s.id && (
+                    <p className="text-xs text-rose-600 mt-1.5">{setoranError.message}</p>
+                  )}
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button onClick={() => { setTolakTarik(s); setCatatanTolakTarik('') }}
+                    disabled={pending && setoranActionId === s.id}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50">
+                    <XCircle className="h-3.5 w-3.5" /> Tolak
+                  </button>
+                  <button onClick={() => handleSetujuiTarik(s.id)}
                     disabled={pending && setoranActionId === s.id}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer disabled:opacity-50">
                     <CheckCircle className="h-3.5 w-3.5" />
@@ -3329,6 +3402,36 @@ function TabSimpanan({ orgId, anggota, setoranPending, stats }: {
               <button onClick={handleTolakSetoran} disabled={!catatanTolak.trim() || pending}
                 className="flex-1 rounded-xl bg-rose-600 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50 transition-colors cursor-pointer">
                 {pending ? 'Memproses...' : 'Tolak Setoran'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal Tolak Penarikan */}
+      <Modal open={!!tolakTarik} onClose={() => { setTolakTarik(null); setCatatanTolakTarik('') }}
+        title={`Tolak Penarikan — ${tolakTarik?.anggota_nama ?? ''}`}>
+        {tolakTarik && (
+          <div className="space-y-3">
+            <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-sm">
+              <p className="font-medium text-gray-900">Simpanan {tolakTarik.jenis_simpanan}</p>
+              <p className="text-gray-500 mt-0.5">{fmt(Number(tolakTarik.jumlah))}</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Alasan penolakan *</label>
+              <textarea rows={3}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                placeholder="Contoh: rekening tujuan tidak valid"
+                value={catatanTolakTarik} onChange={e => setCatatanTolakTarik(e.target.value)} />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => { setTolakTarik(null); setCatatanTolakTarik('') }}
+                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                Batal
+              </button>
+              <button onClick={handleTolakTarik} disabled={!catatanTolakTarik.trim() || pending}
+                className="flex-1 rounded-xl bg-rose-600 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50 transition-colors cursor-pointer">
+                {pending ? 'Memproses...' : 'Tolak Penarikan'}
               </button>
             </div>
           </div>

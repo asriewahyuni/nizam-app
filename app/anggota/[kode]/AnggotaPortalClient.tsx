@@ -4,15 +4,16 @@ import { useState, useTransition, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import {
   Wallet, Briefcase, Bell, LogOut, TrendingUp,
-  CheckCircle, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, Search,
+  CheckCircle, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, Search, Scan, QrCode, Camera,
   Star, GraduationCap, FileText, Send, Upload, XCircle,
   ChevronDown, ChevronUp, ChevronRight, AlertCircle, Home,
   Heart, Coins, Clock, Users, BadgeCheck, Scale, Banknote, TrendingDown,
-  Loader2, MessageCircle, FileSignature,
+  Loader2, MessageCircle, FileSignature, KeyRound, Eye, EyeOff,
 } from 'lucide-react'
+import { updateMyPassword } from '@/modules/auth/actions/auth.actions'
 import {
   createProyek, updateStatusPenawaran, createPembiayaan, toggleMinatProyek, batalkanPembiayaan,
-  getProyekDiskusi, kirimPesanDiskusi, ajukanSetoranSimpanan, getAkadByProyek,
+  getProyekDiskusi, kirimPesanDiskusi, ajukanSetoranSimpanan, ajukanTarikSimpanan, getAkadByProyek,
   transferSaldoSukarela, getAnggotaNameByKode,
   type KojasmatAnggota, type KojasmatProyek, type KojasmatSimpanan,
   type KojasmatPenawaran, type KojasmatPembiayaan, type KojasmatPelatihanTerjadwal, type KojasmatProyekDiskusi,
@@ -22,6 +23,8 @@ import {
   kirimLaporanProyek, simpanDokumen, hapusDokumen, getDokumenByRef,
   type KojasmatLaporanProyek, type KojasmatDokumen,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
+import { QRCodeSVG } from 'qrcode.react'
+import { QRScanner } from './QRScanner'
 import {
   getLaporanKeuanganProyek, catatTransaksiProyek, getTransaksiByProyek, getPemodalDenganPotensi,
   type KojasmatLaporanKeuanganProyek, type KojasmatProyekTransaksi, type KojasmatPemodalDenganPotensi,
@@ -389,6 +392,8 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
   const [setoranList, setSetoranList] = useState(setoran)
   const [detailSetoran, setDetailSetoran] = useState<KojasmatSimpananMutasi | null>(null)
 
+  const saldoSukarela = Number(simpanan.find(s => s.jenis === 'SUKARELA')?.saldo ?? 0)
+
   // ─── Transfer Saldo State ───
   const [transferOpen, setTransferOpen] = useState(false)
   const [transferKode, setTransferKode] = useState('')
@@ -399,7 +404,16 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
   const [transferLookupPending, setTransferLookupPending] = useState(false)
   const [transferConfirm, setTransferConfirm] = useState(false)
 
-  const saldoSukarela = Number(simpanan.find(s => s.jenis === 'SUKARELA')?.saldo ?? 0)
+  // ─── QR Code States ───
+  const [qrScannerOpen, setQrScannerOpen] = useState(false)
+  const [myQrOpen, setMyQrOpen] = useState(false)
+
+  // ─── Tarik Saldo State ───
+  const [tarikSheetOpen, setTarikSheetOpen] = useState(false)
+  const [nominalTarik, setNominalTarik] = useState('')
+  const [tujuanTarik, setTujuanTarik] = useState('')
+  const [tarikError, setTarikError] = useState<string | null>(null)
+  const [tarikSuccess, setTarikSuccess] = useState(false)
 
   function openTransfer() {
     setTransferOpen(true)
@@ -411,14 +425,14 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
     setTransferConfirm(false)
   }
 
-  function lookupRecipient() {
-    if (!transferKode.trim()) return
+  function lookupRecipient(kode = transferKode) {
+    if (!kode.trim()) return
     setTransferError(null)
     setTransferLookupPending(true)
     startTransition(async () => {
-      const result = await getAnggotaNameByKode(anggota.org_id, transferKode.trim().toUpperCase())
+      const result = await getAnggotaNameByKode(anggota.org_id, kode.trim().toUpperCase())
       setTransferLookupPending(false)
-      if (!result) { setTransferError(`Anggota dengan kode "${transferKode}" tidak ditemukan atau tidak aktif`); return }
+      if (!result) { setTransferError(`Anggota dengan kode "${kode}" tidak ditemukan atau tidak aktif`); return }
       setTransferRecipient(result)
     })
   }
@@ -440,6 +454,36 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
       })
       if (res.error) { setTransferError(res.error); setTransferConfirm(false); return }
       setTransferSuccess({ nama: transferRecipient.nama, jumlah, newSaldo: res.data!.newSaldo })
+    })
+  }
+
+  function openTarik() {
+    setTarikSheetOpen(true)
+    setTarikError(null)
+    setTarikSuccess(false)
+    setNominalTarik('')
+    setTujuanTarik('')
+  }
+
+  function submitTarik() {
+    if (!nominalTarik || !tujuanTarik.trim()) return
+    setTarikError(null)
+    startTransition(async () => {
+      const res = await ajukanTarikSimpanan({
+        org_id: anggota.org_id,
+        anggota_id: anggota.id,
+        jumlah: Number(nominalTarik),
+        keterangan: tujuanTarik,
+      })
+      if (res.error) { setTarikError(res.error); return }
+      const simpananSukarelaId = simpanan.find(s => s.jenis === 'SUKARELA')?.id ?? ''
+      setSetoranList(prev => [{
+        id: res.data!.id, simpanan_id: simpananSukarelaId, anggota_id: anggota.id, jenis_mutasi: 'TARIK',
+        jumlah: Number(nominalTarik), saldo_sebelum: null, saldo_sesudah: null, keterangan: tujuanTarik,
+        metode_bayar: null, bukti_dokumen_id: null,
+        tanggal: res.data!.created_at, status: 'PENDING', created_at: res.data!.created_at,
+      }, ...prev])
+      setTarikSuccess(true)
     })
   }
 
@@ -512,18 +556,30 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
         <p className="text-3xl font-bold text-amber-300">{fmt(total)}</p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <button
           onClick={openSetor}
-          className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer"
         >
-          <ArrowUpCircle className="h-4 w-4" /> Setor
+          <ArrowUpCircle className="h-4 w-4 shrink-0" /> Setor
+        </button>
+        <button
+          onClick={openTarik}
+          className="flex items-center justify-center gap-2 rounded-2xl border border-emerald-700 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+        >
+          <ArrowDownCircle className="h-4 w-4 shrink-0" /> Tarik
         </button>
         <button
           onClick={openTransfer}
-          className="flex-1 flex items-center justify-center gap-2 rounded-2xl border-2 border-emerald-700 py-3.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+          className="flex items-center justify-center gap-2 rounded-2xl border-2 border-emerald-700 bg-emerald-50 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
         >
-          <ArrowRightLeft className="h-4 w-4" /> Transfer
+          <ArrowRightLeft className="h-4 w-4 shrink-0" /> Transfer
+        </button>
+        <button
+          onClick={() => setMyQrOpen(true)}
+          className="flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+        >
+          <QrCode className="h-4 w-4 shrink-0 text-gray-500" /> QR Saya
         </button>
       </div>
 
@@ -552,10 +608,11 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
 
       {setoranList.length > 0 && (
         <div className="space-y-2">
-          <p className="font-semibold text-gray-900 text-sm">Riwayat Setoran</p>
+          <p className="font-semibold text-gray-900 text-sm">Riwayat Transaksi</p>
           {setoranList.map(m => {
             const badge = SETORAN_STATUS_BADGE[m.status] ?? SETORAN_STATUS_BADGE.DISETUJUI
             const jenisMutasi = simpanan.find(s => s.id === m.simpanan_id)?.jenis ?? 'SUKARELA'
+            const isTarik = m.jenis_mutasi === 'TARIK'
             return (
               <button
                 key={m.id}
@@ -563,21 +620,28 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
                 onClick={() => setDetailSetoran(m)}
                 className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm text-left cursor-pointer transition-colors hover:border-emerald-200 hover:bg-emerald-50/40"
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">
-                    {JENIS_SIMPANAN_INFO[jenisMutasi].label}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">{fmtTanggalWaktu(m.created_at)}</p>
-                  {m.metode_bayar && (
-                    <p className="text-xs text-gray-400 mt-0.5">{METODE_BAYAR_LABEL[m.metode_bayar]}</p>
-                  )}
-                  {m.status === 'DITOLAK' && m.catatan_admin && (
-                    <p className="text-xs text-rose-600 mt-1">{m.catatan_admin}</p>
-                  )}
+                <div className="min-w-0 flex items-start gap-2.5">
+                  {isTarik
+                    ? <ArrowDownCircle className="h-4 w-4 mt-0.5 shrink-0 text-rose-500" />
+                    : <ArrowUpCircle className="h-4 w-4 mt-0.5 shrink-0 text-emerald-500" />}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900">
+                      {isTarik ? 'Tarik' : 'Setor'} {JENIS_SIMPANAN_INFO[jenisMutasi].label.replace('Simpanan ', '')}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">{fmtTanggalWaktu(m.created_at)}</p>
+                    {m.metode_bayar && (
+                      <p className="text-xs text-gray-400 mt-0.5">{METODE_BAYAR_LABEL[m.metode_bayar]}</p>
+                    )}
+                    {m.status === 'DITOLAK' && m.catatan_admin && (
+                      <p className="text-xs text-rose-600 mt-1">{m.catatan_admin}</p>
+                    )}
+                  </div>
                 </div>
                 <div className="text-right shrink-0 flex items-center gap-2">
                   <div>
-                    <p className="text-sm font-bold text-gray-900">{fmt(Number(m.jumlah))}</p>
+                    <p className={cn('text-sm font-bold', isTarik ? 'text-rose-600' : 'text-gray-900')}>
+                      {isTarik ? '-' : ''}{fmt(Number(m.jumlah))}
+                    </p>
                     <Badge text={badge.label} cls={badge.cls} />
                   </div>
                   <ChevronRight className="h-4 w-4 text-gray-300" />
@@ -588,15 +652,16 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
         </div>
       )}
 
-      <Sheet open={!!detailSetoran} onClose={() => setDetailSetoran(null)} title="Detail Setoran">
+      <Sheet open={!!detailSetoran} onClose={() => setDetailSetoran(null)} title={detailSetoran?.jenis_mutasi === 'TARIK' ? 'Detail Penarikan' : 'Detail Setoran'}>
         {detailSetoran && (() => {
           const badge = SETORAN_STATUS_BADGE[detailSetoran.status] ?? SETORAN_STATUS_BADGE.DISETUJUI
           const jenisMutasi = simpanan.find(s => s.id === detailSetoran.simpanan_id)?.jenis ?? 'SUKARELA'
+          const isTarik = detailSetoran.jenis_mutasi === 'TARIK'
           return (
             <div className="space-y-4">
-              <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4 text-center">
-                <p className="text-xs text-emerald-600 mb-1">{JENIS_SIMPANAN_INFO[jenisMutasi].label}</p>
-                <p className="text-2xl font-bold text-emerald-800">{fmt(Number(detailSetoran.jumlah))}</p>
+              <div className={cn('rounded-2xl border p-4 text-center', isTarik ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100')}>
+                <p className={cn('text-xs mb-1', isTarik ? 'text-rose-600' : 'text-emerald-600')}>{JENIS_SIMPANAN_INFO[jenisMutasi].label}</p>
+                <p className={cn('text-2xl font-bold', isTarik ? 'text-rose-700' : 'text-emerald-800')}>{fmt(Number(detailSetoran.jumlah))}</p>
                 <div className="mt-2 flex justify-center">
                   <Badge text={badge.label} cls={badge.cls} />
                 </div>
@@ -615,7 +680,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
                 )}
                 {detailSetoran.keterangan && (
                   <div className="flex items-center justify-between px-4 py-3 gap-3">
-                    <span className="text-xs text-gray-400 shrink-0">Catatan</span>
+                    <span className="text-xs text-gray-400 shrink-0">{isTarik ? 'Tujuan Transfer' : 'Catatan'}</span>
                     <span className="text-sm font-medium text-gray-800 text-right">{detailSetoran.keterangan}</span>
                   </div>
                 )}
@@ -643,7 +708,9 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
               {detailSetoran.status === 'PENDING' && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
                   <p className="text-xs text-amber-700">
-                    Setoran ini sedang menunggu verifikasi pengurus. Saldo akan diperbarui setelah disetujui.
+                    {isTarik
+                      ? 'Penarikan ini sedang menunggu verifikasi pengurus. Saldo akan berkurang setelah disetujui dan dana ditransfer.'
+                      : 'Setoran ini sedang menunggu verifikasi pengurus. Saldo akan diperbarui setelah disetujui.'}
                   </p>
                 </div>
               )}
@@ -838,9 +905,15 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
                   placeholder="Contoh: KJM-002"
                   value={transferKode}
                   onChange={e => { setTransferKode(e.target.value); setTransferRecipient(null); setTransferConfirm(false) }}
-                  onKeyDown={e => { if (e.key === 'Enter') lookupRecipient() }}
+                  onKeyDown={e => { if (e.key === 'Enter') lookupRecipient(transferKode) }}
                 />
-                <button onClick={lookupRecipient} disabled={!transferKode.trim() || transferLookupPending}
+                <button onClick={() => setQrScannerOpen(true)}
+                  className="shrink-0 rounded-2xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
+                  title="Scan QR"
+                >
+                  <Scan className="h-4 w-4" />
+                </button>
+                <button onClick={() => lookupRecipient(transferKode)} disabled={!transferKode.trim() || transferLookupPending}
                   className="shrink-0 rounded-2xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50">
                   {transferLookupPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 </button>
@@ -907,6 +980,130 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
             </button>
           </div>
         )}
+      </Sheet>
+
+      {/* ─── Tarik Saldo Sheet ─── */}
+      <Sheet open={tarikSheetOpen} onClose={() => setTarikSheetOpen(false)} title="Tarik Simpanan">
+        {tarikSuccess ? (
+          <div className="space-y-4 text-center py-4">
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
+              <CheckCircle className="h-7 w-7 text-emerald-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">Penarikan Diajukan</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Permintaan penarikan Anda sudah kami terima. Pengurus akan memverifikasi
+                sebelum dana ditransfer dan saldo berkurang.
+              </p>
+            </div>
+            <button onClick={() => setTarikSheetOpen(false)}
+              className="w-full rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
+              Tutup
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+              <p className="text-gray-500">Saldo Simpanan Sukarela</p>
+              <p className="font-semibold text-gray-900">{fmt(saldoSukarela)}</p>
+              <p className="text-xs text-gray-400 mt-1">Penarikan hanya berlaku untuk simpanan Sukarela.</p>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Jumlah Penarikan (Rp) *</label>
+              <input type="text" inputMode="numeric"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-emerald-500 text-lg font-semibold tabular-nums"
+                placeholder="100.000"
+                value={nominalTarik ? new Intl.NumberFormat('id-ID').format(Number(nominalTarik)) : ''}
+                onChange={e => setNominalTarik(e.target.value.replace(/\D/g, ''))} />
+              {nominalTarik && Number(nominalTarik) > saldoSukarela && (
+                <p className="text-xs text-rose-600 mt-1.5">Jumlah melebihi saldo simpanan sukarela Anda.</p>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Tujuan Transfer *</label>
+              <input type="text"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
+                placeholder="Nama bank, no. rekening, a.n."
+                value={tujuanTarik} onChange={e => setTujuanTarik(e.target.value)} />
+            </div>
+
+            {tarikError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {tarikError}
+              </div>
+            )}
+
+            <button
+              onClick={submitTarik}
+              disabled={!nominalTarik || !tujuanTarik.trim() || Number(nominalTarik) > saldoSukarela || pending}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {pending ? 'Memproses...' : 'Ajukan Penarikan'}
+            </button>
+          </div>
+        )}
+      </Sheet>
+
+      {/* ─── QR Scanner Sheet ─── */}
+      <Sheet open={qrScannerOpen} onClose={() => setQrScannerOpen(false)} title="Scan QR Code">
+        {qrScannerOpen && (
+          <div className="space-y-4">
+            <QRScanner
+              onClose={() => setQrScannerOpen(false)}
+              onScan={(decodedText) => {
+                let code = decodedText
+                try {
+                  const url = new URL(decodedText)
+                  if (url.protocol === 'nizam:' && url.searchParams.has('kode')) {
+                    code = url.searchParams.get('kode')!
+                  }
+                } catch {
+                  // Not a valid URL, treat as raw code
+                }
+                
+                setQrScannerOpen(false)
+                setTransferKode(code)
+                lookupRecipient(code)
+              }}
+            />
+          </div>
+        )}
+      </Sheet>
+
+      {/* ─── My QR Sheet ─── */}
+      <Sheet open={myQrOpen} onClose={() => setMyQrOpen(false)} title="QR Code Saya">
+        <div className="flex flex-col items-center justify-center py-6 space-y-6">
+          <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
+            <QRCodeSVG
+              value={`nizam:kojasmat:transfer?kode=${anggota.kode_anggota}`}
+              size={240}
+              level="H"
+              includeMargin={false}
+            />
+          </div>
+          
+          <div className="text-center space-y-1">
+            <p className="text-xl font-bold text-gray-900">{anggota.nama}</p>
+            <div className="inline-flex items-center gap-2 bg-gray-50 px-4 py-1.5 rounded-full border border-gray-200">
+              <p className="text-sm font-medium text-gray-600">{anggota.kode_anggota}</p>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(anggota.kode_anggota)
+                }}
+                className="text-emerald-600 hover:text-emerald-700 text-xs font-semibold uppercase tracking-wider cursor-pointer"
+              >
+                Salin
+              </button>
+            </div>
+          </div>
+          
+          <p className="text-sm text-gray-500 text-center px-4">
+            Tunjukkan kode QR ini kepada anggota lain untuk menerima transfer saldo simpanan sukarela.
+          </p>
+        </div>
       </Sheet>
     </div>
   )
@@ -2470,11 +2667,104 @@ function TabInvestasi({
   )
 }
 
+// ─── GANTI PASSWORD ───────────────────────────────────────────────────────────
+
+function PasswordField({
+  label, value, onChange, show, onToggleShow,
+}: {
+  label: string; value: string; onChange: (v: string) => void; show: boolean; onToggleShow: () => void
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-gray-700">{label}</label>
+      <div className="relative">
+        <input
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="w-full rounded-2xl border border-gray-200 px-4 py-3 pr-11 text-sm outline-none focus:border-emerald-500"
+        />
+        <button type="button" onClick={onToggleShow}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer">
+          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function GantiPasswordSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [pending, startTransition] = useTransition()
+  const [newPwd, setNewPwd] = useState('')
+  const [confirmPwd, setConfirmPwd] = useState('')
+  const [showNewPwd, setShowNewPwd] = useState(false)
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
+  function handleClose() {
+    setNewPwd(''); setConfirmPwd(''); setError(null); setSuccess(false)
+    onClose()
+  }
+
+  function handleSubmit() {
+    setError(null)
+    if (!newPwd) { setError('Password baru wajib diisi.'); return }
+    if (newPwd.length < 8) { setError('Password minimal 8 karakter.'); return }
+    if (newPwd !== confirmPwd) { setError('Konfirmasi password tidak cocok.'); return }
+    startTransition(async () => {
+      const res = await updateMyPassword(newPwd)
+      if (res.error) { setError(res.error); return }
+      setSuccess(true)
+    })
+  }
+
+  return (
+    <Sheet open={open} onClose={handleClose} title="Ganti Password">
+      {success ? (
+        <div className="space-y-4 text-center py-4">
+          <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
+            <CheckCircle className="h-7 w-7 text-emerald-600" />
+          </div>
+          <p className="font-semibold text-gray-900">Password Berhasil Diperbarui</p>
+          <button onClick={handleClose}
+            className="w-full rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
+            Tutup
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <PasswordField label="Password Baru" value={newPwd} onChange={setNewPwd} show={showNewPwd} onToggleShow={() => setShowNewPwd(v => !v)} />
+          <PasswordField label="Konfirmasi Password Baru" value={confirmPwd} onChange={setConfirmPwd} show={showConfirmPwd} onToggleShow={() => setShowConfirmPwd(v => !v)} />
+          {newPwd && newPwd.length < 8 && (
+            <p className="text-xs text-amber-600">Password minimal 8 karakter.</p>
+          )}
+          {newPwd && confirmPwd && newPwd !== confirmPwd && (
+            <p className="text-xs text-rose-600">Konfirmasi password tidak cocok.</p>
+          )}
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          )}
+          <button
+            onClick={handleSubmit}
+            disabled={pending || !newPwd || !confirmPwd}
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 transition-colors cursor-pointer"
+          >
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {pending ? 'Menyimpan...' : 'Simpan Password Baru'}
+          </button>
+        </div>
+      )}
+    </Sheet>
+  )
+}
+
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 
 export default function AnggotaPortalClient(props: Props) {
   const { anggota, simpanan, setoran, proyekDiajukan, pembiayaan, penawaran, laporan, proyekTersedia, orgNama } = props
   const [activeTab, setActiveTab] = useState<ActiveTab>('beranda')
+  const [gantiPasswordOpen, setGantiPasswordOpen] = useState(false)
 
   useEffect(() => {
     const handleHash = () => {
@@ -2524,6 +2814,10 @@ export default function AnggotaPortalClient(props: Props) {
             <span className="font-mono text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
               {anggota.kode_anggota}
             </span>
+            <button type="button" onClick={() => setGantiPasswordOpen(true)}
+              className="rounded-full p-2 text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer">
+              <KeyRound className="h-4 w-4" />
+            </button>
             <a href="/logout"
               className="rounded-full p-2 text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer">
               <LogOut className="h-4 w-4" />
@@ -2568,6 +2862,8 @@ export default function AnggotaPortalClient(props: Props) {
           <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/90 to-transparent pointer-events-none" />
         </div>
       </nav>
+
+      <GantiPasswordSheet open={gantiPasswordOpen} onClose={() => setGantiPasswordOpen(false)} />
     </div>
   )
 }
