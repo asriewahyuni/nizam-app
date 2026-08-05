@@ -2317,3 +2317,70 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
   // Untungnya Supabase secara otomatis mengenali session di sisi Client saat URL ?code=...
   return { error: 'Supabase menggunakan flow form client-side tanpa mengirim raw token.' }
 }
+
+// ─────────────────────────────────────────────────────────────
+// registerLmsMember — Create a new LMS member account
+// ─────────────────────────────────────────────────────────────
+export async function registerLmsMember(formData: FormData) {
+  const email = formData.get('email') as string
+  const password = formData.get('password') as string
+  const fullName = formData.get('fullName') as string
+  const orgId = formData.get('orgId') as string
+  const orgSlug = formData.get('orgSlug') as string
+  const redirectTo = formData.get('redirectTo') as string || '/dashboard'
+
+  if (!email || !password || !fullName || !orgId) {
+    return { error: 'Data tidak lengkap.' }
+  }
+
+  try {
+    const internalUser = await createInternalAuthUser({
+      email,
+      password,
+      fullName,
+      userType: 'member',
+    })
+
+    if ('error' in internalUser) {
+      return { error: internalUser.error }
+    }
+
+    const userId = (internalUser as any).userId
+
+    if (userId) {
+      const adminClient = await createAdminClient()
+      const { error: insertError } = await adminClient
+        .from('org_members')
+        .insert({
+          org_id: orgId,
+          user_id: userId,
+          role: 'member',
+          is_active: true
+        })
+        
+      if (insertError) {
+        // If it's a duplicate, it's fine, they might already be a member
+        if (!insertError.message.includes('duplicate key')) {
+          console.error('Failed to insert org_member:', insertError)
+        }
+      }
+
+      // Send Welcome Email
+      try {
+        const { sendSystemEmail } = await import('@/lib/email/sender')
+        await sendSystemEmail({
+          fromName: 'Portal Pembelajaran',
+          toEmail: email,
+          subject: 'Selamat Datang di Portal Pembelajaran',
+          html: `<p>Halo ${fullName},</p><p>Akun Anda telah berhasil dibuat. Silakan login menggunakan email dan password yang Anda buat.</p>`
+        })
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError)
+      }
+    }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) }
+  }
+
+  redirect(redirectTo)
+}
