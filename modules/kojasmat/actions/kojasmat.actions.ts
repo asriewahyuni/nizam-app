@@ -54,7 +54,7 @@ export type KojasmatSimpananMutasi = {
   id: string
   simpanan_id: string
   anggota_id: string
-  jenis_mutasi: 'SETOR' | 'TARIK' | 'BAGI_HASIL' | 'KOREKSI'
+  jenis_mutasi: 'SETOR' | 'TARIK' | 'BAGI_HASIL' | 'KOREKSI' | 'TRANSFER_MASUK' | 'TRANSFER_KELUAR'
   jumlah: number
   saldo_sebelum: number | null
   saldo_sesudah: number | null

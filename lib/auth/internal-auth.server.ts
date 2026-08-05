@@ -382,6 +382,17 @@ function verifyScryptPassword(password: string, storedHash: string) {
   return timingSafeEqual(actualHash, expectedHash)
 }
 
+// Re-verifikasi password user yang sedang login (bukan untuk login awal) — dipakai
+// untuk konfirmasi keamanan sebelum aksi sensitif seperti transfer simpanan antar anggota.
+export async function verifyPasswordByUserId(userId: string, password: string): Promise<boolean> {
+  const { rows: [row] } = await queryPostgres(
+    `SELECT password_hash FROM internal_auth_users WHERE id = $1::uuid LIMIT 1`,
+    [userId]
+  )
+  if (!row?.password_hash) return false
+  return verifyScryptPassword(password, row.password_hash)
+}
+
 function toInternalSessionUser(row: InternalAuthSessionRow): InternalAuthSessionUser {
   const sessionUserId = normalizeInput(row.legacy_user_id) || row.user_id
   return {

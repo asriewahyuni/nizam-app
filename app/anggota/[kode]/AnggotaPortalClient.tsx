@@ -9,7 +9,10 @@ import {
   ChevronDown, ChevronUp, ChevronRight, AlertCircle, Home,
   Heart, Coins, Clock, Users, BadgeCheck, Scale, Banknote, TrendingDown,
   Loader2, MessageCircle, FileSignature, KeyRound, Eye, EyeOff,
+  QrCode, ScanLine, ArrowLeftRight,
 } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
+import { BarcodeScanner } from '@/components/shared/BarcodeScanner'
 import { updateMyPassword } from '@/modules/auth/actions/auth.actions'
 import {
   createProyek, updateStatusPenawaran, createPembiayaan, toggleMinatProyek, batalkanPembiayaan,
@@ -19,6 +22,9 @@ import {
   type KojasmatSimpananMutasi, type KojasmatAkad,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
+  getAnggotaTransferPreview, kirimTransferSimpanan, type KojasmatTransferPreview,
+} from '@/modules/kojasmat/actions/kojasmat-transfer.actions'
+import {
   kirimLaporanProyek, simpanDokumen, hapusDokumen, getDokumenByRef,
   type KojasmatLaporanProyek, type KojasmatDokumen,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
@@ -27,6 +33,25 @@ import {
   type KojasmatLaporanKeuanganProyek, type KojasmatProyekTransaksi, type KojasmatPemodalDenganPotensi,
 } from '@/modules/kojasmat/actions/kojasmat-keuangan.actions'
 import { getInfoPembayaran } from '@/modules/kojasmat/actions/kojasmat-test.actions'
+
+// Payload QR internal anggota — dipindai anggota lain untuk mengirim transfer simpanan.
+const KOJASMAT_QR_TAG = 'kojasmat_member'
+type KojasmatMemberQrPayload = { t: typeof KOJASMAT_QR_TAG; org_id: string; anggota_id: string }
+
+function buildMemberQrPayload(orgId: string, anggotaId: string): string {
+  const payload: KojasmatMemberQrPayload = { t: KOJASMAT_QR_TAG, org_id: orgId, anggota_id: anggotaId }
+  return JSON.stringify(payload)
+}
+
+function parseMemberQrPayload(raw: string): { anggotaId: string } | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<KojasmatMemberQrPayload>
+    if (parsed.t !== KOJASMAT_QR_TAG || typeof parsed.anggota_id !== 'string' || !parsed.anggota_id) return null
+    return { anggotaId: parsed.anggota_id }
+  } catch {
+    return null
+  }
+}
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -349,6 +374,11 @@ const SETORAN_STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   DITOLAK:   { label: 'Ditolak',             cls: 'bg-rose-100 text-rose-700' },
 }
 
+const MUTASI_DEBIT_TYPES = new Set(['TARIK', 'TRANSFER_KELUAR'])
+const MUTASI_LABEL: Record<string, string> = {
+  SETOR: 'Setor', TARIK: 'Tarik', TRANSFER_KELUAR: 'Transfer Keluar', TRANSFER_MASUK: 'Transfer Masuk',
+}
+
 async function uploadBuktiSetoran(
   file: File, orgId: string
 ): Promise<{ key: string; name: string; size: number } | { error: string }> {
@@ -426,6 +456,71 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
     })
   }
 
+  const [transferSheetOpen, setTransferSheetOpen] = useState(false)
+  const [transferView, setTransferView] = useState<'kirim' | 'terima'>('kirim')
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [transferTarget, setTransferTarget] = useState<KojasmatTransferPreview | null>(null)
+  const [nominalTransfer, setNominalTransfer] = useState('')
+  const [catatanTransfer, setCatatanTransfer] = useState('')
+  const [passwordTransfer, setPasswordTransfer] = useState('')
+  const [showPasswordTransfer, setShowPasswordTransfer] = useState(false)
+  const [transferError, setTransferError] = useState<string | null>(null)
+  const [transferSuccess, setTransferSuccess] = useState(false)
+
+  function openTransfer() {
+    setTransferSheetOpen(true)
+    setTransferView('kirim')
+    setTransferTarget(null)
+    setNominalTransfer('')
+    setCatatanTransfer('')
+    setPasswordTransfer('')
+    setTransferError(null)
+    setTransferSuccess(false)
+  }
+
+  function handleScanTransfer(decoded: string) {
+    setScannerOpen(false)
+    const parsed = parseMemberQrPayload(decoded)
+    if (!parsed) { setTransferError('QR tidak dikenali. Pastikan Anda memindai QR anggota Kojasmat.'); return }
+    setTransferError(null)
+    startTransition(async () => {
+      const res = await getAnggotaTransferPreview(parsed.anggotaId)
+      if ('error' in res) { setTransferError(res.error); return }
+      setTransferTarget(res.data)
+    })
+  }
+
+  function submitTransfer() {
+    if (!transferTarget || !nominalTransfer || !passwordTransfer) return
+    setTransferError(null)
+    startTransition(async () => {
+      const res = await kirimTransferSimpanan({
+        ke_anggota_id: transferTarget.id,
+        jumlah: Number(nominalTransfer),
+        password: passwordTransfer,
+        catatan: catatanTransfer || undefined,
+      })
+      if ('error' in res) { setTransferError(res.error); return }
+      setSetoranList(prev => [{
+        id: `local-${Date.now()}`,
+        simpanan_id: simpanan.find(s => s.jenis === 'SUKARELA')?.id ?? '',
+        anggota_id: anggota.id, jenis_mutasi: 'TRANSFER_KELUAR',
+        jumlah: Number(nominalTransfer), saldo_sebelum: null, saldo_sesudah: null,
+        keterangan: `Transfer ke ${transferTarget.nama} (${transferTarget.kode_anggota})${catatanTransfer ? ` — ${catatanTransfer}` : ''}`,
+        metode_bayar: null, bukti_dokumen_id: null,
+        tanggal: new Date().toISOString(), status: 'DISETUJUI', created_at: new Date().toISOString(),
+      }, ...prev])
+      setTransferSuccess(true)
+    })
+  }
+
+  function resetTransferTarget() {
+    setTransferTarget(null)
+    setNominalTransfer('')
+    setPasswordTransfer('')
+    setTransferError(null)
+  }
+
   function openSetor() {
     setSheetOpen(true)
     setSetorError(null)
@@ -495,18 +590,24 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
         <p className="text-3xl font-bold text-amber-300">{fmt(total)}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-2.5">
         <button
           onClick={openSetor}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 py-3.5 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-emerald-700 py-3 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer"
         >
           <ArrowUpCircle className="h-4 w-4" /> Setor
         </button>
         <button
           onClick={openTarik}
-          className="flex items-center justify-center gap-2 rounded-2xl border border-emerald-700 py-3.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-emerald-700 py-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
         >
           <ArrowDownCircle className="h-4 w-4" /> Tarik
+        </button>
+        <button
+          onClick={openTransfer}
+          className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-amber-500 py-3 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+        >
+          <ArrowLeftRight className="h-4 w-4" /> Transfer
         </button>
       </div>
 
@@ -539,7 +640,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
           {setoranList.map(m => {
             const badge = SETORAN_STATUS_BADGE[m.status] ?? SETORAN_STATUS_BADGE.DISETUJUI
             const jenisMutasi = simpanan.find(s => s.id === m.simpanan_id)?.jenis ?? 'SUKARELA'
-            const isTarik = m.jenis_mutasi === 'TARIK'
+            const isDebit = MUTASI_DEBIT_TYPES.has(m.jenis_mutasi)
             return (
               <button
                 key={m.id}
@@ -548,16 +649,19 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
                 className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm text-left cursor-pointer transition-colors hover:border-emerald-200 hover:bg-emerald-50/40"
               >
                 <div className="min-w-0 flex items-start gap-2.5">
-                  {isTarik
+                  {isDebit
                     ? <ArrowDownCircle className="h-4 w-4 mt-0.5 shrink-0 text-rose-500" />
                     : <ArrowUpCircle className="h-4 w-4 mt-0.5 shrink-0 text-emerald-500" />}
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900">
-                      {isTarik ? 'Tarik' : 'Setor'} {JENIS_SIMPANAN_INFO[jenisMutasi].label.replace('Simpanan ', '')}
+                      {MUTASI_LABEL[m.jenis_mutasi] ?? m.jenis_mutasi} {JENIS_SIMPANAN_INFO[jenisMutasi].label.replace('Simpanan ', '')}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">{fmtTanggalWaktu(m.created_at)}</p>
                     {m.metode_bayar && (
                       <p className="text-xs text-gray-400 mt-0.5">{METODE_BAYAR_LABEL[m.metode_bayar]}</p>
+                    )}
+                    {m.keterangan && (m.jenis_mutasi === 'TRANSFER_KELUAR' || m.jenis_mutasi === 'TRANSFER_MASUK') && (
+                      <p className="text-xs text-gray-400 mt-0.5">{m.keterangan}</p>
                     )}
                     {m.status === 'DITOLAK' && m.catatan_admin && (
                       <p className="text-xs text-rose-600 mt-1">{m.catatan_admin}</p>
@@ -566,8 +670,8 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
                 </div>
                 <div className="text-right shrink-0 flex items-center gap-2">
                   <div>
-                    <p className={cn('text-sm font-bold', isTarik ? 'text-rose-600' : 'text-gray-900')}>
-                      {isTarik ? '-' : ''}{fmt(Number(m.jumlah))}
+                    <p className={cn('text-sm font-bold', isDebit ? 'text-rose-600' : 'text-gray-900')}>
+                      {isDebit ? '-' : ''}{fmt(Number(m.jumlah))}
                     </p>
                     <Badge text={badge.label} cls={badge.cls} />
                   </div>
@@ -579,16 +683,18 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
         </div>
       )}
 
-      <Sheet open={!!detailSetoran} onClose={() => setDetailSetoran(null)} title={detailSetoran?.jenis_mutasi === 'TARIK' ? 'Detail Penarikan' : 'Detail Setoran'}>
+      <Sheet open={!!detailSetoran} onClose={() => setDetailSetoran(null)} title={`Detail ${detailSetoran ? (MUTASI_LABEL[detailSetoran.jenis_mutasi] ?? detailSetoran.jenis_mutasi) : ''}`}>
         {detailSetoran && (() => {
           const badge = SETORAN_STATUS_BADGE[detailSetoran.status] ?? SETORAN_STATUS_BADGE.DISETUJUI
           const jenisMutasi = simpanan.find(s => s.id === detailSetoran.simpanan_id)?.jenis ?? 'SUKARELA'
+          const isDebit = MUTASI_DEBIT_TYPES.has(detailSetoran.jenis_mutasi)
           const isTarik = detailSetoran.jenis_mutasi === 'TARIK'
+          const isTransfer = detailSetoran.jenis_mutasi === 'TRANSFER_KELUAR' || detailSetoran.jenis_mutasi === 'TRANSFER_MASUK'
           return (
             <div className="space-y-4">
-              <div className={cn('rounded-2xl border p-4 text-center', isTarik ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100')}>
-                <p className={cn('text-xs mb-1', isTarik ? 'text-rose-600' : 'text-emerald-600')}>{JENIS_SIMPANAN_INFO[jenisMutasi].label}</p>
-                <p className={cn('text-2xl font-bold', isTarik ? 'text-rose-700' : 'text-emerald-800')}>{fmt(Number(detailSetoran.jumlah))}</p>
+              <div className={cn('rounded-2xl border p-4 text-center', isDebit ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100')}>
+                <p className={cn('text-xs mb-1', isDebit ? 'text-rose-600' : 'text-emerald-600')}>{JENIS_SIMPANAN_INFO[jenisMutasi].label}</p>
+                <p className={cn('text-2xl font-bold', isDebit ? 'text-rose-700' : 'text-emerald-800')}>{fmt(Number(detailSetoran.jumlah))}</p>
                 <div className="mt-2 flex justify-center">
                   <Badge text={badge.label} cls={badge.cls} />
                 </div>
@@ -596,7 +702,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
 
               <div className="rounded-xl border border-gray-100 divide-y divide-gray-100">
                 <div className="flex items-center justify-between px-4 py-3">
-                  <span className="text-xs text-gray-400">Waktu Pengajuan</span>
+                  <span className="text-xs text-gray-400">Waktu</span>
                   <span className="text-sm font-medium text-gray-800 text-right">{fmtTanggalWaktu(detailSetoran.created_at)}</span>
                 </div>
                 {detailSetoran.metode_bayar && (
@@ -607,7 +713,7 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
                 )}
                 {detailSetoran.keterangan && (
                   <div className="flex items-center justify-between px-4 py-3 gap-3">
-                    <span className="text-xs text-gray-400 shrink-0">{isTarik ? 'Tujuan Transfer' : 'Catatan'}</span>
+                    <span className="text-xs text-gray-400 shrink-0">{isTarik ? 'Tujuan Transfer' : isTransfer ? 'Keterangan' : 'Catatan'}</span>
                     <span className="text-sm font-medium text-gray-800 text-right">{detailSetoran.keterangan}</span>
                   </div>
                 )}
@@ -852,6 +958,135 @@ function TabSimpanan({ anggota, simpanan, setoran }: {
           </div>
         )}
       </Sheet>
+
+      <Sheet open={transferSheetOpen} onClose={() => setTransferSheetOpen(false)} title="Transfer Simpanan">
+        {transferSuccess ? (
+          <div className="space-y-4 text-center py-4">
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
+              <CheckCircle className="h-7 w-7 text-emerald-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">Transfer Berhasil</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {fmt(Number(nominalTransfer))} sudah dikirim ke {transferTarget?.nama} ({transferTarget?.kode_anggota}).
+              </p>
+            </div>
+            <button onClick={() => setTransferSheetOpen(false)}
+              className="w-full rounded-2xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors cursor-pointer">
+              Tutup
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex gap-2 rounded-xl bg-gray-100 p-1">
+              <button type="button" onClick={() => setTransferView('kirim')}
+                className={cn('flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+                  transferView === 'kirim' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+                Kirim
+              </button>
+              <button type="button" onClick={() => setTransferView('terima')}
+                className={cn('flex-1 rounded-lg py-2 text-sm font-medium transition-colors cursor-pointer',
+                  transferView === 'terima' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+                Terima
+              </button>
+            </div>
+
+            {transferView === 'terima' ? (
+              <div className="space-y-3 text-center py-2">
+                <p className="text-sm text-gray-500">Tunjukkan QR ini ke sesama anggota untuk menerima transfer simpanan sukarela.</p>
+                <div className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-white p-5">
+                  <QRCodeSVG value={buildMemberQrPayload(anggota.org_id, anggota.id)} size={200} />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">{anggota.nama}</p>
+                  <p className="text-xs font-mono text-gray-400">{anggota.kode_anggota}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+                  <p className="text-gray-500">Saldo Simpanan Sukarela</p>
+                  <p className="font-semibold text-gray-900">{fmt(saldoSukarela)}</p>
+                </div>
+
+                {!transferTarget ? (
+                  <button type="button" onClick={() => setScannerOpen(true)}
+                    className="w-full flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/60 py-8 text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer">
+                    <ScanLine className="h-8 w-8" />
+                    <span className="text-sm font-semibold">Scan QR Anggota Tujuan</span>
+                  </button>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                      <div>
+                        <p className="text-xs text-emerald-600">Transfer ke</p>
+                        <p className="text-sm font-semibold text-emerald-900">{transferTarget.nama}</p>
+                        <p className="text-xs font-mono text-emerald-600">{transferTarget.kode_anggota}</p>
+                      </div>
+                      <button type="button" onClick={resetTransferTarget}
+                        className="text-xs font-medium text-emerald-700 hover:text-emerald-900 cursor-pointer">
+                        Ganti
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700">Jumlah Transfer (Rp) *</label>
+                      <input type="text" inputMode="numeric"
+                        className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-emerald-500 text-lg font-semibold tabular-nums"
+                        placeholder="100.000"
+                        value={nominalTransfer ? new Intl.NumberFormat('id-ID').format(Number(nominalTransfer)) : ''}
+                        onChange={e => setNominalTransfer(e.target.value.replace(/\D/g, ''))} />
+                      {nominalTransfer && Number(nominalTransfer) > saldoSukarela && (
+                        <p className="text-xs text-rose-600 mt-1.5">Jumlah melebihi saldo simpanan sukarela Anda.</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700">Catatan (opsional)</label>
+                      <input type="text"
+                        className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
+                        placeholder="Contoh: bayar arisan"
+                        value={catatanTransfer} onChange={e => setCatatanTransfer(e.target.value)} />
+                    </div>
+
+                    <PasswordField label="Konfirmasi Password Anda *" value={passwordTransfer} onChange={setPasswordTransfer}
+                      show={showPasswordTransfer} onToggleShow={() => setShowPasswordTransfer(v => !v)} />
+
+                    {transferError && (
+                      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {transferError}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={submitTransfer}
+                      disabled={!nominalTransfer || !passwordTransfer || Number(nominalTransfer) > saldoSukarela || pending}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 transition-colors cursor-pointer"
+                    >
+                      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      {pending ? 'Memproses...' : 'Kirim Transfer'}
+                    </button>
+                  </>
+                )}
+
+                {!transferTarget && transferError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {transferError}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Sheet>
+
+      {scannerOpen && (
+        <BarcodeScanner
+          title="Scan QR Anggota"
+          onScan={handleScanTransfer}
+          onClose={() => setScannerOpen(false)}
+        />
+      )}
     </div>
   )
 }
