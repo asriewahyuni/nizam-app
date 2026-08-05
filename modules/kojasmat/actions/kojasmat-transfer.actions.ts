@@ -14,16 +14,15 @@ import { resolveInternalUserId } from '@/lib/auth/internal-auth.shared'
 import { revalidatePath } from 'next/cache'
 import { enqueueNotification } from '@/modules/notifications/outbox.server'
 
-// session.user.id bisa berisi legacy_user_id — resolveInternalUserId() menormalkan
-// ke internal_auth_users.id, yang dipakai kojasmat_anggota.user_id.
-async function getAnggotaBySession(): Promise<{ id: string; org_id: string; nama: string; kode_anggota: string } | null> {
+async function getAnggotaBySession(): Promise<{ id: string; org_id: string; nama: string; kode_anggota: string } | { error: string }> {
   const session = await getInternalAuthSession()
-  if (!session) return null
+  if (!session) return { error: 'Sesi login tidak ditemukan.' }
   const { rows: [anggota] } = await queryPostgres(
     `SELECT id, org_id, nama, kode_anggota FROM kojasmat_anggota WHERE user_id = $1::uuid LIMIT 1`,
     [resolveInternalUserId(session)]
   )
-  return (anggota as { id: string; org_id: string; nama: string; kode_anggota: string } | undefined) ?? null
+  if (!anggota) return { error: 'Akun Anda bukan Anggota Koperasi.' }
+  return anggota as { id: string; org_id: string; nama: string; kode_anggota: string }
 }
 
 export type KojasmatTransferPreview = {
@@ -35,7 +34,7 @@ export type KojasmatTransferPreview = {
 // Dipanggil setelah scan QR — validasi target sebelum menampilkan form nominal.
 export async function getAnggotaTransferPreview(keAnggotaId: string): Promise<{ data: KojasmatTransferPreview } | { error: string }> {
   const pengirim = await getAnggotaBySession()
-  if (!pengirim) return { error: 'Sesi login tidak ditemukan. Silakan login ulang.' }
+  if ('error' in pengirim) return { error: pengirim.error }
 
   const { rows: [tujuan] } = await queryPostgres(
     `SELECT id, org_id, nama, kode_anggota, status FROM kojasmat_anggota WHERE id = $1::uuid LIMIT 1`,
@@ -183,14 +182,13 @@ export async function kirimTransferSimpanan(payload: {
 
 export async function getAnggotaTransferPreviewByKode(kodeAnggota: string): Promise<{ data: KojasmatTransferPreview } | { error: string }> {
   const pengirim = await getAnggotaBySession()
-  if (!pengirim) return { error: 'Sesi login tidak ditemukan. Silakan login ulang.' }
+  if ('error' in pengirim) return { error: pengirim.error }
 
   const { rows: [tujuan] } = await queryPostgres(
-    `SELECT id, org_id, nama, kode_anggota, status FROM kojasmat_anggota WHERE kode_anggota = $1 LIMIT 1`,
-    [kodeAnggota]
+    `SELECT id, org_id, nama, kode_anggota, status FROM kojasmat_anggota WHERE kode_anggota = $1 AND org_id = $2 LIMIT 1`,
+    [kodeAnggota, pengirim.org_id]
   )
-  if (!tujuan) return { error: 'Kode anggota tidak ditemukan.' }
-  if (tujuan.org_id !== pengirim.org_id) return { error: 'Anggota tujuan bukan dari koperasi yang sama.' }
+  if (!tujuan) return { error: 'Kode anggota tidak ditemukan di koperasi Anda.' }
   if (tujuan.id === pengirim.id) return { error: 'Tidak bisa transfer ke diri sendiri.' }
   if (tujuan.status === 'DIBEKUKAN') return { error: 'Anggota tujuan sedang dibekukan dan tidak bisa menerima transfer.' }
 
