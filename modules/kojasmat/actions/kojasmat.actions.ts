@@ -1322,7 +1322,13 @@ export async function createPembiayaan(payload: {
 
     const sisa = Number(proyekData.kebutuhan_modal) - Number(proyekData.modal_terkumpul)
     if (payload.jumlah > sisa) {
-      throw new Error(`Melebihi sisa kebutuhan (Rp ${sisa.toLocaleString('id-ID')})`)
+      await client.query('ROLLBACK')
+      client.release()
+      return { 
+        error: `Melebihi sisa kebutuhan (Rp ${sisa.toLocaleString('id-ID')})`, 
+        quota_error: true,
+        modal_terkumpul: Number(proyekData.modal_terkumpul) 
+      }
     }
 
     // Pembiayaan hanya boleh memakai simpanan SUKARELA — simpanan pokok/wajib
@@ -1404,35 +1410,53 @@ export async function batalkanPembiayaan(pembiayaanId: string) {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 
-  const { rows: [pb] } = await queryPostgres(`SELECT * FROM kojasmat_pembiayaan WHERE id=$1`, [pembiayaanId])
-  if (!pb) return { error: 'Data pembiayaan tidak ditemukan' }
-  if (pb.status !== 'AKTIF') return { error: 'Pembiayaan ini sudah tidak aktif' }
-
-  const { rows: [proyek] } = await queryPostgres(`SELECT * FROM kojasmat_proyek WHERE id=$1`, [pb.proyek_id])
-  if (!proyek) return { error: 'Proyek tidak ditemukan' }
-  if (!['FUNDING_AKTIF', 'FUNDING_DITUTUP'].includes(proyek.status)) {
-    return { error: 'Pembiayaan hanya dapat dibatalkan sebelum proyek berjalan' }
-  }
-
-  await queryPostgres(`UPDATE kojasmat_pembiayaan SET status='GAGAL' WHERE id=$1`, [pembiayaanId])
-
-  const newModal = Number(proyek.modal_terkumpul) - Number(pb.jumlah)
-  const newStatus = proyek.status === 'FUNDING_DITUTUP' && newModal < Number(proyek.kebutuhan_modal) ? 'FUNDING_AKTIF' : proyek.status
-
-  await queryPostgres(
-    `UPDATE kojasmat_proyek SET modal_terkumpul=$2, status=$3, updated_at=NOW() WHERE id=$1`,
-    [pb.proyek_id, newModal, newStatus]
-  )
-
+  const client = await connectPostgresClient()
   try {
-    await jurnalPembatalanPembiayaan(
-      proyek.org_id, proyek.jenis_akad as 'MUDHARABAH' | 'MURABAHAH' | 'INAN',
-      Number(pb.jumlah), pembiayaanId, String(proyek.kode_proyek),
-    )
-    if (Number(pb.ujrah_diwakilkan) > 0) {
-      await jurnalPembatalanUjrah(proyek.org_id, proyek.jenis_akad, Number(pb.ujrah_diwakilkan), pembiayaanId, String(proyek.kode_proyek))
+    await client.query('BEGIN')
+
+    const { rows: pembiayaanRows } = await client.query(`SELECT * FROM kojasmat_pembiayaan WHERE id=$1 FOR UPDATE`, [pembiayaanId])
+    const pb = pembiayaanRows[0]
+    if (!pb) throw new Error('Data pembiayaan tidak ditemukan')
+    if (pb.status !== 'AKTIF') throw new Error('Pembiayaan ini sudah tidak aktif')
+
+    const { rows: proyekRows } = await client.query(`SELECT * FROM kojasmat_proyek WHERE id=$1 FOR UPDATE`, [pb.proyek_id])
+    const proyek = proyekRows[0]
+    if (!proyek) throw new Error('Proyek tidak ditemukan')
+    if (!['FUNDING_AKTIF', 'FUNDING_DITUTUP'].includes(proyek.status)) {
+      throw new Error('Pembiayaan hanya dapat dibatalkan sebelum proyek berjalan')
     }
-  } catch (_) { /* jurnal non-fatal */ }
+
+    await client.query(`UPDATE kojasmat_pembiayaan SET status='GAGAL' WHERE id=$1`, [pembiayaanId])
+
+    const newModal = Number(proyek.modal_terkumpul) - Number(pb.jumlah)
+    const newStatus = proyek.status === 'FUNDING_DITUTUP' && newModal < Number(proyek.kebutuhan_modal) ? 'FUNDING_AKTIF' : proyek.status
+
+    await client.query(
+      `UPDATE kojasmat_proyek SET modal_terkumpul=$2, status=$3, updated_at=NOW() WHERE id=$1`,
+      [pb.proyek_id, newModal, newStatus]
+    )
+    
+    await client.query('COMMIT')
+    
+    try {
+      await jurnalPembatalanPembiayaan(
+        proyek.org_id, proyek.jenis_akad as 'MUDHARABAH' | 'MURABAHAH' | 'INAN',
+        Number(pb.jumlah), pembiayaanId, String(proyek.kode_proyek),
+      )
+      if (Number(pb.ujrah_diwakilkan) > 0) {
+        await jurnalPembatalanUjrah(proyek.org_id, proyek.jenis_akad, Number(pb.ujrah_diwakilkan), pembiayaanId, String(proyek.kode_proyek))
+      }
+    } catch (_) { /* jurnal non-fatal */ }
+
+  } catch (error) {
+    await client.query('ROLLBACK')
+    client.release()
+    return { error: error instanceof Error ? error.message : 'Terjadi kesalahan saat membatalkan pembiayaan' }
+  }
+  
+  client.release()
+
+
 
   revalidatePath('/kojasmat')
   return { data: { ok: true } }

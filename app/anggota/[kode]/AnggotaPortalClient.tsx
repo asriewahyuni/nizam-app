@@ -1049,51 +1049,6 @@ function DiskusiPanel({ orgId, proyekId, anggotaNama }: { orgId: string; proyekI
     }
     setSending(false)
   }
-
-  if (loading) return <div className="py-6 text-center text-xs text-gray-400">Memuat diskusi...</div>
-
-  return (
-    <div className="rounded-xl border border-gray-200 overflow-hidden flex flex-col mt-4">
-      <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center gap-2">
-        <MessageCircle className="h-4 w-4 text-gray-500" />
-        <span className="text-xs font-semibold text-gray-700">Ruang Diskusi (Pemodal & Pengurus)</span>
-      </div>
-      <div className="p-4 bg-white max-h-64 overflow-y-auto space-y-4">
-        {diskusi.length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-4">Belum ada diskusi.</p>
-        ) : (
-          diskusi.map(d => (
-            <div key={d.id} className="text-sm">
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="font-semibold text-gray-800 text-xs">{d.actor_name}</span>
-                <span className="text-[10px] text-gray-400">
-                  {new Date(d.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-              <p className="text-gray-700 bg-gray-50 p-2.5 rounded-xl rounded-tl-none inline-block">{d.pesan}</p>
-            </div>
-          ))
-        )}
-      </div>
-      <div className="p-3 bg-gray-50 border-t border-gray-200 flex gap-2">
-        <input 
-          type="text" 
-          value={pesan} 
-          onChange={e => setPesan(e.target.value)} 
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
-          placeholder="Tulis pesan..." 
-          className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-        />
-        <button 
-          onClick={handleSend} 
-          disabled={!pesan.trim() || sending}
-          className="rounded-xl bg-emerald-600 px-3 py-2 text-white hover:bg-emerald-700 disabled:opacity-50"
-        >
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </button>
-      </div>
-    </div>
-  )
 }
 
 function DaftarPemodalPanel({ proyekId }: { proyekId: string }) {
@@ -1982,6 +1937,12 @@ function TabInvestasi({
       })
       if (res.error) {
         setBiayaiError(res.error)
+        // Auto-recovery: If quota is taken, update UI with the latest modal_terkumpul
+        if ((res as any).quota_error && (res as any).modal_terkumpul !== undefined) {
+          const m = (res as any).modal_terkumpul
+          setSheetBiayai(prev => prev ? { ...prev, modal_terkumpul: m } : null)
+          setList(prev => prev.map(x => x.id === sheetBiayai.id ? { ...x, modal_terkumpul: m } : x))
+        }
         return
       }
       setList(prev => prev.map(x =>
@@ -1989,6 +1950,14 @@ function TabInvestasi({
           ? { ...x, modal_terkumpul: Number(x.modal_terkumpul) + jumlahNum, sudah_dibiayai: true }
           : x
       ))
+      if (res.data) {
+        setPembiayaanList(prev => [{
+          ...res.data,
+          nama_proyek: sheetBiayai.nama_proyek,
+          jenis_akad: sheetBiayai.jenis_akad,
+          proyek_status: sheetBiayai.status,
+        } as unknown as KojasmatPembiayaan, ...prev])
+      }
       setSheetBiayai(null)
       setJumlah('')
       setKehadiranAkad('SENDIRI')
@@ -2088,7 +2057,6 @@ function TabInvestasi({
                     )}
                     {pembiayaanAktif && <JadwalAkadPanel proyekId={pm.proyek_id} />}
                     <LaporanInvestorPanel proyekId={pm.proyek_id} porsiPct={Number(pm.porsi_pct)} />
-                    <DiskusiPanel orgId={anggota.org_id} proyekId={pm.proyek_id} anggotaNama={anggota.nama} />
                   </div>
                 )}
               </div>
