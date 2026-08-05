@@ -57,8 +57,8 @@ import {
 } from '@/modules/kojasmat/lib/kojasmat-account-mapping.shared'
 import {
   saveKojasmatWhatsappSettingsAction, sendKojasmatTestWhatsappAction,
-  type TenantWhatsappConfig,
 } from '@/modules/kojasmat/actions/kojasmat-notifikasi.actions'
+import type { TenantWhatsappConfig } from '@/modules/notifications/whatsapp-settings.server'
 
 const KATEGORI_PENDAPATAN = ['Penjualan', 'Jasa', 'Pendapatan Lain'] as const
 const KATEGORI_BEBAN = ['Bahan Baku', 'Operasional', 'Gaji/Upah', 'Sewa', 'Transportasi', 'Beban Lain'] as const

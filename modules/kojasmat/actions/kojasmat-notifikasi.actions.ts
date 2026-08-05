@@ -7,7 +7,6 @@
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { isOrgAdminOrManajemen } from './kojasmat.actions'
 import {
-  getTenantWhatsappSettings,
   saveTenantWhatsappSettings,
   sendTenantTestWhatsappAction,
   type TenantWhatsappConfig,
@@ -42,6 +41,3 @@ export async function sendKojasmatTestWhatsappAction(orgId: string, targetPhone:
   }
   return sendTenantTestWhatsappAction(orgId, targetPhone)
 }
-
-export { getTenantWhatsappSettings }
-export type { TenantWhatsappConfig }
