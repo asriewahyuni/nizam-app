@@ -87,6 +87,7 @@ export type KojasmatProyek = {
   nisbah_pemodal: number
   min_investasi: number
   durasi_bulan: number
+  durasi_hari: number
   tanggal_mulai?: string
   tanggal_selesai?: string
   status: string
@@ -220,6 +221,7 @@ export type KojasmatPenawaran = {
   ujrah_nominal?: number
   ujrah_wakalah_akad?: number
   durasi_bulan?: number
+  durasi_hari?: number
   proyek_status?: string
 }
 
@@ -956,6 +958,7 @@ export async function createProyek(payload: {
   nisbah_pengaju?: number
   nisbah_pemodal?: number
   durasi_bulan?: number
+  durasi_hari?: number
   agunan?: string
   notes?: string
 }) {
@@ -980,8 +983,8 @@ export async function createProyek(payload: {
     `INSERT INTO kojasmat_proyek
        (org_id, pengaju_id, kode_proyek, nama_proyek, deskripsi, jenis_akad,
         kebutuhan_modal, ujrah_nominal, ujrah_wakalah_akad, nisbah_pengaju, nisbah_pemodal,
-        durasi_bulan, agunan, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        durasi_bulan, durasi_hari, agunan, notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      RETURNING *`,
     [
       payload.org_id, payload.pengaju_id, kode, payload.nama_proyek,
@@ -992,6 +995,7 @@ export async function createProyek(payload: {
       payload.nisbah_pengaju ?? 30,
       payload.nisbah_pemodal ?? 70,
       payload.durasi_bulan ?? 6,
+      payload.durasi_hari ?? 0,
       payload.agunan ?? null, payload.notes ?? null,
     ]
   )
@@ -1033,6 +1037,7 @@ export async function updateProyek(id: string, payload: {
   nisbah_pengaju?: number
   nisbah_pemodal?: number
   durasi_bulan: number
+  durasi_hari?: number
   agunan?: string
   notes?: string
 }) {
@@ -1051,7 +1056,7 @@ export async function updateProyek(id: string, payload: {
      SET nama_proyek=$2, deskripsi=$3, jenis_akad=$4,
          kebutuhan_modal=$5, ujrah_nominal=$6, ujrah_wakalah_akad=$10,
          nisbah_pengaju=$11, nisbah_pemodal=$12,
-         durasi_bulan=$7, agunan=$8, notes=$9, updated_at=NOW()
+         durasi_bulan=$7, durasi_hari=$13, agunan=$8, notes=$9, updated_at=NOW()
      WHERE id=$1`,
     [
       id, payload.nama_proyek, payload.deskripsi ?? null,
@@ -1059,25 +1064,96 @@ export async function updateProyek(id: string, payload: {
       payload.durasi_bulan, payload.agunan ?? null, payload.notes ?? null,
       payload.ujrah_wakalah_akad ?? 0,
       nisbahPengaju, nisbahPemodal,
+      payload.durasi_hari ?? 0,
     ]
   )
   revalidatePath('/kojasmat')
   return { data: { ok: true } }
 }
 
+// Hapus proyek di status apa pun. Jika masih ada pembiayaan AKTIF (dana pemodal
+// sudah masuk, baik yang masih di Dana Syirkah Temporer maupun yang sudah terkunci
+// di Simpanan Proyek pasca akad ditandatangani), dana itu dilepas & dikembalikan ke
+// Simpanan Sukarela pemodal serta jurnal penerimaan dana dibalik, sebelum baris
+// proyek (dan seluruh anak tabelnya via ON DELETE CASCADE) dihapus permanen.
 export async function deleteProyek(id: string) {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
 
-  const { rows: [p] } = await queryPostgres(
-    `SELECT status FROM kojasmat_proyek WHERE id=$1`, [id]
-  )
-  if (!p) return { error: 'Proyek tidak ditemukan' }
-  if (p.status !== 'DRAFT') return { error: 'Hanya proyek berstatus DRAFT yang dapat dihapus' }
+  const client = await connectPostgresClient()
+  let proyek: KojasmatProyek | null = null
+  let pembiayaanAktif: { id: string; pemodal_id: string; jumlah: number; ujrah_diwakilkan: number }[] = []
 
-  await queryPostgres(`DELETE FROM kojasmat_proyek WHERE id=$1`, [id])
+  try {
+    await client.query('BEGIN')
+
+    const { rows: proyekRows } = await client.query(`SELECT * FROM kojasmat_proyek WHERE id=$1 FOR UPDATE`, [id])
+    proyek = proyekRows[0]
+    if (!proyek) throw new Error('Proyek tidak ditemukan')
+
+    const { rows } = await client.query(
+      `SELECT id, pemodal_id, jumlah, ujrah_diwakilkan FROM kojasmat_pembiayaan WHERE proyek_id=$1 AND status='AKTIF' FOR UPDATE`,
+      [id]
+    )
+    pembiayaanAktif = rows
+
+    for (const pb of pembiayaanAktif) {
+      const { rows: [simpananProyek] } = await client.query(
+        `SELECT id, saldo FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='PROYEK' FOR UPDATE`,
+        [pb.pemodal_id]
+      )
+      if (simpananProyek && Number(simpananProyek.saldo) > 0) {
+        const jumlahLepas = Math.min(Number(simpananProyek.saldo), Number(pb.jumlah))
+        const saldoSebelum = Number(simpananProyek.saldo)
+        const saldoSesudah = saldoSebelum - jumlahLepas
+        await client.query(`UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`, [simpananProyek.id, saldoSesudah])
+        await client.query(
+          `INSERT INTO kojasmat_simpanan_mutasi (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, status)
+           VALUES ($1,$2,$3,'TARIK',$4,$5,$6,$7,'DISETUJUI')`,
+          [proyek.org_id, simpananProyek.id, pb.pemodal_id, jumlahLepas, saldoSebelum, saldoSesudah, `Pelepasan dana — proyek ${proyek.kode_proyek} dihapus`]
+        )
+      }
+
+      const { rows: [simpananSukarela] } = await client.query(
+        `SELECT id, saldo FROM kojasmat_simpanan WHERE anggota_id=$1 AND jenis='SUKARELA' FOR UPDATE`,
+        [pb.pemodal_id]
+      )
+      if (simpananSukarela) {
+        const saldoSebelum = Number(simpananSukarela.saldo)
+        const saldoSesudah = saldoSebelum + Number(pb.jumlah)
+        await client.query(`UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`, [simpananSukarela.id, saldoSesudah])
+        await client.query(
+          `INSERT INTO kojasmat_simpanan_mutasi (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, status)
+           VALUES ($1,$2,$3,'SETOR',$4,$5,$6,$7,'DISETUJUI')`,
+          [proyek.org_id, simpananSukarela.id, pb.pemodal_id, Number(pb.jumlah), saldoSebelum, saldoSesudah, `Pengembalian dana — proyek ${proyek.kode_proyek} dihapus`]
+        )
+      }
+    }
+
+    await client.query(`DELETE FROM kojasmat_proyek WHERE id=$1`, [id])
+    await client.query('COMMIT')
+
+    try {
+      for (const pb of pembiayaanAktif) {
+        await jurnalPembatalanPembiayaan(
+          proyek.org_id, proyek.jenis_akad as 'MUDHARABAH' | 'MURABAHAH' | 'INAN',
+          Number(pb.jumlah), pb.id, String(proyek.kode_proyek),
+        )
+        if (Number(pb.ujrah_diwakilkan) > 0) {
+          await jurnalPembatalanUjrah(proyek.org_id, proyek.jenis_akad, Number(pb.ujrah_diwakilkan), pb.id, String(proyek.kode_proyek))
+        }
+      }
+    } catch (_) { /* jurnal non-fatal */ }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    client.release()
+    return { error: error instanceof Error ? error.message : 'Terjadi kesalahan saat menghapus proyek' }
+  }
+
+  client.release()
+
   revalidatePath('/kojasmat')
-  return { data: { ok: true } }
+  return { data: { ok: true, dana_dikembalikan: pembiayaanAktif.length } }
 }
 
 // Ambil role aktor di org untuk dicatat di riwayat proyek (audit trail saja, bukan guard izin).
@@ -1839,7 +1915,7 @@ export async function kirimPenawaranProyek(payload: {
 export async function getPenawaranByAnggota(anggotaId: string): Promise<KojasmatPenawaran[]> {
   const { rows } = await queryPostgres(
     `SELECT pn.*, p.nama_proyek, p.jenis_akad, p.kebutuhan_modal,
-            p.modal_terkumpul, p.ujrah_nominal, p.ujrah_wakalah_akad, p.durasi_bulan, p.status AS proyek_status
+            p.modal_terkumpul, p.ujrah_nominal, p.ujrah_wakalah_akad, p.durasi_bulan, p.durasi_hari, p.status AS proyek_status
      FROM kojasmat_penawaran pn
      LEFT JOIN kojasmat_proyek p ON p.id = pn.proyek_id
      WHERE pn.anggota_id=$1 ORDER BY pn.sent_at DESC`,

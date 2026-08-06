@@ -99,6 +99,10 @@ function fmtTanggalWaktu(d: string) {
   }).format(new Date(d)) + ' WIB'
 }
 
+function fmtDurasiProyek(bulan: number, hari?: number | null) {
+  return hari ? `${bulan} bulan ${hari} hari` : `${bulan} bulan`
+}
+
 const METODE_BAYAR_LABEL: Record<string, string> = {
   TRANSFER: 'Transfer Bank',
   QRIS: 'QRIS',
@@ -250,7 +254,7 @@ function TabBeranda({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-emerald-900 text-sm">{p.nama_proyek}</p>
-                  <p className="text-xs text-emerald-600 mt-0.5">{p.durasi_bulan} bulan · {p.kode_proyek}</p>
+                  <p className="text-xs text-emerald-600 mt-0.5">{fmtDurasiProyek(p.durasi_bulan, p.durasi_hari)} · {p.kode_proyek}</p>
                 </div>
                 <Badge text="Berjalan" cls="bg-emerald-200 text-emerald-800" />
               </div>
@@ -1666,7 +1670,7 @@ function TabProyek({ anggota, proyekDiajukan, onRequestUpgrade }: {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [form, setForm] = useState({
     nama_proyek: '', deskripsi: '', jenis_akad: 'MUDHARABAH',
-    kebutuhan_modal: '', durasi_bulan: '6', agunan: '', nisbah_pengaju: 30,
+    kebutuhan_modal: '', durasi_bulan: '6', durasi_hari: '0', agunan: '', nisbah_pengaju: 30,
   })
 
   const nisbah_pemodal = 100 - form.nisbah_pengaju
@@ -1682,7 +1686,7 @@ function TabProyek({ anggota, proyekDiajukan, onRequestUpgrade }: {
 
   function resetSheet() {
     setSheetOpen(false)
-    setForm({ nama_proyek: '', deskripsi: '', jenis_akad: 'MUDHARABAH', kebutuhan_modal: '', durasi_bulan: '6', agunan: '', nisbah_pengaju: 30 })
+    setForm({ nama_proyek: '', deskripsi: '', jenis_akad: 'MUDHARABAH', kebutuhan_modal: '', durasi_bulan: '6', durasi_hari: '0', agunan: '', nisbah_pengaju: 30 })
     setUploadedDoks([])
   }
 
@@ -1696,6 +1700,7 @@ function TabProyek({ anggota, proyekDiajukan, onRequestUpgrade }: {
         jenis_akad: form.jenis_akad as 'MURABAHAH' | 'MUDHARABAH' | 'INAN',
         kebutuhan_modal: Number(form.kebutuhan_modal),
         durasi_bulan: Number(form.durasi_bulan),
+        durasi_hari: Number(form.durasi_hari) || 0,
         agunan: form.agunan || undefined,
         nisbah_pengaju: form.nisbah_pengaju,
         nisbah_pemodal: nisbah_pemodal,
@@ -1761,7 +1766,7 @@ function TabProyek({ anggota, proyekDiajukan, onRequestUpgrade }: {
                         <Badge text={AKAD_LABEL[p.jenis_akad] ?? p.jenis_akad} cls="bg-gray-100 text-gray-500" />
                       </div>
                       <p className="font-semibold text-gray-900 text-sm truncate">{p.nama_proyek}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{p.kode_proyek} · {p.durasi_bulan} bulan</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{p.kode_proyek} · {fmtDurasiProyek(p.durasi_bulan, p.durasi_hari)}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-bold text-gray-900 text-sm">{fmt(Number(p.kebutuhan_modal))}</p>
@@ -1828,18 +1833,23 @@ function TabProyek({ anggota, proyekDiajukan, onRequestUpgrade }: {
               <option value="INAN">Musyarakah Inan — Modal bersama</option>
             </select>
           </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">Modal (Rp) *</label>
+            <input type="text" inputMode="numeric" className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 tabular-nums"
+              placeholder="5.000.000"
+              value={form.kebutuhan_modal ? new Intl.NumberFormat('id-ID').format(Number(form.kebutuhan_modal)) : ''}
+              onChange={e => setForm(f => ({ ...f, kebutuhan_modal: e.target.value.replace(/\D/g, '') }))} />
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Modal (Rp) *</label>
-              <input type="text" inputMode="numeric" className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500 tabular-nums"
-                placeholder="5.000.000"
-                value={form.kebutuhan_modal ? new Intl.NumberFormat('id-ID').format(Number(form.kebutuhan_modal)) : ''}
-                onChange={e => setForm(f => ({ ...f, kebutuhan_modal: e.target.value.replace(/\D/g, '') }))} />
-            </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Durasi (bulan)</label>
               <input type="number" className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
                 value={form.durasi_bulan} onChange={e => setForm(f => ({ ...f, durasi_bulan: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Durasi (hari)</label>
+              <input type="number" className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
+                value={form.durasi_hari} onChange={e => setForm(f => ({ ...f, durasi_hari: e.target.value }))} />
             </div>
           </div>
           <div>
@@ -2027,7 +2037,7 @@ function TabPenawaran({ anggota, penawaran, simpanan, onRequestUpgrade }: {
                   <div className="flex-1">
                     <p className="font-semibold text-gray-900 text-sm">{p.nama_proyek ?? '—'}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {AKAD_LABEL[p.jenis_akad ?? ''] ?? p.jenis_akad} · {p.durasi_bulan ?? '?'} bulan
+                      {AKAD_LABEL[p.jenis_akad ?? ''] ?? p.jenis_akad} · {p.durasi_bulan != null ? fmtDurasiProyek(p.durasi_bulan, p.durasi_hari) : '?'}
                     </p>
                   </div>
                   <p className="font-bold text-gray-900 text-sm shrink-0">{fmt(Number(p.kebutuhan_modal ?? 0))}</p>
@@ -2564,7 +2574,7 @@ function TabInvestasi({
                     )}
                   </div>
                   <p className="font-semibold text-gray-900 text-sm leading-snug">{p.nama_proyek}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">oleh {p.pengaju_nama ?? '—'} · {p.durasi_bulan} bulan</p>
+                  <p className="text-xs text-gray-400 mt-0.5">oleh {p.pengaju_nama ?? '—'} · {fmtDurasiProyek(p.durasi_bulan, p.durasi_hari)}</p>
                 </div>
 
                 {/* Tombol minat */}
@@ -2621,7 +2631,7 @@ function TabInvestasi({
             {/* Footer stats */}
             <div className="border-t border-gray-50 px-4 py-2.5 flex flex-wrap items-center gap-3 text-xs text-gray-500 bg-gray-50/50">
               <span className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5 shrink-0" /> {p.durasi_bulan} bulan
+                <Clock className="h-3.5 w-3.5 shrink-0" /> {fmtDurasiProyek(p.durasi_bulan, p.durasi_hari)}
               </span>
               {p.nisbah_pemodal > 0 && (
                 <span className="flex items-center gap-1">

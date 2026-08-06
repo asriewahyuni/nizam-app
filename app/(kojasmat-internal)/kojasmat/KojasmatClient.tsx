@@ -1815,7 +1815,7 @@ function DetailProyekPanel({ proyek }: { proyek: KojasmatProyek }) {
         </div>
         <h3 className="text-base font-semibold text-gray-900">{proyek.nama_proyek}</h3>
         <p className="text-sm text-gray-500 mt-0.5">
-          {proyek.kode_proyek} · Pengaju: {proyek.pengaju_nama ?? '—'} · {proyek.durasi_bulan} bulan
+          {proyek.kode_proyek} · Pengaju: {proyek.pengaju_nama ?? '—'} · {fmtDurasiProyek(proyek.durasi_bulan, proyek.durasi_hari)}
         </p>
         {proyek.deskripsi && <p className="text-sm text-gray-600 mt-2 leading-relaxed">{proyek.deskripsi}</p>}
         {proyek.agunan && <p className="text-xs text-gray-500 mt-2">Agunan: {proyek.agunan}</p>}
@@ -2063,7 +2063,7 @@ type ProyekForm = {
   ujrah_nominal: string
   ujrah_wakalah_akad: string
   nisbah_pengaju: number
-  durasi_bulan: string; agunan: string; notes: string
+  durasi_bulan: string; durasi_hari: string; agunan: string; notes: string
 }
 
 const emptyProyekForm: ProyekForm = {
@@ -2072,7 +2072,11 @@ const emptyProyekForm: ProyekForm = {
   ujrah_nominal: '150000',
   ujrah_wakalah_akad: '50000',
   nisbah_pengaju: 30,
-  durasi_bulan: '6', agunan: '', notes: ''
+  durasi_bulan: '6', durasi_hari: '0', agunan: '', notes: ''
+}
+
+function fmtDurasiProyek(bulan: number, hari?: number | null): string {
+  return hari ? `${bulan} bulan ${hari} hari` : `${bulan} bulan`
 }
 
 function TabProyek({ orgId, proyek, anggota }: {
@@ -2084,6 +2088,7 @@ function TabProyek({ orgId, proyek, anggota }: {
   const [modalEdit, setModalEdit] = useState<KojasmatProyek | null>(null)
   const [modalDelete, setModalDelete] = useState<KojasmatProyek | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [konfirmasiHapusLanjut, setKonfirmasiHapusLanjut] = useState(false)
   const [dokProyek, setDokProyek] = useState<KojasmatProyek | null>(null)
   const [keuanganProyek, setKeuanganProyek] = useState<KojasmatProyek | null>(null)
   const [detailProyek, setDetailProyek] = useState<KojasmatProyek | null>(null)
@@ -2120,6 +2125,7 @@ function TabProyek({ orgId, proyek, anggota }: {
         nisbah_pengaju: form.nisbah_pengaju,
         nisbah_pemodal: 100 - form.nisbah_pengaju,
         durasi_bulan: Number(form.durasi_bulan),
+        durasi_hari: Number(form.durasi_hari) || 0,
         agunan: form.agunan || undefined,
         notes: form.notes || undefined,
       })
@@ -2217,6 +2223,7 @@ function TabProyek({ orgId, proyek, anggota }: {
       ujrah_wakalah_akad: String(p.ujrah_wakalah_akad ?? 0),
       nisbah_pengaju: p.nisbah_pengaju ?? 30,
       durasi_bulan: String(p.durasi_bulan),
+      durasi_hari: String(p.durasi_hari ?? 0),
       agunan: p.agunan ?? '',
       notes: p.notes ?? '',
     })
@@ -2236,6 +2243,7 @@ function TabProyek({ orgId, proyek, anggota }: {
         nisbah_pengaju: editForm.nisbah_pengaju,
         nisbah_pemodal: 100 - editForm.nisbah_pengaju,
         durasi_bulan: Number(editForm.durasi_bulan),
+        durasi_hari: Number(editForm.durasi_hari) || 0,
         agunan: editForm.agunan || undefined,
         notes: editForm.notes || undefined,
       })
@@ -2301,7 +2309,7 @@ function TabProyek({ orgId, proyek, anggota }: {
                   </div>
                   <h3 className="font-semibold text-gray-900 truncate">{p.nama_proyek}</h3>
                   <p className="text-sm text-gray-500 mt-0.5">
-                    Pengaju: {p.pengaju_nama ?? '—'} · {p.durasi_bulan} bulan
+                    Pengaju: {p.pengaju_nama ?? '—'} · {fmtDurasiProyek(p.durasi_bulan, p.durasi_hari)}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
                     Nisbah Pengaju {p.nisbah_pengaju ?? 30}% · Pemodal {p.nisbah_pemodal ?? 70}%
@@ -2337,14 +2345,12 @@ function TabProyek({ orgId, proyek, anggota }: {
                     >
                       <Pencil className="h-3 w-3" /> Edit
                     </button>
-                    {p.status === 'DRAFT' && (
-                      <button
-                        onClick={() => { setModalDelete(p); setDeleteError(null) }}
-                        className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="h-3 w-3" /> Hapus
-                      </button>
-                    )}
+                    <button
+                      onClick={() => { setModalDelete(p); setDeleteError(null); setKonfirmasiHapusLanjut(false) }}
+                      className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="h-3 w-3" /> Hapus
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2485,7 +2491,7 @@ function TabProyek({ orgId, proyek, anggota }: {
                 <option value="INAN">Musyarakah Inan — Modal Bersama</option>
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Kebutuhan Modal (Rp) *</label>
                 <input type="number"
@@ -2497,6 +2503,12 @@ function TabProyek({ orgId, proyek, anggota }: {
                 <input type="number"
                   className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                   value={editForm.durasi_bulan} onChange={e => setEditForm(f => ({ ...f, durasi_bulan: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Durasi (hari)</label>
+                <input type="number"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  value={editForm.durasi_hari} onChange={e => setEditForm(f => ({ ...f, durasi_hari: e.target.value }))} />
               </div>
             </div>
 
@@ -2569,32 +2581,51 @@ function TabProyek({ orgId, proyek, anggota }: {
 
       {/* Modal Konfirmasi Hapus */}
       <Modal open={!!modalDelete} onClose={() => setModalDelete(null)} title="Hapus Proyek">
-        {modalDelete && (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-red-100 bg-red-50 p-4">
-              <p className="font-medium text-red-800">{modalDelete.nama_proyek}</p>
-              <p className="text-sm text-red-600 mt-1">{modalDelete.kode_proyek} · {modalDelete.jenis_akad}</p>
-            </div>
-            <p className="text-sm text-gray-600">
-              Proyek ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.
-            </p>
-            {deleteError && (
-              <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {deleteError}
+        {modalDelete && (() => {
+          const bukanDraft = modalDelete.status !== 'DRAFT'
+          return (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+                <p className="font-medium text-red-800">{modalDelete.nama_proyek}</p>
+                <p className="text-sm text-red-600 mt-1">
+                  {modalDelete.kode_proyek} · {modalDelete.jenis_akad} · {STATUS_PROYEK[modalDelete.status]?.label ?? modalDelete.status}
+                </p>
+              </div>
+              <p className="text-sm text-gray-600">
+                Proyek ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.
               </p>
-            )}
-            <div className="flex gap-3">
-              <button onClick={() => setModalDelete(null)}
-                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
-                Batal
-              </button>
-              <button onClick={handleDelete} disabled={pending}
-                className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer">
-                {pending ? 'Menghapus...' : 'Ya, Hapus'}
-              </button>
+              {bukanDraft && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+                  <p className="text-sm font-medium text-amber-800">Proyek ini sudah melewati status Draft</p>
+                  <ul className="text-xs text-amber-700 list-disc pl-4 space-y-1">
+                    <li>Dana pemodal yang masih terikat di proyek ini akan otomatis dilepas dan dikembalikan ke Simpanan Sukarela masing-masing pemodal.</li>
+                    <li>Seluruh riwayat proyek — pembiayaan, akad, transaksi keuangan, dan bagi hasil — akan ikut terhapus permanen dan tidak bisa dipulihkan.</li>
+                  </ul>
+                  <label className="flex items-start gap-2 text-xs text-amber-800 pt-1 cursor-pointer">
+                    <input type="checkbox" className="mt-0.5 cursor-pointer" checked={konfirmasiHapusLanjut}
+                      onChange={e => setKonfirmasiHapusLanjut(e.target.checked)} />
+                    Saya paham risikonya dan tetap ingin menghapus proyek ini.
+                  </label>
+                </div>
+              )}
+              {deleteError && (
+                <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {deleteError}
+                </p>
+              )}
+              <div className="flex gap-3">
+                <button onClick={() => setModalDelete(null)}
+                  className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                  Batal
+                </button>
+                <button onClick={handleDelete} disabled={pending || (bukanDraft && !konfirmasiHapusLanjut)}
+                  className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer">
+                  {pending ? 'Menghapus...' : 'Ya, Hapus'}
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </Modal>
 
       {/* Modal Proyek Baru */}
@@ -2696,23 +2727,29 @@ function TabProyek({ orgId, proyek, anggota }: {
               <option value="INAN">Musyarakah Inan — Modal Bersama</option>
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Kebutuhan Modal *</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-500 text-sm font-medium">Rp</span>
-                <input type="text" inputMode="numeric"
-                  className="w-full rounded-xl border border-gray-200 pl-9 pr-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                  placeholder="5.000.000"
-                  value={form.kebutuhan_modal ? Number(form.kebutuhan_modal).toLocaleString('id-ID') : ''}
-                  onChange={e => setForm(f => ({ ...f, kebutuhan_modal: e.target.value.replace(/\D/g, '') }))} />
-              </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Kebutuhan Modal *</label>
+            <div className="relative">
+              <span className="absolute left-3 top-2 text-gray-500 text-sm font-medium">Rp</span>
+              <input type="text" inputMode="numeric"
+                className="w-full rounded-xl border border-gray-200 pl-9 pr-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                placeholder="5.000.000"
+                value={form.kebutuhan_modal ? Number(form.kebutuhan_modal).toLocaleString('id-ID') : ''}
+                onChange={e => setForm(f => ({ ...f, kebutuhan_modal: e.target.value.replace(/\D/g, '') }))} />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Durasi (bulan)</label>
               <input type="number"
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                 value={form.durasi_bulan} onChange={e => setForm(f => ({ ...f, durasi_bulan: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Durasi (hari)</label>
+              <input type="number"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={form.durasi_hari} onChange={e => setForm(f => ({ ...f, durasi_hari: e.target.value }))} />
             </div>
           </div>
           <div>
@@ -2783,7 +2820,7 @@ function TabProyek({ orgId, proyek, anggota }: {
             <div className="rounded-xl bg-amber-50 p-4">
               <p className="font-medium text-amber-800">{modalReview.proyek.nama_proyek}</p>
               <p className="text-sm text-amber-600 mt-1">
-                {modalReview.proyek.jenis_akad} · {fmt(Number(modalReview.proyek.kebutuhan_modal))} · {modalReview.proyek.durasi_bulan} bulan
+                {modalReview.proyek.jenis_akad} · {fmt(Number(modalReview.proyek.kebutuhan_modal))} · {fmtDurasiProyek(modalReview.proyek.durasi_bulan, modalReview.proyek.durasi_hari)}
               </p>
               <p className="text-sm text-amber-600 mt-1">
                 Nisbah Pengaju {modalReview.proyek.nisbah_pengaju ?? 30}% · Nisbah Pemodal {modalReview.proyek.nisbah_pemodal ?? 70}%
@@ -3600,7 +3637,6 @@ function TabSimpanan({ orgId, anggota, setoranPending, stats }: {
                 <option value="POKOK">Simpanan Pokok</option>
                 <option value="WAJIB">Simpanan Wajib</option>
                 <option value="SUKARELA">Simpanan Sukarela</option>
-                <option value="PROYEK">Simpanan Proyek</option>
                 <option value="HIBAH_NAMETAG">Hibah Name Tag</option>
                 <option value="HIBAH_MEMBERCARD">Hibah Member Card</option>
                 <option value="HIBAH_KAJIAN">Hibah Kajian</option>
