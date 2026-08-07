@@ -44,52 +44,82 @@ export async function resendOrderAccessEmailAction(orderId: string) {
     order_number: string
     customer_name: string
     customer_email: string | null
+    customer_phone: string | null
+    user_id: string | null
     grand_total: number
     status: string
   }>(
-    `SELECT id::text, order_number, customer_name, customer_email, grand_total::float8, status
+    `SELECT id::text, order_number, customer_name, customer_email, customer_phone,
+            user_id::text, grand_total::float8, status
      FROM public.ecommerce_orders
      WHERE id = $1::uuid AND org_id = $2::uuid LIMIT 1`,
     [orderId, orgData.org.id],
   )
 
   const order = rows[0]
-  if (!order || !order.customer_email) {
-    return { error: 'Order atau email pembeli tidak ditemukan.' }
+  if (!order || (!order.customer_email && !order.customer_phone)) {
+    return { error: 'Order atau kontak pembeli (email/WhatsApp) tidak ditemukan.' }
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://member.coreisec.id'
   const accessUrl = `${appUrl}/login`
 
-  const emailRes = await sendSystemEmail({
-    fromName: orgData.org.name || 'Nizam LMS',
-    toEmail: order.customer_email,
-    subject: `[Akses Kelas] Bukti Pembayaran Order ${order.order_number}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px;">
-        <h2 style="color: #0f172a;">Halo ${order.customer_name},</h2>
-        <p>Berikut adalah pengiriman ulang informasi akses kelas untuk pesanan Anda:</p>
-        <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; margin: 20px 0; border: 1px solid #cbd5e1;">
-          <p style="margin: 4px 0;"><strong>No. Order:</strong> ${order.order_number}</p>
-          <p style="margin: 4px 0;"><strong>Total Pembayaran:</strong> Rp ${order.grand_total.toLocaleString('id-ID')}</p>
-          <p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: #16a34a; font-weight: bold;">LUNAS</span></p>
+  let emailError: string | null = null
+  if (order.customer_email) {
+    const emailRes = await sendSystemEmail({
+      fromName: orgData.org.name || 'Nizam LMS',
+      toEmail: order.customer_email,
+      subject: `[Akses Kelas] Bukti Pembayaran Order ${order.order_number}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <h2 style="color: #0f172a;">Halo ${order.customer_name},</h2>
+          <p>Berikut adalah pengiriman ulang informasi akses kelas untuk pesanan Anda:</p>
+          <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; margin: 20px 0; border: 1px solid #cbd5e1;">
+            <p style="margin: 4px 0;"><strong>No. Order:</strong> ${order.order_number}</p>
+            <p style="margin: 4px 0;"><strong>Total Pembayaran:</strong> Rp ${order.grand_total.toLocaleString('id-ID')}</p>
+            <p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: #16a34a; font-weight: bold;">LUNAS</span></p>
+          </div>
+          <p>Anda dapat langsung masuk ke portal member untuk mulai belajar:</p>
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="${accessUrl}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
+              Masuk ke Member Portal
+            </a>
+          </div>
+          <hr style="border: 0; height: 1px; background: #e2e8f0; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #64748b; text-align: center;">Salam hangat,<br /><strong>Tim ${orgData.org.name}</strong></p>
         </div>
-        <p>Anda dapat langsung masuk ke portal member untuk mulai belajar:</p>
-        <div style="text-align: center; margin: 25px 0;">
-          <a href="${accessUrl}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
-            Masuk ke Member Portal
-          </a>
-        </div>
-        <hr style="border: 0; height: 1px; background: #e2e8f0; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #64748b; text-align: center;">Salam hangat,<br /><strong>Tim ${orgData.org.name}</strong></p>
-      </div>
-    `,
-  })
-
-  if ('error' in emailRes) {
-    return { error: `Gagal mengirim email: ${emailRes.error}` }
+      `,
+    })
+    if ('error' in emailRes) {
+      emailError = `Gagal mengirim email: ${emailRes.error}`
+    }
   }
 
+  if (order.customer_phone) {
+    try {
+      await enqueueNotification({
+        orgId: orgData.org.id,
+        userId: order.user_id,
+        eventType: 'ORDER_ACCESS_RESENT',
+        channel: 'WHATSAPP',
+        recipient: order.customer_phone,
+        templateKey: 'ORDER_ACCESS_RESENT',
+        variables: {
+          name: order.customer_name || 'Member',
+          order_number: order.order_number,
+          amount: formatRupiah(order.grand_total),
+          portal_url: accessUrl,
+        },
+        idempotencyKey: `order-access-resent:${orderId}:WHATSAPP:${Date.now()}`,
+        payload: { orderId, orderNumber: order.order_number },
+      })
+    } catch {
+      // Template WhatsApp (Dripsender) belum dikonfigurasi untuk org ini —
+      // jangan gagalkan resend hanya karena kanal WA opsional ini gagal.
+    }
+  }
+
+  if (emailError) return { error: emailError }
   return { success: true }
 }
 
@@ -261,13 +291,23 @@ async function reopenOrderForPaymentAction(orderId: string) {
   if (!orgData?.org?.id) return { error: 'Organisasi tidak ditemukan.' }
 
   try {
-    const orderResult = await queryPostgres<{ status: string }>(
-      `SELECT status::text FROM public.ecommerce_orders WHERE id = $1::uuid AND org_id = $2::uuid LIMIT 1`,
+    const orderResult = await queryPostgres<{
+      status: string
+      order_number: string
+      customer_name: string
+      customer_email: string | null
+      customer_phone: string
+      grand_total: number
+      user_id: string | null
+    }>(
+      `SELECT status::text, order_number, customer_name, customer_email, customer_phone,
+              grand_total::float8, user_id::text
+       FROM public.ecommerce_orders WHERE id = $1::uuid AND org_id = $2::uuid LIMIT 1`,
       [orderId, orgData.org.id],
     )
-    const current = orderResult.rows[0]?.status
-    if (!current) return { error: 'Order tidak ditemukan.' }
-    if (!['PAYMENT_UNDER_REVIEW', 'PAYMENT_REJECTED', 'PAYMENT_EXCEPTION'].includes(current)) {
+    const order = orderResult.rows[0]
+    if (!order) return { error: 'Order tidak ditemukan.' }
+    if (!['PAYMENT_UNDER_REVIEW', 'PAYMENT_REJECTED', 'PAYMENT_EXCEPTION'].includes(order.status)) {
       return { error: 'Order ini tidak bisa dikembalikan ke status menunggu pembayaran.' }
     }
 
@@ -282,6 +322,39 @@ async function reopenOrderForPaymentAction(orderId: string) {
        VALUES ($1::uuid, $2::uuid, 'ADMIN', 'ORDER_REOPENED', 'Order dikembalikan ke status menunggu pembayaran oleh admin.')`,
       [orgData.org.id, orderId],
     )
+
+    const itemsResult = await queryPostgres<{ product_name: string }>(
+      `SELECT DISTINCT product_name FROM public.ecommerce_order_items WHERE org_id = $1::uuid AND order_id = $2::uuid`,
+      [orgData.org.id, orderId],
+    )
+    const variables: Record<string, string | number | null> = {
+      name: order.customer_name || 'Member',
+      order_number: order.order_number,
+      product_name: itemsResult.rows.map((row) => row.product_name).join(', ') || 'pesanan Anda',
+      amount: formatRupiah(order.grand_total),
+      payment_due: '24 jam ke depan',
+    }
+    const recipients: Array<{ channel: 'EMAIL' | 'WHATSAPP'; value: string }> = []
+    if (order.customer_email) recipients.push({ channel: 'EMAIL', value: order.customer_email })
+    if (order.customer_phone) recipients.push({ channel: 'WHATSAPP', value: order.customer_phone })
+    for (const recipient of recipients) {
+      try {
+        await enqueueNotification({
+          orgId: orgData.org.id,
+          userId: order.user_id,
+          eventType: 'ORDER_PENDING_PAYMENT',
+          channel: recipient.channel,
+          recipient: recipient.value,
+          templateKey: 'ORDER_PENDING_PAYMENT',
+          variables,
+          idempotencyKey: `order-reopened:${orderId}:${recipient.channel}:${Date.now()}`,
+          payload: { orderId, orderNumber: order.order_number },
+        })
+      } catch {
+        // Notifikasi opsional; jangan gagalkan pembukaan ulang order kalau kanal ini gagal.
+      }
+    }
+
     revalidatePath('/lms/admin/penjualan/transaksi')
     return { success: true }
   } catch (error) {
@@ -289,11 +362,17 @@ async function reopenOrderForPaymentAction(orderId: string) {
   }
 }
 
+const STATUS_EVENT_TEMPLATE_KEY: Record<'in_progress' | 'shipping' | 'completed', string> = {
+  in_progress: 'ORDER_IN_PROGRESS',
+  shipping: 'ORDER_SHIPPING',
+  completed: 'ORDER_COMPLETED',
+}
+
 /**
- * Kirim notifikasi untuk event yang TIDAK punya template default org
- * (in_progress/shipping/completed) — hanya terkirim kalau produk terkait
- * punya override konten sendiri. Gagal diam-diam supaya transisi status
- * order tidak ikut gagal hanya karena belum ada teks notifikasi disiapkan.
+ * Kirim notifikasi in_progress/shipping/completed: pakai override konten
+ * per produk kalau dikonfigurasi, kalau tidak fallback ke template default
+ * org (notification_templates). Gagal diam-diam supaya transisi status
+ * order tidak ikut gagal hanya karena kanal notifikasi ini bermasalah.
  */
 async function sendOverrideOnlyStatusNotification(
   orgId: string,
@@ -348,6 +427,7 @@ async function sendOverrideOnlyStatusNotification(
           eventType: `ORDER_${overrideEventKey.toUpperCase()}`,
           channel: recipient.channel,
           recipient: recipient.value,
+          templateKey: STATUS_EVENT_TEMPLATE_KEY[overrideEventKey],
           variables,
           idempotencyKey: `order-${overrideEventKey}:${orderId}:${recipient.channel}`,
           payload: { orderId, orderNumber: order.order_number },
@@ -355,7 +435,7 @@ async function sendOverrideOnlyStatusNotification(
           overrideEventKey,
         })
       } catch {
-        // Tidak ada override konten untuk event ini di produk terkait — lewati diam-diam.
+        // Tidak ada override maupun template default untuk event ini — lewati diam-diam.
       }
     }
   } catch {

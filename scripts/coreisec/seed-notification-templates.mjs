@@ -112,6 +112,77 @@ _*) Jika ingin update info & program terbaru, silakan bergabung ke channel teleg
     },
   },
   {
+    key: 'ORDER_IN_PROGRESS',
+    email: {
+      subject: 'Pesanan {{order_number}} sedang diproses',
+      body: `<p>Assalamu'alaikum, kak {{name}}</p><p>Pesanan Anda <strong>{{order_number}}</strong> senilai <strong>{{amount}}</strong> sedang kami proses.</p><p>Kami akan kabari lagi begitu ada perkembangan.</p><p><i>Syukran wa Jazakumullahu khairan</i></p>`,
+    },
+    whatsapp: {
+      body: `Assalamu'alaikum, kak {{name}}
+
+Pesanan Anda #{{order_number}} senilai *{{amount}}* sedang kami proses ya kak.
+
+Kami kabari lagi begitu ada perkembangan.
+
+_Syukran wa Jazakumullahu khairan_
+${FOOTER_WA}`,
+    },
+  },
+  {
+    key: 'ORDER_SHIPPING',
+    email: {
+      subject: 'Pesanan {{order_number}} sedang dikirim',
+      body: `<p>Assalamu'alaikum, kak {{name}}</p><p>Kabar baik! Pesanan Anda <strong>{{order_number}}</strong> senilai <strong>{{amount}}</strong> sedang dalam proses pengiriman.</p><p>Terima kasih sudah bersabar menunggu.</p>`,
+    },
+    whatsapp: {
+      body: `Assalamu'alaikum, kak {{name}}
+
+Kabar baik! Pesanan Anda #{{order_number}} senilai *{{amount}}* sedang dalam proses pengiriman ya kak.
+
+Terima kasih sudah bersabar menunggu.
+${FOOTER_WA}`,
+    },
+  },
+  {
+    key: 'ORDER_COMPLETED',
+    email: {
+      subject: 'Pesanan {{order_number}} selesai',
+      body: `<p>Alhamdulillah, kak {{name}}</p><p>Pesanan Anda <strong>{{order_number}}</strong> senilai <strong>{{amount}}</strong> telah SELESAI.</p><p>Terima kasih atas kepercayaannya, semoga bermanfaat dan berkah.</p>`,
+    },
+    whatsapp: {
+      body: `Alhamdulillah, kak {{name}}
+
+Pesanan Anda #{{order_number}} senilai *{{amount}}* telah SELESAI.
+
+Terima kasih atas kepercayaannya, semoga bermanfaat dan berkah.
+${FOOTER_WA}`,
+    },
+  },
+  {
+    key: 'ORDER_ACCESS_RESENT',
+    email: {
+      subject: '[Akses Kelas] Info order {{order_number}}',
+      body: `<p>Assalamu'alaikum, kak {{name}}</p><p>Berikut kami kirimkan ulang info akses kelas untuk pesanan Anda.</p><p>Nomor order: <strong>{{order_number}}</strong><br/>Total pembayaran: <strong>{{amount}}</strong><br/>Status: <strong>LUNAS</strong></p><p><strong>CARA AKSES KELASNYA:</strong></p><ol><li>Kunjungi {{portal_url}}</li><li>Login dengan email &amp; password akun Anda.</li><li>Pilih Menu Akses Kelas Anda.</li></ol><p><i>Syukran wa Jazakumullahu khairan</i></p>`,
+    },
+    whatsapp: {
+      body: `Assalamu'alaikum, kak {{name}}
+
+Berikut kami kirimkan ulang info akses kelas untuk pesanan Anda.
+
+Nomor order: #{{order_number}}
+Total pembayaran: *{{amount}}*
+Status: *LUNAS*
+
+*CARA AKSES KELASNYA:*
+1. Kunjungi {{portal_url}}
+2. Login dengan email / password akun Anda.
+3. Pilih Menu Akses Kelas Anda.
+
+_Syukran wa Jazakumullahu khairan_
+${FOOTER_WA}`,
+    },
+  },
+  {
     key: 'AFFILIATE_COMMISSION_EARNED',
     email: {
       subject: 'Komisi baru dari order {{order_number}}',
