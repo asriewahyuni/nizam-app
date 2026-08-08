@@ -196,7 +196,18 @@ const SHEET_SCHEMAS: SheetSchema[] = [
     numericFields: ['acquisition_cost', 'accumulated_depreciation', 'useful_life_months', 'residual_value'],
     dateFields: ['acquisition_date'],
     enumFields: {
-      asset_category: ['TANAH', 'BANGUNAN', 'KENDARAAN', 'MESIN'],
+      // Sinkron dengan CATEGORY_ALIASES di migration.actions.ts — daftar ini harus
+      // memuat semua varian yang diterima proses import, bukan cuma 4 kategori inti,
+      // supaya validasi di sini tidak mem-flag warning palsu untuk nilai yang
+      // sebenarnya sudah dikenali backend.
+      asset_category: [
+        'TANAH', 'LAND',
+        'BANGUNAN', 'GEDUNG', 'BUILDING',
+        'KENDARAAN', 'VEHICLE', 'MOBIL', 'MOTOR', 'BUS',
+        'MESIN', 'MACHINE', 'PERALATAN', 'EQUIPMENT',
+        'PERALATAN & MESIN', 'PERALATAN DAN MESIN', 'MESIN & PERALATAN',
+        'ELEKTRONIK', 'ELECTRONIC', 'INTERIOR', 'FURNITURE',
+      ],
     },
   },
   {

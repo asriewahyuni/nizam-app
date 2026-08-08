@@ -183,11 +183,12 @@ function TabBeranda({
           <p className="text-emerald-200 text-xs mb-0.5">Total Simpanan</p>
           <p className="text-4xl font-bold tracking-tight text-amber-300">{fmt(totalSimpanan)}</p>
 
-          <div className="mt-5 grid grid-cols-3 gap-2 border-t border-white/10 pt-4">
+          <div className="mt-5 grid grid-cols-4 gap-2 border-t border-white/10 pt-4">
             {[
               { label: 'Pokok',    jenis: 'POKOK',    color: 'text-blue-300' },
               { label: 'Wajib',    jenis: 'WAJIB',    color: 'text-emerald-300' },
               { label: 'Sukarela', jenis: 'SUKARELA', color: 'text-purple-300' },
+              { label: 'Proyek',   jenis: 'PROYEK',   color: 'text-amber-300' },
             ].map(({ label, jenis, color }) => {
               const s = simpanan.find(x => x.jenis === jenis)
               return (

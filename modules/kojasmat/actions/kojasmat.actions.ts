@@ -496,10 +496,11 @@ export async function postSimpananMutasi(payload: {
     `UPDATE kojasmat_simpanan SET saldo=$2, updated_at=NOW() WHERE id=$1`,
     [simpanan.id, sesudah]
   )
-  await queryPostgres(
+  const { rows: [insertedMutasi] } = await queryPostgres(
     `INSERT INTO kojasmat_simpanan_mutasi
        (org_id, simpanan_id, anggota_id, jenis_mutasi, jumlah, saldo_sebelum, saldo_sesudah, keterangan, tanggal, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     RETURNING id`,
     [
       payload.org_id, simpanan.id, payload.anggota_id,
       payload.jenis_mutasi, payload.jumlah,
@@ -509,23 +510,29 @@ export async function postSimpananMutasi(payload: {
       payload.created_by ?? null,
     ]
   )
+  const mutasiId = insertedMutasi.id as string
 
+  let journalEntryId: string | null = null
   try {
     if (payload.jenis_mutasi === 'SETOR') {
-      await jurnalSetorSimpanan(
+      journalEntryId = await jurnalSetorSimpanan(
         payload.org_id, payload.jenis_simpanan, payload.jumlah,
         String(simpanan.id), payload.keterangan,
       )
     } else if (payload.jenis_mutasi === 'TARIK') {
-      await jurnalTarikSimpanan(
+      journalEntryId = await jurnalTarikSimpanan(
         payload.org_id, payload.jenis_simpanan, payload.jumlah,
         String(simpanan.id), payload.keterangan,
       )
     }
   } catch (_) { /* jurnal non-fatal — transaksi simpanan tetap tercatat */ }
 
+  if (journalEntryId) {
+    await queryPostgres(`UPDATE kojasmat_simpanan_mutasi SET journal_entry_id=$2 WHERE id=$1`, [mutasiId, journalEntryId])
+  }
+
   revalidatePath('/kojasmat')
-  return { data: { saldo: sesudah } }
+  return { data: { saldo: sesudah, mutasi_id: mutasiId, journal_entry_id: journalEntryId } }
 }
 
 export async function catatSimpananMutasi(payload: {

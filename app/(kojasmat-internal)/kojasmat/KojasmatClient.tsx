@@ -11,7 +11,7 @@ import {
   AlertTriangle, ClipboardList, Eye, Link2, ExternalLink,
   BookOpen, ArrowDownCircle, X, Copy, Check, Pencil, Trash2, Upload, FolderOpen,
   TrendingDown, Scale, Loader2, CalendarClock, FileSignature, History, Lock, MessageCircle,
-  Download, FileSpreadsheet, Landmark, Key, ShieldCheck,
+  Download, FileSpreadsheet, Landmark, Key, ShieldCheck, RotateCcw,
 } from 'lucide-react'
 import {
   createAnggota, updateAnggota, deleteAnggota,
@@ -38,8 +38,8 @@ import {
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
 import { seedKojasmatDummyData, resetAndReseedKojasmat } from '@/modules/kojasmat/actions/kojasmat-seeder.actions'
 import {
-  parseKojasmatBulkImportFile, executeKojasmatBulkImport,
-  type KojasmatBulkPreview, type KojasmatBulkImportResult,
+  parseKojasmatBulkImportFile, executeKojasmatBulkImport, rollbackKojasmatBulkImport,
+  type KojasmatBulkPreview, type KojasmatBulkImportResult, type KojasmatBulkRollbackResult,
 } from '@/modules/kojasmat/actions/kojasmat-bulk-import.actions'
 import {
   catatTransaksiProyek, getTransaksiByProyek, getLaporanKeuanganProyek,
@@ -906,6 +906,10 @@ function BulkImportModal({ orgId, open, onClose }: { orgId: string; open: boolea
               </div>
             )}
 
+            {result.import_batch_id && (result.anggota_created > 0 || result.simpanan_created > 0 || result.proyek_created > 0) && (
+              <RollbackSection orgId={orgId} importBatchId={result.import_batch_id} />
+            )}
+
             <button onClick={handleClose}
               className="w-full rounded-xl bg-gray-900 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors cursor-pointer">
               Selesai
@@ -914,6 +918,78 @@ function BulkImportModal({ orgId, open, onClose }: { orgId: string; open: boolea
         )}
       </div>
     </Modal>
+  )
+}
+
+// Membatalkan satu batch bulk import (anggota/simpanan/proyek yang baru saja
+// dibuat) kalau ternyata ada kesalahan — mis. salah upload file atau NIK
+// hasil auto-generate perlu diperbaiki dulu. Anggota/proyek yang sudah punya
+// aktivitas lanjutan tidak dihapus otomatis (lihat rollbackKojasmatBulkImport).
+function RollbackSection({ orgId, importBatchId }: { orgId: string; importBatchId: string }) {
+  const [pending, startTransition] = useTransition()
+  const [confirming, setConfirming] = useState(false)
+  const [result, setResult] = useState<KojasmatBulkRollbackResult | null>(null)
+
+  function handleRollback() {
+    startTransition(async () => {
+      const res = await rollbackKojasmatBulkImport(orgId, importBatchId)
+      setResult(res)
+      setConfirming(false)
+    })
+  }
+
+  if (result) {
+    return (
+      <div className={cn('rounded-xl border p-3 text-xs space-y-1',
+        result.error ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-gray-50 text-gray-700')}>
+        {result.error ? (
+          <p>Gagal membatalkan import: {result.error}</p>
+        ) : (
+          <>
+            <p className="font-medium">
+              Import dibatalkan: {result.anggota_dihapus} anggota, {result.mutasi_dihapus} setoran, {result.proyek_dihapus} proyek dihapus.
+            </p>
+            {result.anggota_dilewati.length > 0 && (
+              <p>{result.anggota_dilewati.length} anggota tidak dihapus (sudah ada aktivitas lain sejak import) — cek manual di halaman Anggota.</p>
+            )}
+            {result.proyek_dilewati.length > 0 && (
+              <p>{result.proyek_dilewati.length} proyek tidak dihapus (sudah diproses) — cek manual di halaman Proyek.</p>
+            )}
+            {result.jurnal_gagal_void.length > 0 && (
+              <p>{result.jurnal_gagal_void.length} jurnal akuntansi gagal di-void otomatis — void manual lewat menu Jurnal Akuntansi.</p>
+            )}
+          </>
+        )}
+      </div>
+    )
+  }
+
+  if (confirming) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 space-y-2">
+        <p>
+          Yakin batalkan import ini? Anggota baru &amp; setoran dari import ini akan dihapus, jurnal akuntansi terkait
+          akan di-void. Anggota/proyek yang sudah ada aktivitas lanjutan tidak akan dihapus otomatis.
+        </p>
+        <div className="flex gap-2">
+          <button onClick={() => setConfirming(false)}
+            className="flex-1 rounded-lg border border-gray-200 bg-white py-1.5 font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+            Batal
+          </button>
+          <button onClick={handleRollback} disabled={pending}
+            className="flex-1 rounded-lg bg-red-600 py-1.5 font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer">
+            {pending ? 'Membatalkan...' : 'Ya, Batalkan Import'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <button onClick={() => setConfirming(true)}
+      className="w-full flex items-center justify-center gap-2 rounded-xl border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer">
+      <RotateCcw className="h-4 w-4" /> Batalkan Import Ini
+    </button>
   )
 }
 
@@ -4266,6 +4342,21 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
                 <p className="text-xs text-gray-400">Alamat</p>
                 <p className="font-medium text-gray-800">{selected.alamat ?? '—'}</p>
               </div>
+              {(selected.kontak_darurat_nama || selected.kontak_darurat_phone) && (
+                <div className="col-span-2 rounded-xl border border-red-100 bg-red-50 p-3">
+                  <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-1.5">Kontak Darurat</p>
+                  <p className="font-medium text-gray-800">
+                    {selected.kontak_darurat_nama ?? '—'}
+                    {selected.kontak_darurat_hubungan && (
+                      <span className="ml-1.5 font-normal text-gray-500">({selected.kontak_darurat_hubungan})</span>
+                    )}
+                  </p>
+                  <p className="text-sm text-gray-600">{selected.kontak_darurat_phone ?? '—'}</p>
+                  {selected.kontak_darurat_alamat && (
+                    <p className="text-sm text-gray-600 mt-1">{selected.kontak_darurat_alamat}</p>
+                  )}
+                </div>
+              )}
               {selected.alasan_bergabung && (
                 <div className="col-span-2">
                   <p className="text-xs text-gray-400">Alasan Bergabung</p>

@@ -64,7 +64,7 @@ export async function GET() {
       ['• nik harus 16 digit angka.'],
       ['• status anggota: CALON, AKTIF, TIDAK_AKTIF, atau DIBEKUKAN (default CALON jika kosong).'],
       ['• is_verified: YA atau TIDAK (default TIDAK jika kosong).'],
-      ['• jenis simpanan: POKOK, WAJIB, atau SUKARELA.'],
+      ['• jenis simpanan: POKOK, WAJIB, SUKARELA, atau PROYEK (mis. migrasi modal proyek dari sistem lama).'],
       ['• jenis_akad proyek: MURABAHAH, MUDHARABAH, atau INAN.'],
       ['• tanggal & joined_at format: YYYY-MM-DD, contoh: 2025-01-15. Kosongkan untuk pakai hari ini.'],
       ['• Semua setoran simpanan awal otomatis tercatat ke jurnal akuntansi ERP.'],
@@ -131,7 +131,7 @@ export async function GET() {
     addExampleRow(ws2, 3, ['3374010101990001', 'POKOK', 500000, '2025-01-15', 'Setoran pokok migrasi'])
     addExampleRow(ws2, 4, ['3374010101990001', 'WAJIB', 250000, '2025-02-15', 'Setoran wajib Bln 1'])
     for (let r = 5; r <= 1000; r++) {
-      ws2.getCell(r, 2).dataValidation = { type: 'list', formulae: ['"POKOK,WAJIB,SUKARELA"'], showErrorMessage: true }
+      ws2.getCell(r, 2).dataValidation = { type: 'list', formulae: ['"POKOK,WAJIB,SUKARELA,PROYEK"'], showErrorMessage: true }
       ws2.getCell(r, 3).numFmt = '#,##0'
     }
     ws2.views = [{ state: 'frozen', xSplit: 0, ySplit: 2 }]

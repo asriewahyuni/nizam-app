@@ -23,16 +23,16 @@ async function postJurnal(
   description: string,
   refType: string,
   refId: string,
-) {
-  if (amount <= 0) return
+): Promise<string | null> {
+  if (amount <= 0) return null
   const mapping = await getKojasmatAccountMapping(orgId)
   const debitId = mapping[debitRole]
   const creditId = mapping[creditRole]
   if (!debitId || !creditId) {
     // Peran akun belum dipetakan admin — skip non-fatal
-    return
+    return null
   }
-  await createJournalEntry({
+  const result = await createJournalEntry({
     org_id: orgId,
     entry_date: new Date().toISOString().split('T')[0],
     description,
@@ -44,6 +44,7 @@ async function postJurnal(
       { account_id: creditId, debit: 0,      credit: amount, memo: description },
     ],
   })
+  return 'entryId' in result ? result.entryId : null
 }
 
 const SIMPANAN_ROLE: Record<'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP', KojasmatAccountRole> = {
@@ -74,8 +75,8 @@ export async function jurnalSetorSimpanan(
   jumlah: number,
   simpananId: string,
   keteranganExtra?: string,
-) {
-  await postJurnal(
+): Promise<string | null> {
+  return postJurnal(
     orgId, 'kas', SIMPANAN_ROLE[jenis], jumlah,
     `Setoran simpanan ${jenis}${keteranganExtra ? ` — ${keteranganExtra}` : ''}`,
     'KOJASMAT_SIMPANAN_SETOR', simpananId,
@@ -123,8 +124,8 @@ export async function jurnalTarikSimpanan(
   jumlah: number,
   simpananId: string,
   keteranganExtra?: string,
-) {
-  await postJurnal(
+): Promise<string | null> {
+  return postJurnal(
     orgId, SIMPANAN_ROLE[jenis], 'kas', jumlah,
     `Penarikan simpanan ${jenis}${keteranganExtra ? ` — ${keteranganExtra}` : ''}`,
     'KOJASMAT_SIMPANAN_TARIK', simpananId,

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import {
   User, Phone, MapPin, Briefcase, FileText, Upload,
   CheckCircle, ChevronRight, Loader2, X, Eye, EyeOff, ClipboardList, Wallet, XCircle,
-  PiggyBank, Info, Star
+  PiggyBank, Info, Star, AlertTriangle, Landmark, Coins
 } from 'lucide-react'
 import {
   buatPendaftaran,
@@ -18,8 +18,8 @@ import {
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-type Step = 'data' | 'dokumen' | 'tes' | 'bayar' | 'selesai'
-const STEPS: Step[] = ['data', 'dokumen', 'tes', 'bayar', 'selesai']
+type Step = 'data' | 'kontak_darurat' | 'dokumen' | 'tes' | 'bayar' | 'selesai'
+const STEPS: Step[] = ['data', 'kontak_darurat', 'dokumen', 'tes', 'bayar', 'selesai']
 
 type FormData = {
   nama_lengkap: string
@@ -31,7 +31,13 @@ type FormData = {
   alamat: string
   pekerjaan: string
   alasan_bergabung: string
+  kontak_darurat_nama: string
+  kontak_darurat_hubungan: string
+  kontak_darurat_phone: string
+  kontak_darurat_alamat: string
 }
+
+const HUBUNGAN_DARURAT_OPTIONS = ['Suami/Istri', 'Orang Tua', 'Anak', 'Saudara Kandung', 'Lainnya']
 
 type DokumenUploaded = {
   jenis: KojasmatDokumen['jenis_dokumen']
@@ -193,7 +199,8 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
   const [form, setForm] = useState<FormData>({
     nama_lengkap: '', nik: '', email: '', password: '', confirm_password: '',
-    phone: '', alamat: '', pekerjaan: '', alasan_bergabung: ''
+    phone: '', alamat: '', pekerjaan: '', alasan_bergabung: '',
+    kontak_darurat_nama: '', kontak_darurat_hubungan: '', kontak_darurat_phone: '', kontak_darurat_alamat: '',
   })
 
   function setField(k: keyof FormData, v: string) {
@@ -258,6 +265,8 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   const [buktiFile, setBuktiFile] = useState<{ key: string; name: string; size: number } | null>(null)
   const [buktiUploading, setBuktiUploading] = useState(false)
   const [setujuIjarah, setSetujuIjarah] = useState(false)
+  const [pokokChecked, setPokokChecked] = useState(true)
+  const [wajibChecked, setWajibChecked] = useState(true)
   const [topupSukarelaChecked, setTopupSukarelaChecked] = useState(false)
   const [topupSukarelaAmount, setTopupSukarelaAmount] = useState('')
   const [aktivasiResult, setAktivasiResult] = useState<{ activated: boolean; kode_anggota?: string; login_identifier?: string | null } | null>(null)
@@ -294,8 +303,8 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
       const res = await submitPembayaranPendaftaran(pendaftaranId, {
         org_id: orgId,
         biaya_admin: 0,
-        simpanan_pokok: 0,
-        simpanan_wajib: 0,
+        simpanan_pokok: pokokChecked ? infoBayar.nominal_simpanan_pokok : 0,
+        simpanan_wajib: wajibChecked ? infoBayar.nominal_simpanan_wajib : 0,
         ijarah_fee: infoBayar.ijarah_platform_fee,
         sukarela_topup: topupSukarelaChecked ? Number(topupSukarelaAmount) || 0 : 0,
         file_key: buktiFile.key,
@@ -314,11 +323,20 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
-  function handleSubmitData() {
+  function handleLanjutData() {
     if (!form.nama_lengkap.trim()) { setError('Nama lengkap wajib diisi'); return }
     if (form.email && !form.password) { setError('Masukkan kata sandi untuk akun Anda'); return }
     if (form.password && form.password.length < 8) { setError('Kata sandi minimal 8 karakter'); return }
     if (form.password && form.password !== form.confirm_password) { setError('Konfirmasi kata sandi tidak cocok'); return }
+    setError(null)
+    setStep('kontak_darurat')
+  }
+
+  function handleSubmitKontakDarurat() {
+    if (!form.kontak_darurat_nama.trim() || !form.kontak_darurat_hubungan.trim()
+      || !form.kontak_darurat_phone.trim() || !form.kontak_darurat_alamat.trim()) {
+      setError('Semua field kontak darurat wajib diisi'); return
+    }
     setError(null)
     startTransition(async () => {
       const res = await buatPendaftaran({
@@ -331,6 +349,10 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
         alamat: form.alamat || undefined,
         pekerjaan: form.pekerjaan || undefined,
         alasan_bergabung: form.alasan_bergabung || undefined,
+        kontak_darurat_nama: form.kontak_darurat_nama,
+        kontak_darurat_hubungan: form.kontak_darurat_hubungan,
+        kontak_darurat_phone: form.kontak_darurat_phone,
+        kontak_darurat_alamat: form.kontak_darurat_alamat,
       })
       if (res.error) { setError(res.error); return }
       setPendaftaranId(res.data!.id)
@@ -465,12 +487,97 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
             )}
 
             <button
-              onClick={handleSubmitData}
-              disabled={!form.nama_lengkap.trim() || pending}
+              onClick={handleLanjutData}
+              disabled={!form.nama_lengkap.trim()}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
             >
-              {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Menyimpan...</> : <>Lanjut Upload Dokumen <ChevronRight className="h-4 w-4" /></>}
+              Lanjut <ChevronRight className="h-4 w-4" />
             </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Step: Kontak Darurat ──
+  if (step === 'kontak_darurat') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg">
+          <div className="mb-6 text-center">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 mb-3">
+              <AlertTriangle className="h-6 w-6 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Kontak Darurat</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Orang yang bisa dihubungi pengurus koperasi jika terjadi keadaan darurat pada Anda.
+            </p>
+          </div>
+
+          {/* Progress */}
+          <StepProgress step={step} />
+
+          <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Nama Kontak Darurat *</label>
+              <input
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                placeholder="Nama orang yang bisa dihubungi"
+                value={form.kontak_darurat_nama} onChange={e => setField('kontak_darurat_nama', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Hubungan Kontak Darurat *</label>
+              <select
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                value={form.kontak_darurat_hubungan} onChange={e => setField('kontak_darurat_hubungan', e.target.value)}
+              >
+                <option value="">— pilih —</option>
+                {HUBUNGAN_DARURAT_OPTIONS.map(h => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Nomor Telepon / WA Kontak Darurat *</label>
+              <input
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                placeholder="08xxxxxxxxxx"
+                value={form.kontak_darurat_phone} onChange={e => setField('kontak_darurat_phone', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Alamat Kontak Darurat *</label>
+              <textarea rows={3}
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
+                placeholder="Alamat lengkap kontak darurat"
+                value={form.kontak_darurat_alamat} onChange={e => setField('kontak_darurat_alamat', e.target.value)}
+              />
+            </div>
+
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setError(null); setStep('data') }}
+                disabled={pending}
+                className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
+              >
+                Kembali
+              </button>
+              <button
+                onClick={handleSubmitKontakDarurat}
+                disabled={
+                  !form.kontak_darurat_nama.trim() || !form.kontak_darurat_hubungan.trim()
+                  || !form.kontak_darurat_phone.trim() || !form.kontak_darurat_alamat.trim() || pending
+                }
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Menyimpan...</> : <>Lanjut <ChevronRight className="h-4 w-4" /></>}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -695,13 +802,47 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
             )}
             {infoBayar && (() => {
               const fmtIdr = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
+              const pokokAmount = pokokChecked ? infoBayar.nominal_simpanan_pokok : 0
+              const wajibAmount = wajibChecked ? infoBayar.nominal_simpanan_wajib : 0
               const topupAmount = topupSukarelaChecked ? (Number(topupSukarelaAmount) || 0) : 0
-              const totalDibayar = infoBayar.ijarah_platform_fee + topupAmount
+              const totalDibayar = pokokAmount + wajibAmount + infoBayar.ijarah_platform_fee + topupAmount
               return (
               <>
+                {(infoBayar.nominal_simpanan_pokok > 0 || infoBayar.nominal_simpanan_wajib > 0) && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                      <Landmark className="h-4 w-4 text-emerald-600" /> {STEPS.indexOf('bayar') + 1}. Simpanan Keanggotaan
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-3">
+                      Simpanan Pokok &amp; Simpanan Wajib adalah syarat keanggotaan koperasi dan menjadi hak Anda sebagai anggota
+                      (bisa ditarik saat berhenti sesuai AD/ART). Anda bisa membayarnya sekarang atau menyusul lewat portal anggota.
+                    </p>
+                    {infoBayar.nominal_simpanan_pokok > 0 && (
+                      <label className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 text-sm cursor-pointer hover:bg-emerald-50 transition-colors mb-2">
+                        <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-emerald-600"
+                          checked={pokokChecked} onChange={e => setPokokChecked(e.target.checked)} />
+                        <span className="flex-1 text-gray-700">
+                          Simpanan Pokok
+                        </span>
+                        <span className="font-semibold text-gray-900 shrink-0">{fmtIdr(infoBayar.nominal_simpanan_pokok)}</span>
+                      </label>
+                    )}
+                    {infoBayar.nominal_simpanan_wajib > 0 && (
+                      <label className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 text-sm cursor-pointer hover:bg-emerald-50 transition-colors">
+                        <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-emerald-600"
+                          checked={wajibChecked} onChange={e => setWajibChecked(e.target.checked)} />
+                        <span className="flex-1 text-gray-700">
+                          Simpanan Wajib
+                        </span>
+                        <span className="font-semibold text-gray-900 shrink-0">{fmtIdr(infoBayar.nominal_simpanan_wajib)}</span>
+                      </label>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
-                    <Wallet className="h-4 w-4 text-purple-500" /> {STEPS.indexOf('bayar') + 1}. Biaya Pendaftaran — Akad Ijarah Platform
+                    <Wallet className="h-4 w-4 text-purple-500" /> Biaya Pendaftaran — Akad Ijarah Platform
                   </h3>
                   <p className="text-sm text-gray-500 mb-3">
                     Akad sewa manfaat (ijarah) atas layanan platform koperasi, sebesar{' '}
@@ -734,6 +875,22 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                   <div className="mt-4">
                     <p className="text-sm font-semibold text-gray-900 mb-2">Ringkasan Pembayaran</p>
                     <div className="rounded-xl border border-gray-200 divide-y divide-gray-100">
+                      {pokokAmount > 0 && (
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <span className="flex items-center gap-2 text-sm text-gray-700">
+                            <Landmark className="h-4 w-4 text-emerald-600" /> Simpanan Pokok
+                          </span>
+                          <span className="text-sm font-semibold text-gray-900">{fmtIdr(pokokAmount)}</span>
+                        </div>
+                      )}
+                      {wajibAmount > 0 && (
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <span className="flex items-center gap-2 text-sm text-gray-700">
+                            <Coins className="h-4 w-4 text-emerald-600" /> Simpanan Wajib
+                          </span>
+                          <span className="text-sm font-semibold text-gray-900">{fmtIdr(wajibAmount)}</span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between px-4 py-3">
                         <span className="flex items-center gap-2 text-sm text-gray-700">
                           <Wallet className="h-4 w-4 text-purple-500" /> Ijarah Platform (siklus pertama, {infoBayar.ijarah_platform_periode_hari} hari)
@@ -757,7 +914,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
                   <div className="mt-3 flex items-start gap-2 text-xs text-gray-500">
                     <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    <p>Tidak ada biaya lain selain akad ijarah di atas, kecuali Anda memilih menambah Simpanan Sukarela secara sukarela.</p>
+                    <p>Tidak ada biaya lain selain yang tercantum di ringkasan di atas.</p>
                   </div>
 
                   <label className="mt-3 flex items-start gap-2 rounded-xl border border-gray-200 p-3 text-sm cursor-pointer hover:bg-gray-50 transition-colors">

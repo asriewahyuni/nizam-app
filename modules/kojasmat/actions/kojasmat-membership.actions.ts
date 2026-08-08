@@ -53,6 +53,10 @@ export type KojasmatPendaftaran = {
   alamat?: string
   pekerjaan?: string
   alasan_bergabung?: string
+  kontak_darurat_nama?: string
+  kontak_darurat_hubungan?: string
+  kontak_darurat_phone?: string
+  kontak_darurat_alamat?: string
   status: 'MENUNGGU' | 'DISETUJUI' | 'DITOLAK' | 'DIREVISI'
   catatan_pengurus?: string
   ditinjau_oleh?: string
@@ -154,6 +158,10 @@ export async function buatPendaftaran(payload: {
   alamat?: string
   pekerjaan?: string
   alasan_bergabung?: string
+  kontak_darurat_nama?: string
+  kontak_darurat_hubungan?: string
+  kontak_darurat_phone?: string
+  kontak_darurat_alamat?: string
 }) {
   try {
     // Cek dulu apakah calon anggota ini sudah pernah mendaftar di koperasi ini
@@ -204,8 +212,9 @@ export async function buatPendaftaran(payload: {
 
     const { rows } = await queryPostgres(
       `INSERT INTO kojasmat_pendaftaran
-         (org_id, user_id, nama_lengkap, nik, email, phone, alamat, pekerjaan, alasan_bergabung)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         (org_id, user_id, nama_lengkap, nik, email, phone, alamat, pekerjaan, alasan_bergabung,
+          kontak_darurat_nama, kontak_darurat_hubungan, kontak_darurat_phone, kontak_darurat_alamat)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING id, status, created_at`,
       [
         payload.org_id, authUserId,
@@ -213,6 +222,8 @@ export async function buatPendaftaran(payload: {
         payload.nik ?? null, payload.email ?? null,
         payload.phone ?? null, payload.alamat ?? null,
         payload.pekerjaan ?? null, payload.alasan_bergabung ?? null,
+        payload.kontak_darurat_nama ?? null, payload.kontak_darurat_hubungan ?? null,
+        payload.kontak_darurat_phone ?? null, payload.kontak_darurat_alamat ?? null,
       ]
     )
     return { data: rows[0] as { id: string; status: string; created_at: string } }
@@ -246,14 +257,17 @@ async function createAnggotaFromPendaftaran(
   // Buat anggota baru
   const { rows: [anggota] } = await queryPostgres(
     `INSERT INTO kojasmat_anggota
-       (org_id, kode_anggota, nama, nik, email, phone, alamat, pekerjaan, status, is_verified, user_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       (org_id, kode_anggota, nama, nik, email, phone, alamat, pekerjaan, status, is_verified, user_id,
+        kontak_darurat_nama, kontak_darurat_hubungan, kontak_darurat_phone, kontak_darurat_alamat)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      RETURNING id`,
     [
       pend.org_id, kode, pend.nama_lengkap,
       pend.nik, pend.email, pend.phone,
       pend.alamat, pend.pekerjaan,
       opts.status, isAktif, pend.user_id ?? null,
+      pend.kontak_darurat_nama ?? null, pend.kontak_darurat_hubungan ?? null,
+      pend.kontak_darurat_phone ?? null, pend.kontak_darurat_alamat ?? null,
     ]
   )
 

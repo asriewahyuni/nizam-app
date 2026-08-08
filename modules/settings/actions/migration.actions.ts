@@ -2752,11 +2752,17 @@ export async function importFixedAssetsMigration(
   // Peralatan & Mesin) — tidak ada akun terpisah untuk Interior/Elektronik, sehingga
   // keduanya di-alias ke MESIN (Peralatan & Mesin) di CATEGORY_ALIASES di bawah.
   // TANAH tidak memiliki akun akumulasi penyusutan karena tanah tidak disusutkan.
+  //
+  // PERALATAN: '1508'/'1509' BUKAN bagian dari STANDARD_PSAK_COA_TEMPLATE — akun ini
+  // hanya ada di CoA lokal beberapa organisasi (mis. Tirta Marwah, yang di-switch dari
+  // coa_management_mode INHERITED ke LOCAL khusus supaya punya kategori Peralatan
+  // terpisah dari Mesin). Untuk org lain yang tidak punya akun 1508/1509, resolveAssetAccounts()
+  // otomatis fallback ke assetAccount/fallbackAccumDepAccount generik — aman, tidak perlu guard tambahan.
   const CATEGORY_ASSET_CODE: Record<string, string> = {
-    TANAH: '1501', BANGUNAN: '1502', KENDARAAN: '1504', MESIN: '1506',
+    TANAH: '1501', BANGUNAN: '1502', KENDARAAN: '1504', MESIN: '1506', PERALATAN: '1508',
   }
   const CATEGORY_ACCUM_CODE: Record<string, string> = {
-    BANGUNAN: '1503', KENDARAAN: '1505', MESIN: '1507',
+    BANGUNAN: '1503', KENDARAAN: '1505', MESIN: '1507', PERALATAN: '1509',
   }
   // Tidak ada akun beban penyusutan per kategori di CoA standar (hanya satu akun
   // generik "Biaya Penyusutan", kode 6009) — semua kategori memakai fallbackDepExpenseAccount.
@@ -2765,7 +2771,9 @@ export async function importFixedAssetsMigration(
     TANAH: 'TANAH', LAND: 'TANAH',
     KENDARAAN: 'KENDARAAN', VEHICLE: 'KENDARAAN', MOBIL: 'KENDARAAN', MOTOR: 'KENDARAAN', BUS: 'KENDARAAN',
     BANGUNAN: 'BANGUNAN', GEDUNG: 'BANGUNAN', BUILDING: 'BANGUNAN',
-    MESIN: 'MESIN', MACHINE: 'MESIN', PERALATAN: 'MESIN', EQUIPMENT: 'MESIN',
+    MESIN: 'MESIN', MACHINE: 'MESIN',
+    PERALATAN: 'PERALATAN', EQUIPMENT: 'PERALATAN',
+    'PERALATAN & MESIN': 'PERALATAN', 'PERALATAN DAN MESIN': 'PERALATAN', 'MESIN & PERALATAN': 'PERALATAN',
     ELEKTRONIK: 'MESIN', ELECTRONIC: 'MESIN',
     INTERIOR: 'MESIN', FURNITURE: 'MESIN',
   }
