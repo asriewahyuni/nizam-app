@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { BarcodeScanner } from '@/components/shared/BarcodeScanner'
+import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
 import { updateMyPassword } from '@/modules/auth/actions/auth.actions'
 import {
   createProyek, updateStatusPenawaran, createPembiayaan, toggleMinatProyek, batalkanPembiayaan,
@@ -3042,47 +3043,50 @@ export default function AnggotaPortalClient(props: Props) {
 
   return (
     <div className="min-h-screen bg-emerald-50/40">
-      {/* Top bar */}
-      <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-sm border-b border-amber-200/60 px-4 py-3">
-        <div className="flex items-center justify-between max-w-lg mx-auto">
-          <div>
-            <p className="text-[10px] text-emerald-600/70 uppercase tracking-widest">{orgNama}</p>
-            <h1 className="font-bold text-gray-900 text-base leading-tight">{anggota.nama}</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {isSahabat ? (
-              <span className="hidden sm:flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                <GraduationCap className="h-3 w-3" /> Sahabat
+      <MobilePullToRefresh scrollContainerId="anggota-portal-scroll-root" />
+      <div id="anggota-portal-scroll-root" className="h-screen overflow-y-auto">
+        {/* Top bar */}
+        <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-sm border-b border-amber-200/60 px-4 py-3">
+          <div className="flex items-center justify-between max-w-lg mx-auto">
+            <div>
+              <p className="text-[10px] text-emerald-600/70 uppercase tracking-widest">{orgNama}</p>
+              <h1 className="font-bold text-gray-900 text-base leading-tight">{anggota.nama}</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              {isSahabat ? (
+                <span className="hidden sm:flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                  <GraduationCap className="h-3 w-3" /> Sahabat
+                </span>
+              ) : (
+                <button type="button" onClick={openUpgradeSheet}
+                  className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-200 transition-colors cursor-pointer">
+                  <Lock className="h-3 w-3" /> Teman <span className="hidden sm:inline">— Upgrade</span>
+                </button>
+              )}
+              <span className="font-mono text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                {anggota.kode_anggota}
               </span>
-            ) : (
-              <button type="button" onClick={openUpgradeSheet}
-                className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-200 transition-colors cursor-pointer">
-                <Lock className="h-3 w-3" /> Teman <span className="hidden sm:inline">— Upgrade</span>
+              <button type="button" onClick={() => setGantiPasswordOpen(true)}
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer">
+                <KeyRound className="h-4 w-4" />
               </button>
-            )}
-            <span className="font-mono text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
-              {anggota.kode_anggota}
-            </span>
-            <button type="button" onClick={() => setGantiPasswordOpen(true)}
-              className="rounded-full p-2 text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer">
-              <KeyRound className="h-4 w-4" />
-            </button>
-            <a href="/logout"
-              className="rounded-full p-2 text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer">
-              <LogOut className="h-4 w-4" />
-            </a>
+              <a href="/logout"
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer">
+                <LogOut className="h-4 w-4" />
+              </a>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="mx-auto max-w-lg px-4 py-5 pb-28">
-        {activeTab === 'beranda'   && <TabBeranda {...props} onLihatSemuaProyek={() => handleTabClick('investasi')} />}
-        {activeTab === 'simpanan'  && <TabSimpanan anggota={anggota} simpanan={simpanan} setoran={setoran} akadIjarah={akadIjarah} onRequestUpgrade={openUpgradeSheet} />}
-        {activeTab === 'proyek'    && <TabProyek anggota={anggota} proyekDiajukan={proyekDiajukan} onRequestUpgrade={openUpgradeSheet} />}
-        {activeTab === 'investasi' && <TabInvestasi anggota={anggota} simpanan={simpanan} proyekTersedia={proyekTersedia} pembiayaan={pembiayaan} onRequestUpgrade={openUpgradeSheet} />}
-        {activeTab === 'penawaran' && <TabPenawaran anggota={anggota} penawaran={penawaran} simpanan={simpanan} onRequestUpgrade={openUpgradeSheet} />}
-        {activeTab === 'laporan'   && <TabLaporan anggota={anggota} proyekDiajukan={proyekDiajukan} laporan={laporan} />}
+        {/* Content */}
+        <div className="mx-auto max-w-lg px-4 py-5 pb-28">
+          {activeTab === 'beranda'   && <TabBeranda {...props} onLihatSemuaProyek={() => handleTabClick('investasi')} />}
+          {activeTab === 'simpanan'  && <TabSimpanan anggota={anggota} simpanan={simpanan} setoran={setoran} akadIjarah={akadIjarah} onRequestUpgrade={openUpgradeSheet} />}
+          {activeTab === 'proyek'    && <TabProyek anggota={anggota} proyekDiajukan={proyekDiajukan} onRequestUpgrade={openUpgradeSheet} />}
+          {activeTab === 'investasi' && <TabInvestasi anggota={anggota} simpanan={simpanan} proyekTersedia={proyekTersedia} pembiayaan={pembiayaan} onRequestUpgrade={openUpgradeSheet} />}
+          {activeTab === 'penawaran' && <TabPenawaran anggota={anggota} penawaran={penawaran} simpanan={simpanan} onRequestUpgrade={openUpgradeSheet} />}
+          {activeTab === 'laporan'   && <TabLaporan anggota={anggota} proyekDiajukan={proyekDiajukan} laporan={laporan} />}
+        </div>
       </div>
 
       {/* Bottom Nav */}
