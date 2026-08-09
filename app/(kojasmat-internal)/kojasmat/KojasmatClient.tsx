@@ -94,6 +94,7 @@ type Props = {
     ijarah_platform_periode_hari: number
     ijarah_sukarela_opsional_minimal: number
     komitmen_sections: KomitmenSection[]
+    admin_whatsapp: string
   }
   bankAccounts: { id: string; bank_name: string; account_number: string }[]
   qrisPreviewUrl: string | null
@@ -4873,6 +4874,7 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
     ijarah_platform_fee: String(moduleSettings.ijarah_platform_fee),
     ijarah_platform_periode_hari: String(moduleSettings.ijarah_platform_periode_hari),
     ijarah_sukarela_opsional_minimal: String(moduleSettings.ijarah_sukarela_opsional_minimal),
+    admin_whatsapp: moduleSettings.admin_whatsapp,
   })
   const [tierForm, setTierForm] = useState(
     moduleSettings.apresiasi_tiers.map(t => ({ min_score: String(t.min_score), label: t.label }))
@@ -4958,6 +4960,7 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
           .filter(t => t.label.trim())
           .map(t => ({ min_score: Number(t.min_score) || 0, label: t.label.trim() })),
         komitmen_sections: komitmenForm.filter(s => s.title.trim() && s.checkbox_label.trim()),
+        admin_whatsapp: settingsForm.admin_whatsapp.replace(/\D/g, ''),
       })
     })
   }
@@ -5036,6 +5039,15 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
                 <option key={b.id} value={b.id}>{b.bank_name} · {b.account_number}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">No. WhatsApp Admin (bantuan calon anggota)</label>
+            <input
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              placeholder="Contoh: 6281234567890"
+              value={settingsForm.admin_whatsapp}
+              onChange={e => setSettingsForm(f => ({ ...f, admin_whatsapp: e.target.value }))} />
+            <p className="mt-1 text-xs text-gray-400">Tombol &quot;Hubungi Admin&quot; di halaman menunggu verifikasi akan membuka WhatsApp ke nomor ini.</p>
           </div>
         </div>
 

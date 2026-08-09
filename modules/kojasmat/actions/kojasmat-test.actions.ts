@@ -76,6 +76,7 @@ export type KojasmatModuleSettings = {
   ijarah_platform_periode_hari: number
   ijarah_sukarela_opsional_minimal: number
   komitmen_sections: KomitmenSection[]
+  admin_whatsapp: string
 }
 
 function resolveApresiasi(skor: number, tiers: ApresiasiTier[]): string | null {
@@ -191,6 +192,7 @@ export async function getModuleSettings(orgId: string): Promise<KojasmatModuleSe
     komitmen_sections: Array.isArray(settings.komitmen_sections) && settings.komitmen_sections.length > 0
       ? settings.komitmen_sections as KomitmenSection[]
       : DEFAULT_KOMITMEN_SECTIONS,
+    admin_whatsapp: (settings.admin_whatsapp as string) ?? '',
   }
 }
 
@@ -404,6 +406,7 @@ export async function getInfoPembayaran(orgId: string) {
       ijarah_sukarela_opsional_minimal: settings.ijarah_sukarela_opsional_minimal,
       bank_account: bankAccount,
       qris_image_url: qrisImageUrl,
+      admin_whatsapp: settings.admin_whatsapp,
     }
   }
 }

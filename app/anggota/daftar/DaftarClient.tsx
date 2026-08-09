@@ -3,9 +3,10 @@
 import { useState, useTransition, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import {
-  User, Phone, MapPin, Briefcase, FileText, Upload,
+  User, MapPin, Briefcase, FileText, Upload,
   CheckCircle, ChevronRight, Loader2, X, Eye, EyeOff, ClipboardList, Wallet, XCircle,
-  PiggyBank, Info, Star, AlertTriangle, Landmark, Coins
+  PiggyBank, Info, Star, AlertTriangle, Landmark, Coins,
+  Home, Bell, Lock, Download, Share, MessageCircle, Clock, Smartphone
 } from 'lucide-react'
 import {
   buatPendaftaran,
@@ -199,6 +200,138 @@ function DocUploadRow({
   )
 }
 
+// ─── INSTALL APLIKASI (PWA) ────────────────────────────────────────────────────
+
+type PwaPlatform = 'ios' | 'android' | 'desktop'
+
+function detectPwaPlatform(): PwaPlatform {
+  if (typeof navigator === 'undefined') return 'desktop'
+  const ua = navigator.userAgent
+  if (/iPhone|iPad|iPod/.test(ua)) return 'ios'
+  if (/Android/.test(ua)) return 'android'
+  return 'desktop'
+}
+
+function isRunningStandalone(): boolean {
+  if (typeof window === 'undefined') return false
+  const nav = window.navigator as Navigator & { standalone?: boolean }
+  return window.matchMedia?.('(display-mode: standalone)').matches || nav.standalone === true
+}
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => void
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
+function PwaInstallModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [platform, setPlatform] = useState<PwaPlatform>('desktop')
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [installing, setInstalling] = useState(false)
+  const [installed, setInstalled] = useState(false)
+
+  useEffect(() => {
+    setPlatform(detectPwaPlatform())
+    function handlePrompt(e: Event) {
+      e.preventDefault()
+      setDeferredPrompt(e as BeforeInstallPromptEvent)
+    }
+    function handleInstalled() { setInstalled(true) }
+    window.addEventListener('beforeinstallprompt', handlePrompt)
+    window.addEventListener('appinstalled', handleInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handlePrompt)
+      window.removeEventListener('appinstalled', handleInstalled)
+    }
+  }, [])
+
+  async function handleInstallClick() {
+    if (!deferredPrompt) return
+    setInstalling(true)
+    deferredPrompt.prompt()
+    try {
+      await deferredPrompt.userChoice
+    } finally {
+      setDeferredPrompt(null)
+      setInstalling(false)
+    }
+  }
+
+  if (!open) return null
+
+  const steps = platform === 'ios'
+    ? [
+        { icon: Share, text: 'Tap ikon Share (kotak dengan panah ke atas) di bar bawah/atas Safari' },
+        { icon: Download, text: 'Scroll ke bawah lalu pilih "Add to Home Screen" / "Tambah ke Layar Utama"' },
+        { icon: CheckCircle, text: 'Tap "Add" / "Tambah" di pojok kanan atas' },
+      ]
+    : platform === 'android'
+    ? [
+        { icon: MessageCircle, text: 'Tap ikon titik tiga (⋮) di pojok kanan atas browser' },
+        { icon: Download, text: 'Pilih "Add to Home screen" / "Install app"' },
+        { icon: CheckCircle, text: 'Tap "Install" atau "Tambahkan"' },
+      ]
+    : [
+        { icon: Download, text: 'Cari ikon install (⊕) di ujung kanan address bar browser' },
+        { icon: MessageCircle, text: 'Atau buka menu browser (⋮) lalu pilih "Install [nama aplikasi]"' },
+        { icon: CheckCircle, text: 'Klik "Install" pada dialog yang muncul' },
+      ]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 shrink-0">
+              <Smartphone className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900">Install Aplikasi Anggota</h3>
+              <p className="text-xs text-gray-500">Akses lebih cepat dari layar utama HP Anda</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 cursor-pointer shrink-0">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {installed ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center text-sm text-emerald-700">
+            Aplikasi berhasil di-install. Cek layar utama HP Anda.
+          </div>
+        ) : (
+          <>
+            {deferredPrompt && (
+              <button onClick={handleInstallClick} disabled={installing}
+                className="mb-4 w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+                {installing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Install Sekarang
+              </button>
+            )}
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              {deferredPrompt ? 'Atau install manual:' : 'Cara install manual:'}
+            </p>
+            <div className="space-y-2.5">
+              {steps.map((s, i) => (
+                <div key={i} className="flex items-start gap-3 text-sm">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 text-xs font-bold">
+                    {i + 1}
+                  </div>
+                  <p className="text-gray-700 pt-0.5">{s.text}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <button onClick={onClose}
+          className="mt-5 w-full rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+          Nanti Saja
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── MAIN CLIENT ──────────────────────────────────────────────────────────────
 
 export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNama: string }) {
@@ -299,6 +432,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
     biaya_admin_pendaftaran: number; nominal_simpanan_pokok: number; nominal_simpanan_wajib: number
     ijarah_platform_fee: number; ijarah_platform_periode_hari: number; ijarah_sukarela_opsional_minimal: number
     bank_account: { bank_name: string; account_number: string; account_holder: string } | null; qris_image_url: string | null
+    admin_whatsapp: string
   } | null>(null)
   const [metodeBayar, setMetodeBayar] = useState<'TRANSFER' | 'QRIS'>('TRANSFER')
   const [buktiFile, setBuktiFile] = useState<{ key: string; name: string; size: number } | null>(null)
@@ -309,6 +443,15 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   const [topupSukarelaChecked, setTopupSukarelaChecked] = useState(false)
   const [topupSukarelaAmount, setTopupSukarelaAmount] = useState('')
   const [aktivasiResult, setAktivasiResult] = useState<{ activated: boolean; kode_anggota?: string; login_identifier?: string | null } | null>(null)
+
+  // ── Install Aplikasi (PWA) ──
+  const [pwaModalOpen, setPwaModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (step !== 'selesai') return
+    if (isRunningStandalone()) return
+    setPwaModalOpen(true)
+  }, [step])
 
   function muatInfoBayar() {
     setError(null)
@@ -1147,47 +1290,101 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   }
 
   // ── Step: Selesai ──
+  const menuPreview: { label: string; icon: React.ElementType }[] = [
+    { label: 'Beranda', icon: Home },
+    { label: 'Simpanan', icon: Wallet },
+    { label: 'Proyek', icon: Briefcase },
+    { label: 'Investasi', icon: Coins },
+    { label: 'Penawaran', icon: Bell },
+  ]
+  const waNomor = infoBayar?.admin_whatsapp?.trim()
+  const waHref = waNomor
+    ? `https://wa.me/${waNomor}?text=${encodeURIComponent(
+        `Halo pengurus ${orgNama}, saya ingin menanyakan status verifikasi pendaftaran saya (kode: ${pendaftaranId?.slice(0, 8).toUpperCase()}).`
+      )}`
+    : null
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md text-center">
-        <div className="rounded-2xl bg-white p-8 shadow-sm">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-4">
-            <CheckCircle className="h-8 w-8 text-emerald-600" />
-          </div>
-          {aktivasiResult?.activated ? (
-            <>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Selamat Datang, Anggota Baru!</h2>
-              <p className="text-sm text-gray-600 mb-6">
-                Keanggotaan Anda di <strong>{orgNama}</strong> sudah <strong>aktif</strong>. Anda bisa langsung login ke portal anggota.
-              </p>
-              <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-left space-y-2 text-sm">
-                <p className="font-semibold text-emerald-800">Kode Anggota Anda:</p>
-                <p className="font-mono text-lg text-emerald-900">{aktivasiResult.kode_anggota}</p>
-                <p className="text-emerald-700 pt-2">
-                  Login menggunakan email/NIK dan kata sandi yang Anda buat di langkah pertama.
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100">
+      {!aktivasiResult?.activated && (
+        <div className="sticky top-0 z-20 flex items-center justify-center gap-2 bg-amber-500 py-2.5 text-sm font-semibold text-white shadow-sm">
+          <Clock className="h-4 w-4" /> Status: Menunggu Verifikasi Pengurus
+        </div>
+      )}
+      <div className="flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <div className="rounded-2xl bg-white p-8 shadow-sm">
+            <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-4">
+              <CheckCircle className="h-8 w-8 text-emerald-600" />
+            </div>
+            {aktivasiResult?.activated ? (
+              <>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Selamat Datang, Anggota Baru!</h2>
+                <p className="text-sm text-gray-600 mb-6">
+                  Keanggotaan Anda di <strong>{orgNama}</strong> sudah <strong>aktif</strong>. Anda bisa langsung login ke portal anggota.
                 </p>
-              </div>
-            </>
-          ) : (
-            <>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Pembayaran Diterima — Menunggu Verifikasi</h2>
-              <p className="text-sm text-gray-600 mb-6">
-                Bukti transfer Anda sudah kami terima. Pengurus <strong>{orgNama}</strong> akan
-                memverifikasi pembayaran sebelum akun keanggotaan Anda diaktifkan.
-              </p>
-              <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-left space-y-2 text-sm">
-                <p className="font-semibold text-emerald-800">Proses selanjutnya:</p>
-                <p className="text-emerald-700">1. Pengurus memverifikasi bukti transfer Anda</p>
-                <p className="text-emerald-700">2. Akun anggota diaktifkan dan kode anggota dikirim</p>
-                <p className="text-emerald-700">3. Login ke portal anggota untuk mulai bertransaksi</p>
-              </div>
-            </>
-          )}
-          <p className="mt-6 text-xs text-gray-400">
-            Kode pendaftaran: <span className="font-mono">{pendaftaranId?.slice(0, 8).toUpperCase()}</span>
-          </p>
+                <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-left space-y-2 text-sm">
+                  <p className="font-semibold text-emerald-800">Kode Anggota Anda:</p>
+                  <p className="font-mono text-lg text-emerald-900">{aktivasiResult.kode_anggota}</p>
+                  <p className="text-emerald-700 pt-2">
+                    Login menggunakan email/NIK dan kata sandi yang Anda buat di langkah pertama.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Pembayaran Diterima — Menunggu Verifikasi</h2>
+                <p className="text-sm text-gray-600 mb-6">
+                  Bukti transfer Anda sudah kami terima. Pengurus <strong>{orgNama}</strong> akan
+                  memverifikasi pembayaran sebelum akun keanggotaan Anda diaktifkan.
+                </p>
+                <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-left space-y-2 text-sm">
+                  <p className="font-semibold text-emerald-800">Proses selanjutnya:</p>
+                  <p className="text-emerald-700">1. Pengurus memverifikasi bukti transfer Anda</p>
+                  <p className="text-emerald-700">2. Akun anggota diaktifkan dan kode anggota dikirim</p>
+                  <p className="text-emerald-700">3. Login ke portal anggota untuk mulai bertransaksi</p>
+                </div>
+
+                <div className="mt-5 text-left">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                    Menu Anda (aktif setelah diverifikasi)
+                  </p>
+                  <div className="grid grid-cols-5 gap-2">
+                    {menuPreview.map(m => (
+                      <div key={m.label} className="relative flex flex-col items-center gap-1 rounded-xl border border-gray-100 bg-gray-50 py-3 px-1">
+                        <div className="relative">
+                          <m.icon className="h-5 w-5 text-gray-300" />
+                          <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-300">
+                            <Lock className="h-2.5 w-2.5 text-white" />
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-medium text-gray-400 text-center leading-tight">{m.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-5 space-y-2">
+                  <button onClick={() => setPwaModalOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer">
+                    <Download className="h-4 w-4" /> Cara Install Aplikasi
+                  </button>
+                  {waHref && (
+                    <a href={waHref} target="_blank" rel="noopener noreferrer"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] py-2.5 text-sm font-semibold text-white hover:brightness-95 transition-all cursor-pointer">
+                      <MessageCircle className="h-4 w-4" /> Hubungi Admin via WhatsApp
+                    </a>
+                  )}
+                </div>
+              </>
+            )}
+            <p className="mt-6 text-xs text-gray-400">
+              Kode pendaftaran: <span className="font-mono">{pendaftaranId?.slice(0, 8).toUpperCase()}</span>
+            </p>
+          </div>
         </div>
       </div>
+      <PwaInstallModal open={pwaModalOpen} onClose={() => setPwaModalOpen(false)} />
     </div>
   )
 }
