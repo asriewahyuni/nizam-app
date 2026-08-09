@@ -8,7 +8,8 @@ import { Eye, EyeOff, ArrowRight, ShieldCheck, Loader2, HandCoins } from 'lucide
 export default function AnggotaLoginClient({ orgId }: { orgId?: string }) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const error = searchParams.get('error')
+  const [loginError, setLoginError] = useState<string | null>(null)
+  const error = loginError ?? searchParams.get('error')
   const redirectTo = searchParams.get('redirectTo') || ''
 
   const [showPass, setShowPass] = useState(false)
@@ -23,8 +24,11 @@ export default function AnggotaLoginClient({ orgId }: { orgId?: string }) {
   function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
-    startTransition(() => {
-      signInAsAnggota(fd)
+    setLoginError(null)
+    startTransition(async () => {
+      const res = await signInAsAnggota(fd)
+      if ('error' in res) { setLoginError(res.error); return }
+      router.push(res.redirectTo)
     })
   }
 
@@ -72,7 +76,7 @@ export default function AnggotaLoginClient({ orgId }: { orgId?: string }) {
           {error && (
             <div role="alert" className="mb-5 px-4 py-3 rounded-xl text-sm font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-start gap-2.5">
               <ShieldCheck size={15} className="mt-0.5 shrink-0" />
-              {decodeURIComponent(error)}
+              {loginError ?? decodeURIComponent(error!)}
             </div>
           )}
 

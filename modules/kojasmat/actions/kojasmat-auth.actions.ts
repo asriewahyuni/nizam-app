@@ -3,22 +3,29 @@
 // Kojasmat — autentikasi anggota koperasi
 // Login via kode_anggota + password, scope ke org_id agar data tidak tercampur antar bisnis
 
-import { redirect } from 'next/navigation'
 import { queryPostgres } from '@/lib/db/postgres'
 import {
   signInWithInternalAuth,
   createInternalAuthResetTokenByEmail,
 } from '@/lib/auth/internal-auth.server'
 
-export async function signInAsAnggota(formData: FormData) {
+// Mengembalikan { error } atau { redirectTo } alih-alih redirect() langsung.
+// Fungsi ini dipanggil sebagai plain async function (bukan <form action={...}>)
+// dari AnggotaLoginClient — redirect() di server action yang dipanggil langsung
+// seperti itu rawan race "Router action dispatched before initialization" saat
+// router client belum selesai init (paling sering kejadian di cold-start PWA
+// standalone). Navigasi jadi tanggung jawab client via router.push() setelah
+// menerima hasilnya, yang aman karena router sudah pasti siap saat itu.
+export async function signInAsAnggota(formData: FormData): Promise<
+  { error: string } | { redirectTo: string }
+> {
   const kode = String(formData.get('kode_anggota') || '').trim().toUpperCase()
   const password = String(formData.get('password') || '').trim()
   const redirectTo = String(formData.get('redirectTo') || '').trim()
   const orgId = String(formData.get('org_id') || '').trim()
 
   if (!kode || !password) {
-    const base = orgId ? `/anggota/login?org=${orgId}` : '/anggota/login'
-    redirect(`${base}&error=${encodeURIComponent('Kode anggota dan kata sandi wajib diisi.')}`)
+    return { error: 'Kode anggota dan kata sandi wajib diisi.' }
   }
 
   // Scope ke org_id jika tersedia — mencegah data antar bisnis tercampur
@@ -39,18 +46,17 @@ export async function signInAsAnggota(formData: FormData) {
       )
 
   const anggota = rows[0]
-  const loginBase = orgId ? `/anggota/login?org=${orgId}` : '/anggota/login'
 
   if (!anggota) {
-    redirect(`${loginBase}&error=${encodeURIComponent('Kode anggota tidak ditemukan.')}`)
+    return { error: 'Kode anggota tidak ditemukan.' }
   }
 
   if (anggota.status === 'DIBEKUKAN') {
-    redirect(`${loginBase}&error=${encodeURIComponent('Akun Anda dibekukan. Hubungi pengurus koperasi.')}`)
+    return { error: 'Akun Anda dibekukan. Hubungi pengurus koperasi.' }
   }
 
   if (!anggota.email && !anggota.nik) {
-    redirect(`${loginBase}&error=${encodeURIComponent('Akun belum diaktifkan. Hubungi pengurus koperasi untuk mendapatkan akses login.')}`)
+    return { error: 'Akun belum diaktifkan. Hubungi pengurus koperasi untuk mendapatkan akses login.' }
   }
 
   const result = await signInWithInternalAuth({
@@ -60,13 +66,13 @@ export async function signInAsAnggota(formData: FormData) {
   })
 
   if ('error' in result) {
-    redirect(`${loginBase}&error=${encodeURIComponent('Kode anggota atau kata sandi salah.')}`)
+    return { error: 'Kode anggota atau kata sandi salah.' }
   }
 
   // Gunakan kode_anggota dari DB (bukan input user) agar URL selalu konsisten
   const kodeAnggota = anggota.kode_anggota as string
   const portalUrl = orgId ? `/anggota/${kodeAnggota}?org=${orgId}` : `/anggota/${kodeAnggota}`
-  redirect(redirectTo || portalUrl)
+  return { redirectTo: redirectTo || portalUrl }
 }
 
 export async function requestAnggotaPasswordReset(formData: FormData): Promise<{
