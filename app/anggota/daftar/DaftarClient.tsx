@@ -10,16 +10,28 @@ import {
 import {
   buatPendaftaran,
   simpanDokumenPendaftaran,
+  submitLayananKomitmen,
   type KojasmatDokumen,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
 import {
   mulaiTestMasuk, submitTestMasuk, forceLulusTestMasuk, getInfoPembayaran, submitPembayaranPendaftaran,
+  getKomitmenSections, type KomitmenSection,
 } from '@/modules/kojasmat/actions/kojasmat-test.actions'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-type Step = 'data' | 'kontak_darurat' | 'dokumen' | 'tes' | 'bayar' | 'selesai'
-const STEPS: Step[] = ['data', 'kontak_darurat', 'dokumen', 'tes', 'bayar', 'selesai']
+type Step = 'data' | 'kontak_darurat' | 'dokumen' | 'tes' | 'layanan' | 'komitmen' | 'bayar' | 'selesai'
+const STEPS: Step[] = ['data', 'kontak_darurat', 'dokumen', 'tes', 'layanan', 'komitmen', 'bayar', 'selesai']
+
+const LAYANAN_OPTIONS = [
+  'Tabungan Qardh (Sukarela, Tanpa Manfaat)',
+  'Keanggotaan Umum',
+  'Ingin Ikut Syirkah Proyek (penawaran akan diberikan terpisah)',
+  'Ingin Mendapatkan Edukasi Mu’amalah',
+  'Program Baitul Maal & Ta’awun',
+  'Program Logistik / Distribusi Ummat',
+  'Pembiayaan Barang (Murabahah Syariah)',
+]
 
 type FormData = {
   nama_lengkap: string
@@ -255,6 +267,33 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testMasukId, testResult])
 
+  // ── Layanan & Komitmen ──
+  const [layananSelected, setLayananSelected] = useState<string[]>([])
+  const [komitmenSections, setKomitmenSections] = useState<KomitmenSection[] | null>(null)
+  const [komitmenChecked, setKomitmenChecked] = useState<boolean[]>([])
+
+  function toggleLayanan(value: string) {
+    setLayananSelected(list => list.includes(value) ? list.filter(v => v !== value) : [...list, value])
+  }
+
+  function muatKomitmenSections() {
+    startTransition(async () => {
+      const res = await getKomitmenSections(orgId)
+      setKomitmenSections(res.data)
+      setKomitmenChecked(res.data.map(() => false))
+    })
+  }
+
+  function handleSubmitKomitmen() {
+    if (!pendaftaranId || komitmenChecked.some(c => !c)) return
+    setError(null)
+    startTransition(async () => {
+      const res = await submitLayananKomitmen(pendaftaranId, orgId, layananSelected)
+      if (res.error) { setError(res.error); return }
+      setStep('bayar')
+    })
+  }
+
   // ── Pembayaran ──
   const [infoBayar, setInfoBayar] = useState<{
     biaya_admin_pendaftaran: number; nominal_simpanan_pokok: number; nominal_simpanan_wajib: number
@@ -319,6 +358,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
   useEffect(() => {
     if (step === 'tes' && !testMasukId && !testLoading) mulaiTest()
+    if (step === 'komitmen' && !komitmenSections) muatKomitmenSections()
     if (step === 'bayar' && !infoBayar) muatInfoBayar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
@@ -700,9 +740,9 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                     <Star className="h-4 w-4" /> {testResult.apresiasi}
                   </span>
                 )}
-                <button onClick={() => setStep('bayar')}
+                <button onClick={() => setStep('layanan')}
                   className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer">
-                  Lanjut ke Pembayaran <ChevronRight className="h-4 w-4" />
+                  Lanjut <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             )}
@@ -773,6 +813,103 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                 </div>
               )
             })()}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Step: Layanan Yang Diinginkan ──
+  if (step === 'layanan' && pendaftaranId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg">
+          <div className="mb-6 text-center">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 mb-3">
+              <ClipboardList className="h-6 w-6 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Layanan Yang Diinginkan</h1>
+            <p className="text-sm text-gray-500 mt-1">Boleh pilih satu atau lebih (opsional).</p>
+          </div>
+
+          <StepProgress step={step} />
+
+          <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
+            <div className="space-y-2">
+              {LAYANAN_OPTIONS.map(opt => (
+                <label key={opt} className={cn(
+                  'flex items-start gap-2.5 rounded-xl border p-3 text-sm cursor-pointer transition-colors',
+                  layananSelected.includes(opt) ? 'border-emerald-300 bg-emerald-50/60' : 'border-gray-200 hover:bg-gray-50'
+                )}>
+                  <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-emerald-600"
+                    checked={layananSelected.includes(opt)} onChange={() => toggleLayanan(opt)} />
+                  <span className="text-gray-700">{opt}</span>
+                </label>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setStep('komitmen')}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer"
+            >
+              Lanjut <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Step: Komitmen ──
+  if (step === 'komitmen' && pendaftaranId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg">
+          <div className="mb-6 text-center">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 mb-3">
+              <FileText className="h-6 w-6 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Komitmen</h1>
+            <p className="text-sm text-gray-500 mt-1">Mohon baca dan centang setiap bagian sebelum melanjutkan.</p>
+          </div>
+
+          <StepProgress step={step} />
+
+          <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
+            {!komitmenSections && (
+              <div className="py-12 text-center text-gray-400">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Memuat...
+              </div>
+            )}
+
+            {komitmenSections && komitmenSections.map((s, i) => (
+              <div key={i} className="rounded-xl border border-gray-200 p-4">
+                <p className="text-sm font-semibold text-gray-900 mb-2">{i + 1}. {s.title}</p>
+                <p className="text-sm text-gray-600 whitespace-pre-line mb-3">{s.body}</p>
+                <label className="flex items-start gap-2.5 text-sm cursor-pointer">
+                  <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-emerald-600"
+                    checked={komitmenChecked[i] ?? false}
+                    onChange={e => setKomitmenChecked(list => list.map((c, idx) => idx === i ? e.target.checked : c))} />
+                  <span className="text-gray-700">{s.checkbox_label}</span>
+                </label>
+              </div>
+            ))}
+
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            {komitmenSections && (
+              <button
+                onClick={handleSubmitKomitmen}
+                disabled={komitmenChecked.some(c => !c) || pending}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Menyimpan...</> : <>Lanjut ke Pembayaran <ChevronRight className="h-4 w-4" /></>}
+              </button>
+            )}
           </div>
         </div>
       </div>

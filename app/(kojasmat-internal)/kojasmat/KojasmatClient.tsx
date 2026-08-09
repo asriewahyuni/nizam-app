@@ -48,7 +48,7 @@ import {
 } from '@/modules/kojasmat/actions/kojasmat-keuangan.actions'
 import {
   simpanBankSoal, hapusBankSoal, updateModuleSettings, getTestMasukByPendaftaran,
-  type KojasmatBankSoal, type ApresiasiTier, type KojasmatTestMasukRingkas,
+  type KojasmatBankSoal, type ApresiasiTier, type KojasmatTestMasukRingkas, type KomitmenSection,
 } from '@/modules/kojasmat/actions/kojasmat-test.actions'
 import { saveKojasmatAccountMappingAction } from '@/modules/kojasmat/actions/kojasmat-account-mapping.actions'
 import {
@@ -93,6 +93,7 @@ type Props = {
     ijarah_platform_fee: number
     ijarah_platform_periode_hari: number
     ijarah_sukarela_opsional_minimal: number
+    komitmen_sections: KomitmenSection[]
   }
   bankAccounts: { id: string; bank_name: string; account_number: string }[]
   qrisPreviewUrl: string | null
@@ -4363,6 +4364,24 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
                   <p className="text-gray-700 text-sm">{selected.alasan_bergabung}</p>
                 </div>
               )}
+              {selected.layanan_diinginkan && selected.layanan_diinginkan.length > 0 && (
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-400 mb-1">Layanan Yang Diinginkan</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selected.layanan_diinginkan.map(l => (
+                      <span key={l} className="rounded-lg bg-emerald-50 border border-emerald-100 px-2 py-1 text-xs text-emerald-700">{l}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="col-span-2">
+                <p className="text-xs text-gray-400">Komitmen Disetujui</p>
+                <p className="font-medium text-gray-800">
+                  {selected.komitmen_disetujui_at
+                    ? new Date(selected.komitmen_disetujui_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+                    : '— belum menyelesaikan step Komitmen'}
+                </p>
+              </div>
             </div>
 
             {/* Dokumen */}
@@ -4833,6 +4852,7 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
   const [tierForm, setTierForm] = useState(
     moduleSettings.apresiasi_tiers.map(t => ({ min_score: String(t.min_score), label: t.label }))
   )
+  const [komitmenForm, setKomitmenForm] = useState<KomitmenSection[]>(moduleSettings.komitmen_sections)
   const [qrisUploading, setQrisUploading] = useState(false)
   const [qrisPreview, setQrisPreview] = useState(qrisPreviewUrl)
   const [qrisName, setQrisName] = useState(moduleSettings.qris_image_name)
@@ -4912,6 +4932,7 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
         apresiasi_tiers: tierForm
           .filter(t => t.label.trim())
           .map(t => ({ min_score: Number(t.min_score) || 0, label: t.label.trim() })),
+        komitmen_sections: komitmenForm.filter(s => s.title.trim() && s.checkbox_label.trim()),
       })
     })
   }
@@ -4926,6 +4947,18 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
 
   function removeTier(index: number) {
     setTierForm(list => list.filter((_, i) => i !== index))
+  }
+
+  function updateKomitmenSection(index: number, field: keyof KomitmenSection, value: string) {
+    setKomitmenForm(list => list.map((s, i) => i === index ? { ...s, [field]: value } : s))
+  }
+
+  function addKomitmenSection() {
+    setKomitmenForm(list => [...list, { title: '', body: '', checkbox_label: '' }])
+  }
+
+  function removeKomitmenSection(index: number) {
+    setKomitmenForm(list => list.filter((_, i) => i !== index))
   }
 
   const formValid = form.pertanyaan.trim() && form.pilihan_a.trim() && form.pilihan_b.trim()
@@ -5078,6 +5111,52 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
             ))}
             {tierForm.length === 0 && (
               <p className="text-xs text-gray-400">Belum ada tingkat apresiasi — tambahkan minimal satu.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-5 pt-5 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="text-sm font-semibold text-gray-900">Bagian Komitmen (Sebelum Bayar)</h4>
+            <button onClick={addKomitmenSection}
+              className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer">
+              <Plus className="h-3.5 w-3.5" /> Tambah Bagian
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Ditampilkan berurutan di step &quot;Komitmen&quot; wizard pendaftaran publik, tepat sebelum step Bayar.
+            Calon anggota wajib mencentang semua bagian untuk lanjut. Draft awal disalin dari materi lama —
+            mohon periksa &amp; lengkapi teksnya (khususnya bagian yang masih terpotong) sebelum dipakai anggota sungguhan.
+          </p>
+          <div className="space-y-3">
+            {komitmenForm.map((s, i) => (
+              <div key={i} className="rounded-xl border border-gray-200 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 text-xs font-semibold text-gray-400 w-5">{i + 1}.</span>
+                  <input
+                    className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium outline-none focus:border-emerald-500"
+                    placeholder="Judul bagian, mis. Pemahaman Akad"
+                    value={s.title}
+                    onChange={e => updateKomitmenSection(i, 'title', e.target.value)} />
+                  <button onClick={() => removeKomitmenSection(i)}
+                    className="shrink-0 rounded-xl border border-red-200 bg-red-50 p-2 text-red-600 hover:bg-red-100 transition-colors cursor-pointer">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <textarea rows={3}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 resize-none"
+                  placeholder="Isi penjelasan bagian ini..."
+                  value={s.body}
+                  onChange={e => updateKomitmenSection(i, 'body', e.target.value)} />
+                <input
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  placeholder="Teks checkbox persetujuan, mis. Saya memahami dan menyetujui ketentuan di atas."
+                  value={s.checkbox_label}
+                  onChange={e => updateKomitmenSection(i, 'checkbox_label', e.target.value)} />
+              </div>
+            ))}
+            {komitmenForm.length === 0 && (
+              <p className="text-xs text-gray-400">Belum ada bagian komitmen — tambahkan minimal satu.</p>
             )}
           </div>
         </div>

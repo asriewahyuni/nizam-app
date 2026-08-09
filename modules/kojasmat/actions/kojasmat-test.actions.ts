@@ -33,6 +33,36 @@ const DEFAULT_APRESIASI_TIERS: ApresiasiTier[] = [
   { min_score: 60, label: 'Maqbul' },
 ]
 
+export type KomitmenSection = { title: string; body: string; checkbox_label: string }
+
+// Draft awal — teks section 2 sengaja dipotong persis seperti sumber referensi
+// (belum lengkap), dan tidak ada section pelengkap antara "Komitmen Syariah" dan
+// "Simpanan Keanggotaan (SPK)" karena teksnya belum tersedia saat draft ini dibuat.
+// Pengurus WAJIB melengkapi/mengedit lewat Pengaturan Kojasmat > Bagian Komitmen
+// sebelum wizard pendaftaran publik dianggap siap dipakai anggota sungguhan.
+const DEFAULT_KOMITMEN_SECTIONS: KomitmenSection[] = [
+  {
+    title: 'Pemahaman Akad',
+    body: 'Calon anggota memahami bahwa:\n- Biaya administrasi = akad ijarah\n- Tabarru’ wajib = kontribusi sosial, bukan simpanan\n- Qardh (tabungan) = pinjaman sukarela, tidak menghasilkan manfaat\n- Syirkah proyek = akad terpisah, harus disetujui setiap kali ada peluang\n- Tidak ada dana otomatis digunakan tanpa izin anggota',
+    checkbox_label: 'Saya memahami dan menyetujui ketentuan akad di atas.',
+  },
+  {
+    title: 'Komitmen Syariah',
+    body: 'Saya berkomitmen mengikuti aturan syariah KOJASMAT di bawah pengawasan DPS CORe ISEC. Saya setuju bahwa setiap transaksi harus...',
+    checkbox_label: 'Saya setuju dengan komitmen syariah di atas.',
+  },
+  {
+    title: 'Simpanan Keanggotaan (SPK)',
+    body: 'SP & SW dicatat sebagai simpanan Anda. ADK merupakan biaya administrasi pendaftaran (akad ijarah), tidak dikembalikan.',
+    checkbox_label: 'Saya setuju membayar biaya Simpanan Keanggotaan (SPK) sesuai rincian di atas.',
+  },
+  {
+    title: 'Persetujuan Akhir',
+    body: 'Dengan ini saya menyatakan bahwa seluruh data yang saya isi adalah benar, dan saya menyetujui untuk mengikuti seluruh ketentuan syariah dalam operasional KOJASMAT.',
+    checkbox_label: 'Saya setuju & siap diverifikasi. Saya bersedia mengikuti sosialisasi muamalah sebelum menjadi anggota resmi.',
+  },
+]
+
 export type KojasmatModuleSettings = {
   passing_threshold: number
   biaya_admin_pendaftaran: number
@@ -45,6 +75,7 @@ export type KojasmatModuleSettings = {
   ijarah_platform_fee: number
   ijarah_platform_periode_hari: number
   ijarah_sukarela_opsional_minimal: number
+  komitmen_sections: KomitmenSection[]
 }
 
 function resolveApresiasi(skor: number, tiers: ApresiasiTier[]): string | null {
@@ -157,7 +188,18 @@ export async function getModuleSettings(orgId: string): Promise<KojasmatModuleSe
     ijarah_platform_fee: Number(settings.ijarah_platform_fee ?? 25000),
     ijarah_platform_periode_hari: Number(settings.ijarah_platform_periode_hari ?? 30),
     ijarah_sukarela_opsional_minimal: Number(settings.ijarah_sukarela_opsional_minimal ?? 20000),
+    komitmen_sections: Array.isArray(settings.komitmen_sections) && settings.komitmen_sections.length > 0
+      ? settings.komitmen_sections as KomitmenSection[]
+      : DEFAULT_KOMITMEN_SECTIONS,
   }
+}
+
+// Tidak butuh auth — bagian dari wizard publik pendaftaran, dipakai di step
+// "Komitmen" sebelum bayar. Terpisah dari getInfoPembayaran supaya tidak perlu
+// menunggu resolve QRIS/rekening bank yang baru relevan di step berikutnya.
+export async function getKomitmenSections(orgId: string): Promise<{ data: KomitmenSection[] }> {
+  const settings = await getModuleSettings(orgId)
+  return { data: settings.komitmen_sections }
 }
 
 export async function updateModuleSettings(orgId: string, partial: Partial<KojasmatModuleSettings>) {

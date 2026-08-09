@@ -57,6 +57,8 @@ export type KojasmatPendaftaran = {
   kontak_darurat_hubungan?: string
   kontak_darurat_phone?: string
   kontak_darurat_alamat?: string
+  layanan_diinginkan?: string[]
+  komitmen_disetujui_at?: string | null
   status: 'MENUNGGU' | 'DISETUJUI' | 'DITOLAK' | 'DIREVISI'
   catatan_pengurus?: string
   ditinjau_oleh?: string
@@ -232,6 +234,23 @@ export async function buatPendaftaran(payload: {
   }
 }
 
+// Tidak butuh auth — bagian dari wizard publik pendaftaran. Dipanggil sekali saat
+// calon anggota menyelesaikan step "Komitmen" (mencentang semua bagian), menyimpan
+// minat layanan yang dipilih di step sebelumnya sekaligus stempel waktu persetujuan.
+export async function submitLayananKomitmen(pendaftaranId: string, orgId: string, layananDiinginkan: string[]) {
+  try {
+    await queryPostgres(
+      `UPDATE kojasmat_pendaftaran
+       SET layanan_diinginkan=$3, komitmen_disetujui_at=NOW(), updated_at=NOW()
+       WHERE id=$1 AND org_id=$2`,
+      [pendaftaranId, orgId, layananDiinginkan]
+    )
+    return { data: { ok: true } }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Gagal menyimpan komitmen' }
+  }
+}
+
 // Inti pembuatan anggota dari pendaftaran — dipakai baik oleh staf yang approve manual
 // (status awal CALON) maupun alur otomatis test+bayar (status langsung AKTIF).
 async function createAnggotaFromPendaftaran(
@@ -258,8 +277,8 @@ async function createAnggotaFromPendaftaran(
   const { rows: [anggota] } = await queryPostgres(
     `INSERT INTO kojasmat_anggota
        (org_id, kode_anggota, nama, nik, email, phone, alamat, pekerjaan, status, is_verified, user_id,
-        kontak_darurat_nama, kontak_darurat_hubungan, kontak_darurat_phone, kontak_darurat_alamat)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        kontak_darurat_nama, kontak_darurat_hubungan, kontak_darurat_phone, kontak_darurat_alamat, layanan_diinginkan)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
      RETURNING id`,
     [
       pend.org_id, kode, pend.nama_lengkap,
@@ -268,6 +287,7 @@ async function createAnggotaFromPendaftaran(
       opts.status, isAktif, pend.user_id ?? null,
       pend.kontak_darurat_nama ?? null, pend.kontak_darurat_hubungan ?? null,
       pend.kontak_darurat_phone ?? null, pend.kontak_darurat_alamat ?? null,
+      pend.layanan_diinginkan ?? null,
     ]
   )
 
