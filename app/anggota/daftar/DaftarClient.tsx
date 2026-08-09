@@ -1300,7 +1300,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   const waNomor = infoBayar?.admin_whatsapp?.trim()
   const waHref = waNomor
     ? `https://wa.me/${waNomor}?text=${encodeURIComponent(
-        `Halo pengurus ${orgNama}, saya ingin menanyakan status verifikasi pendaftaran saya (kode: ${pendaftaranId?.slice(0, 8).toUpperCase()}).`
+        `Halo pengurus ${orgNama}, saya ingin mengonfirmasi pendaftaran & pembayaran saya (kode: ${pendaftaranId?.slice(0, 8).toUpperCase()}). Mohon diverifikasi ya, terima kasih.`
       )}`
     : null
 
@@ -1364,17 +1364,11 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                   </div>
                 </div>
 
-                <div className="mt-5 space-y-2">
+                <div className="mt-5">
                   <button onClick={() => setPwaModalOpen(true)}
                     className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer">
                     <Download className="h-4 w-4" /> Cara Install Aplikasi
                   </button>
-                  {waHref && (
-                    <a href={waHref} target="_blank" rel="noopener noreferrer"
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#25D366] py-2.5 text-sm font-semibold text-white hover:brightness-95 transition-all cursor-pointer">
-                      <MessageCircle className="h-4 w-4" /> Hubungi Admin via WhatsApp
-                    </a>
-                  )}
                 </div>
               </>
             )}
@@ -1384,6 +1378,14 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
           </div>
         </div>
       </div>
+      {waHref && !aktivasiResult?.activated && (
+        <a href={waHref} target="_blank" rel="noopener noreferrer"
+          aria-label="Konfirmasi pendaftaran via WhatsApp"
+          className="fixed bottom-5 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg shadow-emerald-900/20 hover:brightness-95 transition-all cursor-pointer">
+          <span className="absolute inline-flex h-full w-full animate-ping motion-reduce:animate-none rounded-full bg-[#25D366] opacity-40" />
+          <MessageCircle className="h-6 w-6 relative" />
+        </a>
+      )}
       <PwaInstallModal open={pwaModalOpen} onClose={() => setPwaModalOpen(false)} />
     </div>
   )
