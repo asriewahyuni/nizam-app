@@ -67,6 +67,8 @@ export type KojasmatPendaftaran = {
   biaya_admin_dibayar?: number | null
   simpanan_pokok_dibayar?: number | null
   simpanan_wajib_dibayar?: number | null
+  ijarah_fee_dibayar?: number | null
+  simpanan_sukarela_dibayar?: number | null
   bukti_bayar_dokumen_id?: string | null
   status_bayar?: 'BELUM' | 'SUDAH'
   dibayar_at?: string | null
@@ -254,10 +256,7 @@ export async function submitLayananKomitmen(pendaftaranId: string, orgId: string
 // Inti pembuatan anggota dari pendaftaran — dipakai baik oleh staf yang approve manual
 // (status awal CALON) maupun alur otomatis test+bayar (status langsung AKTIF).
 async function createAnggotaFromPendaftaran(
-  pend: KojasmatPendaftaran & {
-    simpanan_pokok_dibayar?: number | null; simpanan_wajib_dibayar?: number | null; biaya_admin_dibayar?: number | null
-    ijarah_fee_dibayar?: number | null; simpanan_sukarela_dibayar?: number | null
-  },
+  pend: KojasmatPendaftaran,
   opts: { status: 'CALON' | 'AKTIF' }
 ) {
   // Buat nomor anggota baru

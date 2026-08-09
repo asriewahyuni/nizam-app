@@ -990,7 +990,10 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
                   <label className="flex items-start gap-2 rounded-xl border border-purple-200 bg-purple-50/50 p-3 text-sm cursor-pointer hover:bg-purple-50 transition-colors">
                     <input type="checkbox" className="mt-0.5 h-4 w-4 cursor-pointer accent-purple-600"
-                      checked={topupSukarelaChecked} onChange={e => { setTopupSukarelaChecked(e.target.checked); if (!e.target.checked) setTopupSukarelaAmount('') }} />
+                      checked={topupSukarelaChecked} onChange={e => {
+                        setTopupSukarelaChecked(e.target.checked)
+                        setTopupSukarelaAmount(e.target.checked ? String(infoBayar.ijarah_sukarela_opsional_minimal) : '')
+                      }} />
                     <span className="text-gray-700">
                       Saya juga ingin menabung Simpanan Sukarela tambahan (opsional, minimal {fmtIdr(infoBayar.ijarah_sukarela_opsional_minimal)}).
                     </span>

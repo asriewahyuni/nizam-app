@@ -4443,36 +4443,61 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
               )}
             </div>
 
-            {/* Pembayaran SPK */}
+            {/* Rincian Pembayaran — harus sama persis dengan item & nominal yang ditampilkan
+                di Ringkasan Pembayaran wizard publik (lihat DaftarClient.tsx step 'bayar') */}
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Pembayaran SPK</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Rincian Pembayaran</p>
               {selected.status_bayar !== 'SUDAH' ? (
                 <p className="text-sm text-gray-400 italic">Belum melakukan pembayaran</p>
-              ) : (
+              ) : (() => {
+                const sp = Number(selected.simpanan_pokok_dibayar ?? 0)
+                const sw = Number(selected.simpanan_wajib_dibayar ?? 0)
+                const adk = Number(selected.biaya_admin_dibayar ?? 0)
+                const ijarah = Number(selected.ijarah_fee_dibayar ?? 0)
+                const sukarela = Number(selected.simpanan_sukarela_dibayar ?? 0)
+                const total = sp + sw + adk + ijarah + sukarela
+                return (
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 space-y-1.5 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-emerald-700">Simpanan Pokok (SP)</span>
-                    <span className="font-medium text-emerald-800">{fmt(Number(selected.simpanan_pokok_dibayar ?? 0))}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-emerald-700">Simpanan Wajib (SW)</span>
-                    <span className="font-medium text-emerald-800">{fmt(Number(selected.simpanan_wajib_dibayar ?? 0))}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-emerald-700">Admin Keanggotaan (ADK)</span>
-                    <span className="font-medium text-emerald-800">{fmt(Number(selected.biaya_admin_dibayar ?? 0))}</span>
-                  </div>
+                  {sp > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-emerald-700">Simpanan Pokok (SP)</span>
+                      <span className="font-medium text-emerald-800">{fmt(sp)}</span>
+                    </div>
+                  )}
+                  {sw > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-emerald-700">Simpanan Wajib (SW)</span>
+                      <span className="font-medium text-emerald-800">{fmt(sw)}</span>
+                    </div>
+                  )}
+                  {ijarah > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-emerald-700">Ijarah Platform</span>
+                      <span className="font-medium text-emerald-800">{fmt(ijarah)}</span>
+                    </div>
+                  )}
+                  {sukarela > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-emerald-700">Simpanan Sukarela</span>
+                      <span className="font-medium text-emerald-800">{fmt(sukarela)}</span>
+                    </div>
+                  )}
+                  {adk > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-emerald-700">Admin Keanggotaan (ADK)</span>
+                      <span className="font-medium text-emerald-800">{fmt(adk)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-emerald-200 pt-1.5 font-bold">
-                    <span className="text-emerald-800">Total SPK</span>
-                    <span className="text-emerald-900">
-                      {fmt(Number(selected.simpanan_pokok_dibayar ?? 0) + Number(selected.simpanan_wajib_dibayar ?? 0) + Number(selected.biaya_admin_dibayar ?? 0))}
-                    </span>
+                    <span className="text-emerald-800">Total Dibayar</span>
+                    <span className="text-emerald-900">{fmt(total)}</span>
                   </div>
                   {selected.dibayar_at && (
                     <p className="text-xs text-emerald-600 pt-1">Dibayar: {String(selected.dibayar_at).split('T')[0]}</p>
                   )}
                 </div>
-              )}
+                )
+              })()}
             </div>
 
             {selected.catatan_pengurus && (
