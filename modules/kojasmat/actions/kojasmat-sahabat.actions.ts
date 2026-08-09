@@ -14,7 +14,12 @@ import { isOrgAdminOrManajemen } from './kojasmat.actions'
 
 const SOAL_PER_TEST = 20
 
-async function getOwnAnggota(): Promise<{ id: string; org_id: string; tingkat: string } | { error: string }> {
+// previewAnggotaId: dipakai saat staf/owner/manajer sedang preview portal anggota
+// (pola yang sama dengan app/anggota/[kode]/page.tsx) supaya mereka bisa mencoba
+// alur test kedua atas nama anggota yang di-preview — bukan celah untuk anggota
+// biasa mengklaim identitas anggota lain, karena tetap divalidasi lewat
+// isOrgAdminOrManajemen(session.user.id, ...) di bawah.
+async function getOwnAnggota(previewAnggotaId?: string): Promise<{ id: string; org_id: string; tingkat: string } | { error: string }> {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Sesi login tidak ditemukan. Silakan login ulang.' }
   const userId = resolveInternalUserId(session)
@@ -22,8 +27,19 @@ async function getOwnAnggota(): Promise<{ id: string; org_id: string; tingkat: s
     `SELECT id, org_id, tingkat FROM kojasmat_anggota WHERE user_id=$1::uuid LIMIT 1`,
     [userId]
   )
-  if (!anggota) return { error: 'Akun Anda bukan anggota koperasi.' }
-  return anggota as { id: string; org_id: string; tingkat: string }
+  if (anggota) return anggota as { id: string; org_id: string; tingkat: string }
+
+  if (previewAnggotaId) {
+    const { rows: [preview] } = await queryPostgres(
+      `SELECT id, org_id, tingkat FROM kojasmat_anggota WHERE id=$1 LIMIT 1`,
+      [previewAnggotaId]
+    )
+    if (preview && await isOrgAdminOrManajemen(session.user.id, preview.org_id)) {
+      return preview as { id: string; org_id: string; tingkat: string }
+    }
+  }
+
+  return { error: 'Akun Anda bukan anggota koperasi.' }
 }
 
 export type KojasmatTestSahabat = {
@@ -55,11 +71,11 @@ export async function getTestSahabatByAnggota(anggotaId: string): Promise<Kojasm
   return (test as KojasmatTestSahabat | undefined) ?? null
 }
 
-export async function mulaiTestSahabat(): Promise<
+export async function mulaiTestSahabat(previewAnggotaId?: string): Promise<
   { data: { test_id: string; attempt_number: number; soal: { id: string; pertanyaan: string; pilihan_a: string; pilihan_b: string; pilihan_c: string; pilihan_d: string }[] } }
   | { error: string }
 > {
-  const anggota = await getOwnAnggota()
+  const anggota = await getOwnAnggota(previewAnggotaId)
   if ('error' in anggota) return anggota
   if (anggota.tingkat === 'SAHABAT') return { error: 'Anda sudah tingkat Sahabat.' }
 
@@ -122,11 +138,11 @@ export async function mulaiTestSahabat(): Promise<
   }
 }
 
-export async function submitTestSahabat(testId: string, jawaban: Record<string, string>): Promise<
+export async function submitTestSahabat(testId: string, jawaban: Record<string, string>, previewAnggotaId?: string): Promise<
   { data: { skor: number; jumlah_benar: number; total_soal: number; status: 'LULUS' | 'GAGAL'; passing_threshold: number } }
   | { error: string }
 > {
-  const anggota = await getOwnAnggota()
+  const anggota = await getOwnAnggota(previewAnggotaId)
   if ('error' in anggota) return anggota
 
   const { rows: [test] } = await queryPostgres(

@@ -2859,9 +2859,10 @@ function UpgradePrompt({ label, onClick }: { label: string; onClick: () => void 
   )
 }
 
-function SahabatUpgradeSheet({ open, onClose, testSahabat, onUpdated }: {
+function SahabatUpgradeSheet({ open, onClose, testSahabat, onUpdated, anggotaId }: {
   open: boolean; onClose: () => void; testSahabat: KojasmatTestSahabat | null
   onUpdated: (t: KojasmatTestSahabat | null) => void
+  anggotaId: string
 }) {
   const [pending, startTransition] = useTransition()
   const [test, setTest] = useState(testSahabat)
@@ -2877,7 +2878,7 @@ function SahabatUpgradeSheet({ open, onClose, testSahabat, onUpdated }: {
   function handleMulai() {
     setError(null)
     startTransition(async () => {
-      const res = await mulaiTestSahabat()
+      const res = await mulaiTestSahabat(anggotaId)
       if ('error' in res) { setError(res.error); return }
       setTestId(res.data.test_id)
       setSoal(res.data.soal)
@@ -2966,7 +2967,7 @@ function SahabatUpgradeSheet({ open, onClose, testSahabat, onUpdated }: {
             setError(null)
             startTransition(async () => {
               if (!testId) return
-              const res = await submitTestSahabat(testId, jawaban)
+              const res = await submitTestSahabat(testId, jawaban, anggotaId)
               if ('error' in res) { setError(res.error); return }
               setResult(res.data)
               setSoal([])
@@ -3117,6 +3118,7 @@ export default function AnggotaPortalClient(props: Props) {
         onClose={() => setSahabatSheetOpen(false)}
         testSahabat={testSahabatState}
         onUpdated={setTestSahabatState}
+        anggotaId={anggota.id}
       />
     </div>
   )
