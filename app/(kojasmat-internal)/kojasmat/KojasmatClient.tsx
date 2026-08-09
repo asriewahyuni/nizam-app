@@ -12,6 +12,7 @@ import {
   BookOpen, ArrowDownCircle, X, Copy, Check, Pencil, Trash2, Upload, FolderOpen,
   TrendingDown, Scale, Loader2, CalendarClock, FileSignature, History, Lock, MessageCircle,
   Download, FileSpreadsheet, Landmark, Key, ShieldCheck, RotateCcw,
+  Home, Bell, Coins, Smartphone,
 } from 'lucide-react'
 import {
   createAnggota, updateAnggota, deleteAnggota,
@@ -4165,6 +4166,7 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
   const [actionResult, setActionResult] = useState<string | null>(null)
   const [kredensial, setKredensial] = useState<KredensialAnggota | null>(null)
   const [copied, setCopied] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   const filtered = pendaftaran.filter(p =>
     filterStatus === 'SEMUA' || p.status === filterStatus
@@ -4501,6 +4503,13 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
               })()}
             </div>
 
+            {selected.status === 'MENUNGGU' && (
+              <button onClick={() => setPreviewOpen(true)}
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+                <Smartphone className="h-4 w-4" /> Preview Portal Anggota
+              </button>
+            )}
+
             {selected.catatan_pengurus && (
               <div className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2 text-sm text-blue-700">
                 <span className="font-medium">Catatan sebelumnya:</span> {selected.catatan_pengurus}
@@ -4601,6 +4610,62 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
                 </button>
               )}
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Preview Portal — read-only, staf lihat apa yang dilihat calon anggota,
+          tanpa membuat kojasmat_anggota atau memberi akses login sungguhan. */}
+      <Modal open={previewOpen} onClose={() => setPreviewOpen(false)} title="Preview Portal Anggota">
+        {selected && (
+          <div className="space-y-4">
+            <p className="text-xs text-gray-400">
+              Tampilan ini persis seperti yang dilihat <strong>{selected.nama_lengkap}</strong> di halaman
+              &quot;Menunggu Verifikasi&quot; setelah membayar — hanya untuk staf, tidak membuat akun anggota.
+            </p>
+            <div className="rounded-2xl border border-gray-100 overflow-hidden">
+              <div className="flex items-center justify-center gap-2 bg-amber-500 py-2.5 text-sm font-semibold text-white">
+                <Clock className="h-4 w-4" /> Status: Menunggu Verifikasi Pengurus
+              </div>
+              <div className="bg-white p-5 text-center">
+                <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 mb-3">
+                  <CheckCircle className="h-7 w-7 text-emerald-600" />
+                </div>
+                <h3 className="text-base font-bold text-gray-900 mb-1">Pembayaran Diterima — Menunggu Verifikasi</h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Pengurus akan memverifikasi pembayaran sebelum akun keanggotaan diaktifkan.
+                </p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 text-left">
+                  Menu Anda (aktif setelah diverifikasi)
+                </p>
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { label: 'Beranda', icon: Home },
+                    { label: 'Simpanan', icon: Wallet },
+                    { label: 'Proyek', icon: Briefcase },
+                    { label: 'Investasi', icon: Coins },
+                    { label: 'Penawaran', icon: Bell },
+                  ].map(m => (
+                    <div key={m.label} className="relative flex flex-col items-center gap-1 rounded-xl border border-gray-100 bg-gray-50 py-3 px-1">
+                      <div className="relative">
+                        <m.icon className="h-5 w-5 text-gray-300" />
+                        <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-gray-300">
+                          <Lock className="h-2.5 w-2.5 text-white" />
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-medium text-gray-400 text-center leading-tight">{m.label}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 text-xs text-gray-400">
+                  Kode pendaftaran: <span className="font-mono">{selected.id.slice(0, 8).toUpperCase()}</span>
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setPreviewOpen(false)}
+              className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+              Tutup
+            </button>
           </div>
         )}
       </Modal>
