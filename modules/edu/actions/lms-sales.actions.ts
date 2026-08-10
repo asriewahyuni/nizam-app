@@ -149,6 +149,17 @@ export async function saveLmsSimpleProductAction(formData: FormData) {
         [storeId, orgId],
       )
       if (!storeCheck.rows[0]) {
+        // storeId yang dikirim form bisa basi kalau org aktif berubah setelah
+        // halaman dimuat (mis. ganti organisasi di tab lain lalu submit form lama).
+        // Bedakan kasus itu dari toko yang benar-benar dihapus/nonaktif agar
+        // pesan errornya tidak menyesatkan.
+        const foreignStoreCheck = await client.query<{ org_id: string }>(
+          `SELECT org_id::text FROM public.stores WHERE id = $1::uuid LIMIT 1`,
+          [storeId],
+        )
+        if (foreignStoreCheck.rows[0] && foreignStoreCheck.rows[0].org_id !== orgId) {
+          throw new Error('Organisasi aktif berubah sejak halaman ini dimuat. Muat ulang halaman lalu coba lagi.')
+        }
         throw new Error('Store tidak ditemukan atau sudah tidak aktif.')
       }
 

@@ -181,6 +181,16 @@ export default function ProductEditor({
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
 
+  // `draft.storeId` hanya di-set sekali lewat lazy initializer useState. Kalau
+  // org aktif berubah dan komponen ini re-render dengan `stores` baru tanpa
+  // remount, storeId lama bisa jadi tidak valid lagi untuk org yang sekarang
+  // aktif. Sinkronkan ulang supaya form tidak diam-diam mengirim storeId basi.
+  useEffect(() => {
+    if (stores.length === 0) return
+    if (stores.some((store) => store.id === draft.storeId)) return
+    setDraft((prev) => ({ ...prev, storeId: stores[0].id }))
+  }, [stores, draft.storeId])
+
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
