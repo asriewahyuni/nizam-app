@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
+import { ERPBridge } from '@/lib/erp-bridge/finances'
 import type { WorkshopWorkOrder, WorkshopVehicle, WorkshopStatus } from '@/modules/workshop/lib/workshop-types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ export async function getWorkshopVehicles(orgId: string, branchId?: string | nul
 
   let q = db
     .from('workshop_vehicles')
-    .select('*, contact:contacts(id, name)')
+    .select('*, contact:contacts(id, name), fixed_asset:fixed_assets(id, code, name, current_book_value)')
     .eq('org_id', orgId)
 
   if (sel.branchId) q = q.eq('branch_id', sel.branchId)
@@ -52,25 +53,198 @@ export async function getWorkshopVehicles(orgId: string, branchId?: string | nul
   const { data, error } = await q.order('created_at', { ascending: false })
   if (error) { console.error('getWorkshopVehicles:', error); return [] }
 
-  return (data || []).map((r: Record<string, unknown>) => ({
-    id: String(r.id || ''),
-    orgId: String(r.org_id || ''),
-    branchId: r.branch_id ? String(r.branch_id) : null,
-    contactId: r.contact_id ? String(r.contact_id) : null,
-    contactName: String(((r.contact as { name?: unknown } | null)?.name) || ''),
-    plateNumber: String(r.plate_number || ''),
-    brand: String(r.brand || ''),
-    model: String(r.model || ''),
-    year: r.year ? Number(r.year) : null,
-    color: r.color ? String(r.color) : null,
-    engineNumber: r.engine_number ? String(r.engine_number) : null,
-    chassisNumber: r.chassis_number ? String(r.chassis_number) : null,
-    fuelType: String(r.fuel_type || 'BENSIN'),
-    transmission: String(r.transmission || 'MANUAL'),
-    lastOdometer: Number(r.last_odometer || 0),
-    notes: r.notes ? String(r.notes) : null,
-    createdAt: String(r.created_at || ''),
+  return (data || []).map((r: Record<string, unknown>) => {
+    const fixedAsset = r.fixed_asset as Record<string, unknown> | null
+    return {
+      id: String(r.id || ''),
+      orgId: String(r.org_id || ''),
+      branchId: r.branch_id ? String(r.branch_id) : null,
+      contactId: r.contact_id ? String(r.contact_id) : null,
+      contactName: String(((r.contact as { name?: unknown } | null)?.name) || ''),
+      plateNumber: String(r.plate_number || ''),
+      brand: String(r.brand || ''),
+      model: String(r.model || ''),
+      year: r.year ? Number(r.year) : null,
+      color: r.color ? String(r.color) : null,
+      engineNumber: r.engine_number ? String(r.engine_number) : null,
+      chassisNumber: r.chassis_number ? String(r.chassis_number) : null,
+      fuelType: String(r.fuel_type || 'BENSIN'),
+      transmission: String(r.transmission || 'MANUAL'),
+      lastOdometer: Number(r.last_odometer || 0),
+      notes: r.notes ? String(r.notes) : null,
+      createdAt: String(r.created_at || ''),
+      fixedAssetId: r.fixed_asset_id ? String(r.fixed_asset_id) : null,
+      vehicleCategory: (String(r.vehicle_category || 'EXTERNAL') as 'EXTERNAL' | 'INTERNAL'),
+      fixedAsset: fixedAsset ? {
+        id: String(fixedAsset.id || ''),
+        code: String(fixedAsset.code || ''),
+        name: String(fixedAsset.name || ''),
+        current_book_value: Number(fixedAsset.current_book_value || 0),
+      } : null,
+    }
+  })
+}
+
+// ─── Fleet Mode (Tirta Marwah dkk) ──────────────────────────────────────────────
+
+export interface FleetFixedAsset {
+  id: string
+  code: string
+  name: string
+  category: string
+  purchase_date: string
+  current_book_value: number
+}
+
+/** Aset tetap kategori kendaraan yang bisa diregistrasi sebagai armada internal. */
+export async function getFixedAssetsForFleet(orgId: string): Promise<FleetFixedAsset[]> {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const res = await queryPostgres<Record<string, unknown>>(
+    `SELECT id, code, name, category, purchase_date, current_book_value
+     FROM public.fixed_assets
+     WHERE org_id = $1 AND status = 'ACTIVE' AND category ILIKE '%kendaraan%'
+     ORDER BY name ASC`,
+    [orgId]
+  )
+  return res.rows.map(r => ({
+    id: String(r.id),
+    code: String(r.code),
+    name: String(r.name),
+    category: String(r.category || ''),
+    purchase_date: String(r.purchase_date || ''),
+    current_book_value: Number(r.current_book_value || 0),
   }))
+}
+
+/** Registrasi kendaraan armada internal dari aset tetap yang sudah terdaftar. */
+export async function createFleetVehicleFromAsset(orgId: string, payload: {
+  fixed_asset_id: string
+  plate_number: string
+  brand: string
+  model: string
+  year?: number | null
+  color?: string | null
+  engine_number?: string | null
+  chassis_number?: string | null
+  fuel_type?: string
+  transmission?: string
+  last_odometer?: number
+  notes?: string | null
+}) {
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+  const branch = await requireBranch(orgId)
+  if ('error' in branch) return { error: branch.error }
+
+  const { error } = await db.from('workshop_vehicles').insert({
+    org_id: orgId,
+    branch_id: branch.branchId,
+    contact_id: null,
+    fixed_asset_id: payload.fixed_asset_id,
+    vehicle_category: 'INTERNAL',
+    plate_number: payload.plate_number,
+    brand: payload.brand,
+    model: payload.model,
+    year: payload.year ?? null,
+    color: payload.color ?? null,
+    engine_number: payload.engine_number ?? null,
+    chassis_number: payload.chassis_number ?? null,
+    fuel_type: payload.fuel_type || 'BENSIN',
+    transmission: payload.transmission || 'MANUAL',
+    last_odometer: payload.last_odometer ?? 0,
+    notes: payload.notes ?? null,
+  })
+  if (error) return { error: error.message }
+
+  revalidatePath('/workshop')
+  return { success: true }
+}
+
+/**
+ * Toggle Fleet Mode untuk instance Workshop org ini — update settings saja,
+ * TIDAK menyentuh status instance (beda dari saveModuleSettings() generik yang
+ * mereset status ke ONBOARDING dan akan bounce org yang sudah READY ke wizard setup).
+ */
+export async function setWorkshopFleetMode(orgId: string, enabled: boolean) {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  await queryPostgres(
+    `UPDATE public.org_module_instances
+     SET settings = COALESCE(settings, '{}'::jsonb) || $2::jsonb
+     WHERE org_id = $1 AND module_key = 'Workshop'`,
+    [orgId, JSON.stringify({ fleet_mode: enabled })]
+  )
+  revalidatePath('/workshop')
+  return { success: true }
+}
+
+/**
+ * Selesaikan SPK armada internal: tandai selesai + catat biaya servis sebagai
+ * beban pemeliharaan (bukan invoice ke customer). DR akun beban yang dipilih,
+ * CR kas/bank — via ERPBridge.recordExpense agar tidak silo dari akuntansi.
+ */
+export async function completeInternalWorkOrder(orgId: string, workOrderId: string, payload: {
+  maintenance_cost_account_id: string
+  notes?: string
+}) {
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  const { data: order, error: orderErr } = await db
+    .from('workshop_work_orders')
+    .select('*, vehicle:workshop_vehicles(plate_number)')
+    .eq('id', workOrderId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (orderErr || !order) return { error: 'SPK tidak ditemukan.' }
+
+  const orderRec = order as Record<string, unknown>
+  const branchId = orderRec.branch_id as string | null
+  const spkNumber = String(orderRec.spk_number || '')
+  const vehicle = orderRec.vehicle as Record<string, unknown> | null
+  const plateNumber = String(vehicle?.plate_number || '')
+  const total = Number(orderRec.total || 0)
+
+  const cashAccountId =
+    (await ERPBridge.getDefaultAccount(orgId, '1101')) ||
+    (await ERPBridge.getDefaultAccount(orgId, '1103'))
+  if (!cashAccountId) return { error: 'Akun Kas (1101) tidak ditemukan. Periksa COA.' }
+
+  if (total > 0) {
+    const journalResult = await ERPBridge.recordExpense({
+      orgId,
+      branchId: branchId ?? undefined,
+      amount: total,
+      date: new Date().toISOString().split('T')[0],
+      description: `Biaya Servis ${plateNumber} — ${spkNumber}`,
+      referenceType: 'WORKSHOP_INTERNAL_MAINTENANCE',
+      referenceId: workOrderId,
+      debitAccountId: payload.maintenance_cost_account_id,
+      creditAccountId: cashAccountId,
+      autoPost: true,
+    })
+    if (journalResult && 'error' in journalResult) {
+      return { error: `Gagal mencatat jurnal biaya: ${journalResult.error}` }
+    }
+  }
+
+  const { error: updateError } = await db
+    .from('workshop_work_orders')
+    .update({
+      status: 'SELESAI',
+      is_internal: true,
+      maintenance_cost_account_id: payload.maintenance_cost_account_id,
+      actual_finish: new Date().toISOString(),
+      notes: payload.notes ?? orderRec.notes ?? null,
+    })
+    .eq('id', workOrderId)
+    .eq('org_id', orgId)
+
+  if (updateError) return { error: updateError.message }
+
+  revalidatePath('/workshop')
+  revalidatePath('/accounting/journal')
+  return { success: true }
 }
 
 export async function createWorkshopVehicle(orgId: string, formData: FormData) {
@@ -165,6 +339,8 @@ export async function getWorkshopWorkOrders(orgId: string, branchId?: string | n
         notes: item.notes ? String(item.notes) : null,
       })),
       createdAt: String(r.created_at || ''),
+      isInternal: Boolean(r.is_internal),
+      maintenanceCostAccountId: r.maintenance_cost_account_id ? String(r.maintenance_cost_account_id) : null,
     }
   })
 }
@@ -176,12 +352,24 @@ export async function createWorkshopWorkOrder(orgId: string, formData: FormData)
   if ('error' in branch) return { error: branch.error }
 
   const spkNumber = generateSpkNumber()
+  const vehicleId = (formData.get('vehicle_id') as string) || null
+
+  let isInternal = false
+  if (vehicleId) {
+    const { data: vehicleRow } = await db
+      .from('workshop_vehicles')
+      .select('vehicle_category')
+      .eq('id', vehicleId)
+      .eq('org_id', orgId)
+      .maybeSingle()
+    isInternal = String((vehicleRow as Record<string, unknown> | null)?.vehicle_category || '') === 'INTERNAL'
+  }
 
   const payload = {
     org_id: orgId,
     branch_id: branch.branchId,
     spk_number: spkNumber,
-    vehicle_id: (formData.get('vehicle_id') as string) || null,
+    vehicle_id: vehicleId,
     contact_id: (formData.get('contact_id') as string) || null,
     mechanic_name: (formData.get('mechanic_name') as string) || null,
     status: 'ANTRI',
@@ -192,6 +380,7 @@ export async function createWorkshopWorkOrder(orgId: string, formData: FormData)
     subtotal: 0,
     discount: 0,
     total: 0,
+    is_internal: isInternal,
   }
 
   const { data: order, error } = await db
@@ -210,6 +399,14 @@ export async function updateWorkOrderStatus(orgId: string, orderId: string, stat
   const supabase = await createClient()
   const db = supabase as unknown as LooseDb
 
+  const { data: existing } = await db
+    .from('workshop_work_orders')
+    .select('is_internal')
+    .eq('id', orderId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  const isInternal = Boolean((existing as Record<string, unknown> | null)?.is_internal)
+
   const updates: Record<string, unknown> = { status }
   if (status === 'SELESAI' || status === 'DISERAHKAN') {
     updates.actual_finish = new Date().toISOString()
@@ -223,13 +420,17 @@ export async function updateWorkOrderStatus(orgId: string, orderId: string, stat
 
   if (error) return { error: error.message }
 
-  // Posting jurnal otomatis saat SPK diserahkan ke pelanggan
-  if (status === 'DISERAHKAN') {
+  // Posting jurnal otomatis saat SPK diserahkan ke pelanggan — SKIP untuk armada
+  // internal (tidak ada customer/piutang; biaya sudah dicatat via completeInternalWorkOrder).
+  if (status === 'DISERAHKAN' && !isInternal) {
     const journalResult = await postWorkshopJournal(orgId, orderId, db)
     if ('error' in journalResult) {
       console.error('postWorkshopJournal error:', journalResult.error)
     }
     // Deduct stok spare part dari inventori
+    await deductWorkshopPartInventory(orgId, orderId)
+  } else if (status === 'DISERAHKAN' && isInternal) {
+    // Armada internal: tetap deduct stok part jika ada, tanpa jurnal AR/pendapatan.
     await deductWorkshopPartInventory(orgId, orderId)
   }
 
@@ -576,7 +777,7 @@ export async function getWorkshopPartProducts(orgId: string) {
      FROM public.products p
      LEFT JOIN public.inventory_stocks s ON s.product_id = p.id AND s.org_id = p.org_id
      WHERE p.org_id = $1
-       AND p.type IN ('INVENTORY', 'PART', 'SPAREPART')
+       AND p.type = 'INVENTORY'
      GROUP BY p.id, p.name, p.sku, p.selling_price
      ORDER BY p.name`,
     [orgId]

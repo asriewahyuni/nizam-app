@@ -246,6 +246,7 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     href: '/workshop',
     isCore: false,
     category: 'business_type',
+    defaultSettings: { fleet_mode: false },
     onboardingSteps: [
       { id: 'settings', title: 'Pengaturan Bengkel', description: 'Tentukan layanan jasa bengkel, kategori spare part, dan tarif teknisi.' },
     ],

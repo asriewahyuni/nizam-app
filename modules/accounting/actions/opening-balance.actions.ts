@@ -69,12 +69,12 @@ export async function applyOpeningBalances(orgId: string, periodId?: string) {
 
   // Panggil function SQL
   const { queryPostgres } = await import('@/lib/db/postgres')
-  const { rows } = await queryPostgres<{ apply_opening_balances: any }>(
+  const { rows } = await queryPostgres<{ result: any }>(
     `SELECT apply_opening_balances($1::uuid, $2::uuid) as result`,
     [orgId, periodId || null]
   )
 
-  const result = rows?.[0]?.apply_opening_balances
+  const result = rows?.[0]?.result
   if (!result?.success) {
     return { error: result?.error || 'Gagal apply opening balance.' }
   }

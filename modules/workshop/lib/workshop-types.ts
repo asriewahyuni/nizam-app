@@ -28,6 +28,14 @@ export interface WorkshopVehicle {
   lastOdometer: number
   notes: string | null
   createdAt: string
+  fixedAssetId: string | null
+  vehicleCategory: 'EXTERNAL' | 'INTERNAL'
+  fixedAsset?: {
+    id: string
+    code: string
+    name: string
+    current_book_value: number
+  } | null
 }
 
 export interface WorkshopWorkOrderItem {
@@ -64,4 +72,6 @@ export interface WorkshopWorkOrder {
   notes: string | null
   items: WorkshopWorkOrderItem[]
   createdAt: string
+  isInternal: boolean
+  maintenanceCostAccountId: string | null
 }

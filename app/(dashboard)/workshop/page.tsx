@@ -6,7 +6,9 @@ import {
   getWorkshopVehicles,
   getWorkshopServiceRates,
   getWorkshopPartProducts,
+  getFixedAssetsForFleet,
 } from '@/modules/workshop/actions/workshop.actions'
+import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
 import { WorkshopClient } from './WorkshopClient'
 
 export const revalidate = 0
@@ -18,7 +20,7 @@ export default async function WorkshopPage() {
   const orgId = orgData.org.id
   const supabase = await createClient() as any
 
-  const [workOrders, vehicles, contactsResult, invoicesResult, serviceRates, partProducts] = await Promise.all([
+  const [workOrders, vehicles, contactsResult, invoicesResult, serviceRates, partProducts, moduleInstanceResult, accounts] = await Promise.all([
     getWorkshopWorkOrders(orgId),
     getWorkshopVehicles(orgId),
     supabase.from('contacts').select('id, name').eq('org_id', orgId).order('name'),
@@ -32,7 +34,21 @@ export default async function WorkshopPage() {
       .order('created_at', { ascending: false }),
     getWorkshopServiceRates(orgId),
     getWorkshopPartProducts(orgId),
+    supabase
+      .from('org_module_instances')
+      .select('settings')
+      .eq('org_id', orgId)
+      .eq('module_key', 'Workshop')
+      .eq('status', 'READY')
+      .maybeSingle(),
+    getChartOfAccounts(orgId),
   ])
+
+  const isFleetMode = moduleInstanceResult?.data?.settings?.fleet_mode === true
+  const fixedAssetsForFleet = isFleetMode ? await getFixedAssetsForFleet(orgId) : []
+  const expenseAccounts = (accounts || [])
+    .filter((a: any) => a.type === 'EXPENSE' && a.is_active !== false)
+    .map((a: any) => ({ id: a.id, code: a.code, name: a.name }))
 
   const invoices = (invoicesResult.data || []).map((s: any) => ({
     id: String(s.id),
@@ -54,6 +70,9 @@ export default async function WorkshopPage() {
         invoices={invoices}
         serviceRates={serviceRates}
         partProducts={partProducts}
+        isFleetMode={isFleetMode}
+        fixedAssets={fixedAssetsForFleet}
+        expenseAccounts={expenseAccounts}
       />
     </div>
   )

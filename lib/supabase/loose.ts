@@ -7,6 +7,7 @@ export interface LooseQuery extends PromiseLike<LooseQueryResponse> {
   select: (columns?: string) => LooseQuery
   eq: (column: string, value: unknown) => LooseQuery
   neq: (column: string, value: unknown) => LooseQuery
+  in: (column: string, values: unknown[]) => LooseQuery
   order: (column: string, options?: { ascending: boolean }) => LooseQuery
   limit: (count: number) => LooseQuery
   insert: (values: unknown) => LooseQuery

@@ -28,6 +28,9 @@ import {
   updateWorkOrderStatus,
   addWorkOrderItem,
   deleteWorkOrderItem,
+  createFleetVehicleFromAsset,
+  completeInternalWorkOrder,
+  type FleetFixedAsset,
 } from '@/modules/workshop/actions/workshop.actions'
 import {
   getVehicleForSpkPrefill,
@@ -55,6 +58,8 @@ interface WorkshopInvoice {
   customerName: string
 }
 
+export interface ExpenseAccount { id: string; code: string; name: string }
+
 interface Props {
   orgId: string
   workOrders: WorkshopWorkOrder[]
@@ -63,6 +68,9 @@ interface Props {
   invoices: WorkshopInvoice[]
   serviceRates: ServiceRate[]
   partProducts: PartProduct[]
+  isFleetMode: boolean
+  fixedAssets: FleetFixedAsset[]
+  expenseAccounts: ExpenseAccount[]
 }
 
 type Tab = 'spk' | 'vehicles' | 'invoices'
@@ -89,7 +97,7 @@ const STATUS_TRANSITIONS: Record<WorkshopStatus, WorkshopStatus[]> = {
 
 // ─── WorkshopClient ───────────────────────────────────────────────────────────
 
-export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices, serviceRates, partProducts }: Props) {
+export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices, serviceRates, partProducts, isFleetMode, fixedAssets, expenseAccounts }: Props) {
   const [tab, setTab] = useState<Tab>('spk')
   const { confirm, ConfirmUI } = useConfirm()
   const [search, setSearch] = useState('')
@@ -107,6 +115,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
     info: string
   } | null>(null)
   const [vehicleLoading, setVehicleLoading] = useState(false)
+  const [selectedFleetAssetId, setSelectedFleetAssetId] = useState('')
 
   // Filter berdasarkan pencarian
   const filteredOrders = useMemo(() => {
@@ -177,9 +186,25 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
   async function handleCreateVehicle(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
-    const res = await createWorkshopVehicle(orgId, new FormData(e.currentTarget))
+    const fd = new FormData(e.currentTarget)
+    const res = selectedFleetAssetId
+      ? await createFleetVehicleFromAsset(orgId, {
+          fixed_asset_id: selectedFleetAssetId,
+          plate_number: String(fd.get('plate_number') || ''),
+          brand: String(fd.get('brand') || ''),
+          model: String(fd.get('model') || ''),
+          year: fd.get('year') ? Number(fd.get('year')) : null,
+          color: (fd.get('color') as string) || null,
+          engine_number: (fd.get('engine_number') as string) || null,
+          chassis_number: (fd.get('chassis_number') as string) || null,
+          fuel_type: (fd.get('fuel_type') as string) || 'BENSIN',
+          transmission: (fd.get('transmission') as string) || 'MANUAL',
+          last_odometer: Number(fd.get('last_odometer') || 0),
+          notes: (fd.get('notes') as string) || null,
+        })
+      : await createWorkshopVehicle(orgId, fd)
     if (res.error) alert(res.error)
-    else { setShowVehicleModal(false); window.location.reload() }
+    else { setShowVehicleModal(false); setSelectedFleetAssetId(''); window.location.reload() }
     setLoading(false)
   }
 
@@ -293,6 +318,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
           orgId={orgId}
           serviceRates={serviceRates}
           partProducts={partProducts}
+          expenseAccounts={expenseAccounts}
         />
       ) : tab === 'invoices' ? (
         <InvoiceList invoices={invoices} workOrders={workOrders} />
@@ -376,16 +402,39 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
       {/* Modal: Daftarkan Kendaraan */}
       <AnimatePresence>
         {showVehicleModal && (
-          <Modal title="Daftarkan Kendaraan" onClose={() => setShowVehicleModal(false)}>
+          <Modal title="Daftarkan Kendaraan" onClose={() => { setShowVehicleModal(false); setSelectedFleetAssetId('') }}>
             <form onSubmit={handleCreateVehicle} className="space-y-4">
-              <FormRow label="Pelanggan">
-                <select name="contact_id" className={inputCls}>
-                  <option value="">— Pilih pelanggan —</option>
-                  {contacts.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </FormRow>
+              {isFleetMode && (
+                <FormRow label="Aset Tetap Armada (opsional)">
+                  <select
+                    value={selectedFleetAssetId}
+                    onChange={e => setSelectedFleetAssetId(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">— Kendaraan bukan dari aset tetap —</option>
+                    {fixedAssets.map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.code} — {a.name} ({formatRupiah(a.current_book_value)})
+                      </option>
+                    ))}
+                  </select>
+                  {selectedFleetAssetId && (
+                    <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                      ✓ Akan didaftarkan sebagai armada INTERNAL, tanpa perlu pelanggan.
+                    </p>
+                  )}
+                </FormRow>
+              )}
+              {!selectedFleetAssetId && (
+                <FormRow label="Pelanggan">
+                  <select name="contact_id" className={inputCls}>
+                    <option value="">— Pilih pelanggan —</option>
+                    {contacts.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </FormRow>
+              )}
               <FormRow label="Nomor Plat" required>
                 <input name="plate_number" required placeholder="Contoh: B 1234 ABC" className={`${inputCls} uppercase`} />
               </FormRow>
@@ -455,6 +504,7 @@ function SpkList({
   orgId,
   serviceRates,
   partProducts,
+  expenseAccounts,
 }: {
   orders: WorkshopWorkOrder[]
   selectedOrder: WorkshopWorkOrder | null
@@ -463,6 +513,7 @@ function SpkList({
   orgId: string
   serviceRates: ServiceRate[]
   partProducts: PartProduct[]
+  expenseAccounts: ExpenseAccount[]
 }) {
   if (orders.length === 0) {
     return (
@@ -484,6 +535,7 @@ function SpkList({
           orgId={orgId}
           serviceRates={serviceRates}
           partProducts={partProducts}
+          expenseAccounts={expenseAccounts}
         />
       ))}
     </div>
@@ -498,6 +550,7 @@ function SpkCard({
   orgId,
   serviceRates,
   partProducts,
+  expenseAccounts,
 }: {
   order: WorkshopWorkOrder
   isExpanded: boolean
@@ -506,6 +559,7 @@ function SpkCard({
   orgId: string
   serviceRates: ServiceRate[]
   partProducts: PartProduct[]
+  expenseAccounts: ExpenseAccount[]
 }) {
   const [showItemForm, setShowItemForm] = useState(false)
   const [itemLoading, setItemLoading] = useState(false)
@@ -513,6 +567,7 @@ function SpkCard({
   const [selectedName, setSelectedName] = useState('')
   const [selectedPrice, setSelectedPrice] = useState(0)
   const [selectedProductId, setSelectedProductId] = useState('')
+  const [showCompleteModal, setShowCompleteModal] = useState(false)
   const cfg = STATUS_CONFIG[order.status]
 
   function resetItemForm() {
@@ -822,6 +877,19 @@ function SpkCard({
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide self-center mr-2">Ubah status:</p>
                     {transitions.map(nextStatus => {
                       const nextCfg = STATUS_CONFIG[nextStatus]
+                      // Armada internal: transisi ke SELESAI wajib lewat modal "Selesai & Catat Biaya"
+                      // (agar akun beban dipilih & jurnal biaya langsung tercatat).
+                      if (order.isInternal && nextStatus === 'SELESAI') {
+                        return (
+                          <button type="button"
+                            key={nextStatus}
+                            onClick={() => setShowCompleteModal(true)}
+                            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border transition-all hover:opacity-80 ${nextCfg.color}`}
+                          >
+                            {nextCfg.icon} Selesai & Catat Biaya
+                          </button>
+                        )
+                      }
                       return (
                         <button type="button"
                           key={nextStatus}
@@ -835,14 +903,92 @@ function SpkCard({
                   </>
                 )}
                 {(order.status === 'SELESAI' || order.status === 'DISERAHKAN') && order.total > 0 && (
-                  <CreateInvoiceButton orderId={order.id} orgId={orgId} />
+                  order.isInternal ? (
+                    <span className="ml-auto px-4 py-2 text-xs font-semibold rounded-xl border bg-indigo-50 text-indigo-600 border-indigo-200">
+                      Biaya servis sudah tercatat sebagai beban pemeliharaan
+                    </span>
+                  ) : (
+                    <CreateInvoiceButton orderId={order.id} orgId={orgId} />
+                  )
                 )}
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Modal: Selesai & Catat Biaya (armada internal) */}
+      <AnimatePresence>
+        {showCompleteModal && (
+          <CompleteInternalWorkOrderModal
+            order={order}
+            orgId={orgId}
+            expenseAccounts={expenseAccounts}
+            onClose={() => setShowCompleteModal(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  )
+}
+
+// ─── Complete Internal Work Order Modal ─────────────────────────────────────────
+
+function CompleteInternalWorkOrderModal({
+  order,
+  orgId,
+  expenseAccounts,
+  onClose,
+}: {
+  order: WorkshopWorkOrder
+  orgId: string
+  expenseAccounts: ExpenseAccount[]
+  onClose: () => void
+}) {
+  const [accountId, setAccountId] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleConfirm(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!accountId) { alert('Pilih akun beban pemeliharaan terlebih dahulu.'); return }
+    setSubmitting(true)
+    const res = await completeInternalWorkOrder(orgId, order.id, { maintenance_cost_account_id: accountId })
+    if (res.error) alert(res.error)
+    else window.location.reload()
+    setSubmitting(false)
+  }
+
+  return (
+    <Modal title="Selesai & Catat Biaya" onClose={onClose}>
+      <form onSubmit={handleConfirm} className="space-y-4">
+        <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm">
+          <p className="text-slate-500">SPK <span className="font-semibold text-slate-700">{order.spkNumber}</span></p>
+          <p className="text-slate-500 mt-1">Total biaya: <span className="font-bold text-[#003366]">{formatRupiah(order.total)}</span></p>
+        </div>
+        <FormRow label="Akun Beban Pemeliharaan" required>
+          <select
+            value={accountId}
+            onChange={e => setAccountId(e.target.value)}
+            required
+            className={inputCls}
+          >
+            <option value="">— Pilih akun beban —</option>
+            {expenseAccounts.map(a => (
+              <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+            ))}
+          </select>
+          {expenseAccounts.length === 0 && (
+            <p className="text-[10px] text-amber-600 font-semibold mt-1">Tidak ada akun beban (EXPENSE) di CoA. Tambahkan dulu di Akuntansi.</p>
+          )}
+        </FormRow>
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-700">Batal</button>
+          <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-[#003366] text-white text-sm font-bold rounded-xl disabled:opacity-50">
+            {submitting ? 'Memproses...' : 'Konfirmasi'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -873,16 +1019,28 @@ function VehicleList({ vehicles }: { vehicles: WorkshopVehicle[] }) {
               <p className="text-xl font-semibold text-slate-900 tracking-tight">{v.plateNumber}</p>
               <p className="text-sm font-bold text-[#003366]">{v.brand} {v.model} {v.year ? `(${v.year})` : ''}</p>
             </div>
-            <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-semibold rounded-full uppercase">
-              {v.transmission}
-            </span>
+            <div className="flex flex-col items-end gap-1.5">
+              {v.vehicleCategory === 'INTERNAL' && (
+                <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-semibold rounded-full uppercase">
+                  Internal
+                </span>
+              )}
+              <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-semibold rounded-full uppercase">
+                {v.transmission}
+              </span>
+            </div>
           </div>
+          {v.vehicleCategory === 'INTERNAL' && v.fixedAsset && (
+            <div className="p-2.5 bg-indigo-50/60 border border-indigo-100 rounded-xl text-xs text-indigo-700 font-medium">
+              Aset {v.fixedAsset.code} · Nilai buku {formatRupiah(v.fixedAsset.current_book_value)}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div>
               <p className="font-semibold text-slate-400 uppercase tracking-wide text-[10px]">Pemilik</p>
               <div className="flex items-center gap-1 mt-0.5">
                 <User size={11} className="text-slate-400" />
-                <span className="font-bold text-slate-700">{v.contactName || '—'}</span>
+                <span className="font-bold text-slate-700">{v.contactName || (v.vehicleCategory === 'INTERNAL' ? 'Armada Internal' : '—')}</span>
               </div>
             </div>
             <div>
@@ -1001,7 +1159,6 @@ function InfoCell({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
       <p className="text-sm font-medium text-slate-700 mt-0.5">{value}</p>
-      {ConfirmUI}
     </div>
   )
 }
