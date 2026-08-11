@@ -11,6 +11,8 @@ import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { resolveInternalUserId } from '@/lib/auth/internal-auth.shared'
 import { revalidatePath } from 'next/cache'
 import { isOrgAdminOrManajemen } from './kojasmat.actions'
+import { getModuleSettings } from './kojasmat-test.actions'
+import { enqueueNotification } from '@/modules/notifications/outbox.server'
 
 const SOAL_PER_TEST = 40
 const PASSING_THRESHOLD = 85
@@ -20,23 +22,25 @@ const PASSING_THRESHOLD = 85
 // alur test kedua atas nama anggota yang di-preview — bukan celah untuk anggota
 // biasa mengklaim identitas anggota lain, karena tetap divalidasi lewat
 // isOrgAdminOrManajemen(session.user.id, ...) di bawah.
-async function getOwnAnggota(previewAnggotaId?: string): Promise<{ id: string; org_id: string; tingkat: string } | { error: string }> {
+type OwnAnggota = { id: string; org_id: string; tingkat: string; nama: string; phone: string | null }
+
+async function getOwnAnggota(previewAnggotaId?: string): Promise<OwnAnggota | { error: string }> {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Sesi login tidak ditemukan. Silakan login ulang.' }
   const userId = resolveInternalUserId(session)
   const { rows: [anggota] } = await queryPostgres(
-    `SELECT id, org_id, tingkat FROM kojasmat_anggota WHERE user_id=$1::uuid LIMIT 1`,
+    `SELECT id, org_id, tingkat, nama, phone FROM kojasmat_anggota WHERE user_id=$1::uuid LIMIT 1`,
     [userId]
   )
-  if (anggota) return anggota as { id: string; org_id: string; tingkat: string }
+  if (anggota) return anggota as OwnAnggota
 
   if (previewAnggotaId) {
     const { rows: [preview] } = await queryPostgres(
-      `SELECT id, org_id, tingkat FROM kojasmat_anggota WHERE id=$1 LIMIT 1`,
+      `SELECT id, org_id, tingkat, nama, phone FROM kojasmat_anggota WHERE id=$1 LIMIT 1`,
       [previewAnggotaId]
     )
     if (preview && await isOrgAdminOrManajemen(session.user.id, preview.org_id)) {
-      return preview as { id: string; org_id: string; tingkat: string }
+      return preview as OwnAnggota
     }
   }
 
@@ -174,6 +178,29 @@ export async function submitTestSahabat(testId: string, jawaban: Record<string, 
     [testId, JSON.stringify(jawaban), jumlahBenar, skor, status]
   )
 
+  if (status === 'LULUS' && anggota.phone) {
+    const settings = await getModuleSettings(anggota.org_id)
+    const tmpl = settings.pesan_otomatis.sahabat_menunggu_approval
+    if (tmpl.enabled) {
+      await enqueueNotification({
+        orgId: anggota.org_id,
+        userId: null,
+        eventType: 'kojasmat_test_sahabat_lulus',
+        channel: 'WHATSAPP',
+        providerCode: 'DRIPSENDER',
+        recipient: anggota.phone,
+        body: tmpl.body,
+        variables: {
+          nama: anggota.nama,
+          skor,
+          jumlah_benar: jumlahBenar,
+          total_soal: soalIds.length,
+        },
+        idempotencyKey: `kojasmat-test-sahabat:${testId}:lulus:whatsapp`,
+      }).catch(() => null)
+    }
+  }
+
   revalidatePath('/kojasmat')
   return {
     data: {
@@ -207,7 +234,10 @@ export async function setujuiTestSahabat(testId: string): Promise<{ success: tru
   if (!session) return { error: 'Tidak terautentikasi' }
 
   const { rows: [test] } = await queryPostgres(
-    `SELECT org_id, anggota_id, status FROM kojasmat_test_sahabat WHERE id=$1`,
+    `SELECT t.org_id, t.anggota_id, t.status, a.nama, a.phone, a.kode_anggota
+     FROM kojasmat_test_sahabat t
+     JOIN kojasmat_anggota a ON a.id = t.anggota_id
+     WHERE t.id=$1`,
     [testId]
   )
   if (!test) return { error: 'Test tidak ditemukan' }
@@ -227,6 +257,24 @@ export async function setujuiTestSahabat(testId: string): Promise<{ success: tru
   if (!updated) return { error: 'Test ini sudah diproses.' }
 
   await queryPostgres(`UPDATE kojasmat_anggota SET tingkat='SAHABAT', updated_at=NOW() WHERE id=$1`, [test.anggota_id])
+
+  if (test.phone) {
+    const settings = await getModuleSettings(test.org_id)
+    const tmpl = settings.pesan_otomatis.sahabat_disetujui
+    if (tmpl.enabled) {
+      await enqueueNotification({
+        orgId: test.org_id,
+        userId: null,
+        eventType: 'kojasmat_sahabat_disetujui',
+        channel: 'WHATSAPP',
+        providerCode: 'DRIPSENDER',
+        recipient: test.phone,
+        body: tmpl.body,
+        variables: { nama: test.nama, kode_anggota: test.kode_anggota },
+        idempotencyKey: `kojasmat-test-sahabat:${testId}:disetujui:whatsapp`,
+      }).catch(() => null)
+    }
+  }
 
   revalidatePath('/kojasmat')
   return { success: true }

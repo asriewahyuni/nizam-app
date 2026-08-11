@@ -5,6 +5,7 @@
 import type { PoolClient } from 'pg'
 import { connectPostgresClient, queryPostgres } from '@/lib/db/postgres'
 import { getNotificationProvider } from './providers'
+import { interpolate } from './interpolate.shared'
 
 type OutboxRow = {
   id: string
@@ -18,13 +19,6 @@ type OutboxRow = {
   attempts: number
   max_attempts: number
   idempotency_key: string
-}
-
-function interpolate(template: string, values: Record<string, string | number | null>) {
-  return template.replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, (_match, key: string) => {
-    const value = values[key]
-    return value == null ? '' : String(value)
-  })
 }
 
 /**

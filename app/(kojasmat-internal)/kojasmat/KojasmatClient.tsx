@@ -66,6 +66,8 @@ import {
 import {
   getTestSahabatPendingByOrg, setujuiTestSahabat, tolakTestSahabat, type KojasmatTestSahabatPending,
 } from '@/modules/kojasmat/actions/kojasmat-sahabat.actions'
+import type { PesanOtomatisKey, PesanOtomatisSettings } from '@/modules/kojasmat/lib/pesan-otomatis.shared'
+import { interpolate } from '@/modules/notifications/interpolate.shared'
 
 const KATEGORI_PENDAPATAN = ['Penjualan', 'Jasa', 'Pendapatan Lain'] as const
 const KATEGORI_BEBAN = ['Bahan Baku', 'Operasional', 'Gaji/Upah', 'Sewa', 'Transportasi', 'Beban Lain'] as const
@@ -96,6 +98,7 @@ type Props = {
     ijarah_sukarela_opsional_minimal: number
     komitmen_sections: KomitmenSection[]
     admin_whatsapp: string
+    pesan_otomatis: PesanOtomatisSettings
   }
   bankAccounts: { id: string; bank_name: string; account_number: string }[]
   qrisPreviewUrl: string | null
@@ -4160,7 +4163,7 @@ function SahabatApprovalPanel({ orgId }: { orgId: string }) {
   )
 }
 
-function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: KojasmatPendaftaran[] }) {
+function TabPermohonan({ orgId, pendaftaran, moduleSettings }: { orgId: string; pendaftaran: KojasmatPendaftaran[]; moduleSettings: Props['moduleSettings'] }) {
   const [pending, startTransition] = useTransition()
   const [selected, setSelected] = useState<KojasmatPendaftaran | null>(null)
   const [dokumen, setDokumen] = useState<KojasmatDokumen[]>([])
@@ -4203,19 +4206,13 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
 
   function buildWaText(k: KredensialAnggota) {
     const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
-    return [
-      `Halo ${k.nama},`,
-      ``,
-      `Pendaftaran keanggotaan koperasi Anda telah *DISETUJUI* ✅`,
-      ``,
-      `*Kode Anggota:* ${k.kode_anggota}`,
-      `*Login di:* ${appUrl}/anggota/login`,
-      k.login_identifier ? `*Email/NIK:* ${k.login_identifier}` : null,
-      k.temp_password ? `*Password:* ${k.temp_password}` : null,
-      ``,
-      `Silakan login dan ganti password setelah masuk pertama kali.`,
-      `Selamat bergabung! 🤝`,
-    ].filter(Boolean).join('\n')
+    return interpolate(moduleSettings.pesan_otomatis.pendaftaran_disetujui_teman.body, {
+      nama: k.nama,
+      kode_anggota: k.kode_anggota,
+      login_url: `${appUrl}/anggota/login`,
+      login_identifier: k.login_identifier ?? '-',
+      temp_password: k.temp_password ?? '(gunakan password saat mendaftar)',
+    })
   }
 
   function handleAction(action: 'setujui' | 'tolak' | 'revisi') {
@@ -5529,12 +5526,30 @@ function TabPengaturanAkun({ orgId, accountMapping, accounts }: {
 
 // ─── TAB: NOTIFIKASI WHATSAPP ─────────────────────────────────────────────────
 
-function TabNotifikasi({ orgId, whatsappSettings }: { orgId: string; whatsappSettings: TenantWhatsappConfig }) {
+function TabNotifikasi({ orgId, whatsappSettings, pesanOtomatis }: { orgId: string; whatsappSettings: TenantWhatsappConfig; pesanOtomatis: PesanOtomatisSettings }) {
   const [pending, startTransition] = useTransition()
   const [config, setConfig] = useState<TenantWhatsappConfig>(whatsappSettings)
   const [testPhone, setTestPhone] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [testMessage, setTestMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [pesanForm, setPesanForm] = useState<PesanOtomatisSettings>(pesanOtomatis)
+  const [pesanMessage, setPesanMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  function updatePesan(key: PesanOtomatisKey, field: 'body' | 'enabled', value: string | boolean) {
+    setPesanForm(form => ({ ...form, [key]: { ...form[key], [field]: value } }))
+  }
+
+  function handleSimpanTemplate() {
+    setPesanMessage(null)
+    startTransition(async () => {
+      const payload = Object.fromEntries(
+        (Object.keys(pesanForm) as PesanOtomatisKey[]).map(k => [k, { body: pesanForm[k].body, enabled: pesanForm[k].enabled }])
+      )
+      const res = await updateModuleSettings(orgId, { pesan_otomatis: payload as unknown as Props['moduleSettings']['pesan_otomatis'] })
+      if (res.error) { setPesanMessage({ type: 'error', text: res.error }); return }
+      setPesanMessage({ type: 'success', text: 'Template pesan otomatis berhasil disimpan.' })
+    })
+  }
 
   function handleSave() {
     setMessage(null)
@@ -5604,6 +5619,61 @@ function TabNotifikasi({ orgId, whatsappSettings }: { orgId: string; whatsappSet
           <button onClick={handleSave} disabled={pending}
             className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
             {pending ? 'Menyimpan...' : 'Simpan Pengaturan WhatsApp'}
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-2 text-emerald-700 font-bold mb-1">
+          <FileText size={20} />
+          <h2 className="text-lg text-gray-900">Template Pesan Otomatis</h2>
+        </div>
+        <p className="text-xs text-gray-500 mb-5">
+          Pesan WhatsApp yang terkirim otomatis ke calon anggota/anggota di setiap tahap pendaftaran &amp; upgrade Sahabat. Gunakan <code className="text-xs bg-gray-100 rounded px-1 py-0.5">{'{{variabel}}'}</code> untuk menyisipkan info otomatis.
+        </p>
+
+        {pesanMessage && (
+          <div className={cn(
+            'mb-4 rounded-xl border px-4 py-3 text-sm font-semibold',
+            pesanMessage.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'
+          )}>
+            {pesanMessage.text}
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {(Object.keys(pesanForm) as PesanOtomatisKey[]).map(key => {
+            const entry = pesanForm[key]
+            return (
+              <div key={key} className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{entry.label}</p>
+                    <p className="text-xs text-gray-500">{entry.deskripsi}</p>
+                  </div>
+                  <label className="flex items-center gap-1.5 shrink-0 cursor-pointer">
+                    <span className="text-xs text-gray-500">Aktif</span>
+                    <input type="checkbox" checked={entry.enabled}
+                      onChange={e => updatePesan(key, 'enabled', e.target.checked)}
+                      className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" />
+                  </label>
+                </div>
+                <textarea rows={5}
+                  value={entry.body}
+                  onChange={e => updatePesan(key, 'body', e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-mono outline-none focus:border-emerald-500" />
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Variabel tersedia: {entry.variabel.map(v => `{{${v}}}`).join(', ')}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="flex justify-end mt-5">
+          <button onClick={handleSimpanTemplate} disabled={pending}
+            className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+            {pending ? 'Menyimpan...' : 'Simpan Template Pesan'}
           </button>
         </div>
       </div>
@@ -5767,7 +5837,7 @@ export default function KojasmatClient({
 
       <div className="mx-auto px-4 pt-6">
         {activeTab === 'dashboard'  && <TabDashboard stats={stats} orgId={orgId} />}
-        {activeTab === 'permohonan' && <TabPermohonan orgId={orgId} pendaftaran={pendaftaran} />}
+        {activeTab === 'permohonan' && <TabPermohonan orgId={orgId} pendaftaran={pendaftaran} moduleSettings={moduleSettings} />}
         {activeTab === 'anggota'    && <TabAnggota orgId={orgId} anggota={anggota} />}
         {activeTab === 'proyek'     && <TabProyek orgId={orgId} proyek={proyek} anggota={anggota} />}
         {activeTab === 'simpanan'   && <TabSimpanan orgId={orgId} anggota={anggota} setoranPending={setoranPending} stats={stats} />}
@@ -5776,7 +5846,7 @@ export default function KojasmatClient({
         {activeTab === 'tindakan'   && <TabTindakan orgId={orgId} anggota={anggota} proyek={proyek} tindakan={tindakan} />}
         {activeTab === 'soal'       && <TabBankSoal orgId={orgId} bankSoal={bankSoal} moduleSettings={moduleSettings} bankAccounts={bankAccounts} qrisPreviewUrl={qrisPreviewUrl} />}
         {activeTab === 'akun'       && <TabPengaturanAkun orgId={orgId} accountMapping={accountMapping} accounts={chartOfAccounts} />}
-        {activeTab === 'notifikasi' && <TabNotifikasi orgId={orgId} whatsappSettings={whatsappSettings} />}
+        {activeTab === 'notifikasi' && <TabNotifikasi orgId={orgId} whatsappSettings={whatsappSettings} pesanOtomatis={moduleSettings.pesan_otomatis} />}
       </div>
     </div>
   )

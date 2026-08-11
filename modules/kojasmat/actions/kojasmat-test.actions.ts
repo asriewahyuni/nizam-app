@@ -5,6 +5,13 @@
 import { queryPostgres } from '@/lib/db/postgres'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
+import { formatRupiah } from '@/lib/utils'
+import { enqueueNotification } from '@/modules/notifications/outbox.server'
+import {
+  PESAN_OTOMATIS_CATALOG,
+  type PesanOtomatisOverride,
+  type PesanOtomatisSettings,
+} from '../lib/pesan-otomatis.shared'
 
 const DEFAULT_PASSING_THRESHOLD = 70
 const SOAL_PER_TEST = 15
@@ -77,6 +84,7 @@ export type KojasmatModuleSettings = {
   ijarah_sukarela_opsional_minimal: number
   komitmen_sections: KomitmenSection[]
   admin_whatsapp: string
+  pesan_otomatis: PesanOtomatisSettings
 }
 
 function resolveApresiasi(skor: number, tiers: ApresiasiTier[]): string | null {
@@ -193,7 +201,25 @@ export async function getModuleSettings(orgId: string): Promise<KojasmatModuleSe
       ? settings.komitmen_sections as KomitmenSection[]
       : DEFAULT_KOMITMEN_SECTIONS,
     admin_whatsapp: (settings.admin_whatsapp as string) ?? '',
+    pesan_otomatis: resolvePesanOtomatis(settings.pesan_otomatis),
   }
+}
+
+// Resolve per-key (bukan all-or-nothing) supaya key katalog baru di masa depan
+// (mis. notifikasi proyek) otomatis dapat default meski org belum pernah
+// menyimpan override untuk key tersebut.
+function resolvePesanOtomatis(saved: unknown): PesanOtomatisSettings {
+  const savedMap = (saved ?? {}) as Record<string, Partial<PesanOtomatisOverride>>
+  return Object.fromEntries(PESAN_OTOMATIS_CATALOG.map(c => {
+    const override = savedMap[c.key]
+    return [c.key, {
+      label: c.label,
+      deskripsi: c.deskripsi,
+      variabel: c.variabel,
+      body: override?.body?.trim() ? override.body : c.defaultBody,
+      enabled: override?.enabled ?? true,
+    }]
+  })) as PesanOtomatisSettings
 }
 
 // Tidak butuh auth — bagian dari wizard publik pendaftaran, dipakai di step
@@ -316,6 +342,10 @@ export async function submitTestMasuk(testMasukId: string, jawaban: Record<strin
     const settings = await getModuleSettings(testMasuk.org_id)
     const apresiasi = resolveApresiasi(skor, settings.apresiasi_tiers)
 
+    if (status === 'LULUS') {
+      await notifyTestMasukLulus(testMasuk.org_id, testMasuk.pendaftaran_id, testMasukId, settings, skor, apresiasi)
+    }
+
     return {
       data: {
         skor,
@@ -329,6 +359,60 @@ export async function submitTestMasuk(testMasukId: string, jawaban: Record<strin
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Gagal submit test' }
   }
+}
+
+// Kirim WA "lulus test masuk, menunggu pembayaran" — best-effort, tidak boleh
+// menggagalkan submit test kalau nomor tidak ada / provider belum disetel.
+async function notifyTestMasukLulus(
+  orgId: string,
+  pendaftaranId: string,
+  testMasukId: string,
+  settings: KojasmatModuleSettings,
+  skor: number,
+  apresiasi: string | null,
+) {
+  const tmpl = settings.pesan_otomatis.pendaftaran_menunggu_bayar
+  if (!tmpl.enabled) return
+
+  const { rows: [pend] } = await queryPostgres(
+    `SELECT nama_lengkap, phone FROM kojasmat_pendaftaran WHERE id=$1`,
+    [pendaftaranId]
+  )
+  if (!pend?.phone) return
+
+  let bankAccount: BankAccountInfo | null = null
+  if (settings.bank_account_id) {
+    const { rows } = await queryPostgres(
+      `SELECT bank_name, account_number, account_holder FROM bank_accounts WHERE id=$1 AND org_id=$2`,
+      [settings.bank_account_id, orgId]
+    )
+    bankAccount = (rows[0] as BankAccountInfo | undefined) ?? null
+  }
+
+  const totalTagihan = settings.biaya_admin_pendaftaran + settings.nominal_simpanan_pokok + settings.nominal_simpanan_wajib
+
+  await enqueueNotification({
+    orgId,
+    userId: null,
+    eventType: 'kojasmat_test_masuk_lulus',
+    channel: 'WHATSAPP',
+    providerCode: 'DRIPSENDER',
+    recipient: pend.phone,
+    body: tmpl.body,
+    variables: {
+      nama: pend.nama_lengkap,
+      skor,
+      apresiasi: apresiasi ?? '-',
+      biaya_admin_pendaftaran: formatRupiah(settings.biaya_admin_pendaftaran),
+      nominal_simpanan_pokok: formatRupiah(settings.nominal_simpanan_pokok),
+      nominal_simpanan_wajib: formatRupiah(settings.nominal_simpanan_wajib),
+      total_tagihan: formatRupiah(totalTagihan),
+      bank_name: bankAccount?.bank_name ?? '-',
+      account_number: bankAccount?.account_number ?? '-',
+      account_holder: bankAccount?.account_holder ?? '-',
+    },
+    idempotencyKey: `kojasmat-test-masuk:${testMasukId}:lulus:whatsapp`,
+  }).catch(() => null)
 }
 
 // Bypass admin — tandai test LULUS 100% tanpa menjawab soal apapun. Dipicu lewat
@@ -465,6 +549,29 @@ export async function submitPembayaranPendaftaran(pendaftaranId: string, payload
       [pendaftaranId, payload.biaya_admin, payload.simpanan_pokok, payload.simpanan_wajib,
         payload.ijarah_fee, payload.sukarela_topup, dokumen.id]
     )
+
+    const tmplVerifikasi = settings.pesan_otomatis.pendaftaran_menunggu_verifikasi
+    if (pend.phone && tmplVerifikasi.enabled) {
+      const totalDibayar = payload.biaya_admin + payload.simpanan_pokok + payload.simpanan_wajib
+        + payload.ijarah_fee + payload.sukarela_topup
+      await enqueueNotification({
+        orgId: payload.org_id,
+        userId: null,
+        eventType: 'kojasmat_pembayaran_pendaftaran_diterima',
+        channel: 'WHATSAPP',
+        providerCode: 'DRIPSENDER',
+        recipient: pend.phone,
+        body: tmplVerifikasi.body,
+        variables: {
+          nama: pend.nama_lengkap,
+          total_dibayar: formatRupiah(totalDibayar),
+          biaya_admin: formatRupiah(payload.biaya_admin),
+          simpanan_pokok: formatRupiah(payload.simpanan_pokok),
+          simpanan_wajib: formatRupiah(payload.simpanan_wajib),
+        },
+        idempotencyKey: `kojasmat-pendaftaran:${pendaftaranId}:bayar:whatsapp`,
+      }).catch(() => null)
+    }
 
     // Status pendaftaran TETAP MENUNGGU — aktivasi anggota (termasuk posting
     // setoran pokok/wajib ke jurnal) baru terjadi saat pengurus memverifikasi

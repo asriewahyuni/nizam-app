@@ -12,28 +12,6 @@ import { enqueueNotification } from '@/modules/notifications/outbox.server'
 import { getModuleSettings } from './kojasmat-test.actions'
 import { tagihIjarah } from './kojasmat-ijarah.actions'
 
-function buildPendaftaranDisetujuiWaText(input: {
-  nama: string
-  kodeAnggota: string
-  loginIdentifier: string | null
-  tempPassword: string | null
-}) {
-  const appUrl = String(process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '')
-  return [
-    `Halo ${input.nama},`,
-    ``,
-    `Pendaftaran keanggotaan koperasi Anda telah *DISETUJUI* ✅`,
-    ``,
-    `*Kode Anggota:* ${input.kodeAnggota}`,
-    `*Login di:* ${appUrl}/anggota/login`,
-    input.loginIdentifier ? `*Email/NIK:* ${input.loginIdentifier}` : null,
-    input.tempPassword ? `*Password:* ${input.tempPassword}` : null,
-    ``,
-    `Silakan login dan ganti password setelah masuk pertama kali.`,
-    `Selamat bergabung! 🤝`,
-  ].filter(Boolean).join('\n')
-}
-
 // session.user.id bisa berisi legacy_user_id (Supabase UUID), bukan internal_auth_users.id.
 // Gunakan fungsi ini untuk FK yang merujuk ke internal_auth_users(id).
 function getInternalUserId(session: { user: { id: string; user_metadata: Record<string, unknown> } }): string {
@@ -452,7 +430,10 @@ export async function setujuiPendaftaran(pendaftaranId: string) {
 
     // Kirim konfirmasi WA otomatis begitu disetujui — best-effort, tidak boleh
     // menggagalkan approval kalau nomor tidak ada / provider belum disetel.
-    if (pend.phone) {
+    const settings = await getModuleSettings(pend.org_id)
+    const tmplDisetujui = settings.pesan_otomatis.pendaftaran_disetujui_teman
+    if (pend.phone && tmplDisetujui.enabled) {
+      const appUrl = String(process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '')
       await enqueueNotification({
         orgId: pend.org_id,
         userId: null,
@@ -460,12 +441,14 @@ export async function setujuiPendaftaran(pendaftaranId: string) {
         channel: 'WHATSAPP',
         providerCode: 'DRIPSENDER',
         recipient: pend.phone,
-        body: buildPendaftaranDisetujuiWaText({
+        body: tmplDisetujui.body,
+        variables: {
           nama: pend.nama_lengkap,
-          kodeAnggota: data.kode_anggota,
-          loginIdentifier: data.login_identifier,
-          tempPassword: data.temp_password,
-        }),
+          kode_anggota: data.kode_anggota,
+          login_url: `${appUrl}/anggota/login`,
+          login_identifier: data.login_identifier ?? '-',
+          temp_password: data.temp_password ?? '(gunakan password saat mendaftar)',
+        },
         idempotencyKey: `kojasmat-pendaftaran:${pendaftaranId}:disetujui:whatsapp`,
       }).catch(() => null)
     }
