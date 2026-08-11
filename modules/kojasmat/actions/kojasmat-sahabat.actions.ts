@@ -12,7 +12,8 @@ import { resolveInternalUserId } from '@/lib/auth/internal-auth.shared'
 import { revalidatePath } from 'next/cache'
 import { isOrgAdminOrManajemen } from './kojasmat.actions'
 
-const SOAL_PER_TEST = 20
+const SOAL_PER_TEST = 40
+const PASSING_THRESHOLD = 85
 
 // previewAnggotaId: dipakai saat staf/owner/manajer sedang preview portal anggota
 // (pola yang sama dengan app/anggota/[kode]/page.tsx) supaya mereka bisa mencoba
@@ -123,10 +124,10 @@ export async function mulaiTestSahabat(previewAnggotaId?: string): Promise<
     : 1
 
   const { rows: [test] } = await queryPostgres(
-    `INSERT INTO kojasmat_test_sahabat (org_id, anggota_id, soal_ids, attempt_number)
-     VALUES ($1,$2,$3,$4)
+    `INSERT INTO kojasmat_test_sahabat (org_id, anggota_id, soal_ids, attempt_number, passing_threshold)
+     VALUES ($1,$2,$3,$4,$5)
      RETURNING id, attempt_number`,
-    [anggota.org_id, anggota.id, soalIds, attemptNumber]
+    [anggota.org_id, anggota.id, soalIds, attemptNumber, PASSING_THRESHOLD]
   )
 
   return {

@@ -7,7 +7,7 @@ import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
 
 const DEFAULT_PASSING_THRESHOLD = 70
-const SOAL_PER_TEST = 20
+const SOAL_PER_TEST = 15
 
 export type KojasmatBankSoal = {
   id: string

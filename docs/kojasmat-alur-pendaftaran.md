@@ -55,7 +55,7 @@ Panel admin: `TabPermohonan` di [`app/(kojasmat-internal)/kojasmat/KojasmatClien
 
 Untuk setiap pendaftaran, pengurus melihat:
 - Data diri & dokumen (termasuk bukti transfer yang diupload)
-- Riwayat tes masuk (skor, status LULUS/GAGAL, jumlah percobaan)
+- Riwayat tes masuk (skor, status LULUS/GAGAL, jumlah quiz)
 - Rincian pembayaran: Simpanan Pokok, Simpanan Wajib, Admin Keanggotaan, total, tanggal bayar
 
 Lalu pengurus memilih salah satu aksi:

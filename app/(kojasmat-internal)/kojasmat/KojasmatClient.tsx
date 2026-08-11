@@ -4043,6 +4043,11 @@ const STATUS_PEND: Record<string, { label: string; color: string }> = {
   DIREVISI:  { label: 'Revisi',    color: 'bg-blue-100 text-blue-700' },
 }
 
+// Jumlah soal per test — harus sinkron dengan SOAL_PER_TEST di
+// modules/kojasmat/actions/kojasmat-test.actions.ts (Quiz 1) dan
+// kojasmat-sahabat.actions.ts (Quiz 2)
+const SOAL_MINIMAL: Record<'MASUK' | 'SAHABAT', number> = { MASUK: 15, SAHABAT: 40 }
+
 type KredensialAnggota = {
   kode_anggota: string
   nama: string
@@ -4424,7 +4429,7 @@ function TabPermohonan({ orgId, pendaftaran }: { orgId: string; pendaftaran: Koj
                   {testRiwayat.map(t => (
                     <div key={t.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-sm">
                       <div>
-                        <span className="text-gray-500">Percobaan #{t.attempt_number}</span>
+                        <span className="text-gray-500">Quiz #{t.attempt_number}</span>
                         {t.skor != null && (
                           <span className="ml-2 text-gray-800 font-medium">
                             {Number(t.skor).toFixed(0)}% ({t.jumlah_benar} benar)
@@ -5293,8 +5298,8 @@ function TabBankSoal({ orgId, bankSoal, moduleSettings, bankAccounts, qrisPrevie
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-gray-900">Bank Soal {jenisFilter === 'MASUK' ? 'Test Masuk' : 'Test Sahabat (Upgrade)'}</h3>
-          <p className={cn('text-sm', aktifCount < 20 ? 'text-red-600 font-medium' : 'text-gray-500')}>
-            {aktifCount} soal aktif {aktifCount < 20 && '— minimal 20 soal aktif dibutuhkan agar test bisa dimulai'}
+          <p className={cn('text-sm', aktifCount < SOAL_MINIMAL[jenisFilter] ? 'text-red-600 font-medium' : 'text-gray-500')}>
+            {aktifCount} soal aktif {aktifCount < SOAL_MINIMAL[jenisFilter] && `— minimal ${SOAL_MINIMAL[jenisFilter]} soal aktif dibutuhkan agar test bisa dimulai`}
           </p>
         </div>
         <button onClick={openNew}
@@ -5695,7 +5700,7 @@ export default function KojasmatClient({
     { key: 'pelatihan',   label: 'Pelatihan',      icon: GraduationCap },
     { key: 'laporan',     label: 'Laporan',         icon: FileText,      badge: laporan.filter(l => l.status === 'DIKIRIM').length || undefined },
     { key: 'tindakan',    label: 'Tindakan',        icon: AlertTriangle, badge: tindakanAktif || undefined, badgeColor: 'bg-red-100 text-red-700' },
-    { key: 'soal',        label: 'Bank Soal',       icon: BookOpen,      badge: bankSoal.filter(s => s.is_active && s.jenis === 'MASUK').length < 20 ? bankSoal.filter(s => s.is_active && s.jenis === 'MASUK').length : undefined, badgeColor: 'bg-red-100 text-red-700' },
+    { key: 'soal',        label: 'Bank Soal',       icon: BookOpen,      badge: bankSoal.filter(s => s.is_active && s.jenis === 'MASUK').length < SOAL_MINIMAL.MASUK ? bankSoal.filter(s => s.is_active && s.jenis === 'MASUK').length : undefined, badgeColor: 'bg-red-100 text-red-700' },
     { key: 'akun',        label: 'Pengaturan Akun', icon: Landmark,      badge: (KOJASMAT_ACCOUNT_ROLES.length - KOJASMAT_ACCOUNT_ROLES.filter(r => accountMapping[r]).length) || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
     { key: 'notifikasi',  label: 'Notifikasi',      icon: MessageCircle, badge: whatsappSettings.enabled ? undefined : 1, badgeColor: 'bg-amber-100 text-amber-700' },
   ]
