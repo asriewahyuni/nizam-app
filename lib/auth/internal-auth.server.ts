@@ -185,22 +185,23 @@ export async function createInternalAuthResetTokenByEmail(email: string) {
 }
 
 export async function verifyAndResetInternalAuthPassword(token: string, newPassword: string) {
-  if (newPassword.length < 8) return { error: 'Password minimal 8 karakter.' }
-  
+  const password = normalizeInput(newPassword)
+  if (password.length < 8) return { error: 'Password minimal 8 karakter.' }
+
   try {
     const tokenHash = createHash('sha256').update(token.trim()).digest('hex')
-    
+
     const { rows } = await queryPostgres<{ id: string, user_id: string }>(
       `select id::text as id, user_id::text as user_id from public.internal_auth_password_resets where token_hash = $1 and used_at is null and expires_at > now() limit 1`,
       [tokenHash]
     )
-    
+
     if (!rows || rows.length === 0) {
       return { error: 'Link reset password tidak valid atau sudah kadaluarsa.' }
     }
-    
+
     const resetRow = rows[0]
-    const newHash = hashPasswordWithScrypt(newPassword)
+    const newHash = hashPasswordWithScrypt(password)
     
     await queryPostgres(
       `
@@ -226,8 +227,9 @@ export async function verifyAndResetInternalAuthPassword(token: string, newPassw
 }
 
 export async function resetInternalAuthPasswordById(userId: string, newPassword: string) {
-  if (newPassword.length < 8) return { error: 'Password minimal 8 karakter.' }
-  const newHash = hashPasswordWithScrypt(newPassword)
+  const password = normalizeInput(newPassword)
+  if (password.length < 8) return { error: 'Password minimal 8 karakter.' }
+  const newHash = hashPasswordWithScrypt(password)
   const normId = normalizeUuid(userId)
   if (!normId) return { error: 'ID Anggota tidak valid untuk mereset sandi.' }
 

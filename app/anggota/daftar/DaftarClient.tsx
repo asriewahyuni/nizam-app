@@ -18,6 +18,14 @@ import {
   mulaiTestMasuk, submitTestMasuk, forceLulusTestMasuk, getInfoPembayaran, submitPembayaranPendaftaran,
   getKomitmenSections, type KomitmenSection,
 } from '@/modules/kojasmat/actions/kojasmat-test.actions'
+import { normalizeWhatsappPhone } from '@/modules/sales/lib/pos-whatsapp'
+
+// ─── VALIDASI ─────────────────────────────────────────────────────────────────
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+function isValidEmail(value: string) {
+  return EMAIL_REGEX.test(value.trim())
+}
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -508,6 +516,9 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
   function handleLanjutData() {
     if (!form.nama_lengkap.trim()) { setError('Nama lengkap wajib diisi'); return }
+    if (form.nik && form.nik.length !== 16) { setError('NIK harus 16 digit angka'); return }
+    if (form.phone && form.phone.length < 9) { setError('Nomor HP/WhatsApp tidak valid'); return }
+    if (form.email && !isValidEmail(form.email)) { setError('Format email tidak valid'); return }
     if (form.email && !form.password) { setError('Masukkan kata sandi untuk akun Anda'); return }
     if (form.password && form.password.length < 8) { setError('Kata sandi minimal 8 karakter'); return }
     if (form.password && form.password !== form.confirm_password) { setError('Konfirmasi kata sandi tidak cocok'); return }
@@ -528,7 +539,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
         nik: form.nik || undefined,
         email: form.email || undefined,
         password: form.password || undefined,
-        phone: form.phone || undefined,
+        phone: form.phone ? normalizeWhatsappPhone(form.phone) : undefined,
         alamat: form.alamat || undefined,
         pekerjaan: form.pekerjaan || undefined,
         alasan_bergabung: form.alasan_bergabung || undefined,
@@ -576,19 +587,38 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">NIK</label>
                 <input
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  type="text" inputMode="numeric" pattern="[0-9]*"
+                  className={cn(
+                    'w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2 transition-colors',
+                    form.nik && form.nik.length !== 16
+                      ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                      : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100'
+                  )}
                   placeholder="16 digit"
                   maxLength={16}
-                  value={form.nik} onChange={e => setField('nik', e.target.value)}
+                  value={form.nik} onChange={e => setField('nik', e.target.value.replace(/\D/g, '').slice(0, 16))}
                 />
+                {form.nik && form.nik.length !== 16 && (
+                  <p className="mt-1 text-xs text-red-500">NIK harus 16 digit angka</p>
+                )}
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">No. HP</label>
                 <input
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  type="text" inputMode="numeric" pattern="[0-9]*"
+                  className={cn(
+                    'w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2 transition-colors',
+                    form.phone && form.phone.length < 9
+                      ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                      : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100'
+                  )}
                   placeholder="08xxxxxxxxxx"
-                  value={form.phone} onChange={e => setField('phone', e.target.value)}
+                  maxLength={15}
+                  value={form.phone} onChange={e => setField('phone', e.target.value.replace(/\D/g, '').slice(0, 15))}
                 />
+                {form.phone && form.phone.length < 9 && (
+                  <p className="mt-1 text-xs text-red-500">Nomor tidak valid</p>
+                )}
               </div>
             </div>
             <div>
@@ -596,10 +626,18 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                 Email <span className="text-gray-400 font-normal">(untuk login portal)</span>
               </label>
               <input type="email"
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                className={cn(
+                  'w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2 transition-colors',
+                  form.email && !isValidEmail(form.email)
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                    : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100'
+                )}
                 placeholder="email@contoh.com"
                 value={form.email} onChange={e => setField('email', e.target.value)}
               />
+              {form.email && !isValidEmail(form.email) && (
+                <p className="mt-1 text-xs text-red-500">Format email tidak valid</p>
+              )}
             </div>
             {form.email && (
               <div className="grid grid-cols-2 gap-3">
@@ -671,7 +709,12 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
             <button
               onClick={handleLanjutData}
-              disabled={!form.nama_lengkap.trim()}
+              disabled={
+                !form.nama_lengkap.trim()
+                || (!!form.nik && form.nik.length !== 16)
+                || (!!form.phone && form.phone.length < 9)
+                || (!!form.email && !isValidEmail(form.email))
+              }
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
             >
               Lanjut <ChevronRight className="h-4 w-4" />
