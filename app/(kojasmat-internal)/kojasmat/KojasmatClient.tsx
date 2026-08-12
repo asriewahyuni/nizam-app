@@ -1271,6 +1271,13 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
   const [loadingDokAnggota, setLoadingDokAnggota] = useState(false)
   const [bukuOpen, setBukuOpen] = useState(false)
   const [bukuAnggota, setBukuAnggota] = useState<KojasmatAnggota | null>(null)
+  const [transaksiAnggota, setTransaksiAnggota] = useState<KojasmatAnggota | null>(null)
+  const [transaksiModalOpen, setTransaksiModalOpen] = useState(false)
+  const [mutasiError, setMutasiError] = useState<string | null>(null)
+  const [transaksiForm, setTransaksiForm] = useState({
+    jenis_simpanan: 'WAJIB', jenis_mutasi: 'SETOR',
+    jumlah: '', keterangan: '', tanggal: new Date().toISOString().split('T')[0]
+  })
 
   const filteredData = anggota.filter(a => {
     const matchSearch = a.nama.toLowerCase().includes(search.toLowerCase()) || 
@@ -1329,6 +1336,35 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
   function openBukuTabunganAnggota(a: KojasmatAnggota) {
     setBukuAnggota(a)
     setBukuOpen(true)
+  }
+
+  function openTransaksiAnggota(a: KojasmatAnggota) {
+    setTransaksiAnggota(a)
+    setBukuOpen(false)
+    setTransaksiModalOpen(true)
+  }
+
+  function handleMutasiAnggota() {
+    if (!transaksiAnggota) return
+    setMutasiError(null)
+    startTransition(async () => {
+      const res = await catatSimpananMutasi({
+        org_id: orgId,
+        anggota_id: transaksiAnggota.id,
+        jenis_simpanan: transaksiForm.jenis_simpanan as 'POKOK' | 'WAJIB' | 'SUKARELA' | 'PROYEK' | 'HIBAH_NAMETAG' | 'HIBAH_MEMBERCARD' | 'HIBAH_KAJIAN' | 'HIBAH_BOP',
+        jenis_mutasi: transaksiForm.jenis_mutasi as 'SETOR' | 'TARIK' | 'KOREKSI',
+        jumlah: Number(transaksiForm.jumlah),
+        keterangan: transaksiForm.keterangan || undefined,
+        tanggal: transaksiForm.tanggal,
+      })
+      if (res.error) {
+        setMutasiError(res.error)
+        return
+      }
+      setMutasiError(null)
+      setTransaksiModalOpen(false)
+      setTransaksiForm({ jenis_simpanan: 'WAJIB', jenis_mutasi: 'SETOR', jumlah: '', keterangan: '', tanggal: new Date().toISOString().split('T')[0] })
+    })
   }
 
   function buildAnggotaWaText(k: KredensialAnggota) {
@@ -1803,10 +1839,84 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
             key={bukuAnggota.id}
             anggota={bukuAnggota}
             orgId={orgId}
-            onTransaksi={() => setBukuOpen(false)}
+            onTransaksi={() => openTransaksiAnggota(bukuAnggota)}
           />
         )}
       </Drawer>
+
+      {/* Modal Transaksi — dipicu dari tombol "+ Transaksi" di Buku Tabungan */}
+      <Modal open={transaksiModalOpen} onClose={() => { setTransaksiModalOpen(false); setMutasiError(null) }}
+        title={`Transaksi Simpanan — ${transaksiAnggota?.nama ?? ''}`}>
+        <div className="space-y-3">
+          {mutasiError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {mutasiError}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Jenis Simpanan</label>
+              <select className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                value={transaksiForm.jenis_simpanan}
+                onChange={e => setTransaksiForm(f => ({ ...f, jenis_simpanan: e.target.value }))}>
+                <option value="POKOK">Simpanan Pokok</option>
+                <option value="WAJIB">Simpanan Wajib</option>
+                <option value="SUKARELA">Simpanan Sukarela</option>
+                <option value="HIBAH_NAMETAG">Hibah Name Tag</option>
+                <option value="HIBAH_MEMBERCARD">Hibah Member Card</option>
+                <option value="HIBAH_KAJIAN">Hibah Kajian</option>
+                <option value="HIBAH_BOP">Hibah BOP</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Jenis Mutasi</label>
+              <select className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                value={transaksiForm.jenis_mutasi}
+                onChange={e => setTransaksiForm(f => ({ ...f, jenis_mutasi: e.target.value }))}>
+                <option value="SETOR">Setoran</option>
+                <option value="TARIK">Penarikan</option>
+                <option value="KOREKSI">Koreksi</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Jumlah (Rp)</label>
+              <input type="number"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                placeholder="50000"
+                value={transaksiForm.jumlah} onChange={e => setTransaksiForm(f => ({ ...f, jumlah: e.target.value }))} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Tanggal</label>
+              <input type="date"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                value={transaksiForm.tanggal} onChange={e => setTransaksiForm(f => ({ ...f, tanggal: e.target.value }))} />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Keterangan</label>
+            <input
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              placeholder="Contoh: Setoran wajib bulan Juni"
+              value={transaksiForm.keterangan} onChange={e => setTransaksiForm(f => ({ ...f, keterangan: e.target.value }))} />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button onClick={() => setTransaksiModalOpen(false)}
+              className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
+              Batal
+            </button>
+            <button onClick={handleMutasiAnggota} disabled={!transaksiForm.jumlah || pending}
+              className={cn('flex-1 rounded-xl py-2 text-sm font-medium text-white transition-colors cursor-pointer disabled:opacity-50',
+                transaksiForm.jenis_mutasi === 'TARIK' ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700')}>
+              {pending ? 'Memproses...'
+                : transaksiForm.jenis_mutasi === 'SETOR' ? 'Catat Setoran'
+                : transaksiForm.jenis_mutasi === 'TARIK' ? 'Catat Penarikan'
+                : 'Catat Koreksi'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
