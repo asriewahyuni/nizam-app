@@ -819,7 +819,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Kontak Darurat</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Orang yang bisa dihubungi pengurus koperasi jika terjadi keadaan darurat pada Anda.
+              Orang yang bisa dihubungi CS jika terjadi keadaan darurat pada Anda.
             </p>
           </div>
 
@@ -1165,7 +1165,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 mb-3">
               <FileText className="h-6 w-6 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Komitmen</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Sighat (Ijab-Qabul)</h1>
             <p className="text-sm text-gray-500 mt-1">Mohon baca dan centang setiap bagian sebelum melanjutkan.</p>
           </div>
 
@@ -1390,7 +1390,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                     </div>
                   ) : infoBayar.qris_image_url ? null : (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-                      Rekening tujuan belum diatur oleh pengurus. Hubungi pengurus koperasi untuk info rekening.
+                      Rekening tujuan belum diatur oleh CS. Hubungi CS untuk info rekening.
                     </div>
                   )
                 )}
@@ -1453,7 +1453,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   const waNomor = infoBayar?.admin_whatsapp?.trim()
   const waHref = waNomor
     ? `https://wa.me/${waNomor}?text=${encodeURIComponent(
-        `Halo pengurus ${orgNama}, saya ingin mengonfirmasi pendaftaran & pembayaran saya (kode: ${pendaftaranId?.slice(0, 8).toUpperCase()}). Mohon diverifikasi ya, terima kasih.`
+        `Halo CS ${orgNama}, saya ingin mengonfirmasi pendaftaran & pembayaran saya (kode: ${pendaftaranId?.slice(0, 8).toUpperCase()}). Mohon diverifikasi ya, terima kasih.`
       )}`
     : null
 

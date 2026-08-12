@@ -44,7 +44,7 @@ export default function AnggotaLoginClient({ orgId }: { orgId?: string }) {
       if (res.success) {
         setResetMsg({
           type: 'success',
-          text: 'Permintaan reset diterima. Silakan hubungi pengurus koperasi untuk mendapatkan kata sandi baru.',
+          text: 'Permintaan reset diterima. Silakan hubungi CS untuk mendapatkan kata sandi baru.',
         })
         setResetKode('')
         setTimeout(() => { setShowReset(false); setResetMsg(null) }, 8000)
@@ -77,7 +77,7 @@ export default function AnggotaLoginClient({ orgId }: { orgId?: string }) {
         <div className="bg-slate-900/60 border border-white/8 rounded-2xl p-7 shadow-2xl backdrop-blur-sm">
           <div className="mb-6">
             <h2 className="text-lg font-bold text-white">Masuk ke Akun Anda</h2>
-            <p className="text-slate-400 text-sm mt-1">Gunakan kode anggota dan kata sandi yang diberikan pengurus.</p>
+            <p className="text-slate-400 text-sm mt-1">Gunakan kode anggota dan kata sandi yang diberikan CS.</p>
           </div>
 
           {/* Error banner */}
@@ -143,7 +143,7 @@ export default function AnggotaLoginClient({ orgId }: { orgId?: string }) {
                   type="button"
                   onClick={() => setShowPass(v => !v)}
                   aria-label={showPass ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors cursor-pointer p-1"
+                  className="absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-slate-500 hover:text-white transition-colors cursor-pointer"
                 >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -165,7 +165,7 @@ export default function AnggotaLoginClient({ orgId }: { orgId?: string }) {
 
           <p className="mt-6 pt-5 border-t border-white/5 text-center text-xs text-slate-500 leading-relaxed">
             Belum punya akun?{' '}
-            <span className="text-slate-400">Hubungi pengurus koperasi untuk mendaftar.</span>
+            <span className="text-slate-400">Hubungi CS untuk mendaftar.</span>
           </p>
         </div>
 

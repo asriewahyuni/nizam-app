@@ -44,7 +44,7 @@ export type KomitmenSection = { title: string; body: string; checkbox_label: str
 
 // Draft awal — teks section 2 sengaja dipotong persis seperti sumber referensi
 // (belum lengkap), dan tidak ada section pelengkap antara "Komitmen Syariah" dan
-// "Simpanan Keanggotaan (SPK)" karena teksnya belum tersedia saat draft ini dibuat.
+// "Simpanan Keanggotaan" karena teksnya belum tersedia saat draft ini dibuat.
 // Pengurus WAJIB melengkapi/mengedit lewat Pengaturan Kojasmat > Bagian Komitmen
 // sebelum wizard pendaftaran publik dianggap siap dipakai anggota sungguhan.
 const DEFAULT_KOMITMEN_SECTIONS: KomitmenSection[] = [
@@ -59,9 +59,9 @@ const DEFAULT_KOMITMEN_SECTIONS: KomitmenSection[] = [
     checkbox_label: 'Saya setuju dengan komitmen syariah di atas.',
   },
   {
-    title: 'Simpanan Keanggotaan (SPK)',
-    body: 'SP & SW dicatat sebagai simpanan Anda. ADK merupakan biaya administrasi pendaftaran (akad ijarah), tidak dikembalikan.',
-    checkbox_label: 'Saya setuju membayar biaya Simpanan Keanggotaan (SPK) sesuai rincian di atas.',
+    title: 'Simpanan Keanggotaan',
+    body: 'SP & SW dicatat sebagai simpanan Anda. ADM merupakan biaya administrasi pendaftaran (akad ijarah), tidak dikembalikan.',
+    checkbox_label: 'Saya setuju membayar biaya Simpanan Keanggotaan sesuai rincian di atas.',
   },
   {
     title: 'Persetujuan Akhir',

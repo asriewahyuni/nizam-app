@@ -42,9 +42,9 @@ export const PESAN_OTOMATIS_CATALOG: PesanOtomatisCatalogEntry[] = [
     deskripsi: 'Terkirim otomatis saat calon anggota LULUS test masuk, berisi rincian tagihan pendaftaran & rekening tujuan transfer.',
     variabel: ['nama', 'skor', 'apresiasi', 'biaya_admin_pendaftaran', 'nominal_simpanan_pokok', 'nominal_simpanan_wajib', 'total_tagihan', 'bank_name', 'account_number', 'account_holder'],
     defaultBody:
-`Halo *{{nama}}*,
+`Assalamu'alaikum, {{nama}}
 
-Selamat! Anda *LULUS* test masuk KOJASMAT dengan skor *{{skor}}* ({{apresiasi}}). 🎉
+Alhamdulillah, Anda *LULUS* test masuk KOJASMAT dengan skor *{{skor}}* ({{apresiasi}}). 🤲
 
 Langkah terakhir sebelum resmi terdaftar adalah menyelesaikan pembayaran:
 - Biaya Admin Pendaftaran: {{biaya_admin_pendaftaran}}
@@ -56,7 +56,7 @@ Transfer ke:
 *{{bank_name}}* a.n. {{account_holder}}
 No. Rek: {{account_number}}
 
-Setelah transfer, silakan upload bukti pembayaran di halaman pendaftaran Anda untuk diverifikasi pengurus.`,
+Setelah transfer, silakan unggah bukti pembayaran di halaman pendaftaran Anda untuk diverifikasi CS. Barakallahu fiik.`,
   },
   {
     key: 'pendaftaran_menunggu_verifikasi',
@@ -64,16 +64,16 @@ Setelah transfer, silakan upload bukti pembayaran di halaman pendaftaran Anda un
     deskripsi: 'Terkirim otomatis begitu calon anggota mengunggah bukti transfer, sebelum diverifikasi pengurus.',
     variabel: ['nama', 'total_dibayar', 'biaya_admin', 'simpanan_pokok', 'simpanan_wajib'],
     defaultBody:
-`Halo *{{nama}}*,
+`Assalamu'alaikum, {{nama}}
 
-Bukti pembayaran pendaftaran Anda sebesar *{{total_dibayar}}* sudah kami terima. ✅
+Alhamdulillah, bukti pembayaran pendaftaran Anda sebesar *{{total_dibayar}}* sudah kami terima. ✅
 
 Rincian:
 - Biaya Admin: {{biaya_admin}}
 - Simpanan Pokok: {{simpanan_pokok}}
 - Simpanan Wajib: {{simpanan_wajib}}
 
-Status pendaftaran Anda sekarang *menunggu verifikasi pengurus*. Kami akan mengabari begitu verifikasi selesai. Terima kasih atas kesabarannya 🙏`,
+Status pendaftaran Anda sekarang *menunggu verifikasi CS*. InsyaAllah kami kabari begitu verifikasi selesai. Jazakumullahu khairan atas kesabarannya 🙏`,
   },
   {
     key: 'pendaftaran_disetujui_teman',
@@ -81,9 +81,9 @@ Status pendaftaran Anda sekarang *menunggu verifikasi pengurus*. Kami akan menga
     deskripsi: 'Terkirim otomatis saat pengurus menyetujui pendaftaran, berisi kode anggota & kredensial login.',
     variabel: ['nama', 'kode_anggota', 'login_url', 'login_identifier', 'temp_password'],
     defaultBody:
-`Halo *{{nama}}*,
+`Assalamu'alaikum, {{nama}}
 
-Pendaftaran keanggotaan koperasi Anda telah *DISETUJUI* ✅
+Alhamdulillah, pendaftaran keanggotaan koperasi Anda telah *DISETUJUI* ✅
 
 *Kode Anggota:* {{kode_anggota}}
 *Login di:* {{login_url}}
@@ -91,7 +91,7 @@ Pendaftaran keanggotaan koperasi Anda telah *DISETUJUI* ✅
 *Password:* {{temp_password}}
 
 Silakan login dan ganti password setelah masuk pertama kali.
-Selamat bergabung! 🤝`,
+Barakallahu fiik, selamat bergabung menjadi bagian keluarga besar KOJASMAT! 🤝`,
   },
   {
     key: 'sahabat_menunggu_approval',
@@ -99,11 +99,11 @@ Selamat bergabung! 🤝`,
     deskripsi: 'Terkirim otomatis saat anggota (Teman) LULUS test kedua (upgrade Sahabat), sebelum disetujui pengurus.',
     variabel: ['nama', 'skor', 'jumlah_benar', 'total_soal'],
     defaultBody:
-`Halo *{{nama}}*,
+`Assalamu'alaikum, {{nama}}
 
-Selamat! Anda *LULUS* test kedua (upgrade tingkat Sahabat) dengan skor *{{skor}}* ({{jumlah_benar}}/{{total_soal}} benar). 🎉
+Alhamdulillah, Anda *LULUS* test kedua (upgrade tingkat Sahabat) dengan skor *{{skor}}* ({{jumlah_benar}}/{{total_soal}} benar). 🤲
 
-Status upgrade Anda sekarang *menunggu persetujuan pengurus*. Kami akan mengabari begitu tingkat Sahabat Anda aktif.`,
+Status upgrade Anda sekarang *menunggu persetujuan CS*. InsyaAllah kami kabari begitu tingkat Sahabat Anda aktif.`,
   },
   {
     key: 'sahabat_disetujui',
@@ -111,12 +111,12 @@ Status upgrade Anda sekarang *menunggu persetujuan pengurus*. Kami akan mengabar
     deskripsi: 'Terkirim otomatis saat pengurus menyetujui upgrade tingkat Sahabat.',
     variabel: ['nama', 'kode_anggota'],
     defaultBody:
-`Halo *{{nama}}*,
+`Assalamu'alaikum, {{nama}}
 
-Selamat! Upgrade keanggotaan Anda ke tingkat *SAHABAT* telah *DISETUJUI* ✅
+Alhamdulillah, upgrade keanggotaan Anda ke tingkat *SAHABAT* telah *DISETUJUI* ✅
 
 *Kode Anggota:* {{kode_anggota}}
 
-Sebagai Sahabat, Anda kini dapat mengikuti proyek syirkah, transfer simpanan antar anggota, dan fitur lanjutan lainnya. Selamat bergabung sebagai Sahabat KOJASMAT! 🤝`,
+Sebagai Sahabat, Anda kini dapat mengikuti proyek syirkah, transfer simpanan antar anggota, dan fitur lanjutan lainnya. Barakallahu fiik, selamat bergabung sebagai Sahabat KOJASMAT! 🤝`,
   },
 ]
