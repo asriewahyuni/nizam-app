@@ -42,6 +42,10 @@ export type KojasmatAnggota = {
   joined_at?: string
   notes?: string
   created_at: string
+  kontak_darurat_nama?: string
+  kontak_darurat_hubungan?: string
+  kontak_darurat_phone?: string
+  kontak_darurat_alamat?: string
 }
 
 export type KojasmatSimpanan = {
@@ -305,6 +309,10 @@ export async function createAnggota(payload: {
   pekerjaan?: string
   joined_at?: string
   notes?: string
+  kontak_darurat_nama?: string
+  kontak_darurat_hubungan?: string
+  kontak_darurat_phone?: string
+  kontak_darurat_alamat?: string
 }) {
   const session = await getInternalAuthSession()
   if (!session) return { error: 'Tidak terautentikasi' }
@@ -322,8 +330,9 @@ export async function createAnggota(payload: {
 
   const { rows } = await queryPostgres(
     `INSERT INTO kojasmat_anggota
-       (org_id, kode_anggota, nama, nik, email, phone, alamat, pekerjaan, joined_at, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       (org_id, kode_anggota, nama, nik, email, phone, alamat, pekerjaan, joined_at, notes,
+        kontak_darurat_nama, kontak_darurat_hubungan, kontak_darurat_phone, kontak_darurat_alamat)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      RETURNING *`,
     [
       payload.org_id, kode, payload.nama,
@@ -331,6 +340,8 @@ export async function createAnggota(payload: {
       payload.phone ?? null, payload.alamat ?? null,
       payload.pekerjaan ?? null,
       payload.joined_at ?? null, payload.notes ?? null,
+      payload.kontak_darurat_nama ?? null, payload.kontak_darurat_hubungan ?? null,
+      payload.kontak_darurat_phone ?? null, payload.kontak_darurat_alamat ?? null,
     ]
   )
 
@@ -377,13 +388,17 @@ export async function updateAnggota(id: string, payload: Partial<KojasmatAnggota
   const { rows } = await queryPostgres(
     `UPDATE kojasmat_anggota
      SET nama=$2, nik=$3, email=$4, phone=$5, alamat=$6, pekerjaan=$7,
-         status=$8, is_verified=$9, joined_at=$10, notes=$11, updated_at=NOW()
+         status=$8, is_verified=$9, joined_at=$10, notes=$11,
+         kontak_darurat_nama=$12, kontak_darurat_hubungan=$13,
+         kontak_darurat_phone=$14, kontak_darurat_alamat=$15, updated_at=NOW()
      WHERE id=$1 RETURNING *`,
     [
       id, payload.nama, payload.nik ?? null, payload.email ?? null,
       payload.phone ?? null, payload.alamat ?? null, payload.pekerjaan ?? null,
       payload.status ?? 'CALON', payload.is_verified ?? false,
       payload.joined_at ?? null, payload.notes ?? null,
+      payload.kontak_darurat_nama ?? null, payload.kontak_darurat_hubungan ?? null,
+      payload.kontak_darurat_phone ?? null, payload.kontak_darurat_alamat ?? null,
     ]
   )
   revalidatePath('/kojasmat')

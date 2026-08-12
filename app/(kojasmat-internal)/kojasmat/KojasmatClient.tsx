@@ -1240,12 +1240,17 @@ type AnggotaForm = {
   nama: string; nik: string; email: string; phone: string
   alamat: string; pekerjaan: string; joined_at: string; notes: string
   is_verified: boolean; status: string
+  kontak_darurat_nama: string; kontak_darurat_hubungan: string
+  kontak_darurat_phone: string; kontak_darurat_alamat: string
 }
 
 const emptyAnggotaForm: AnggotaForm = {
   nama: '', nik: '', email: '', phone: '', alamat: '', pekerjaan: '', joined_at: '', notes: '',
   is_verified: false, status: 'CALON',
+  kontak_darurat_nama: '', kontak_darurat_hubungan: '', kontak_darurat_phone: '', kontak_darurat_alamat: '',
 }
+
+const HUBUNGAN_DARURAT_OPTIONS = ['Suami/Istri', 'Orang Tua', 'Anak', 'Saudara Kandung', 'Lainnya']
 
 function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggota[] }) {
   const [pending, startTransition] = useTransition()
@@ -1291,7 +1296,11 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
     setForm({ nama: a.nama, nik: a.nik ?? '', email: a.email ?? '', phone: a.phone ?? '',
               alamat: a.alamat ?? '', pekerjaan: a.pekerjaan ?? '',
               joined_at: a.joined_at ?? '', notes: a.notes ?? '',
-              is_verified: a.is_verified, status: a.status })
+              is_verified: a.is_verified, status: a.status,
+              kontak_darurat_nama: a.kontak_darurat_nama ?? '',
+              kontak_darurat_hubungan: a.kontak_darurat_hubungan ?? '',
+              kontak_darurat_phone: a.kontak_darurat_phone ?? '',
+              kontak_darurat_alamat: a.kontak_darurat_alamat ?? '' })
     setModalOpen(true)
   }
 
@@ -1552,6 +1561,54 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
               onChange={e => setForm(f => ({ ...f, alamat: e.target.value }))}
             />
           </div>
+
+          <div className="pt-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Kontak Darurat</p>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Nama Kontak Darurat</label>
+                <input
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  placeholder="Nama orang yang bisa dihubungi"
+                  value={form.kontak_darurat_nama}
+                  onChange={e => setForm(f => ({ ...f, kontak_darurat_nama: e.target.value }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Hubungan</label>
+                  <select
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    value={form.kontak_darurat_hubungan}
+                    onChange={e => setForm(f => ({ ...f, kontak_darurat_hubungan: e.target.value }))}>
+                    <option value="">— pilih —</option>
+                    {HUBUNGAN_DARURAT_OPTIONS.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">No. Telepon / WA</label>
+                  <input
+                    type="text" inputMode="numeric" pattern="[0-9]*"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                    placeholder="628xxxxxxxxxx"
+                    maxLength={15}
+                    value={form.kontak_darurat_phone}
+                    onChange={e => setForm(f => ({ ...f, kontak_darurat_phone: e.target.value.replace(/\D/g, '').slice(0, 15) }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Alamat Kontak Darurat</label>
+                <textarea rows={2}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
+                  placeholder="Alamat lengkap kontak darurat"
+                  value={form.kontak_darurat_alamat}
+                  onChange={e => setForm(f => ({ ...f, kontak_darurat_alamat: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
           {selected && (
             <div className="grid grid-cols-2 gap-3">
               <div>
