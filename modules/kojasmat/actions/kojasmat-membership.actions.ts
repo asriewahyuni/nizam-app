@@ -185,7 +185,7 @@ export async function buatPendaftaran(payload: {
         // Email/NIK sudah dipakai akun lain di platform Nizam (bukan pendaftaran
         // koperasi ini — sudah dicek di atas) — kemungkinan akun organisasi lain.
         if ((authResult.error ?? '').toLowerCase().includes('sudah terdaftar')) {
-          return { error: 'Email atau NIK ini sudah terpakai untuk akun lain di sistem. Gunakan email/NIK berbeda, atau hubungi pengurus koperasi jika Anda yakin ini keliru.' }
+          return { error: 'Email atau NIK ini sudah terpakai untuk akun lain di sistem. Gunakan email/NIK berbeda' }
         }
         return { error: authResult.error }
       }
@@ -214,12 +214,15 @@ export async function buatPendaftaran(payload: {
   }
 }
 
-// Tidak butuh auth — form publik untuk calon anggota. Cek cepat email di step
-// "Data Pribadi" (sebelum kontak darurat & dokumen diisi) supaya duplikasi
-// ketahuan di awal, bukan baru gagal setelah wizard hampir selesai — logikanya
-// sama dengan pengecekan email/nik di buatPendaftaran().
-export async function cekEmailPendaftaran(orgId: string, email: string) {
+// Tidak butuh auth — form publik untuk calon anggota. Cek cepat email/NIK di
+// step "Data Pribadi" (sebelum kontak darurat & dokumen diisi) supaya
+// duplikasi ketahuan di awal, bukan baru gagal setelah wizard hampir selesai
+// — mencakup dua sumber konflik: pendaftaran koperasi ini sendiri, dan akun
+// internal_auth_users platform-wide (dicek ulang oleh createInternalAuthUser
+// di buatPendaftaran(), tapi di sini cuma SELECT — belum bikin akun apapun).
+export async function cekEmailPendaftaran(orgId: string, email: string, nik?: string) {
   const normalized = email.trim().toLowerCase()
+  const normalizedNik = (nik ?? '').trim().toUpperCase()
   if (!normalized) return { available: true }
   try {
     const { rows } = await queryPostgres(
@@ -229,14 +232,29 @@ export async function cekEmailPendaftaran(orgId: string, email: string) {
       [orgId, normalized]
     )
     const existing = rows[0]
-    if (!existing) return { available: true }
-    if (existing.status === 'MENUNGGU' || existing.status === 'DIREVISI') {
-      return { available: false, error: 'Email ini sudah dipakai untuk pendaftaran yang sedang berjalan. Lanjutkan pendaftaran sebelumnya, atau hubungi pengurus koperasi.' }
+    if (existing) {
+      if (existing.status === 'MENUNGGU' || existing.status === 'DIREVISI') {
+        return { available: false, error: 'Email ini sudah dipakai untuk pendaftaran yang sedang berjalan. Lanjutkan pendaftaran sebelumnya, atau hubungi pengurus koperasi.' }
+      }
+      if (existing.status === 'DISETUJUI') {
+        return { available: false, error: 'Email ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
+      }
+      return { available: false, error: 'Pendaftaran sebelumnya dengan email ini telah ditolak. Hubungi pengurus koperasi untuk info lebih lanjut.' }
     }
-    if (existing.status === 'DISETUJUI') {
-      return { available: false, error: 'Email ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
+
+    const { rows: authRows } = await queryPostgres(
+      `SELECT id FROM internal_auth_users
+       WHERE is_active = true
+         AND ((login_email IS NOT NULL AND LOWER(login_email) = $1)
+              OR ($2 <> '' AND login_nik IS NOT NULL AND UPPER(login_nik) = $2))
+       LIMIT 1`,
+      [normalized, normalizedNik]
+    )
+    if (authRows[0]) {
+      return { available: false, error: 'Email atau NIK ini sudah terpakai untuk akun lain di sistem. Gunakan email/NIK berbeda' }
     }
-    return { available: false, error: 'Pendaftaran sebelumnya dengan email ini telah ditolak. Hubungi pengurus koperasi untuk info lebih lanjut.' }
+
+    return { available: true }
   } catch {
     return { available: true }
   }

@@ -361,31 +361,37 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
   function setField(k: keyof FormData, v: string) {
     setForm(f => ({ ...f, [k]: v }))
-    if (k === 'email') setEmailCheck({ status: 'idle' })
+    if (k === 'email' || k === 'nik') setEmailCheck({ status: 'idle' })
   }
 
-  // ── Cek email duplikat (step Data Pribadi) ──
+  // ── Cek email/NIK duplikat (step Data Pribadi) — mencakup pendaftaran
+  // koperasi ini sendiri maupun akun internal_auth_users platform-wide.
   const [emailCheck, setEmailCheck] = useState<{
     status: 'idle' | 'checking' | 'ok' | 'taken'
     message?: string
     checkedEmail?: string
+    checkedNik?: string
   }>({ status: 'idle' })
 
-  async function checkEmailNow(email: string) {
+  function emailCheckIsStale() {
+    return emailCheck.checkedEmail !== form.email || emailCheck.checkedNik !== form.nik
+  }
+
+  async function checkEmailNow(email: string, nik: string) {
     if (!email || !isValidEmail(email)) return { ok: true as const }
     setEmailCheck({ status: 'checking' })
-    const res = await cekEmailPendaftaran(orgId, email)
+    const res = await cekEmailPendaftaran(orgId, email, nik)
     if (!res.available) {
-      setEmailCheck({ status: 'taken', message: res.error, checkedEmail: email })
+      setEmailCheck({ status: 'taken', message: res.error, checkedEmail: email, checkedNik: nik })
       return { ok: false as const, message: res.error }
     }
-    setEmailCheck({ status: 'ok', checkedEmail: email })
+    setEmailCheck({ status: 'ok', checkedEmail: email, checkedNik: nik })
     return { ok: true as const }
   }
 
   function handleEmailBlur() {
-    if (form.email && isValidEmail(form.email) && emailCheck.checkedEmail !== form.email) {
-      checkEmailNow(form.email)
+    if (form.email && isValidEmail(form.email) && emailCheckIsStale()) {
+      checkEmailNow(form.email, form.nik)
     }
   }
 
@@ -571,8 +577,8 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
     if (form.nik && form.nik.length !== 16) { setError('NIK harus 16 digit angka'); return }
     if (form.phone && form.phone.length < 9) { setError('Nomor HP/WhatsApp tidak valid'); return }
     if (form.email && !isValidEmail(form.email)) { setError('Format email tidak valid'); return }
-    if (form.email && emailCheck.checkedEmail !== form.email) {
-      const check = await checkEmailNow(form.email)
+    if (form.email && emailCheckIsStale()) {
+      const check = await checkEmailNow(form.email, form.nik)
       if (!check.ok) { setError(check.message || 'Email ini sudah terdaftar.'); return }
     }
     if (form.email && emailCheck.status === 'taken') { setError(emailCheck.message || 'Email ini sudah terdaftar.'); return }
@@ -787,7 +793,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                 || (!!form.phone && form.phone.length < 9)
                 || (!!form.email && !isValidEmail(form.email))
                 || emailCheck.status === 'checking'
-                || (emailCheck.status === 'taken' && emailCheck.checkedEmail === form.email)
+                || (emailCheck.status === 'taken' && !emailCheckIsStale())
               }
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
             >
