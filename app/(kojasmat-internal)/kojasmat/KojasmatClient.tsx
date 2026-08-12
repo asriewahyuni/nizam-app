@@ -1267,6 +1267,10 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
   const [copied, setCopied] = useState(false)
   const [modalDelete, setModalDelete] = useState<KojasmatAnggota | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [dokumenAnggota, setDokumenAnggota] = useState<KojasmatDokumen[]>([])
+  const [loadingDokAnggota, setLoadingDokAnggota] = useState(false)
+  const [bukuOpen, setBukuOpen] = useState(false)
+  const [bukuAnggota, setBukuAnggota] = useState<KojasmatAnggota | null>(null)
 
   const filteredData = anggota.filter(a => {
     const matchSearch = a.nama.toLowerCase().includes(search.toLowerCase()) || 
@@ -1302,12 +1306,29 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
               kontak_darurat_phone: a.kontak_darurat_phone ?? '',
               kontak_darurat_alamat: a.kontak_darurat_alamat ?? '' })
     setModalOpen(true)
+    setDokumenAnggota([])
+    setLoadingDokAnggota(true)
+    getDokumenByRef('ANGGOTA', a.id).then(docs => {
+      setDokumenAnggota(docs)
+      setLoadingDokAnggota(false)
+    })
   }
 
   function openNew() {
     setSelected(null)
     setForm(emptyAnggotaForm)
     setModalOpen(true)
+  }
+
+  async function openSignedUrlAnggota(key: string) {
+    const res = await fetch(`/api/kojasmat/file?key=${encodeURIComponent(key)}`)
+    const { url } = await res.json() as { url: string }
+    window.open(url, '_blank')
+  }
+
+  function openBukuTabunganAnggota(a: KojasmatAnggota) {
+    setBukuAnggota(a)
+    setBukuOpen(true)
   }
 
   function buildAnggotaWaText(k: KredensialAnggota) {
@@ -1478,6 +1499,11 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
                         className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer whitespace-nowrap">
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
+                      <button onClick={() => openBukuTabunganAnggota(a)}
+                        title="Buku Tabungan"
+                        className="rounded-lg p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer">
+                        <BookOpen className="h-4 w-4" />
+                      </button>
                       <button onClick={() => openEdit(a)}
                         className="rounded-lg p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer">
                         <ChevronRight className="h-4 w-4" />
@@ -1610,6 +1636,32 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
           </div>
 
           {selected && (
+            <div className="pt-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Dokumen (KTP, Bukti Pembayaran, dll.)</p>
+              {loadingDokAnggota ? (
+                <p className="text-sm text-gray-400">Memuat dokumen...</p>
+              ) : dokumenAnggota.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">Belum ada dokumen dilampirkan</p>
+              ) : (
+                <div className="space-y-2">
+                  {dokumenAnggota.map(d => (
+                    <div key={d.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{d.jenis_dokumen}</p>
+                        <p className="text-xs text-gray-400">{d.nama_file}</p>
+                      </div>
+                      <button onClick={() => openSignedUrlAnggota(d.file_key)}
+                        className="flex items-center gap-1 rounded-lg bg-white border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer">
+                        <Eye className="h-3.5 w-3.5" /> Lihat
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {selected && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Status Keanggotaan</label>
@@ -1739,6 +1791,22 @@ function TabAnggota({ orgId, anggota }: { orgId: string; anggota: KojasmatAnggot
           </div>
         )}
       </Modal>
+
+      {/* Buku Tabungan Drawer — mutasi transaksi anggota */}
+      <Drawer
+        open={bukuOpen}
+        onClose={() => setBukuOpen(false)}
+        title={`Buku Tabungan — ${bukuAnggota?.nama ?? ''}`}
+      >
+        {bukuAnggota && (
+          <BukuTabunganPanel
+            key={bukuAnggota.id}
+            anggota={bukuAnggota}
+            orgId={orgId}
+            onTransaksi={() => setBukuOpen(false)}
+          />
+        )}
+      </Drawer>
     </div>
   )
 }
