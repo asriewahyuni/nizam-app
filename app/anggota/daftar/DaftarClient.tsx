@@ -612,7 +612,7 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                       ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
                       : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100'
                   )}
-                  placeholder="08xxxxxxxxxx"
+                  placeholder="628xxxxxxxxxx"
                   maxLength={15}
                   value={form.phone} onChange={e => setField('phone', e.target.value.replace(/\D/g, '').slice(0, 15))}
                 />

@@ -3,7 +3,8 @@
 import { useState, useTransition } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { signInAsAnggota, requestAnggotaPasswordReset } from '@/modules/kojasmat/actions/kojasmat-auth.actions'
-import { Eye, EyeOff, ArrowRight, ShieldCheck, Loader2, HandCoins } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, ShieldCheck, Loader2 } from 'lucide-react'
+import Image from 'next/image'
 
 export default function AnggotaLoginClient({ orgId }: { orgId?: string }) {
   const searchParams = useSearchParams()
@@ -58,10 +59,17 @@ export default function AnggotaLoginClient({ orgId }: { orgId?: string }) {
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4">
-            <HandCoins size={28} className="text-emerald-400" />
+          <div className="w-20 h-20 rounded-2xl bg-white border border-emerald-500/20 flex items-center justify-center mb-4 p-2 shadow-lg shadow-emerald-500/10 overflow-hidden">
+            <Image
+              src="/logos/kojasmat_logo.jpeg"
+              alt="Logo Kojasmat"
+              width={80}
+              height={80}
+              className="w-full h-full object-contain"
+              priority
+            />
           </div>
-          <h1 className="text-xl font-black text-white tracking-tight">Portal Anggota</h1>
+          <h1 className="text-xl font-black text-white tracking-tight">Member Kojasmat</h1>
           <p className="text-slate-500 text-sm mt-1 font-medium">Koperasi Syariah</p>
         </div>
 
