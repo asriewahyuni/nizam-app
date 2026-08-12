@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import WhatsappCsButton from './WhatsappCsButton'
 
 // Manifest khusus subtree /anggota — start_url mengarah ke /anggota/login,
 // bukan /dashboard (manifest root untuk staf), supaya PWA yang di-install
@@ -8,5 +9,10 @@ export const metadata: Metadata = {
 }
 
 export default function AnggotaLayout({ children }: { children: React.ReactNode }) {
-  return children
+  return (
+    <>
+      {children}
+      <WhatsappCsButton />
+    </>
+  )
 }
