@@ -8,6 +8,8 @@ export type PesanOtomatisKey =
   | 'pendaftaran_menunggu_bayar'
   | 'pendaftaran_menunggu_verifikasi'
   | 'pendaftaran_disetujui_teman'
+  | 'pendaftaran_ditolak'
+  | 'pendaftaran_perlu_revisi'
   | 'sahabat_menunggu_approval'
   | 'sahabat_disetujui'
   // Key baru untuk notifikasi proyek (funding, keterlibatan anggota) tinggal
@@ -92,6 +94,41 @@ Alhamdulillah, pendaftaran keanggotaan koperasi Anda telah *DISETUJUI* ✅
 
 Silakan login dan ganti password setelah masuk pertama kali.
 Barakallahu fiik, selamat bergabung menjadi bagian keluarga besar KOJASMAT! 🤝`,
+  },
+  {
+    key: 'pendaftaran_ditolak',
+    label: 'Pendaftaran Ditolak',
+    deskripsi: 'Terkirim otomatis saat CS menolak pendaftaran, berisi catatan alasan & link untuk mengajukan ulang dengan data yang sama (tidak perlu isi ulang dari awal).',
+    variabel: ['nama', 'catatan', 'link_lanjutan'],
+    defaultBody:
+`Assalamu'alaikum, {{nama}}
+
+Mohon maaf, pendaftaran keanggotaan Anda di KOJASMAT untuk saat ini belum dapat kami setujui.
+
+Catatan dari CS:
+{{catatan}}
+
+InsyaAllah Anda tetap bisa mengajukan ulang dengan data yang sama lewat link berikut, tidak perlu isi ulang dari awal:
+{{link_lanjutan}}
+
+Barakallahu fiik.`,
+  },
+  {
+    key: 'pendaftaran_perlu_revisi',
+    label: 'Pendaftaran Perlu Revisi',
+    deskripsi: 'Terkirim otomatis saat CS meminta revisi data pendaftaran, berisi catatan & link untuk melanjutkan dengan data yang sudah tersimpan.',
+    variabel: ['nama', 'catatan', 'link_lanjutan'],
+    defaultBody:
+`Assalamu'alaikum, {{nama}}
+
+Alhamdulillah, pendaftaran Anda sudah kami tinjau. Ada sedikit yang perlu diperbaiki dulu sebelum bisa dilanjutkan:
+
+{{catatan}}
+
+Silakan lanjutkan dan perbaiki lewat link berikut (data Anda sebelumnya sudah tersimpan, tidak hilang):
+{{link_lanjutan}}
+
+Jazakumullahu khairan atas kesabarannya.`,
   },
   {
     key: 'sahabat_menunggu_approval',

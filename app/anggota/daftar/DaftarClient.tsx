@@ -11,6 +11,7 @@ import {
 import {
   buatPendaftaran,
   cekEmailPendaftaran,
+  getPendaftaranResumeData,
   simpanDokumenPendaftaran,
   submitLayananKomitmen,
   type KojasmatDokumen,
@@ -345,13 +346,15 @@ function PwaInstallModal({ open, onClose }: { open: boolean; onClose: () => void
 
 // ─── MAIN CLIENT ──────────────────────────────────────────────────────────────
 
-export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNama: string }) {
+export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: string; orgNama: string; resumeId?: string }) {
   const [pending, startTransition] = useTransition()
   const [step, setStep] = useState<Step>('data')
   const [pendaftaranId, setPendaftaranId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dokumenMap, setDokumenMap] = useState<Record<string, DokumenUploaded>>({})
   const [showPassword, setShowPassword] = useState(false)
+  const [resumeLoading, setResumeLoading] = useState(!!resumeId)
+  const [resumePrompt, setResumePrompt] = useState<{ pendaftaranId: string; message: string } | null>(null)
 
   const [form, setForm] = useState<FormData>({
     nama_lengkap: '', nik: '', email: '', password: '', confirm_password: '',
@@ -383,8 +386,14 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
     const res = await cekEmailPendaftaran(orgId, email, nik)
     if (!res.available) {
       setEmailCheck({ status: 'taken', message: res.error, checkedEmail: email, checkedNik: nik })
+      if ('resumable' in res && res.resumable) {
+        setResumePrompt({ pendaftaranId: res.pendaftaranId, message: res.error ?? '' })
+      } else {
+        setResumePrompt(null)
+      }
       return { ok: false as const, message: res.error }
     }
+    setResumePrompt(null)
     setEmailCheck({ status: 'ok', checkedEmail: email, checkedNik: nik })
     return { ok: true as const }
   }
@@ -474,6 +483,49 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
   function toggleLayanan(value: string) {
     setLayananSelected(list => list.includes(value) ? list.filter(v => v !== value) : [...list, value])
   }
+
+  // ── Lanjutkan pendaftaran yang belum selesai / ditolak / diminta revisi ──
+  // Dipicu lewat prompt di step Data Pribadi (email/NIK sudah pernah dipakai)
+  // atau lewat link WA ?resume=<id> yang dikirim saat pendaftaran
+  // ditolak/direvisi — keduanya lompat ke step terakhir yang belum selesai
+  // dengan data yang sudah ada, bukan mengulang dari awal.
+  function resumeFromPendaftaran(id: string) {
+    setResumeLoading(true)
+    setError(null)
+    startTransition(async () => {
+      const res = await getPendaftaranResumeData(orgId, id)
+      setResumeLoading(false)
+      if (res.error || !res.data) { setError(res.error ?? 'Pendaftaran tidak ditemukan.'); return }
+      const { pendaftaran, dokumen, step: resumeStep } = res.data
+      setForm(f => ({
+        ...f,
+        nama_lengkap: pendaftaran.nama_lengkap ?? '',
+        nik: pendaftaran.nik ?? '',
+        email: pendaftaran.email ?? '',
+        phone: pendaftaran.phone ?? '',
+        alamat: pendaftaran.alamat ?? '',
+        pekerjaan: pendaftaran.pekerjaan ?? '',
+        alasan_bergabung: pendaftaran.alasan_bergabung ?? '',
+        kontak_darurat_nama: pendaftaran.kontak_darurat_nama ?? '',
+        kontak_darurat_hubungan: pendaftaran.kontak_darurat_hubungan ?? '',
+        kontak_darurat_phone: pendaftaran.kontak_darurat_phone ?? '',
+        kontak_darurat_alamat: pendaftaran.kontak_darurat_alamat ?? '',
+      }))
+      setDokumenMap(Object.fromEntries(dokumen.map(d => [
+        d.jenis_dokumen,
+        { jenis: d.jenis_dokumen, nama_file: d.nama_file, file_key: d.file_key, file_size: d.file_size ?? 0 },
+      ])))
+      setLayananSelected(pendaftaran.layanan_diinginkan ?? [])
+      setPendaftaranId(pendaftaran.id)
+      setResumePrompt(null)
+      setStep(resumeStep)
+    })
+  }
+
+  useEffect(() => {
+    if (resumeId) resumeFromPendaftaran(resumeId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeId])
 
   function muatKomitmenSections() {
     startTransition(async () => {
@@ -619,6 +671,20 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
   const ktpUploaded = !!dokumenMap['KTP']
 
+  // Deep-link ?resume=<id> — tahan tampilan step "Data Pribadi" kosong sampai
+  // data pendaftaran lama selesai dimuat, supaya tidak sempat kelihatan
+  // form kosong sekilas sebelum lompat ke step yang benar.
+  if (resumeId && resumeLoading && step === 'data') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3 text-gray-400">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="text-sm">Memuat data pendaftaran Anda...</p>
+        </div>
+      </div>
+    )
+  }
+
   // ── Step: Data Pribadi ──
   if (step === 'data') {
     return (
@@ -713,10 +779,23 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
               {form.email && !isValidEmail(form.email) && (
                 <p className="mt-1 text-xs text-red-500">Format email tidak valid</p>
               )}
-              {emailCheck.status === 'taken' && (
+              {emailCheck.status === 'taken' && !resumePrompt && (
                 <p className="mt-1 text-xs text-red-500">{emailCheck.message}</p>
               )}
             </div>
+            {resumePrompt && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2.5">
+                <p className="text-sm text-amber-800">{resumePrompt.message}</p>
+                <button
+                  type="button"
+                  onClick={() => resumeFromPendaftaran(resumePrompt.pendaftaranId)}
+                  disabled={resumeLoading}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-600 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {resumeLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Memuat...</> : 'Lanjutkan Pendaftaran Sebelumnya'}
+                </button>
+              </div>
+            )}
             {form.email && (
               <div className="grid grid-cols-2 gap-3">
                 <div>

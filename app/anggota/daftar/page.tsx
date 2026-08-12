@@ -6,9 +6,9 @@ export const revalidate = 0
 export default async function DaftarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ org?: string }>
+  searchParams: Promise<{ org?: string; resume?: string }>
 }) {
-  const { org } = await searchParams
+  const { org, resume } = await searchParams
 
   if (!org || !/^[0-9a-f-]{36}$/i.test(org)) {
     return (
@@ -16,7 +16,7 @@ export default async function DaftarPage({
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm max-w-md">
           <p className="text-lg font-semibold text-gray-800">URL tidak valid</p>
           <p className="text-sm text-gray-500 mt-2">
-            Hubungi pengurus koperasi untuk mendapatkan link pendaftaran yang benar.
+            Hubungi CS untuk mendapatkan link pendaftaran yang benar.
           </p>
         </div>
       </div>
@@ -34,12 +34,13 @@ export default async function DaftarPage({
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm max-w-md">
           <p className="text-lg font-semibold text-gray-800">Koperasi tidak ditemukan</p>
           <p className="text-sm text-gray-500 mt-2">
-            Link pendaftaran sudah tidak valid. Hubungi pengurus koperasi.
+            Link pendaftaran sudah tidak valid. Hubungi CS.
           </p>
         </div>
       </div>
     )
   }
 
-  return <DaftarClient orgId={orgData.id} orgNama={orgData.name} />
+  const resumeId = resume && /^[0-9a-f-]{36}$/i.test(resume) ? resume : undefined
+  return <DaftarClient orgId={orgData.id} orgNama={orgData.name} resumeId={resumeId} />
 }

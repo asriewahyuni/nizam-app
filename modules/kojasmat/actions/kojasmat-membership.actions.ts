@@ -226,20 +226,24 @@ export async function cekEmailPendaftaran(orgId: string, email: string, nik?: st
   if (!normalized) return { available: true }
   try {
     const { rows } = await queryPostgres(
-      `SELECT status FROM kojasmat_pendaftaran
+      `SELECT id, status FROM kojasmat_pendaftaran
        WHERE org_id = $1 AND email IS NOT NULL AND LOWER(email) = $2
        ORDER BY created_at DESC LIMIT 1`,
       [orgId, normalized]
     )
     const existing = rows[0]
     if (existing) {
-      if (existing.status === 'MENUNGGU' || existing.status === 'DIREVISI') {
-        return { available: false, error: 'Email ini sudah dipakai untuk pendaftaran yang sedang berjalan. Lanjutkan pendaftaran sebelumnya, atau hubungi pengurus koperasi.' }
+      if (existing.status === 'MENUNGGU' || existing.status === 'DIREVISI' || existing.status === 'DITOLAK') {
+        return {
+          available: false,
+          resumable: true as const,
+          pendaftaranId: existing.id as string,
+          error: existing.status === 'DITOLAK'
+            ? 'Pendaftaran sebelumnya dengan email ini pernah ditolak. Anda tetap bisa melanjutkan dengan data yang sama untuk diajukan ulang.'
+            : 'Email ini sudah dipakai untuk pendaftaran yang sedang berjalan. Lanjutkan pendaftaran sebelumnya, bukan mulai dari awal.',
+        }
       }
-      if (existing.status === 'DISETUJUI') {
-        return { available: false, error: 'Email ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
-      }
-      return { available: false, error: 'Pendaftaran sebelumnya dengan email ini telah ditolak. Hubungi pengurus koperasi untuk info lebih lanjut.' }
+      return { available: false, error: 'Email ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
     }
 
     const { rows: authRows } = await queryPostgres(
@@ -257,6 +261,48 @@ export async function cekEmailPendaftaran(orgId: string, email: string, nik?: st
     return { available: true }
   } catch {
     return { available: true }
+  }
+}
+
+// Tidak butuh auth — dipanggil setelah calon anggota memilih "Lanjutkan
+// pendaftaran sebelumnya" (dari cekEmailPendaftaran) atau lewat link WA
+// ?resume=<id> yang dikirim saat pendaftaran ditolak/diminta revisi. Ambil
+// seluruh data pendaftaran + progres test + dokumen supaya wizard bisa
+// lompat langsung ke step terakhir yang belum selesai, bukan mulai ulang.
+export type PendaftaranResumeStep = 'dokumen' | 'tes' | 'layanan' | 'komitmen' | 'bayar'
+
+export async function getPendaftaranResumeData(orgId: string, pendaftaranId: string) {
+  const { rows: pendRows } = await queryPostgres(
+    `SELECT * FROM kojasmat_pendaftaran WHERE id = $1 AND org_id = $2 LIMIT 1`,
+    [pendaftaranId, orgId]
+  )
+  const pendaftaran = pendRows[0] as KojasmatPendaftaran | undefined
+  if (!pendaftaran) return { error: 'Pendaftaran tidak ditemukan.' }
+  if (pendaftaran.status === 'DISETUJUI') {
+    return { error: 'Pendaftaran ini sudah disetujui. Silakan login di halaman Login Anggota.' }
+  }
+
+  const { rows: testRows } = await queryPostgres(
+    `SELECT status, skor, jumlah_benar, passing_threshold FROM kojasmat_test_masuk
+     WHERE pendaftaran_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [pendaftaranId]
+  )
+  const testTerakhir = testRows[0] as { status: 'LULUS' | 'GAGAL'; skor: number; jumlah_benar: number; passing_threshold: number } | undefined
+
+  const dokumen = await getDokumenByRef('PENDAFTARAN', pendaftaranId)
+
+  let step: PendaftaranResumeStep = 'tes'
+  if (pendaftaran.komitmen_disetujui_at) step = 'bayar'
+  else if (pendaftaran.layanan_diinginkan != null) step = 'komitmen'
+  else if (testTerakhir?.status === 'LULUS') step = 'layanan'
+
+  return {
+    data: {
+      pendaftaran,
+      testTerakhir: testTerakhir ?? null,
+      dokumen,
+      step,
+    },
   }
 }
 
@@ -505,17 +551,53 @@ export async function setujuiPendaftaran(pendaftaranId: string) {
   }
 }
 
+// Kirim WA "ditolak"/"perlu revisi" berisi link ?resume=<id> supaya calon
+// anggota bisa lanjutkan dengan data yang sama, bukan isi ulang dari nol —
+// best-effort, tidak boleh menggagalkan aksi tolak/revisi kalau nomor tidak
+// ada / provider belum disetel.
+async function kirimNotifikasiTolakRevisi(
+  pend: { id: string; org_id: string; nama_lengkap: string; phone?: string | null },
+  eventType: 'kojasmat_pendaftaran_ditolak' | 'kojasmat_pendaftaran_perlu_revisi',
+  templateKey: 'pendaftaran_ditolak' | 'pendaftaran_perlu_revisi',
+  catatan: string,
+) {
+  const settings = await getModuleSettings(pend.org_id)
+  const tmpl = settings.pesan_otomatis[templateKey]
+  if (!pend.phone || !tmpl.enabled) return
+  const appUrl = String(process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '')
+  await enqueueNotification({
+    orgId: pend.org_id,
+    userId: null,
+    eventType,
+    channel: 'WHATSAPP',
+    providerCode: 'DRIPSENDER',
+    recipient: pend.phone,
+    body: tmpl.body,
+    variables: {
+      nama: pend.nama_lengkap,
+      catatan: catatan || '-',
+      link_lanjutan: `${appUrl}/anggota/daftar?org=${pend.org_id}&resume=${pend.id}`,
+    },
+    idempotencyKey: `kojasmat-pendaftaran:${pend.id}:${templateKey}:${Date.now()}:whatsapp`,
+  }).catch(() => null)
+}
+
 export async function tolakPendaftaran(pendaftaranId: string, catatan: string) {
   try {
     const session = await getInternalAuthSession()
     if (!session) return { error: 'Tidak terautentikasi' }
 
-    await queryPostgres(
+    const { rows: [pend] } = await queryPostgres<{ id: string; org_id: string; nama_lengkap: string; phone: string | null }>(
       `UPDATE kojasmat_pendaftaran
        SET status='DITOLAK', catatan_pengurus=$2, ditinjau_oleh=$3, ditinjau_at=NOW(), updated_at=NOW()
-       WHERE id=$1`,
+       WHERE id=$1
+       RETURNING id, org_id, nama_lengkap, phone`,
       [pendaftaranId, catatan, getInternalUserId(session)]
     )
+    if (!pend) return { error: 'Pendaftaran tidak ditemukan' }
+
+    await kirimNotifikasiTolakRevisi(pend, 'kojasmat_pendaftaran_ditolak', 'pendaftaran_ditolak', catatan)
+
     revalidatePath('/kojasmat')
     return { data: { ok: true } }
   } catch (err) {
@@ -528,12 +610,17 @@ export async function mintaRevisiPendaftaran(pendaftaranId: string, catatan: str
     const session = await getInternalAuthSession()
     if (!session) return { error: 'Tidak terautentikasi' }
 
-    await queryPostgres(
+    const { rows: [pend] } = await queryPostgres<{ id: string; org_id: string; nama_lengkap: string; phone: string | null }>(
       `UPDATE kojasmat_pendaftaran
        SET status='DIREVISI', catatan_pengurus=$2, ditinjau_oleh=$3, ditinjau_at=NOW(), updated_at=NOW()
-       WHERE id=$1`,
+       WHERE id=$1
+       RETURNING id, org_id, nama_lengkap, phone`,
       [pendaftaranId, catatan, getInternalUserId(session)]
     )
+    if (!pend) return { error: 'Pendaftaran tidak ditemukan' }
+
+    await kirimNotifikasiTolakRevisi(pend, 'kojasmat_pendaftaran_perlu_revisi', 'pendaftaran_perlu_revisi', catatan)
+
     revalidatePath('/kojasmat')
     return { data: { ok: true } }
   } catch (err) {
