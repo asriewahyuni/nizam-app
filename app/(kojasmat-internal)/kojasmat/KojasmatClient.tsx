@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useTransition, useCallback, useRef, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts'
 import {
@@ -32,7 +33,7 @@ import {
   getProyekDiskusi, kirimPesanDiskusi, getSimpananReport, type KojasmatSimpananReport,
 } from '@/modules/kojasmat/actions/kojasmat.actions'
 import {
-  setujuiPendaftaran, tolakPendaftaran, mintaRevisiPendaftaran,
+  setujuiPendaftaran, tolakPendaftaran, mintaRevisiPendaftaran, getPendaftaranBaruSejak,
   getDokumenByRef, simpanDokumen, hapusDokumen, beriTindakan, selesaikanTindakan, ulasLaporan,
   type KojasmatPendaftaran, type KojasmatDokumen,
   type KojasmatLaporanProyek, type KojasmatTindakan,
@@ -5960,6 +5961,39 @@ export default function KojasmatClient({
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
+  const router = useRouter()
+
+  // ── Notifikasi permohonan baru (polling, tanpa perlu refresh manual) ──
+  const [permohonanToasts, setPermohonanToasts] = useState<{ id: string; nama: string; phone: string | null }[]>([])
+  const lastCheckRef = useRef(new Date().toISOString())
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const sejak = lastCheckRef.current
+      const baru = await getPendaftaranBaruSejak(orgId, sejak).catch(() => [])
+      if (baru.length === 0) return
+      lastCheckRef.current = baru[baru.length - 1].created_at
+      setPermohonanToasts(list => [
+        ...list,
+        ...baru.map(p => ({ id: p.id, nama: p.nama_lengkap, phone: p.phone ?? null })),
+      ])
+      router.refresh()
+    }, 20000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId])
+
+  function dismissPermohonanToast(id: string) {
+    setPermohonanToasts(list => list.filter(t => t.id !== id))
+  }
+
+  useEffect(() => {
+    if (permohonanToasts.length === 0) return
+    const timers = permohonanToasts.map(t =>
+      setTimeout(() => dismissPermohonanToast(t.id), 8000)
+    )
+    return () => timers.forEach(clearTimeout)
+  }, [permohonanToasts])
 
   const checkScroll = useCallback(() => {
     if (scrollRef.current) {
@@ -6012,6 +6046,31 @@ export default function KojasmatClient({
 
   return (
     <div className="min-h-screen bg-slate-50/40 pb-10">
+      {/* Notifikasi permohonan baru — muncul otomatis tanpa refresh */}
+      <div className="fixed top-4 right-4 z-50 flex w-full max-w-sm flex-col gap-2.5 sm:right-6 sm:top-6">
+        {permohonanToasts.map(t => (
+          <div key={t.id}
+            className="animate-in slide-in-from-top-2 fade-in flex items-start gap-3 rounded-2xl border border-emerald-200 bg-white p-4 shadow-lg shadow-emerald-900/10">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+              <ClipboardList className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-gray-900">Permohonan baru masuk</p>
+              <p className="mt-0.5 truncate text-sm text-gray-600">{t.nama}{t.phone ? ` · ${t.phone}` : ''}</p>
+              <button
+                onClick={() => { handleTabClick('permohonan'); dismissPermohonanToast(t.id) }}
+                className="mt-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 cursor-pointer">
+                Lihat permohonan →
+              </button>
+            </div>
+            <button onClick={() => dismissPermohonanToast(t.id)}
+              className="shrink-0 rounded-lg p-1 text-gray-300 hover:bg-gray-50 hover:text-gray-500 transition-colors cursor-pointer">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+
       {/* Header */}
       <div className="border-b border-gray-200 bg-white px-6 py-5">
         <div className="flex items-center gap-3">

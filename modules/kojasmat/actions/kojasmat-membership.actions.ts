@@ -129,6 +129,18 @@ export async function getPendaftaranById(id: string): Promise<KojasmatPendaftara
   return (rows[0] ?? null) as KojasmatPendaftaran | null
 }
 
+// Dipoll berkala dari dashboard admin (KojasmatClient) supaya notifikasi
+// permohonan baru muncul tanpa perlu refresh halaman.
+export async function getPendaftaranBaruSejak(orgId: string, sejakIso: string): Promise<KojasmatPendaftaran[]> {
+  const { rows } = await queryPostgres(
+    `SELECT * FROM kojasmat_pendaftaran
+     WHERE org_id = $1 AND created_at > $2::timestamptz
+     ORDER BY created_at ASC`,
+    [orgId, sejakIso]
+  )
+  return rows as KojasmatPendaftaran[]
+}
+
 // Tidak butuh auth — form publik untuk calon anggota
 export async function buatPendaftaran(payload: {
   org_id: string
@@ -208,7 +220,32 @@ export async function buatPendaftaran(payload: {
         payload.kontak_darurat_phone ?? null, payload.kontak_darurat_alamat ?? null,
       ]
     )
-    return { data: rows[0] as { id: string; status: string; created_at: string } }
+    const created = rows[0] as { id: string; status: string; created_at: string }
+
+    // Kabari CS otomatis via WA begitu permohonan baru masuk — best-effort,
+    // tidak boleh menggagalkan pendaftaran kalau nomor CS belum disetel.
+    const settings = await getModuleSettings(payload.org_id)
+    const tmplBaru = settings.pesan_otomatis.pendaftaran_baru_masuk
+    const adminWa = String(settings.admin_whatsapp || '').trim()
+    if (adminWa && tmplBaru.enabled) {
+      await enqueueNotification({
+        orgId: payload.org_id,
+        userId: null,
+        eventType: 'kojasmat_pendaftaran_baru_masuk',
+        channel: 'WHATSAPP',
+        providerCode: 'DRIPSENDER',
+        recipient: adminWa,
+        body: tmplBaru.body,
+        variables: {
+          nama: payload.nama_lengkap,
+          phone: payload.phone || '-',
+          waktu: new Date(created.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+        },
+        idempotencyKey: `kojasmat-pendaftaran:${created.id}:baru-masuk:whatsapp`,
+      }).catch(() => null)
+    }
+
+    return { data: created }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Gagal menyimpan pendaftaran' }
   }
@@ -342,12 +379,13 @@ async function createAnggotaFromPendaftaran(
   const kode = `KJM-${String(nextNum).padStart(3, '0')}`
   const isAktif = opts.status === 'AKTIF'
 
-  // Buat anggota baru
+  // Buat anggota baru — joined_at = tanggal disetujui (bukan tanggal daftar/test)
   const { rows: [anggota] } = await queryPostgres(
     `INSERT INTO kojasmat_anggota
        (org_id, kode_anggota, nama, nik, email, phone, alamat, pekerjaan, status, is_verified, user_id,
-        kontak_darurat_nama, kontak_darurat_hubungan, kontak_darurat_phone, kontak_darurat_alamat, layanan_diinginkan)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        kontak_darurat_nama, kontak_darurat_hubungan, kontak_darurat_phone, kontak_darurat_alamat, layanan_diinginkan,
+        joined_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,CURRENT_DATE)
      RETURNING id`,
     [
       pend.org_id, kode, pend.nama_lengkap,

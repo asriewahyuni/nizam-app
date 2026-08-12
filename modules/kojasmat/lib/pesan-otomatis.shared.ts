@@ -5,6 +5,7 @@
 // untuk pola yang sama.
 
 export type PesanOtomatisKey =
+  | 'pendaftaran_baru_masuk'
   | 'pendaftaran_menunggu_bayar'
   | 'pendaftaran_menunggu_verifikasi'
   | 'pendaftaran_disetujui_teman'
@@ -38,6 +39,22 @@ export type PesanOtomatisEntry = PesanOtomatisOverride & {
 export type PesanOtomatisSettings = Record<PesanOtomatisKey, PesanOtomatisEntry>
 
 export const PESAN_OTOMATIS_CATALOG: PesanOtomatisCatalogEntry[] = [
+  {
+    key: 'pendaftaran_baru_masuk',
+    label: 'Permohonan Baru Masuk (ke CS)',
+    deskripsi: 'Terkirim otomatis ke nomor WhatsApp CS/Admin (bukan ke calon anggota) setiap kali ada pendaftaran baru masuk, supaya bisa segera ditindaklanjuti.',
+    variabel: ['nama', 'phone', 'waktu'],
+    defaultBody:
+`Assalamu'alaikum, CS KOJASMAT
+
+Alhamdulillah, ada permohonan pendaftaran anggota baru masuk:
+
+*Nama:* {{nama}}
+*No. HP:* {{phone}}
+*Waktu:* {{waktu}}
+
+Mohon segera ditindaklanjuti lewat dashboard Kojasmat.`,
+  },
   {
     key: 'pendaftaran_menunggu_bayar',
     label: 'Selesai Registrasi — Menunggu Pembayaran',
