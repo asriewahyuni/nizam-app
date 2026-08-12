@@ -214,6 +214,34 @@ export async function buatPendaftaran(payload: {
   }
 }
 
+// Tidak butuh auth — form publik untuk calon anggota. Cek cepat email di step
+// "Data Pribadi" (sebelum kontak darurat & dokumen diisi) supaya duplikasi
+// ketahuan di awal, bukan baru gagal setelah wizard hampir selesai — logikanya
+// sama dengan pengecekan email/nik di buatPendaftaran().
+export async function cekEmailPendaftaran(orgId: string, email: string) {
+  const normalized = email.trim().toLowerCase()
+  if (!normalized) return { available: true }
+  try {
+    const { rows } = await queryPostgres(
+      `SELECT status FROM kojasmat_pendaftaran
+       WHERE org_id = $1 AND email IS NOT NULL AND LOWER(email) = $2
+       ORDER BY created_at DESC LIMIT 1`,
+      [orgId, normalized]
+    )
+    const existing = rows[0]
+    if (!existing) return { available: true }
+    if (existing.status === 'MENUNGGU' || existing.status === 'DIREVISI') {
+      return { available: false, error: 'Email ini sudah dipakai untuk pendaftaran yang sedang berjalan. Lanjutkan pendaftaran sebelumnya, atau hubungi pengurus koperasi.' }
+    }
+    if (existing.status === 'DISETUJUI') {
+      return { available: false, error: 'Email ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
+    }
+    return { available: false, error: 'Pendaftaran sebelumnya dengan email ini telah ditolak. Hubungi pengurus koperasi untuk info lebih lanjut.' }
+  } catch {
+    return { available: true }
+  }
+}
+
 // Tidak butuh auth — bagian dari wizard publik pendaftaran. Dipanggil sekali saat
 // calon anggota menyelesaikan step "Komitmen" (mencentang semua bagian), menyimpan
 // minat layanan yang dipilih di step sebelumnya sekaligus stempel waktu persetujuan.

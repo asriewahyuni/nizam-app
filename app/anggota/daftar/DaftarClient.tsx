@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import {
   buatPendaftaran,
+  cekEmailPendaftaran,
   simpanDokumenPendaftaran,
   submitLayananKomitmen,
   type KojasmatDokumen,
@@ -358,6 +359,32 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
 
   function setField(k: keyof FormData, v: string) {
     setForm(f => ({ ...f, [k]: v }))
+    if (k === 'email') setEmailCheck({ status: 'idle' })
+  }
+
+  // ── Cek email duplikat (step Data Pribadi) ──
+  const [emailCheck, setEmailCheck] = useState<{
+    status: 'idle' | 'checking' | 'ok' | 'taken'
+    message?: string
+    checkedEmail?: string
+  }>({ status: 'idle' })
+
+  async function checkEmailNow(email: string) {
+    if (!email || !isValidEmail(email)) return { ok: true as const }
+    setEmailCheck({ status: 'checking' })
+    const res = await cekEmailPendaftaran(orgId, email)
+    if (!res.available) {
+      setEmailCheck({ status: 'taken', message: res.error, checkedEmail: email })
+      return { ok: false as const, message: res.error }
+    }
+    setEmailCheck({ status: 'ok', checkedEmail: email })
+    return { ok: true as const }
+  }
+
+  function handleEmailBlur() {
+    if (form.email && isValidEmail(form.email) && emailCheck.checkedEmail !== form.email) {
+      checkEmailNow(form.email)
+    }
   }
 
   // ── Test masuk ──
@@ -514,11 +541,16 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
-  function handleLanjutData() {
+  async function handleLanjutData() {
     if (!form.nama_lengkap.trim()) { setError('Nama lengkap wajib diisi'); return }
     if (form.nik && form.nik.length !== 16) { setError('NIK harus 16 digit angka'); return }
     if (form.phone && form.phone.length < 9) { setError('Nomor HP/WhatsApp tidak valid'); return }
     if (form.email && !isValidEmail(form.email)) { setError('Format email tidak valid'); return }
+    if (form.email && emailCheck.checkedEmail !== form.email) {
+      const check = await checkEmailNow(form.email)
+      if (!check.ok) { setError(check.message || 'Email ini sudah terdaftar.'); return }
+    }
+    if (form.email && emailCheck.status === 'taken') { setError(emailCheck.message || 'Email ini sudah terdaftar.'); return }
     if (form.email && !form.password) { setError('Masukkan kata sandi untuk akun Anda'); return }
     if (form.password && form.password.length < 8) { setError('Kata sandi minimal 8 karakter'); return }
     if (form.password && form.password !== form.confirm_password) { setError('Konfirmasi kata sandi tidak cocok'); return }
@@ -625,18 +657,33 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Email <span className="text-gray-400 font-normal">(untuk login portal)</span>
               </label>
-              <input type="email"
-                className={cn(
-                  'w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2 transition-colors',
-                  form.email && !isValidEmail(form.email)
-                    ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                    : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100'
+              <div className="relative">
+                <input type="email"
+                  className={cn(
+                    'w-full rounded-xl border px-4 py-2.5 pr-10 text-sm outline-none focus:ring-2 transition-colors',
+                    (form.email && !isValidEmail(form.email)) || emailCheck.status === 'taken'
+                      ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                      : emailCheck.status === 'ok'
+                        ? 'border-emerald-300 focus:border-emerald-500 focus:ring-emerald-100'
+                        : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100'
+                  )}
+                  placeholder="email@contoh.com"
+                  value={form.email}
+                  onChange={e => setField('email', e.target.value)}
+                  onBlur={handleEmailBlur}
+                />
+                {emailCheck.status === 'checking' && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
                 )}
-                placeholder="email@contoh.com"
-                value={form.email} onChange={e => setField('email', e.target.value)}
-              />
+                {emailCheck.status === 'ok' && (
+                  <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
+                )}
+              </div>
               {form.email && !isValidEmail(form.email) && (
                 <p className="mt-1 text-xs text-red-500">Format email tidak valid</p>
+              )}
+              {emailCheck.status === 'taken' && (
+                <p className="mt-1 text-xs text-red-500">{emailCheck.message}</p>
               )}
             </div>
             {form.email && (
@@ -714,10 +761,15 @@ export default function DaftarClient({ orgId, orgNama }: { orgId: string; orgNam
                 || (!!form.nik && form.nik.length !== 16)
                 || (!!form.phone && form.phone.length < 9)
                 || (!!form.email && !isValidEmail(form.email))
+                || emailCheck.status === 'checking'
+                || (emailCheck.status === 'taken' && emailCheck.checkedEmail === form.email)
               }
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
             >
-              Lanjut <ChevronRight className="h-4 w-4" />
+              {emailCheck.status === 'checking'
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Memeriksa email...</>
+                : <>Lanjut <ChevronRight className="h-4 w-4" /></>
+              }
             </button>
           </div>
         </div>
