@@ -57,6 +57,51 @@ describe('buildRequestErrorContext', () => {
     expect(context.ErrorMessage).toContain('ECONNREFUSED')
   })
 
+  it('identifies the deployed release and Railway instance in every request alert', () => {
+    const previousCommit = process.env.RAILWAY_GIT_COMMIT_SHA
+    const previousReplica = process.env.RAILWAY_REPLICA_ID
+    process.env.RAILWAY_GIT_COMMIT_SHA = '5c5ec4f0c9585b142f3b3ff084176a899daaf924'
+    process.env.RAILWAY_REPLICA_ID = 'replica-production-1'
+
+    try {
+      const context = buildRequestErrorContext(
+        new Error('failure'),
+        { path: '/api/example', method: 'GET' },
+        { routerKind: 'App Router', routePath: '/api/example', routeType: 'route' },
+      )
+
+      expect(context.ReleaseCommit).toBe('5c5ec4f0c958')
+      expect(context.RailwayReplica).toBe('replica-production-1')
+    } finally {
+      if (previousCommit === undefined) delete process.env.RAILWAY_GIT_COMMIT_SHA
+      else process.env.RAILWAY_GIT_COMMIT_SHA = previousCommit
+      if (previousReplica === undefined) delete process.env.RAILWAY_REPLICA_ID
+      else process.env.RAILWAY_REPLICA_ID = previousReplica
+    }
+  })
+
+  it('classifies pg-pool connection timeout without an error code', () => {
+    const context = buildRequestErrorContext(
+      new Error('Connection terminated due to connection timeout'),
+      { path: '/api/internal/open-api/process-webhook-outbox?limit=25', method: 'POST' },
+      { routerKind: 'App Router', routePath: '/api/internal/open-api/process-webhook-outbox', routeType: 'route' },
+    )
+
+    expect(context.ErrorCategory).toBe('Database connection timeout')
+    expect(context.DiagnosticHint).toContain('PG_CONNECT_TIMEOUT_MS')
+  })
+
+  it('classifies a broken Next.js response transform stream', () => {
+    const context = buildRequestErrorContext(
+      new TypeError('controller[kState].transformAlgorithm is not a function'),
+      { path: '/dashboard', method: 'GET' },
+      { routerKind: 'App Router', routePath: '/dashboard', routeType: 'render', renderSource: 'server-rendering' },
+    )
+
+    expect(context.ErrorCategory).toBe('Next.js response stream failure')
+    expect(context.DiagnosticHint).toContain('release/replica')
+  })
+
   it('uses the Next.js request path and route context instead of an unavailable url property', () => {
     const error = Object.assign(new Error('invalid input syntax for type date: ""'), {
       code: '22007',

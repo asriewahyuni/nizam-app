@@ -68,6 +68,23 @@ function classifyError(error: DatabaseError) {
   const code = optionalText(error.code) || optionalText(nestedError?.code)
   const message = error.message.toLowerCase()
 
+  if (
+    message.includes('connection terminated due to connection timeout')
+    || message.includes('connection timeout')
+  ) {
+    return {
+      category: 'Database connection timeout',
+      hint: 'PostgreSQL did not establish a connection before the pool deadline. The query is retried automatically; verify database availability, pool saturation, and PG_CONNECT_TIMEOUT_MS if retries are exhausted.',
+    }
+  }
+
+  if (message.includes('transformalgorithm is not a function')) {
+    return {
+      category: 'Next.js response stream failure',
+      hint: 'The Node/Next.js response stream became invalid while rendering. Use the release/replica fields to identify stale rolling-deployment instances; inspect Sentry for the originating render trace if it repeats on the same release.',
+    }
+  }
+
   if (code === 'ECONNREFUSED') {
     return {
       category: 'Database connection refused',
@@ -166,6 +183,8 @@ export function buildRequestErrorContext(
   const fallbackMessage = nestedConnectionError?.message || effectiveCode || 'Unknown error'
 
   return {
+    ReleaseCommit: optionalText(process.env.RAILWAY_GIT_COMMIT_SHA)?.substring(0, 12) || 'Unknown release',
+    RailwayReplica: optionalText(process.env.RAILWAY_REPLICA_ID) || optionalText(process.env.HOSTNAME) || 'Unknown instance',
     RequestPath: optionalText(request?.path) || optionalText(routeContext?.routePath) || 'Unknown path',
     RoutePath: optionalText(routeContext?.routePath) || 'Unknown route',
     Method: optionalText(request?.method) || 'Unknown method',

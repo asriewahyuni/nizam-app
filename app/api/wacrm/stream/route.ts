@@ -20,8 +20,22 @@ export async function GET(req: NextRequest) {
 
   // Ambil dedicated connection dari pool runtime agar memakai fallback URL, SSL,
   // dan retry policy yang sama dengan seluruh query PostgreSQL aplikasi.
-  const client = await connectPostgresClient()
-  await client.query(`LISTEN "${channel}"`)
+  // Kegagalan koneksi dibuat terkontrol agar reconnect SSE tidak membanjiri alert unhandled.
+  let client
+  try {
+    client = await connectPostgresClient()
+    await client.query(`LISTEN "${channel}"`)
+  } catch (error) {
+    console.error('[wacrm-stream] PostgreSQL LISTEN unavailable', {
+      orgId,
+      code: error instanceof Error && 'code' in error ? String(error.code || '') : '',
+      message: error instanceof Error ? error.message : String(error),
+    })
+    return Response.json(
+      { error: 'Layanan pesan real-time sementara tidak tersedia.' },
+      { status: 503, headers: { 'Retry-After': '10' } },
+    )
+  }
 
   const encoder = new TextEncoder()
 

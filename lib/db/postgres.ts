@@ -82,6 +82,8 @@ function shouldRetryPostgresError(error: unknown) {
     message.includes('getaddrinfo enotfound')
     || message.includes('eai_again')
     || message.includes('connection terminated unexpectedly')
+    || message.includes('connection terminated due to connection timeout')
+    || message.includes('connection timeout')
     || message.includes('socket hang up')
   )
 }

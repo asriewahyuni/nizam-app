@@ -94,4 +94,19 @@ describe('Postgres retry', () => {
     expect(mockState.poolInstances).toHaveLength(2)
     expect(mockState.poolInstances[0]?.end).toHaveBeenCalledTimes(1)
   })
+
+  it('retry query saat pg-pool timeout tanpa error code', async () => {
+    mockState.queryQueue.push(
+      async () => {
+        throw new Error('Connection terminated due to connection timeout')
+      },
+      async () => ({ rows: [{ processed: 1 }] })
+    )
+
+    const result = await queryPostgres<{ processed: number }>('select 1 as processed')
+
+    expect(result.rows[0]?.processed).toBe(1)
+    expect(mockState.poolInstances).toHaveLength(2)
+    expect(mockState.poolInstances[0]?.end).toHaveBeenCalledTimes(1)
+  })
 })
