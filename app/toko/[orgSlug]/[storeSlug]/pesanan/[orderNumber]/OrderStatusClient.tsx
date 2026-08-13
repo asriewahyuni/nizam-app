@@ -272,6 +272,7 @@ export default function OrderStatusClient({
           <ThankYouPageSection
             payload={payload}
             orgSlug={orgSlug}
+            isPhysicalShipping={isPhysicalShipping}
             primaryColor={primaryColor}
             softColor={softColor}
             copyOrderLink={copyOrderLink}
@@ -942,6 +943,7 @@ export default function OrderStatusClient({
 type ThankYouPageSectionProps = {
   payload: PublicOrderStatusPayload
   orgSlug: string
+  isPhysicalShipping: boolean
   primaryColor: string
   softColor: string
   copyOrderLink: () => void
@@ -955,6 +957,7 @@ type ThankYouPageSectionProps = {
 function ThankYouPageSection({
   payload,
   orgSlug,
+  isPhysicalShipping,
   primaryColor,
   softColor,
   copyOrderLink,
@@ -1051,7 +1054,11 @@ function ThankYouPageSection({
 
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
           <a
-            href={payload.order.accessUrl || `/store/${payload.store.orgSlug}/${payload.store.slug}`}
+            href={
+              isPhysicalShipping
+                ? `/store/${payload.store.orgSlug}/${payload.store.slug}`
+                : `/member/${orgSlug}/kelas`
+            }
             className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-110 active:scale-[0.99]"
             style={{
               background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`,
