@@ -2,8 +2,9 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { Check, ChevronDown } from 'lucide-react'
 
-interface Option {
+export interface SearchableSelectOption {
   id: string
   name: string
   code: string
@@ -12,13 +13,31 @@ interface Option {
 
 interface SearchableSelectProps {
   label?: string
-  options: Option[]
+  options: SearchableSelectOption[]
   value: string
   onChange: (value: string) => void
   placeholder: string
   required?: boolean
   className?: string
   dark?: boolean
+  searchPlaceholder?: string
+  maxVisibleOptions?: number
+}
+
+export function getVisibleSearchableOptions(
+  options: SearchableSelectOption[],
+  searchTerm: string,
+  maxVisibleOptions?: number,
+) {
+  const normalizedSearch = searchTerm.trim().toLowerCase()
+  const filtered = options.filter((option) =>
+    option.name.toLowerCase().includes(normalizedSearch)
+    || (option.code && option.code.toLowerCase().includes(normalizedSearch))
+  )
+
+  return typeof maxVisibleOptions === 'number' && maxVisibleOptions > 0
+    ? filtered.slice(0, maxVisibleOptions)
+    : filtered
 }
 
 export function SearchableSelect({
@@ -29,18 +48,17 @@ export function SearchableSelect({
   placeholder,
   required = false,
   dark = false,
+  searchPlaceholder = 'Cari kode atau nama akun...',
+  maxVisibleOptions,
 }: SearchableSelectProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
-  const [mounted, setMounted] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const formatRupiah = (amount: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount)
-
-  useEffect(() => { setMounted(true) }, [])
 
   const calcDropdownStyle = (): React.CSSProperties => {
     if (!containerRef.current) return {}
@@ -92,10 +110,7 @@ export function SearchableSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isOpen])
 
-  const filtered = options.filter((o) =>
-    o.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (o.code && o.code.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  const filtered = getVisibleSearchableOptions(options, searchTerm, maxVisibleOptions)
 
   const selectedOption = options.find((o) => o.id === (value || ''))
 
@@ -103,12 +118,12 @@ export function SearchableSelect({
     ? `w-full bg-slate-900 text-white border border-slate-800 rounded-xl px-4 py-3 text-xs font-semibold uppercase tracking-wide cursor-pointer hover:border-slate-600 transition-all flex justify-between items-center min-h-[44px] shadow-xl`
     : `w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-[11px] font-bold text-slate-900 cursor-pointer hover:border-indigo-300 transition-all flex justify-between items-center min-h-[44px]`
 
-  const dropdown = isOpen && mounted ? createPortal(
+  const dropdown = isOpen ? createPortal(
     <div ref={dropdownRef} style={dropdownStyle} className="bg-white border border-slate-200 rounded-xl shadow-2xl p-2 overflow-hidden">
       <input
         autoFocus
         className="w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] outline-none focus:border-indigo-500 mb-2 font-medium"
-        placeholder="Cari kode atau nama akun..."
+        placeholder={searchPlaceholder}
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
         onClick={(e) => e.stopPropagation()}
@@ -139,7 +154,7 @@ export function SearchableSelect({
                     {formatRupiah(opt.balance)}
                   </span>
                 )}
-                {value === opt.id && <span className="text-xs ml-1">✓</span>}
+                {value === opt.id && <Check aria-hidden="true" className="ml-1 h-4 w-4" />}
               </div>
             </div>
           ))
@@ -151,8 +166,18 @@ export function SearchableSelect({
 
   return (
     <div className="space-y-1 relative w-full" ref={containerRef}>
-      {label && <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 px-1">{label}</label>}
-      <div onClick={handleOpen} className={triggerClass}>
+      {label && (
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 px-1">
+          {label}{required ? ' *' : ''}
+        </label>
+      )}
+      <button
+        type="button"
+        onClick={handleOpen}
+        className={triggerClass}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+      >
         <div className="flex flex-col min-w-0 flex-1">
           <span className={`truncate ${selectedOption ? (dark ? 'text-white' : 'text-slate-900') : 'text-slate-400'}`}>
             {selectedOption
@@ -165,8 +190,8 @@ export function SearchableSelect({
             </span>
           )}
         </div>
-        <div className={`text-[8px] shrink-0 ml-2 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>▼</div>
-      </div>
+        <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 ml-2 ${dark ? 'text-slate-500' : 'text-slate-400'}`} />
+      </button>
       {dropdown}
     </div>
   )

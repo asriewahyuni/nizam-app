@@ -1322,11 +1322,20 @@ export default function SalesClient({
                     </div>
 
                     <div className="flex-1 space-y-2">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Customer / Klien</label>
-                      <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-xl outline-none text-sm bg-white font-semibold text-slate-900 shadow-sm focus:border-blue-500 transition-all">
-                         <option value="">Pilih Customer...</option>
-                         {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
+                       <SearchableSelect
+                         label="Customer / Klien"
+                         required
+                         value={customerId}
+                         onChange={setCustomerId}
+                         placeholder="Cari dan pilih customer..."
+                         searchPlaceholder="Cari nama, telepon, atau email customer..."
+                         maxVisibleOptions={5}
+                         options={customers.map((customer: { id: string; name?: string | null; phone?: string | null; phone_wa?: string | null; email?: string | null }) => ({
+                           id: String(customer.id),
+                           name: String(customer.name || 'Tanpa nama'),
+                           code: String(customer.phone || customer.phone_wa || customer.email || ''),
+                         }))}
+                       />
                     </div>
 
                     <div className="w-full md:w-48 space-y-2">
