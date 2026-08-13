@@ -113,6 +113,8 @@ export async function updateLmsCourse(formData: FormData) {
   const description = formData.get('description') as string
   const levelCode = formData.get('levelCode') as string
   const isActive = formData.get('isActive') === 'true'
+  const showInCatalogRaw = formData.get('showInCatalog')
+  const showInCatalog = showInCatalogRaw === null ? true : showInCatalogRaw === 'true'
 
   if (!courseId || !title) throw new Error('ID dan Judul wajib diisi')
 
@@ -124,6 +126,7 @@ export async function updateLmsCourse(formData: FormData) {
       description: description || null,
       level_code: levelCode || 'ALL',
       is_active: isActive,
+      show_in_catalog: showInCatalog,
       updated_at: new Date().toISOString(),
     })
     .eq('id', courseId)

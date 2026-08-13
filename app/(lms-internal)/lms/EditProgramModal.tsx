@@ -24,6 +24,7 @@ type Props = {
     description: string | null
     level_code: string | null
     is_active: boolean
+    show_in_catalog?: boolean
     slug: string
   }
 }
@@ -33,6 +34,7 @@ export function EditProgramModal({ open, onClose, course }: Props) {
   const [description, setDescription] = useState(course.description || '')
   const [levelCode, setLevelCode] = useState(course.level_code || 'ALL')
   const [isActive, setIsActive] = useState(course.is_active)
+  const [showInCatalog, setShowInCatalog] = useState(course.show_in_catalog !== false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -44,6 +46,7 @@ export function EditProgramModal({ open, onClose, course }: Props) {
       setDescription(course.description || '')
       setLevelCode(course.level_code || 'ALL')
       setIsActive(course.is_active)
+      setShowInCatalog(course.show_in_catalog !== false)
       setError(null)
       setDone(false)
       setTimeout(() => titleRef.current?.focus(), 100)
@@ -61,6 +64,7 @@ export function EditProgramModal({ open, onClose, course }: Props) {
     fd.set('description', description.trim())
     fd.set('levelCode', levelCode)
     fd.set('isActive', String(isActive))
+    fd.set('showInCatalog', String(showInCatalog))
 
     startTransition(async () => {
       try {
@@ -179,6 +183,29 @@ export function EditProgramModal({ open, onClose, course }: Props) {
                   <span className="text-xs font-semibold text-slate-600">
                     {isActive ? 'Program Aktif' : 'Program Non-Aktif'}
                   </span>
+                </div>
+
+                {/* Catalog visibility toggle */}
+                <div className="mt-3 flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowInCatalog(!showInCatalog)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                      showInCatalog ? 'bg-emerald-500' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                      showInCatalog ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-600">
+                      {showInCatalog ? 'Tampil di Katalog' : 'Disembunyikan dari Katalog'}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Peserta lama yang sudah terdaftar tetap bisa akses meski disembunyikan.
+                    </p>
+                  </div>
                 </div>
 
                 {error && (

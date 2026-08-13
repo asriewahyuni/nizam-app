@@ -110,6 +110,14 @@ export default function CourseActions({ course }: { course: any }) {
               </div>
 
               <div>
+                <label className={labelCls}>Tampil di Katalog</label>
+                <select name="showInCatalog" defaultValue={course.show_in_catalog === false ? 'false' : 'true'} className={inputCls}>
+                  <option value="true">Ya, tampilkan di katalog</option>
+                  <option value="false">Sembunyikan (program sudah tutup, peserta lama tetap bisa akses)</option>
+                </select>
+              </div>
+
+              <div>
                 <label className={labelCls}>Deskripsi Singkat</label>
                 <textarea
                   name="description"

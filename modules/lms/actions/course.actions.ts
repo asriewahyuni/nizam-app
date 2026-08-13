@@ -117,6 +117,7 @@ export async function getLMSCourses(orgSlug: string) {
        WHERE course.org_id = $1::uuid
          AND course.is_active = TRUE
          AND COALESCE(course.status, 'PUBLISHED') = 'PUBLISHED'
+         AND course.show_in_catalog = TRUE
          AND course.deleted_at IS NULL
        ORDER BY course.is_featured DESC, course.published_at DESC NULLS LAST, course.created_at DESC`,
       [orgId],

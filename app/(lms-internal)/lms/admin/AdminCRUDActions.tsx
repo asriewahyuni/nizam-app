@@ -451,6 +451,7 @@ function EditProgramInlineModal({
   const [description, setDescription] = useState(course.description || '')
   const [levelCode, setLevelCode] = useState(course.level_code || 'ALL')
   const [isActive, setIsActive] = useState(course.is_active ?? true)
+  const [showInCatalog, setShowInCatalog] = useState(course.show_in_catalog ?? true)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -465,6 +466,7 @@ function EditProgramInlineModal({
     fd.set('description', description.trim())
     fd.set('levelCode', levelCode)
     fd.set('isActive', String(isActive))
+    fd.set('showInCatalog', String(showInCatalog))
 
     startTransition(async () => {
       try {
@@ -507,6 +509,16 @@ function EditProgramInlineModal({
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
             <span className="text-xs font-semibold text-slate-600">{isActive ? 'Aktif' : 'Non-Aktif'}</span>
+          </div>
+          <div className="flex items-start gap-3">
+            <button type="button" onClick={() => setShowInCatalog(!showInCatalog)}
+              className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${showInCatalog ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${showInCatalog ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+            <div>
+              <p className="text-xs font-semibold text-slate-600">{showInCatalog ? 'Tampil di Katalog' : 'Disembunyikan dari Katalog'}</p>
+              <p className="text-[10px] text-slate-400">Peserta lama yang sudah terdaftar tetap bisa akses meski disembunyikan.</p>
+            </div>
           </div>
           {error && <p className="text-xs font-semibold text-rose-500 bg-rose-50 rounded-xl px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-2">
