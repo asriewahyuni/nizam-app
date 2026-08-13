@@ -15,6 +15,19 @@ type RequestErrorRouteContext = Readonly<{
   revalidateReason?: string
 }>
 
+type UserErrorIdentity = {
+  user: {
+    id?: unknown
+    email?: unknown
+    user_metadata?: Record<string, unknown> | null
+  }
+  organization?: {
+    id?: unknown
+    name?: unknown
+    role?: unknown
+  } | null
+}
+
 type DatabaseError = Error & {
   code?: unknown
   severity?: unknown
@@ -62,6 +75,23 @@ function classifyError(error: DatabaseError) {
     hint: code
       ? 'Use the request route and PostgreSQL metadata below to locate the originating action/query.'
       : 'Use the request route and stack trace to locate the originating action.',
+  }
+}
+
+export function buildUserErrorContext(identity: UserErrorIdentity | null | undefined) {
+  if (!identity?.user) return { UserId: 'Anonymous/unknown' }
+
+  const metadata = identity.user.user_metadata || {}
+  return {
+    UserId: optionalText(identity.user.id) || 'Unknown user',
+    InternalUserId: optionalText(metadata.internal_user_id),
+    UserName: optionalText(metadata.full_name),
+    UserEmail: optionalText(identity.user.email),
+    UserNik: optionalText(metadata.login_nik),
+    LoginType: optionalText(metadata.login_type),
+    OrganizationId: optionalText(identity.organization?.id),
+    OrganizationName: optionalText(identity.organization?.name),
+    OrganizationRole: optionalText(identity.organization?.role),
   }
 }
 
