@@ -2272,8 +2272,7 @@ export async function updateMyPassword(newPassword: string) {
 
 export async function sendPasswordResetEmail(formData: FormData) {
   const email = formData.get('email') as string
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || 
-                 (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+  const origin = String(process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '') || 'https://member.coreisec.id'
 
   if (isInternalAuthProvider()) {
     const { createInternalAuthResetTokenByEmail } = await import('@/lib/auth/internal-auth.server')
