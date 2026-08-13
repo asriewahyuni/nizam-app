@@ -7,6 +7,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs'
+import { buildRequestErrorContext } from '@/lib/monitoring/request-error-context'
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
@@ -20,21 +21,18 @@ export async function register() {
 
 export const onRequestError: typeof Sentry.captureRequestError = async (err, req, ctx) => {
   Sentry.captureRequestError(err, req, ctx)
-  
-  // Notify Slack for unhandled server errors
+
+  // Next.js instrumentation exposes req.path (bukan req.url) serta route metadata di ctx.
+  // Context disanitasi: headers, payload, parameter query, dan detail nilai DB tidak dikirim.
   try {
     const { sendSlackNotification } = await import('@/lib/slack/client')
+    const errorContext = buildRequestErrorContext(err, req, ctx)
     await sendSlackNotification({
-      message: `*Unhandled Request Error*\nAn unexpected error occurred in the Next.js runtime.`,
+      message: `*Unhandled Request Error*\n${errorContext.ErrorCategory} pada ${errorContext.Method} ${errorContext.RequestPath}`,
       level: 'error',
-      context: {
-        ErrorMessage: err instanceof Error ? err.message : String(err),
-        ErrorStack: err instanceof Error ? err.stack?.substring(0, 500) : 'N/A',
-        Url: req?.url || 'Unknown URL',
-        Method: req?.method || 'Unknown Method'
-      }
+      context: errorContext,
     })
-  } catch (slackError) {
-    // Ignore Slack failure to prevent cascading errors
+  } catch {
+    // Ignore Slack failure to prevent cascading errors.
   }
 }
