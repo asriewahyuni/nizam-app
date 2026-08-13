@@ -365,6 +365,7 @@ export async function createAnggota(payload: {
       password: tempPassword,
       fullName: payload.nama,
       userType: 'member',
+      organizationId: payload.org_id,
     })
     if ('error' in userResult) {
       tempPassword = null

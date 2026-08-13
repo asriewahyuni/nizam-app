@@ -15,6 +15,18 @@ type RequestErrorRouteContext = Readonly<{
   revalidateReason?: string
 }>
 
+type NewUserRegistrationIdentity = {
+  email?: unknown
+  nik?: unknown
+  role?: unknown
+  userId?: unknown
+  organization?: {
+    id?: unknown
+    name?: unknown
+    slug?: unknown
+  } | null
+}
+
 type UserErrorIdentity = {
   user: {
     id?: unknown
@@ -36,6 +48,9 @@ type DatabaseError = Error & {
   column?: unknown
   constraint?: unknown
   routine?: unknown
+  address?: unknown
+  port?: unknown
+  errors?: unknown
 }
 
 function optionalText(value: unknown) {
@@ -43,9 +58,36 @@ function optionalText(value: unknown) {
   return normalized || undefined
 }
 
+function getNestedConnectionError(error: DatabaseError) {
+  const nestedErrors = Array.isArray(error.errors) ? error.errors : []
+  return nestedErrors.find((item): item is DatabaseError => item instanceof Error) || null
+}
+
 function classifyError(error: DatabaseError) {
-  const code = optionalText(error.code)
+  const nestedError = getNestedConnectionError(error)
+  const code = optionalText(error.code) || optionalText(nestedError?.code)
   const message = error.message.toLowerCase()
+
+  if (code === 'ECONNREFUSED') {
+    return {
+      category: 'Database connection refused',
+      hint: 'The server could not open the PostgreSQL connection. Verify DATABASE_URL/RAILWAY_DATABASE_URL, hostname, port, and Railway database availability.',
+    }
+  }
+
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
+    return {
+      category: 'Database hostname resolution failed',
+      hint: 'The PostgreSQL hostname could not be resolved. Verify DATABASE_URL/RAILWAY_DATABASE_URL and DNS/network availability.',
+    }
+  }
+
+  if (code === 'ETIMEDOUT' || code === 'ECONNRESET') {
+    return {
+      category: 'Database connection interrupted',
+      hint: 'The PostgreSQL connection timed out or was reset. Check Railway database availability and network stability.',
+    }
+  }
 
   if (code === '22007' || message.includes('invalid input syntax for type date')) {
     return {
@@ -78,6 +120,19 @@ function classifyError(error: DatabaseError) {
   }
 }
 
+export function buildNewUserRegistrationContext(identity: NewUserRegistrationIdentity) {
+  const organization = identity.organization
+  return {
+    Email: optionalText(identity.email) || '-',
+    NIK: optionalText(identity.nik) || '-',
+    Role: optionalText(identity.role) || '-',
+    UserId: optionalText(identity.userId) || '-',
+    OrganizationId: optionalText(organization?.id) || '-',
+    OrganizationName: optionalText(organization?.name) || 'Platform-level / belum terhubung',
+    OrganizationSlug: optionalText(organization?.slug) || '-',
+  }
+}
+
 export function buildUserErrorContext(identity: UserErrorIdentity | null | undefined) {
   if (!identity?.user) return { UserId: 'Anonymous/unknown' }
 
@@ -104,6 +159,11 @@ export function buildRequestErrorContext(
     ? errorValue as DatabaseError
     : new Error(String(errorValue)) as DatabaseError
   const classification = classifyError(error)
+  const nestedConnectionError = getNestedConnectionError(error)
+  const effectiveCode = optionalText(error.code) || optionalText(nestedConnectionError?.code)
+  const connectionAddress = optionalText(error.address) || optionalText(nestedConnectionError?.address)
+  const connectionPort = optionalText(error.port) || optionalText(nestedConnectionError?.port)
+  const fallbackMessage = nestedConnectionError?.message || effectiveCode || 'Unknown error'
 
   return {
     RequestPath: optionalText(request?.path) || optionalText(routeContext?.routePath) || 'Unknown path',
@@ -113,8 +173,11 @@ export function buildRequestErrorContext(
     RouteType: optionalText(routeContext?.routeType) || 'Unknown route type',
     RenderSource: optionalText(routeContext?.renderSource),
     ErrorCategory: classification.category,
-    ErrorMessage: error.message,
-    DatabaseCode: optionalText(error.code),
+    ErrorMessage: optionalText(error.message) || fallbackMessage,
+    DatabaseCode: effectiveCode,
+    ConnectionTarget: connectionAddress
+      ? `${connectionAddress}${connectionPort ? `:${connectionPort}` : ''}`
+      : undefined,
     DatabaseSeverity: optionalText(error.severity),
     DatabaseSchema: optionalText(error.schema),
     DatabaseTable: optionalText(error.table),

@@ -192,6 +192,7 @@ export async function buatPendaftaran(payload: {
         password: payload.password,
         fullName: payload.nama_lengkap,
         userType: 'anggota',
+        organizationId: payload.org_id,
       })
       if ('error' in authResult) {
         // Email/NIK sudah dipakai akun lain di platform Nizam (bukan pendaftaran
@@ -425,6 +426,7 @@ async function createAnggotaFromPendaftaran(
       password: tempPassword,
       fullName: pend.nama_lengkap,
       userType: 'member',
+      organizationId: pend.org_id,
     })
     if ('error' in userResult) {
       // Akun mungkin sudah ada — lanjutkan tanpa error fatal

@@ -587,6 +587,7 @@ describe('Auth Actions', () => {
       password: 'secret123',
       fullName: 'Rina Saputri',
       userType: 'staff',
+      organizationId: 'org-1',
     })
     expect(employeeUpdateQuery.eq).toHaveBeenCalledWith('id', 'emp-1')
     expect(orgMembersTable.upsert).toHaveBeenCalledWith(

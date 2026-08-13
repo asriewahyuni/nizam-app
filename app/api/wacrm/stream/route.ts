@@ -5,7 +5,7 @@
 
 import { NextRequest } from 'next/server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { Client } from 'pg'
+import { connectPostgresClient } from '@/lib/db/postgres'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,9 +18,9 @@ export async function GET(req: NextRequest) {
   // Channel name: wacrm_<org_id tanpa hyphen> — max 63 char, UUID = 32 char + 6 prefix = 38 OK
   const channel = 'wacrm_' + orgId.replace(/-/g, '_')
 
-  // Dedicated connection (bukan pool) — LISTEN butuh koneksi persisten
-  const client = new Client({ connectionString: process.env.RAILWAY_DATABASE_URL })
-  await client.connect()
+  // Ambil dedicated connection dari pool runtime agar memakai fallback URL, SSL,
+  // dan retry policy yang sama dengan seluruh query PostgreSQL aplikasi.
+  const client = await connectPostgresClient()
   await client.query(`LISTEN "${channel}"`)
 
   const encoder = new TextEncoder()
@@ -51,12 +51,12 @@ export async function GET(req: NextRequest) {
       // Cleanup saat client disconnect
       req.signal.addEventListener('abort', async () => {
         clearInterval(keepalive)
-        try { await client.end() } catch {}
+        try { client.release() } catch {}
         try { controller.close() } catch {}
       })
     },
     cancel() {
-      client.end().catch(() => {})
+      client.release()
     },
   })
 

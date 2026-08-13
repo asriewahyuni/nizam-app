@@ -702,6 +702,7 @@ export async function createInternalAuthUser(input: {
   fullName?: string | null
   userType?: string | null
   legacyUserId?: string | null
+  organizationId?: string | null
 }) {
   const normalizedEmail = normalizeEmail(input.email)
   const normalizedNik = normalizeNik(input.nik)
@@ -788,18 +789,31 @@ export async function createInternalAuthUser(input: {
     // legacy_user_id sebagai user.id — cocok dengan org_members.user_id.
     await createSession(userId)
 
-    // Notify Slack about new user registration
+    // Notify Slack about new user registration, including the explicit destination org.
     try {
       const { sendSlackNotification } = await import('@/lib/slack/client')
+      const { buildNewUserRegistrationContext } = await import('@/lib/monitoring/request-error-context')
+      const normalizedOrganizationId = normalizeUuid(input.organizationId)
+      const organization = normalizedOrganizationId
+        ? (await queryPostgres<{ id: string; name: string; slug: string }>(
+            `SELECT id::text, name, slug
+             FROM public.organizations
+             WHERE id = $1::uuid
+             LIMIT 1`,
+            [normalizedOrganizationId],
+          )).rows[0] || null
+        : null
+
       await sendSlackNotification({
         message: `*New User Registered*\nA new user has been created in Nizam ERP.`,
         level: 'success',
-        context: {
-          Email: normalizedEmail || '-',
-          NIK: normalizedNik || '-',
-          Role: normalizedUserType,
-          UserId: resolvedLegacyUserId ?? userId
-        }
+        context: buildNewUserRegistrationContext({
+          email: normalizedEmail,
+          nik: normalizedNik,
+          role: normalizedUserType,
+          userId: resolvedLegacyUserId ?? userId,
+          organization,
+        }),
       })
     } catch (slackError) {
       console.error('Failed to send Slack notification for new user:', slackError)

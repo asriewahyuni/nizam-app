@@ -986,6 +986,7 @@ export async function registerEmployeeAccount(formData: FormData) {
         password,
         fullName: staffFullName || nik,
         userType: 'staff',
+        organizationId: emp.org_id,
       })
 
       if ('error' in internalUser) {
@@ -2339,6 +2340,7 @@ export async function registerLmsMember(formData: FormData) {
       password,
       fullName,
       userType: 'member',
+      organizationId: orgId,
     })
 
     if ('error' in internalUser) {

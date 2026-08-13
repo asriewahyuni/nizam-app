@@ -1,10 +1,62 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildNewUserRegistrationContext,
   buildRequestErrorContext,
   buildUserErrorContext,
 } from '@/lib/monitoring/request-error-context'
 
 describe('buildRequestErrorContext', () => {
+  it('includes the destination organization in new-user registration alerts', () => {
+    expect(buildNewUserRegistrationContext({
+      email: 'member@example.com',
+      nik: null,
+      role: 'member',
+      userId: 'user-id',
+      organization: {
+        id: 'org-id',
+        name: 'CORe ISEC',
+        slug: 'coreisec',
+      },
+    })).toEqual({
+      Email: 'member@example.com',
+      NIK: '-',
+      Role: 'member',
+      UserId: 'user-id',
+      OrganizationId: 'org-id',
+      OrganizationName: 'CORe ISEC',
+      OrganizationSlug: 'coreisec',
+    })
+  })
+
+  it('marks a registration without organization context as platform-level', () => {
+    expect(buildNewUserRegistrationContext({
+      email: 'owner@example.com',
+      role: 'owner',
+      userId: 'owner-id',
+    }).OrganizationName).toBe('Platform-level / belum terhubung')
+  })
+
+  it('classifies ECONNREFUSED as a database connectivity failure', () => {
+    const error = Object.assign(new AggregateError([
+      Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:5432'), {
+        code: 'ECONNREFUSED',
+        address: '127.0.0.1',
+        port: 5432,
+      }),
+    ]), { code: 'ECONNREFUSED' })
+
+    const context = buildRequestErrorContext(
+      error,
+      { path: '/api/wacrm/stream', method: 'GET' },
+      { routerKind: 'App Router', routePath: '/api/wacrm/stream', routeType: 'route' },
+    )
+
+    expect(context.ErrorCategory).toBe('Database connection refused')
+    expect(context.DiagnosticHint).toContain('DATABASE_URL')
+    expect(context.ConnectionTarget).toBe('127.0.0.1:5432')
+    expect(context.ErrorMessage).toContain('ECONNREFUSED')
+  })
+
   it('uses the Next.js request path and route context instead of an unavailable url property', () => {
     const error = Object.assign(new Error('invalid input syntax for type date: ""'), {
       code: '22007',
