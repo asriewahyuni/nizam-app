@@ -1,7 +1,7 @@
 import { unstable_noStore as noStore } from 'next/cache'
 import { redirect, notFound } from 'next/navigation'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { getCrmTicket } from '@/modules/crm/actions/tickets.actions'
+import { getCrmTicket, getCrmAssignableStaff } from '@/modules/crm/actions/tickets.actions'
 import { TicketDetailClient } from './TicketDetailClient'
 
 export default async function CrmTicketDetailPage({
@@ -14,13 +14,17 @@ export default async function CrmTicketDetailPage({
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 
-  const result = await getCrmTicket(id, orgData.org.id)
+  const [result, staff] = await Promise.all([
+    getCrmTicket(id, orgData.org.id),
+    getCrmAssignableStaff(),
+  ])
   if (!result) notFound()
 
   return (
     <TicketDetailClient
       ticket={result.ticket}
       notes={result.notes}
+      assignableStaff={staff}
       orgId={orgData.org.id}
       currentUserName={
         (orgData.user?.user_metadata?.full_name as string | undefined) ||

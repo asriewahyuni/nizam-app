@@ -9,12 +9,16 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import type {
-  CrmTicket,
-  CrmTicketNote,
-  CrmTicketFilters,
-  CreateCrmTicketInput,
-  UpdateCrmTicketInput,
+import {
+  TICKET_STATUS_LABEL,
+  TICKET_PRIORITY_LABEL,
+  type CrmTicket,
+  type CrmTicketNote,
+  type CrmTicketFilters,
+  type CreateCrmTicketInput,
+  type UpdateCrmTicketInput,
+  type CrmTicketStatus,
+  type CrmTicketPriority,
 } from '@/modules/crm/lib/ticket-constants'
 
 // Re-export types so consumers can import from one place
@@ -256,6 +260,18 @@ export async function updateCrmTicket(
   const supabase = await createClient()
   const db = supabase as any
 
+  // 1. Fetch current ticket details for comparison
+  const { data: ticket, error: fetchError } = await db
+    .from('crm_tickets')
+    .select('status, priority, ticket_number, submitter_name, notification_email, notification_phone, assigned_to_user_id, subject')
+    .eq('id', ticketId)
+    .eq('org_id', orgData.org.id)
+    .maybeSingle()
+
+  if (fetchError || !ticket) {
+    return { error: 'Tiket tidak ditemukan.' }
+  }
+
   const patch: Record<string, any> = { updated_at: new Date().toISOString() }
 
   if (input.status !== undefined) {
@@ -278,6 +294,125 @@ export async function updateCrmTicket(
     .eq('org_id', orgData.org.id)
 
   if (error) return { error: error.message || 'Gagal memperbarui tiket.' }
+
+  // 2. Generate activity log notes and trigger notifications
+  const authorName = (orgData.user?.user_metadata?.full_name as string | undefined)
+    || orgData.user?.email?.split('@')[0]
+    || 'Staff'
+
+  const notesToInsert: any[] = []
+
+  // Status trigger
+  if (input.status !== undefined && input.status !== ticket.status) {
+    const oldLabel = TICKET_STATUS_LABEL[ticket.status as CrmTicketStatus] || ticket.status
+    const newLabel = TICKET_STATUS_LABEL[input.status] || input.status
+    notesToInsert.push({
+      ticket_id: ticketId,
+      org_id: orgData.org.id,
+      author_name: 'System',
+      author_type: 'SYSTEM',
+      content: `Status tiket diubah dari "${oldLabel}" menjadi "${newLabel}" oleh ${authorName}.`,
+      is_internal: true,
+      created_at: new Date().toISOString(),
+    })
+
+    // Enqueue notifications (Email/WA)
+    const newStatus = input.status
+    if (newStatus === 'IN_PROGRESS' || newStatus === 'RESOLVED' || newStatus === 'CLOSED') {
+      const subject = `[${ticket.ticket_number}] Status Tiket: ${newLabel}`
+      const body = `Halo ${ticket.submitter_name},\n\n` +
+        `Tiket Anda dengan nomor ${ticket.ticket_number} telah diperbarui ke status: ${newLabel}.\n\n` +
+        `Subjek: ${ticket.subject}\n` +
+        (input.resolution ? `Tindakan/Resolusi: ${input.resolution}\n\n` : `\n`) +
+        `Terima kasih atas perhatian Anda.\nSupport Team`
+
+      // Email
+      if (ticket.notification_email) {
+        try {
+          const { enqueueNotification } = await import('@/modules/notifications/outbox.server')
+          await enqueueNotification({
+            orgId: orgData.org.id,
+            userId: orgData.user?.id,
+            eventType: 'crm_ticket_status_change',
+            channel: 'EMAIL',
+            recipient: ticket.notification_email,
+            subject,
+            body,
+            idempotencyKey: `crm-tkt-email-${ticketId}-${newStatus}-${Date.now()}`,
+          })
+        } catch (err) {
+          console.error('[CRM] Failed to enqueue email notification:', err)
+        }
+      }
+
+      // WhatsApp
+      if (ticket.notification_phone) {
+        try {
+          const { enqueueNotification } = await import('@/modules/notifications/outbox.server')
+          await enqueueNotification({
+            orgId: orgData.org.id,
+            userId: orgData.user?.id,
+            eventType: 'crm_ticket_status_change',
+            channel: 'WHATSAPP',
+            recipient: ticket.notification_phone,
+            body,
+            idempotencyKey: `crm-tkt-wa-${ticketId}-${newStatus}-${Date.now()}`,
+          })
+        } catch (err) {
+          console.error('[CRM] Failed to enqueue WA notification:', err)
+        }
+      }
+    }
+  }
+
+  // Assignee trigger
+  if (input.assigned_to_user_id !== undefined && input.assigned_to_user_id !== ticket.assigned_to_user_id) {
+    let assigneeName = 'Tidak Ditugaskan'
+    if (input.assigned_to_user_id) {
+      const { data: assignee } = await db
+        .from('internal_auth_users')
+        .select('display_name, login_email')
+        .eq('id', input.assigned_to_user_id)
+        .maybeSingle()
+      if (assignee) {
+        assigneeName = assignee.display_name || assignee.login_email
+      }
+    }
+    notesToInsert.push({
+      ticket_id: ticketId,
+      org_id: orgData.org.id,
+      author_name: 'System',
+      author_type: 'SYSTEM',
+      content: `Tiket ditugaskan ke: ${assigneeName} oleh ${authorName}.`,
+      is_internal: true,
+      created_at: new Date().toISOString(),
+    })
+  }
+
+  // Priority trigger
+  if (input.priority !== undefined && input.priority !== ticket.priority) {
+    const oldPrio = TICKET_PRIORITY_LABEL[ticket.priority as CrmTicketPriority] || ticket.priority
+    const newPrio = TICKET_PRIORITY_LABEL[input.priority] || input.priority
+    notesToInsert.push({
+      ticket_id: ticketId,
+      org_id: orgData.org.id,
+      author_name: 'System',
+      author_type: 'SYSTEM',
+      content: `Prioritas tiket diubah dari "${oldPrio}" menjadi "${newPrio}" oleh ${authorName}.`,
+      is_internal: true,
+      created_at: new Date().toISOString(),
+    })
+  }
+
+  // Insert any activity notes generated
+  if (notesToInsert.length > 0) {
+    const { error: notesError } = await db
+      .from('crm_ticket_notes')
+      .insert(notesToInsert)
+    if (notesError) {
+      console.error('[CRM] Failed to insert system notes:', notesError)
+    }
+  }
 
   revalidatePath('/crm/tickets')
   revalidatePath(`/crm/tickets/${ticketId}`)
@@ -354,4 +489,40 @@ export async function createCrmTicketInternal(
     org_id: orgData.org.id,
     source: 'STAFF',
   })
+}
+
+// ─── Staff: Ambil daftar staff yang bisa ditugaskan ─────────────────────────────
+
+export async function getCrmAssignableStaff(): Promise<{ id: string; display_name: string; login_email: string }[]> {
+  const orgData = await getActiveOrg()
+  if (!orgData) return []
+
+  const supabase = await createClient()
+  const db = supabase as any
+
+  // Ambil data anggota organisasi yang aktif
+  const { data, error } = await db
+    .from('org_members')
+    .select('user_id')
+    .eq('org_id', orgData.org.id)
+    .eq('is_active', true)
+
+  if (error || !data) return []
+
+  const userIds = data.map((r: any) => r.user_id).filter(Boolean)
+  if (userIds.length === 0) return []
+
+  // Resolve userIds ke internal_auth_users
+  const { data: users, error: usersError } = await db
+    .from('internal_auth_users')
+    .select('id, display_name, login_email')
+    .or(`id.in.(${userIds.join(',')}),legacy_user_id.in.(${userIds.join(',')})`)
+
+  if (usersError || !users) return []
+
+  return users.map((u: any) => ({
+    id: u.id,
+    display_name: u.display_name || u.login_email,
+    login_email: u.login_email,
+  }))
 }
