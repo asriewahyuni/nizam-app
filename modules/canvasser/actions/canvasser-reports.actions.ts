@@ -6,6 +6,7 @@
 import { queryPostgres } from '@/lib/db/postgres'
 import { formatDate } from '@/lib/utils'
 import { renderCanvasserReportPdf } from '@/modules/canvasser/lib/canvasser-report-pdf'
+import { extractManagedStorageKey, createSignedStorageGetUrl } from '@/lib/storage/object-storage.server'
 import type {
   CanvasserPerformanceReport,
   CanvasserPerformanceReportRow,
@@ -62,6 +63,25 @@ export async function getCanvasserPerformanceReport(orgId: string, params: {
   return { from: params.from, to: params.to, rows, totals }
 }
 
+// Ambil bytes logo org dari bucket Railway untuk di-embed ke PDF. logo_url
+// tersimpan sebagai path proxy (/api/storage/public/...) — tukar ke signed
+// URL S3 dulu supaya bisa di-fetch langsung dari server, tanpa round-trip
+// lewat route proxy app sendiri. Gagal ambil logo tidak boleh menggagalkan
+// pembuatan laporan, jadi semua error di sini ditelan (return null).
+async function fetchOrgLogoBytes(logoUrl: string | null): Promise<Uint8Array | null> {
+  if (!logoUrl) return null
+  try {
+    const key = extractManagedStorageKey(logoUrl)
+    const fetchUrl = key ? await createSignedStorageGetUrl(key) : logoUrl
+    if (!key && !/^(https?:|data:)/i.test(logoUrl)) return null
+    const res = await fetch(fetchUrl)
+    if (!res.ok) return null
+    return new Uint8Array(await res.arrayBuffer())
+  } catch {
+    return null
+  }
+}
+
 export async function generateCanvasserReportPdfBase64(orgId: string, params: {
   from: string
   to: string
@@ -69,14 +89,16 @@ export async function generateCanvasserReportPdfBase64(orgId: string, params: {
 }): Promise<{ base64: string; filename: string } | { error: string }> {
   const [report, orgRes] = await Promise.all([
     getCanvasserPerformanceReport(orgId, params),
-    queryPostgres<{ name: string }>(`SELECT name FROM organizations WHERE id = $1`, [orgId]),
+    queryPostgres<{ name: string; logo_url: string | null }>(`SELECT name, logo_url FROM organizations WHERE id = $1`, [orgId]),
   ])
   const orgName = orgRes.rows[0]?.name || 'Nizam ERP'
+  const logoBytes = await fetchOrgLogoBytes(orgRes.rows[0]?.logo_url || null)
 
   const bytes = await renderCanvasserReportPdf({
     orgName,
     report,
     generatedAtLabel: formatDate(new Date().toISOString()),
+    logoBytes,
   })
 
   return {

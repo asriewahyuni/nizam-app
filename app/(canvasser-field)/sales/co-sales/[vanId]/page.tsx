@@ -6,7 +6,7 @@ import {
   getSessionVisits,
   getVanCustomerRoster,
 } from '@/modules/canvasser/actions/canvasser.actions'
-import { getOrgBrandColor } from '@/modules/canvasser/lib/canvasser-theme.server'
+import { getOrgBrandColor, getOrgBrandLogo } from '@/modules/canvasser/lib/canvasser-theme.server'
 import { queryPostgres } from '@/lib/db/postgres'
 import { VanOperationalClient } from './VanOperationalClient'
 
@@ -27,7 +27,7 @@ export default async function VanOperationalPage({
   if (!van) notFound()
 
   const session = await getTodaySession(orgId, vanId)
-  const [visits, contactsRes, productsRes, roster, unassignedRes, brandColor, warehousesRes] = await Promise.all([
+  const [visits, contactsRes, productsRes, roster, unassignedRes, brandColor, warehousesRes, brandLogoUrl] = await Promise.all([
     session ? getSessionVisits(orgId, session.id) : Promise.resolve([]),
     queryPostgres<{ id: string; name: string; address: string | null; credit_limit: string }>(
       `SELECT id, name, address, credit_limit FROM contacts
@@ -55,6 +55,7 @@ export default async function VanOperationalPage({
       `SELECT id, name FROM warehouses WHERE org_id = $1 AND is_active = true ORDER BY name ASC`,
       [orgId]
     ),
+    getOrgBrandLogo(orgId),
   ])
   const warehouses = warehousesRes.rows.map(w => ({ id: w.id, name: w.name }))
 
@@ -84,6 +85,7 @@ export default async function VanOperationalPage({
       roster={roster}
       unassignedContacts={unassignedContacts}
       brandColor={brandColor}
+      brandLogoUrl={brandLogoUrl}
       warehouses={warehouses}
     />
   )

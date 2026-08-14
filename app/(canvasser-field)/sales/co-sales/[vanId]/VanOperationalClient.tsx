@@ -29,6 +29,7 @@ import { EmptyState, StatusBadge, SafeButton, useConfirm } from '@/components/ui
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { Modal, FormRow, inputCls } from '@/components/canvasser/CanvasserModal'
 import {
+  createSession,
   addVisit,
   addStockToSession,
   closeSession,
@@ -69,6 +70,7 @@ interface Props {
   roster: CanvasserCustomerRosterEntry[]
   unassignedContacts: UnassignedContact[]
   brandColor: string
+  brandLogoUrl: string | null
   warehouses: WarehouseOption[]
 }
 
@@ -106,7 +108,7 @@ const BOTTOM_TABS = [
 // Diam-diam gagal saat offline — data lokasi murni real-time, telat kirim tidak berguna.
 const GPS_PING_INTERVAL_MS = 5 * 60 * 1000
 
-export function VanOperationalClient({ orgId, van, session: initialSession, visits: initialVisits, contacts, products, roster, unassignedContacts, brandColor, warehouses }: Props) {
+export function VanOperationalClient({ orgId, van, session: initialSession, visits: initialVisits, contacts, products, roster, unassignedContacts, brandColor, brandLogoUrl, warehouses }: Props) {
   const sync = useCanvasserSync({ orgId, vanId: van.id, initialSession, initialVisits, products })
   const { session, visits, isOnline, outbox, pendingCount, failedCount } = sync
 
@@ -114,6 +116,7 @@ export function VanOperationalClient({ orgId, van, session: initialSession, visi
   const [showAddVisit, setShowAddVisit] = useState(false)
   const [showAddStock, setShowAddStock] = useState(false)
   const [showCloseSession, setShowCloseSession] = useState(false)
+  const [showStartSession, setShowStartSession] = useState(false)
   const [showAssignCustomer, setShowAssignCustomer] = useState(false)
   const [ledgerContact, setLedgerContact] = useState<{ id: string; name: string } | null>(null)
   const { confirm, ConfirmUI } = useConfirm()
@@ -188,6 +191,11 @@ export function VanOperationalClient({ orgId, van, session: initialSession, visi
     <div className="flex flex-col min-h-screen">
       {/* Header */}
       <div className="shrink-0 bg-white border-b border-slate-200 px-4 pt-4 pb-3 sticky top-0 z-20">
+        {brandLogoUrl && (
+          // h-10 + w-auto + object-contain: tinggi dikunci, lebar menyesuaikan
+          // rasio asli logo (resize proporsional, tidak gepeng/melar).
+          <img src={brandLogoUrl} alt="" className="h-10 w-auto object-contain mb-2" />
+        )}
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <Link href="/sales/co-sales" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-600 mb-0.5 cursor-pointer">
@@ -206,8 +214,21 @@ export function VanOperationalClient({ orgId, van, session: initialSession, visi
               Tutup Sesi
             </button>
           )}
-          {session?.status === 'SELESAI' && (
-            <span className="shrink-0 px-3 py-2 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-xl uppercase">Sesi Ditutup</span>
+          {(!session || session.status === 'SELESAI') && (
+            <div className="shrink-0 flex items-center gap-2">
+              {session?.status === 'SELESAI' && (
+                <span className="px-3 py-2 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-xl uppercase">Sesi Ditutup</span>
+              )}
+              <button type="button"
+                onClick={() => setShowStartSession(true)}
+                disabled={!isOnline}
+                title={!isOnline ? 'Butuh koneksi internet' : undefined}
+                style={{ backgroundColor: brandColor }}
+                className="px-4 py-2.5 text-white text-xs font-bold rounded-xl hover:opacity-90 transition-opacity duration-150 cursor-pointer min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {session?.status === 'SELESAI' ? 'Mulai Sesi Baru' : 'Mulai Sesi'}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -431,6 +452,20 @@ export function VanOperationalClient({ orgId, van, session: initialSession, visi
           </button>
         ))}
       </nav>
+
+      <AnimatePresence>
+        {showStartSession && (!session || session.status === 'SELESAI') && (
+          <StartSessionModal
+            orgId={orgId}
+            vanId={van.id}
+            vanName={van.name}
+            products={products}
+            warehouses={warehouses}
+            brandColor={brandColor}
+            onClose={() => setShowStartSession(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {session && showAddVisit && (
@@ -718,6 +753,92 @@ function AddVisitModal({ orgId, sessionId, contacts, nextOrder, brandColor, onCl
   )
 }
 
+// ─── Modal: Mulai Sesi ───────────────────────────────────────────────────────────
+// Sebelumnya cuma bisa dipicu dari dashboard kantor — sekarang tersedia juga
+// langsung dari layar lapangan, supaya canvasser bisa mulai sesi baru sendiri
+// (mis. putaran ke-2) tanpa menunggu staf kantor. Backend (createSession) sudah
+// mendukung ini: hanya diblokir kalau ADA sesi berstatus AKTIF hari itu.
+
+function StartSessionModal({ orgId, vanId, vanName, products, warehouses, brandColor, onClose }: {
+  orgId: string
+  vanId: string
+  vanName: string
+  products: ProductOption[]
+  warehouses: WarehouseOption[]
+  brandColor: string
+  onClose: () => void
+}) {
+  const [qtyByProduct, setQtyByProduct] = useState<Record<string, number>>({})
+  const [sourceWarehouseId, setSourceWarehouseId] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit() {
+    setError(null)
+    const openingStock: StockItem[] = products
+      .filter(p => (qtyByProduct[p.id] || 0) > 0)
+      .map(p => ({ product_id: p.id, product_name: p.name, qty_loaded: qtyByProduct[p.id], unit: p.unit }))
+
+    if (openingStock.length > 0 && !sourceWarehouseId) {
+      setError('Pilih gudang sumber stok terlebih dahulu.')
+      throw new Error('validation')
+    }
+
+    const res = await createSession(orgId, { van_id: vanId, source_warehouse_id: sourceWarehouseId || undefined, opening_stock: openingStock })
+    if (res.error) { setError(res.error); throw new Error(res.error) }
+    window.location.reload()
+  }
+
+  return (
+    <Modal title={`Mulai Sesi — ${vanName}`} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-xs text-slate-500">Input stok produk yang dimuat ke van sebelum berangkat.</p>
+        {warehouses.length > 0 && (
+          <FormRow label="Gudang Sumber">
+            <select
+              value={sourceWarehouseId}
+              onChange={e => setSourceWarehouseId(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">— Pilih gudang —</option>
+              {warehouses.map(w => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
+            </select>
+          </FormRow>
+        )}
+        {products.length === 0 ? (
+          <p className="text-sm text-amber-600 font-semibold italic">Belum ada produk aktif. Tambahkan produk di modul Inventori dulu.</p>
+        ) : (
+          <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-100 divide-y divide-slate-50">
+            {products.map(p => (
+              <div key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">{p.name}</p>
+                  <p className="text-[10px] text-slate-400 uppercase">{p.unit}</p>
+                </div>
+                <input
+                  type="number" min="0" step="1"
+                  value={qtyByProduct[p.id] || ''}
+                  onChange={e => setQtyByProduct(prev => ({ ...prev, [p.id]: Number(e.target.value) }))}
+                  placeholder="0"
+                  className="w-24 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {error && <p className="text-xs font-semibold text-rose-600">{error}</p>}
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-700 cursor-pointer">Batal</button>
+          <SafeButton onClick={handleSubmit} loadingText="Memulai..." className="!rounded-xl" style={{ backgroundColor: brandColor, borderColor: brandColor }}>
+            Mulai
+          </SafeButton>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ─── Modal: Tambah Stok ─────────────────────────────────────────────────────────
 
 function AddStockModal({ orgId, sessionId, products, warehouses, vanWarehouseId, brandColor, onClose }: {
@@ -863,7 +984,7 @@ function OrderModal({ visit, products, brandColor, onSubmit, onClose }: {
                 className={`${inputCls} flex-1`}
               >
                 {products.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} — {formatRupiah(p.sellingPrice)}</option>
+                  <option key={p.id} value={p.id}>{p.name} ({p.unit}) — {formatRupiah(p.sellingPrice)}</option>
                 ))}
               </select>
               <input

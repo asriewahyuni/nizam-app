@@ -9,6 +9,7 @@ export type CanvasserReportPdfInput = {
   orgName: string
   report: CanvasserPerformanceReport
   generatedAtLabel: string
+  logoBytes?: Uint8Array | null
 }
 
 const PAGE_WIDTH = 595.28
@@ -52,6 +53,20 @@ export async function renderCanvasserReportPdf(input: CanvasserReportPdfInput): 
       return true
     }
     return false
+  }
+
+  if (input.logoBytes) {
+    try {
+      // Kunci tinggi, lebar ikut rasio asli gambar — resize proporsional,
+      // logo tidak gepeng/melar walau bentuk aslinya landscape.
+      const logoImage = await pdf.embedPng(input.logoBytes).catch(() => pdf.embedJpg(input.logoBytes as Uint8Array))
+      const logoHeight = 32
+      const logoWidth = (logoImage.width / logoImage.height) * logoHeight
+      page.drawImage(logoImage, { x: MARGIN, y: y - logoHeight, width: logoWidth, height: logoHeight })
+      y -= logoHeight + 10
+    } catch {
+      // Format logo tidak didukung pdf-lib (mis. WEBP/SVG) — lewati, PDF tetap dibuat tanpa logo.
+    }
   }
 
   page.drawText(input.orgName, { x: MARGIN, y, size: 13, font: bold, color: primary })

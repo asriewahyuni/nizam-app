@@ -222,14 +222,18 @@ function VanCard({ van, location, brandColor, onStartSession, onEdit }: {
       )}
 
       <div className="flex gap-2 pt-1">
-        {van.session ? (
+        {/* Sesi hari ini bisa lebih dari satu (mis. putaran ke-2) — createSession
+            di backend cuma memblokir kalau ADA sesi berstatus AKTIF, jadi begitu
+            status SELESAI, "Mulai Sesi" harus tetap muncul di samping "Lihat Detail". */}
+        {status !== 'BELUM MULAI' && (
           <Link
             href={`/sales/co-sales/${van.id}`}
             className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-200 transition-colors duration-150 cursor-pointer min-h-[44px]"
           >
             Lihat Detail <ArrowRight size={14} />
           </Link>
-        ) : (
+        )}
+        {status !== 'AKTIF' && (
           <button type="button"
             onClick={onStartSession}
             style={{ backgroundColor: brandColor }}

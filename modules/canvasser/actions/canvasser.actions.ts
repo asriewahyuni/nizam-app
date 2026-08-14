@@ -1025,8 +1025,13 @@ export async function getTodayDashboard(orgId: string): Promise<CanvasserTodayDa
   const supabase = await createClient()
   const db = supabase as unknown as LooseDb
 
+  // Satu van bisa punya >1 sesi per hari (mis. putaran ke-2 setelah sesi pertama
+  // ditutup — lihat createSession). order by created_at ascending supaya saat
+  // di-map per van di bawah, entry TERAKHIR (= sesi terbaru) yang dipakai,
+  // bukan urutan tak terjamin dari database.
   const { data: sessionsData, error: sessionsErr } = await db
     .from('canvasser_sessions').select('*').eq('org_id', orgId).eq('session_date', today)
+    .order('created_at', { ascending: true })
   if (sessionsErr) console.error('getTodayDashboard sessions:', sessionsErr)
 
   const sessions = ((sessionsData || []) as Record<string, unknown>[]).map(mapSession)

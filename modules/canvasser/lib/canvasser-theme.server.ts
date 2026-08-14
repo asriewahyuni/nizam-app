@@ -21,3 +21,14 @@ export async function getOrgBrandColor(orgId: string): Promise<string> {
     : ''
   return HEX_COLOR_RE.test(primaryColor) ? primaryColor : DEFAULT_PRIMARY_COLOR
 }
+
+// Logo perusahaan (organizations.logo_url) — sumber yang sama dipakai halaman
+// login & dashboard shell. null kalau org belum upload logo (Settings > Bisnis).
+export async function getOrgBrandLogo(orgId: string): Promise<string | null> {
+  const res = await queryPostgres<{ logo_url: string | null }>(
+    `SELECT logo_url FROM organizations WHERE id = $1`,
+    [orgId]
+  )
+  const logoUrl = String(res.rows[0]?.logo_url || '').trim()
+  return logoUrl || null
+}
