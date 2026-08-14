@@ -292,28 +292,30 @@ export function VanOperationalClient({ orgId, van, session: initialSession, visi
               </button>
             )}
             <div className="rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Produk</th>
-                    <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Dimuat</th>
-                    <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Terjual</th>
-                    <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Sisa</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {stockRows.length === 0 ? (
-                    <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-400 italic">Tidak ada stok dimuat di sesi ini. Tekan &quot;Tambah Stok&quot; di atas.</td></tr>
-                  ) : stockRows.map(row => (
-                    <tr key={row.product_id} className="hover:bg-slate-50/50">
-                      <td className="px-5 py-3 font-medium text-slate-700">{row.product_name}</td>
-                      <td className="px-5 py-3 text-right tabular-nums">{row.qty_loaded} {row.unit}</td>
-                      <td className="px-5 py-3 text-right tabular-nums text-blue-600 font-semibold">{row.sold} {row.unit}</td>
-                      <td className="px-5 py-3 text-right tabular-nums font-bold text-slate-900">{row.remaining} {row.unit}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Produk</th>
+                      <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Dimuat</th>
+                      <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Terjual</th>
+                      <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Sisa</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {stockRows.length === 0 ? (
+                      <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-400 italic">Tidak ada stok dimuat di sesi ini. Tekan &quot;Tambah Stok&quot; di atas.</td></tr>
+                    ) : stockRows.map(row => (
+                      <tr key={row.product_id} className="hover:bg-slate-50/50">
+                        <td className="px-5 py-3 font-medium text-slate-700 whitespace-nowrap">{row.product_name}</td>
+                        <td className="px-5 py-3 text-right tabular-nums whitespace-nowrap">{row.qty_loaded} {row.unit}</td>
+                        <td className="px-5 py-3 text-right tabular-nums text-blue-600 font-semibold whitespace-nowrap">{row.sold} {row.unit}</td>
+                        <td className="px-5 py-3 text-right tabular-nums font-bold text-slate-900 whitespace-nowrap">{row.remaining} {row.unit}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
           )
@@ -332,26 +334,28 @@ export function VanOperationalClient({ orgId, van, session: initialSession, visi
             </div>
             <p className="text-sm text-slate-500">Outlet dikunjungi: <span className="font-bold text-slate-700">{rekap.visitsDone} / {visits.length}</span></p>
             <div className="rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">No. Order</th>
-                    <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Metode</th>
-                    <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {rekap.allOrders.length === 0 ? (
-                    <tr><td colSpan={3} className="px-5 py-10 text-center text-slate-400 italic">Belum ada order hari ini.</td></tr>
-                  ) : rekap.allOrders.map(o => (
-                    <tr key={o.id} className="hover:bg-slate-50/50">
-                      <td className="px-5 py-3 font-mono text-xs text-slate-600">{o.orderNumber}</td>
-                      <td className="px-5 py-3 text-slate-600">{o.paymentMethod}</td>
-                      <td className="px-5 py-3 text-right font-semibold text-slate-900 tabular-nums">{formatRupiah(o.total)}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">No. Order</th>
+                      <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Metode</th>
+                      <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {rekap.allOrders.length === 0 ? (
+                      <tr><td colSpan={3} className="px-5 py-10 text-center text-slate-400 italic">Belum ada order hari ini.</td></tr>
+                    ) : rekap.allOrders.map(o => (
+                      <tr key={o.id} className="hover:bg-slate-50/50">
+                        <td className="px-5 py-3 font-mono text-xs text-slate-600 whitespace-nowrap">{o.orderNumber}</td>
+                        <td className="px-5 py-3 text-slate-600 whitespace-nowrap">{o.paymentMethod}</td>
+                        <td className="px-5 py-3 text-right font-semibold text-slate-900 tabular-nums whitespace-nowrap">{formatRupiah(o.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
           )

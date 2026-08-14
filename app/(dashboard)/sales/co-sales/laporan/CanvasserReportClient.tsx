@@ -125,30 +125,32 @@ export function CanvasserReportClient({ orgId, vans, initialReport, initialFrom,
         <EmptyState icon={FileBarChart} title="Tidak ada data pada periode ini" description="Coba ubah rentang tanggal atau pilih van lain." />
       ) : (
         <div className="rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Tanggal</th>
-                <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Van</th>
-                <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Penjualan</th>
-                <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Kas</th>
-                <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">AR Tertagih</th>
-                <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Kunjungan</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {report.rows.map((row, idx) => (
-                <tr key={`${row.vanId}-${row.sessionDate}-${idx}`} className="hover:bg-slate-50/50">
-                  <td className="px-5 py-3 text-slate-600">{formatDate(row.sessionDate, 'short')}</td>
-                  <td className="px-5 py-3 font-medium text-slate-700">{row.vanCode} — {row.vanName}</td>
-                  <td className="px-5 py-3 text-right tabular-nums font-semibold text-slate-900">{formatRupiah(row.salesTotal)}</td>
-                  <td className="px-5 py-3 text-right tabular-nums text-slate-600">{formatRupiah(row.cashCollected)}</td>
-                  <td className="px-5 py-3 text-right tabular-nums text-slate-600">{formatRupiah(row.arCollected)}</td>
-                  <td className="px-5 py-3 text-right tabular-nums text-slate-600">{row.visitsDone}/{row.visitsTotal}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Tanggal</th>
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Van</th>
+                  <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Penjualan</th>
+                  <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Kas</th>
+                  <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">AR Tertagih</th>
+                  <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Kunjungan</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {report.rows.map((row, idx) => (
+                  <tr key={`${row.vanId}-${row.sessionDate}-${idx}`} className="hover:bg-slate-50/50">
+                    <td className="px-5 py-3 text-slate-600 whitespace-nowrap">{formatDate(row.sessionDate, 'short')}</td>
+                    <td className="px-5 py-3 font-medium text-slate-700 whitespace-nowrap">{row.vanCode} — {row.vanName}</td>
+                    <td className="px-5 py-3 text-right tabular-nums font-semibold text-slate-900 whitespace-nowrap">{formatRupiah(row.salesTotal)}</td>
+                    <td className="px-5 py-3 text-right tabular-nums text-slate-600 whitespace-nowrap">{formatRupiah(row.cashCollected)}</td>
+                    <td className="px-5 py-3 text-right tabular-nums text-slate-600 whitespace-nowrap">{formatRupiah(row.arCollected)}</td>
+                    <td className="px-5 py-3 text-right tabular-nums text-slate-600 whitespace-nowrap">{row.visitsDone}/{row.visitsTotal}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
