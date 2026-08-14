@@ -18,8 +18,18 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'contactId dan stage wajib diisi' }, { status: 400 })
     }
 
-    const VALID_STAGES = ['masuk', 'follow_up', 'negosiasi', 'closing']
-    if (!VALID_STAGES.includes(stage)) {
+    // Ambil settings dari modul instance untuk memvalidasi stage dinamis
+    const instanceResult = await queryPostgres(
+      `SELECT settings FROM org_module_instances WHERE org_id = $1 AND module_key = 'WA_CRM' LIMIT 1`,
+      [orgId]
+    )
+    const settings = instanceResult.rows[0]?.settings || {}
+    const pipelineStages = (settings.pipeline_stages ?? 'Masuk, Follow Up, Negosiasi, Closing')
+      .split(',')
+      .map((s: string) => s.trim().toLowerCase().replace(/\s+/g, '_'))
+      .filter(Boolean)
+
+    if (!pipelineStages.includes(stage)) {
       return NextResponse.json({ error: 'Stage tidak valid' }, { status: 400 })
     }
 

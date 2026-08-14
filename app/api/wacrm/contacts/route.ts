@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
     // Default: kembalikan wacrm_contacts
     const result = await queryPostgres(
-      `SELECT id, name, phone, stage, product_interest, notes, last_message_at, created_at
+      `SELECT id, name, phone, stage, product_interest, notes, last_message_at, created_at, subtasks, checklist
        FROM wacrm_contacts
        WHERE org_id = $1
        ORDER BY last_message_at DESC NULLS LAST, created_at DESC`,
@@ -98,26 +98,53 @@ export async function POST(req: NextRequest) {
 }
 
 // PATCH /api/wacrm/contacts
-// Body: { contactId, name?, product_interest?, notes? }
+// Body: { contactId, name?, product_interest?, notes?, subtasks?, checklist? }
 export async function PATCH(req: NextRequest) {
   try {
     const orgData = await getActiveOrg()
     if (!orgData) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const orgId = orgData.org.id
 
-    const { contactId, name, product_interest, notes } = await req.json()
+    const { contactId, name, product_interest, notes, subtasks, checklist } = await req.json()
     if (!contactId) return NextResponse.json({ error: 'contactId wajib diisi' }, { status: 400 })
     if (name !== undefined && !name?.trim()) return NextResponse.json({ error: 'Nama tidak boleh kosong' }, { status: 400 })
 
-    const result = await queryPostgres(
-      `UPDATE wacrm_contacts
-       SET name             = COALESCE($3, name),
-           product_interest = $4,
-           notes            = $5
-       WHERE id = $1 AND org_id = $2
-       RETURNING id, name, phone, stage, product_interest, notes, last_message_at`,
-      [contactId, orgId, name?.trim() ?? null, product_interest ?? null, notes ?? null]
-    )
+    const fields: string[] = []
+    const params: any[] = [contactId, orgId]
+    let paramIndex = 3
+
+    if (name !== undefined) {
+      fields.push(`name = $${paramIndex++}`)
+      params.push(name.trim())
+    }
+    if (product_interest !== undefined) {
+      fields.push(`product_interest = $${paramIndex++}`)
+      params.push(product_interest)
+    }
+    if (notes !== undefined) {
+      fields.push(`notes = $${paramIndex++}`)
+      params.push(notes)
+    }
+    if (subtasks !== undefined) {
+      fields.push(`subtasks = $${paramIndex++}::jsonb`)
+      params.push(JSON.stringify(subtasks))
+    }
+    if (checklist !== undefined) {
+      fields.push(`checklist = $${paramIndex++}::jsonb`)
+      params.push(JSON.stringify(checklist))
+    }
+
+    if (fields.length === 0) {
+      return NextResponse.json({ error: 'Tidak ada field yang diupdate' }, { status: 400 })
+    }
+
+    const query = `
+      UPDATE wacrm_contacts
+      SET ${fields.join(', ')}
+      WHERE id = $1 AND org_id = $2
+      RETURNING id, name, phone, stage, product_interest, notes, last_message_at, created_at, subtasks, checklist
+    `
+    const result = await queryPostgres(query, params)
 
     if (!result.rows[0]) return NextResponse.json({ error: 'Kontak tidak ditemukan' }, { status: 404 })
     return NextResponse.json({ data: result.rows[0] })
