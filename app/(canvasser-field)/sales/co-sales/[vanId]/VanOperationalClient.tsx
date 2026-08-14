@@ -53,6 +53,11 @@ interface ContactOption { id: string; name: string; address: string | null; cred
 interface ProductOption { id: string; name: string; unit: string; sellingPrice: number }
 interface UnassignedContact { id: string; name: string }
 
+interface WarehouseOption {
+  id: string
+  name: string
+}
+
 interface Props {
   orgId: string
   branchId: string | null
@@ -64,6 +69,7 @@ interface Props {
   roster: CanvasserCustomerRosterEntry[]
   unassignedContacts: UnassignedContact[]
   brandColor: string
+  warehouses: WarehouseOption[]
 }
 
 type Tab = 'kunjungan' | 'stok' | 'rekap' | 'pelanggan'
@@ -100,7 +106,7 @@ const BOTTOM_TABS = [
 // Diam-diam gagal saat offline — data lokasi murni real-time, telat kirim tidak berguna.
 const GPS_PING_INTERVAL_MS = 5 * 60 * 1000
 
-export function VanOperationalClient({ orgId, van, session: initialSession, visits: initialVisits, contacts, products, roster, unassignedContacts, brandColor }: Props) {
+export function VanOperationalClient({ orgId, van, session: initialSession, visits: initialVisits, contacts, products, roster, unassignedContacts, brandColor, warehouses }: Props) {
   const sync = useCanvasserSync({ orgId, vanId: van.id, initialSession, initialVisits, products })
   const { session, visits, isOnline, outbox, pendingCount, failedCount } = sync
 
@@ -441,6 +447,8 @@ export function VanOperationalClient({ orgId, van, session: initialSession, visi
             orgId={orgId}
             sessionId={session.id}
             products={products}
+            warehouses={warehouses}
+            vanWarehouseId={van.warehouseId}
             brandColor={brandColor}
             onClose={() => setShowAddStock(false)}
           />
@@ -708,15 +716,19 @@ function AddVisitModal({ orgId, sessionId, contacts, nextOrder, brandColor, onCl
 
 // ─── Modal: Tambah Stok ─────────────────────────────────────────────────────────
 
-function AddStockModal({ orgId, sessionId, products, brandColor, onClose }: {
+function AddStockModal({ orgId, sessionId, products, warehouses, vanWarehouseId, brandColor, onClose }: {
   orgId: string
   sessionId: string
   products: ProductOption[]
+  warehouses: WarehouseOption[]
+  vanWarehouseId: string | null
   brandColor: string
   onClose: () => void
 }) {
   const [qtyByProduct, setQtyByProduct] = useState<Record<string, number>>({})
+  const [sourceWarehouseId, setSourceWarehouseId] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const sourceOptions = warehouses.filter(w => w.id !== vanWarehouseId)
 
   const items: StockItem[] = products
     .filter(p => (qtyByProduct[p.id] || 0) > 0)
@@ -725,7 +737,8 @@ function AddStockModal({ orgId, sessionId, products, brandColor, onClose }: {
   async function handleSubmit() {
     setError(null)
     if (items.length === 0) { setError('Isi minimal 1 qty produk.'); throw new Error('validation') }
-    const res = await addStockToSession(orgId, sessionId, items)
+    if (!sourceWarehouseId) { setError('Pilih gudang sumber stok terlebih dahulu.'); throw new Error('validation') }
+    const res = await addStockToSession(orgId, sessionId, sourceWarehouseId, items)
     if (res.error) { setError(res.error); throw new Error(res.error) }
     window.location.reload()
   }
@@ -734,6 +747,20 @@ function AddStockModal({ orgId, sessionId, products, brandColor, onClose }: {
     <Modal title="Tambah Stok ke Sesi" onClose={onClose}>
       <div className="space-y-4">
         <p className="text-xs text-slate-500">Qty yang diisi akan ditambahkan ke stok yang sudah dimuat (bukan menimpa).</p>
+        {sourceOptions.length > 0 && (
+          <FormRow label="Gudang Sumber">
+            <select
+              value={sourceWarehouseId}
+              onChange={e => setSourceWarehouseId(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">— Pilih gudang —</option>
+              {sourceOptions.map(w => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
+            </select>
+          </FormRow>
+        )}
         {products.length === 0 ? (
           <p className="text-sm text-amber-600 font-semibold italic">Belum ada produk aktif. Tambahkan produk di modul Inventori dulu.</p>
         ) : (

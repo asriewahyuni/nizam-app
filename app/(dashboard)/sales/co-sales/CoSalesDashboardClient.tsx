@@ -29,6 +29,11 @@ interface ProductOption {
   sellingPrice: number
 }
 
+interface WarehouseOption {
+  id: string
+  name: string
+}
+
 interface Props {
   orgId: string
   branchId: string | null
@@ -38,9 +43,10 @@ interface Props {
   employees: EmployeeOption[]
   vanLocations: CanvasserVanLocation[]
   brandColor: string
+  warehouses: WarehouseOption[]
 }
 
-export function CoSalesDashboardClient({ orgId, vans, todayDashboard, products, employees, vanLocations, brandColor }: Props) {
+export function CoSalesDashboardClient({ orgId, vans, todayDashboard, products, employees, vanLocations, brandColor, warehouses }: Props) {
   const [showVanModal, setShowVanModal] = useState(false)
   const [showSessionModal, setShowSessionModal] = useState(false)
   const [sessionVanId, setSessionVanId] = useState<string | null>(null)
@@ -121,6 +127,7 @@ export function CoSalesDashboardClient({ orgId, vans, todayDashboard, products, 
             vanId={sessionVanId}
             vans={vans}
             products={products}
+            warehouses={warehouses}
             brandColor={brandColor}
             onClose={() => { setShowSessionModal(false); setSessionVanId(null) }}
           />
@@ -268,17 +275,20 @@ function CopyLinkButton({ vanId }: { vanId: string }) {
 
 // ─── Modal: Buat Sesi ─────────────────────────────────────────────────────────
 
-function CreateSessionModal({ orgId, vanId, vans, products, brandColor, onClose }: {
+function CreateSessionModal({ orgId, vanId, vans, products, warehouses, brandColor, onClose }: {
   orgId: string
   vanId: string
   vans: CanvasserVan[]
   products: ProductOption[]
+  warehouses: WarehouseOption[]
   brandColor: string
   onClose: () => void
 }) {
   const [qtyByProduct, setQtyByProduct] = useState<Record<string, number>>({})
+  const [sourceWarehouseId, setSourceWarehouseId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const van = vans.find(v => v.id === vanId)
+  const sourceOptions = warehouses.filter(w => w.id !== van?.warehouseId)
 
   async function handleSubmit() {
     setError(null)
@@ -286,7 +296,12 @@ function CreateSessionModal({ orgId, vanId, vans, products, brandColor, onClose 
       .filter(p => (qtyByProduct[p.id] || 0) > 0)
       .map(p => ({ product_id: p.id, product_name: p.name, qty_loaded: qtyByProduct[p.id], unit: p.unit }))
 
-    const res = await createSession(orgId, { van_id: vanId, opening_stock: openingStock })
+    if (openingStock.length > 0 && !sourceWarehouseId) {
+      setError('Pilih gudang sumber stok terlebih dahulu.')
+      throw new Error('validation')
+    }
+
+    const res = await createSession(orgId, { van_id: vanId, source_warehouse_id: sourceWarehouseId || undefined, opening_stock: openingStock })
     if (res.error) { setError(res.error); throw new Error(res.error) }
     window.location.reload()
   }
@@ -295,6 +310,20 @@ function CreateSessionModal({ orgId, vanId, vans, products, brandColor, onClose 
     <Modal title={`Mulai Sesi — ${van?.name || ''}`} onClose={onClose}>
       <div className="space-y-4">
         <p className="text-xs text-slate-500">Input stok produk yang dimuat ke van sebelum berangkat.</p>
+        {sourceOptions.length > 0 && (
+          <FormRow label="Gudang Sumber">
+            <select
+              value={sourceWarehouseId}
+              onChange={e => setSourceWarehouseId(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">— Pilih gudang —</option>
+              {sourceOptions.map(w => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
+            </select>
+          </FormRow>
+        )}
         {products.length === 0 ? (
           <p className="text-sm text-amber-600 font-semibold italic">Belum ada produk aktif. Tambahkan produk di modul Inventori dulu.</p>
         ) : (

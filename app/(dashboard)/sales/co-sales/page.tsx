@@ -13,7 +13,7 @@ export default async function CoSalesDashboardPage() {
   const orgId = orgData.org.id;
   const activeBranch = await getActiveBranch(orgId);
 
-  const [vans, todayDashboard, productsRes, employeeRows, vanLocations, brandColor] = await Promise.all([
+  const [vans, todayDashboard, productsRes, employeeRows, vanLocations, brandColor, warehousesRes] = await Promise.all([
     getCanvasserVans(orgId),
     getTodayDashboard(orgId),
     queryPostgres<{ id: string; name: string; unit: string; selling_price: string }>(
@@ -25,6 +25,10 @@ export default async function CoSalesDashboardPage() {
     getEmployees(orgId),
     getVanLocations(orgId),
     getOrgBrandColor(orgId),
+    queryPostgres<{ id: string; name: string }>(
+      `SELECT id, name FROM warehouses WHERE org_id = $1 AND is_active = true ORDER BY name ASC`,
+      [orgId]
+    ),
   ]);
 
   const products = productsRes.rows.map(p => ({
@@ -33,6 +37,8 @@ export default async function CoSalesDashboardPage() {
     unit: p.unit,
     sellingPrice: Number(p.selling_price),
   }));
+
+  const warehouses = warehousesRes.rows.map(w => ({ id: w.id, name: w.name }));
 
   const employees = employeeRows.map((e: Record<string, unknown>) => ({
     id: String(e.id || ''),
@@ -50,6 +56,7 @@ export default async function CoSalesDashboardPage() {
       employees={employees}
       vanLocations={vanLocations}
       brandColor={brandColor}
+      warehouses={warehouses}
     />
   );
 }

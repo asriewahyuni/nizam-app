@@ -27,7 +27,7 @@ export default async function VanOperationalPage({
   if (!van) notFound()
 
   const session = await getTodaySession(orgId, vanId)
-  const [visits, contactsRes, productsRes, roster, unassignedRes, brandColor] = await Promise.all([
+  const [visits, contactsRes, productsRes, roster, unassignedRes, brandColor, warehousesRes] = await Promise.all([
     session ? getSessionVisits(orgId, session.id) : Promise.resolve([]),
     queryPostgres<{ id: string; name: string; address: string | null; credit_limit: string }>(
       `SELECT id, name, address, credit_limit FROM contacts
@@ -51,7 +51,12 @@ export default async function VanOperationalPage({
       [orgId]
     ),
     getOrgBrandColor(orgId),
+    queryPostgres<{ id: string; name: string }>(
+      `SELECT id, name FROM warehouses WHERE org_id = $1 AND is_active = true ORDER BY name ASC`,
+      [orgId]
+    ),
   ])
+  const warehouses = warehousesRes.rows.map(w => ({ id: w.id, name: w.name }))
 
   const contacts = contactsRes.rows.map(c => ({
     id: c.id,
@@ -79,6 +84,7 @@ export default async function VanOperationalPage({
       roster={roster}
       unassignedContacts={unassignedContacts}
       brandColor={brandColor}
+      warehouses={warehouses}
     />
   )
 }

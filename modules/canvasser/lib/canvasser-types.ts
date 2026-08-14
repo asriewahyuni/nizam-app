@@ -11,6 +11,7 @@ export interface CanvasserVan {
   driverName: string
   driverPhone: string | null
   fixedAssetId: string | null
+  warehouseId: string | null
   isActive: boolean
   notes: string | null
   createdAt: string

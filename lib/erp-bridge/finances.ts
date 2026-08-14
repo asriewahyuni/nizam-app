@@ -162,12 +162,15 @@ export const ERPBridge = {
       )
       if (existingRows.length > 0) return { success: true }
 
-      // Ambil akun HPP (kode 5021) dan Persediaan (kode 1301) untuk org ini
+      // Ambil akun HPP (kode 5021, fallback 5001) dan Persediaan (kode 1301) untuk org ini.
+      // Fallback ke 5001 karena beberapa org merestrukturisasi CoA-nya dengan kode HPP
+      // berbeda (mis. header 5000/5001) alih-alih kode default seed 5021 — tanpa fallback
+      // ini, jurnal HPP diam-diam ter-skip terus untuk org tsb.
       const { rows: accountRows } = await queryPostgres(
-        `SELECT id, code FROM accounts WHERE org_id = $1 AND code IN ('1301','5021') AND is_active = TRUE`,
+        `SELECT id, code FROM accounts WHERE org_id = $1 AND code IN ('1301','5021','5001') AND is_active = TRUE`,
         [orgId]
       )
-      const hppAccount = accountRows.find(r => r.code === '5021')
+      const hppAccount = accountRows.find(r => r.code === '5021') || accountRows.find(r => r.code === '5001')
       const persediaanAccount = accountRows.find(r => r.code === '1301')
 
       if (!hppAccount || !persediaanAccount) {

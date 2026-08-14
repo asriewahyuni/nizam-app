@@ -72,10 +72,124 @@ function mapVan(r: Record<string, unknown>): CanvasserVan {
     driverName: String(r.driver_name || ''),
     driverPhone: r.driver_phone ? String(r.driver_phone) : null,
     fixedAssetId: r.fixed_asset_id ? String(r.fixed_asset_id) : null,
+    warehouseId: r.warehouse_id ? String(r.warehouse_id) : null,
     isActive: Boolean(r.is_active),
     notes: r.notes ? String(r.notes) : null,
     createdAt: String(r.created_at || ''),
     updatedAt: String(r.updated_at || ''),
+  }
+}
+
+// ── Integrasi stok riil (gudang cabang <-> gudang virtual van) ─────────────────
+// Setiap van punya `warehouses` row sendiri (canvasser_vans.warehouse_id, lihat
+// migrasi 1422). "Muat Stok" = mutasi (transfer) dari gudang cabang ke gudang
+// van — nilai stok org tidak berubah, cuma pindah lokasi. "Catat Order" = stok
+// gudang van benar-benar berkurang (barang sudah diserahkan ke pelanggan).
+
+type StockAvailabilityCheckItem = { productId: string; productName: string; qty: number; unit: string }
+
+async function ensureWarehouseStockAvailable(
+  orgId: string, warehouseId: string, items: StockAvailabilityCheckItem[]
+): Promise<{ error?: string }> {
+  const positive = items.filter(i => i.qty > 0)
+  if (positive.length === 0) return {}
+
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const productIds = positive.map(i => i.productId)
+  const res = await queryPostgres<{ product_id: string; quantity: string }>(
+    `SELECT product_id, COALESCE(SUM(quantity), 0) AS quantity
+     FROM inventory_stocks WHERE org_id = $1 AND warehouse_id = $2 AND product_id = ANY($3)
+     GROUP BY product_id`,
+    [orgId, warehouseId, productIds]
+  )
+  const availableByProduct = new Map(res.rows.map(r => [r.product_id, Number(r.quantity || 0)]))
+
+  for (const item of positive) {
+    const available = availableByProduct.get(item.productId) || 0
+    if (item.qty > available) {
+      return { error: `Stok "${item.productName}" tidak cukup. Tersedia ${available} ${item.unit}, diminta ${item.qty} ${item.unit}.` }
+    }
+  }
+  return {}
+}
+
+// Muat stok dari gudang cabang ke gudang van — divalidasi dulu, lalu dieksekusi
+// sebagai inventory transfer (mekanisme yang sama dgn modul Inventori).
+async function loadStockToVanWarehouse(
+  orgId: string, sourceWarehouseId: string, vanWarehouseId: string, items: StockItem[], notes: string
+): Promise<{ error?: string }> {
+  const positiveItems = items.filter(i => i.qty_loaded > 0)
+  if (positiveItems.length === 0) return {}
+
+  const availability = await ensureWarehouseStockAvailable(
+    orgId, sourceWarehouseId,
+    positiveItems.map(i => ({ productId: i.product_id, productName: i.product_name, qty: i.qty_loaded, unit: i.unit }))
+  )
+  if (availability.error) return availability
+
+  const { createInventoryTransfer } = await import('@/modules/inventory/actions/inventory.actions')
+  const result = await createInventoryTransfer(orgId, {
+    transfer_date: new Date().toISOString().split('T')[0],
+    source_wh_id: sourceWarehouseId,
+    target_wh_id: vanWarehouseId,
+    notes,
+    items: positiveItems.map(i => ({ product_id: i.product_id, quantity: i.qty_loaded, notes: '' })),
+  })
+  if (result && 'error' in result) return { error: `Gagal memuat stok ke van: ${result.error}` }
+  return {}
+}
+
+// Potong stok gudang van secara riil saat order dicatat (canvasser = instant
+// delivery — barang sudah diserahkan ke pelanggan saat ini). Best-effort: order
+// sudah tersimpan sebelum ini dipanggil, jadi kegagalan di sini di-log, bukan
+// membatalkan order (barang secara fisik sudah pindah tangan).
+async function settleCanvasserOrderStock(orgId: string, args: {
+  orderId: string
+  orderNumber: string
+  branchId: string | null
+  vanWarehouseId: string
+  items: { productId: string; productName: string; qty: number; avgCost: number }[]
+}): Promise<void> {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const today = new Date().toISOString().split('T')[0]
+
+  for (const item of args.items) {
+    if (item.qty <= 0) continue
+    try {
+      // adjust_inventory_stock punya 2 overload (4 & 6 parameter, yang 6-param
+      // punya DEFAULT utk 2 parameter terakhir) — memanggil dgn persis 4 argumen
+      // selalu ambigu ("function is not unique") krn cocok dgn overload manapun.
+      // Harus selalu isi 6 argumen eksplisit (batch_number/bin_id = NULL) utk
+      // menghindari ambiguitas ini sama sekali.
+      await queryPostgres(
+        `SELECT adjust_inventory_stock($1::uuid, $2::uuid, $3::uuid, $4::numeric, NULL::text, NULL::uuid)`,
+        [orgId, item.productId, args.vanWarehouseId, -Math.abs(item.qty)]
+      )
+      await queryPostgres(
+        `INSERT INTO stock_movements
+           (org_id, branch_id, product_id, movement_date, quantity, unit_price, reference_type, reference_id, notes)
+         VALUES ($1, $2, $3, $4::date, $5, $6, 'CANVASSER_SALE', $7, $8)`,
+        [orgId, args.branchId, item.productId, today, -Math.abs(item.qty), item.avgCost, args.orderId, `Order canvasser ${args.orderNumber}`]
+      )
+    } catch (err) {
+      (console as any).error('settleCanvasserOrderStock: gagal potong stok van', { orderId: args.orderId, productId: item.productId, err })
+    }
+  }
+
+  try {
+    const cogsResult = await ERPBridge.recordCOGS({
+      orgId,
+      branchId: args.branchId ?? undefined,
+      saleId: args.orderId,
+      saleDate: today,
+      saleNumber: args.orderNumber,
+      lines: args.items.map(i => ({ productId: i.productId, productName: i.productName, quantity: i.qty, avgCost: i.avgCost })),
+    })
+    if (cogsResult && 'error' in cogsResult) {
+      (console as any).warn('settleCanvasserOrderStock: recordCOGS warning', cogsResult.error, { orderId: args.orderId })
+    }
+  } catch (err) {
+    (console as any).warn('settleCanvasserOrderStock: recordCOGS exception', err, { orderId: args.orderId })
   }
 }
 
@@ -227,8 +341,38 @@ export async function createCanvasserVan(orgId: string, payload: {
     .single()
 
   if (error) return { error: error.message }
+  const vanId = String((data as Record<string, unknown>).id)
+
+  // Setiap van butuh gudang virtual sendiri — lokasi stok yang dimutasi dari
+  // gudang cabang saat "Muat Stok" dan berkurang riil saat "Catat Order".
+  const { data: warehouseRow, error: warehouseError } = await db
+    .from('warehouses')
+    .insert({
+      org_id: orgId,
+      code: `VAN-${payload.code}`,
+      name: `Van - ${payload.name}`,
+      branch_id: branch.branchId,
+      is_active: true,
+    })
+    .select('id')
+    .single()
+
+  if (warehouseError) {
+    await db.from('canvasser_vans').delete().eq('id', vanId)
+    return { error: `Gagal membuat gudang van: ${warehouseError.message}` }
+  }
+
+  const { data: updatedVan, error: updateError } = await db
+    .from('canvasser_vans')
+    .update({ warehouse_id: (warehouseRow as Record<string, unknown>).id })
+    .eq('id', vanId)
+    .select('*')
+    .single()
+
+  if (updateError) return { error: updateError.message }
+
   revalidatePath('/sales/co-sales')
-  return { data: mapVan(data as Record<string, unknown>) }
+  return { data: mapVan(updatedVan as Record<string, unknown>) }
 }
 
 export async function updateCanvasserVan(orgId: string, vanId: string, payload: Partial<{
@@ -285,6 +429,7 @@ export async function getTodaySession(orgId: string, vanId: string): Promise<Can
 
 export async function createSession(orgId: string, payload: {
   van_id: string
+  source_warehouse_id?: string
   opening_stock: StockItem[]
 }): Promise<{ data?: CanvasserSession; error?: string }> {
   const supabase = await createClient()
@@ -293,6 +438,26 @@ export async function createSession(orgId: string, payload: {
   const existing = await getTodaySession(orgId, payload.van_id)
   if (existing && existing.status === 'AKTIF') {
     return { error: 'Van ini sudah punya sesi AKTIF hari ini.' }
+  }
+
+  if (payload.opening_stock.some(i => i.qty_loaded > 0)) {
+    const { data: vanRow, error: vanErr } = await db
+      .from('canvasser_vans')
+      .select('warehouse_id, name')
+      .eq('id', payload.van_id)
+      .eq('org_id', orgId)
+      .maybeSingle()
+    if (vanErr || !vanRow) return { error: 'Van tidak ditemukan.' }
+    const van = vanRow as Record<string, unknown>
+    const vanWarehouseId = van.warehouse_id ? String(van.warehouse_id) : null
+    if (!vanWarehouseId) return { error: 'Van ini belum punya gudang. Hubungi admin.' }
+    if (!payload.source_warehouse_id) return { error: 'Pilih gudang sumber stok terlebih dahulu.' }
+
+    const loadResult = await loadStockToVanWarehouse(
+      orgId, payload.source_warehouse_id, vanWarehouseId, payload.opening_stock,
+      `Muat stok awal sesi - ${String(van.name || '')}`
+    )
+    if (loadResult.error) return { error: loadResult.error }
   }
 
   const { data, error } = await db
@@ -317,7 +482,9 @@ export async function createSession(orgId: string, payload: {
 // Menambah stok ke sesi yang sudah AKTIF (mis. canvasser lupa isi stok saat
 // Mulai Sesi, atau ambil tambahan stok di tengah hari). Di-merge ke
 // opening_stock yang sudah ada berdasarkan product_id, bukan menimpa.
-export async function addStockToSession(orgId: string, sessionId: string, items: StockItem[]): Promise<{ data?: CanvasserSession; error?: string }> {
+export async function addStockToSession(
+  orgId: string, sessionId: string, sourceWarehouseId: string, items: StockItem[]
+): Promise<{ data?: CanvasserSession; error?: string }> {
   const supabase = await createClient()
   const db = supabase as unknown as LooseDb
 
@@ -331,18 +498,34 @@ export async function addStockToSession(orgId: string, sessionId: string, items:
   const session = sessionRow as Record<string, unknown>
   if (String(session.status) !== 'AKTIF') return { error: 'Sesi ini sudah ditutup, tidak bisa menambah stok.' }
 
+  if (!items.some(i => i.qty_loaded > 0)) return { error: 'Isi minimal 1 qty produk yang ingin ditambahkan.' }
+  if (!sourceWarehouseId) return { error: 'Pilih gudang sumber stok terlebih dahulu.' }
+
+  const { data: vanRow, error: vanErr } = await db
+    .from('canvasser_vans')
+    .select('warehouse_id, name')
+    .eq('id', String(session.van_id))
+    .eq('org_id', orgId)
+    .maybeSingle()
+  if (vanErr || !vanRow) return { error: 'Van tidak ditemukan.' }
+  const van = vanRow as Record<string, unknown>
+  const vanWarehouseId = van.warehouse_id ? String(van.warehouse_id) : null
+  if (!vanWarehouseId) return { error: 'Van ini belum punya gudang. Hubungi admin.' }
+
+  const loadResult = await loadStockToVanWarehouse(
+    orgId, sourceWarehouseId, vanWarehouseId, items, `Tambah stok sesi - ${String(van.name || '')}`
+  )
+  if (loadResult.error) return { error: loadResult.error }
+
   const currentStock = (session.opening_stock as StockItem[]) || []
   const merged = new Map<string, StockItem>()
   for (const s of currentStock) merged.set(s.product_id, { ...s })
-  let addedAny = false
   for (const item of items) {
     if (item.qty_loaded <= 0) continue
-    addedAny = true
     const existing = merged.get(item.product_id)
     if (existing) existing.qty_loaded += item.qty_loaded
     else merged.set(item.product_id, { ...item })
   }
-  if (!addedAny) return { error: 'Isi minimal 1 qty produk yang ingin ditambahkan.' }
 
   const { data, error } = await db
     .from('canvasser_sessions')
@@ -398,21 +581,32 @@ export async function closeSession(orgId: string, sessionId: string, payload: {
   // Susun jurnal penutupan sesi — hanya jika ada nilai untuk dijurnal.
   let closingJournalEntryId: string | null = null
   if (totalSales > 0 || arCollected > 0) {
-    const [kasId, piutangId, pendapatanId] = await Promise.all([
+    // Beberapa org merestrukturisasi CoA-nya jadi akun pendapatan yang lebih rinci
+    // (4101 Penjualan Tunai / 4102 Penjualan Piutang) dan menonaktifkan 4001 generik.
+    // Coba akun rinci dulu, fallback ke 4001 kalau org belum punya split itu — supaya
+    // penutupan sesi tidak gagal hanya karena penamaan akun pendapatan berbeda.
+    const [kasId, piutangId, pendapatanTunaiId, pendapatanKreditId, pendapatanUmumId] = await Promise.all([
       ERPBridge.getDefaultAccount(orgId, '1101'),
       ERPBridge.getDefaultAccount(orgId, '1201'),
+      ERPBridge.getDefaultAccount(orgId, '4101'),
+      ERPBridge.getDefaultAccount(orgId, '4102'),
       ERPBridge.getDefaultAccount(orgId, '4001'),
     ])
+    const pendapatanTunaiFinalId = pendapatanTunaiId || pendapatanUmumId
+    const pendapatanKreditFinalId = pendapatanKreditId || pendapatanUmumId
+
     if (!kasId) return { error: 'Akun Kas (1101) tidak ditemukan. Periksa COA.' }
     if (creditSales > 0 && !piutangId) return { error: 'Akun Piutang Usaha (1201) tidak ditemukan. Periksa COA.' }
-    if (totalSales > 0 && !pendapatanId) return { error: 'Akun Pendapatan Penjualan (4001) tidak ditemukan. Periksa COA.' }
+    if (cashSales > 0 && !pendapatanTunaiFinalId) return { error: 'Akun Pendapatan Penjualan Tunai (4101/4001) tidak ditemukan. Periksa COA.' }
+    if (creditSales > 0 && !pendapatanKreditFinalId) return { error: 'Akun Pendapatan Penjualan Kredit (4102/4001) tidak ditemukan. Periksa COA.' }
     if (arCollected > 0 && !piutangId) return { error: 'Akun Piutang Usaha (1201) tidak ditemukan. Periksa COA.' }
 
     const lines: { account_id: string; debit: number; credit: number; memo: string }[] = []
     const kasDebit = cashSales + arCollected
     if (kasDebit > 0) lines.push({ account_id: kasId, debit: kasDebit, credit: 0, memo: 'Kas dari penjualan tunai + tagihan AR' })
     if (creditSales > 0 && piutangId) lines.push({ account_id: piutangId, debit: creditSales, credit: 0, memo: 'Penjualan kredit canvasser' })
-    if (totalSales > 0 && pendapatanId) lines.push({ account_id: pendapatanId, debit: 0, credit: totalSales, memo: 'Pendapatan penjualan canvasser' })
+    if (cashSales > 0 && pendapatanTunaiFinalId) lines.push({ account_id: pendapatanTunaiFinalId, debit: 0, credit: cashSales, memo: 'Pendapatan penjualan tunai canvasser' })
+    if (creditSales > 0 && pendapatanKreditFinalId) lines.push({ account_id: pendapatanKreditFinalId, debit: 0, credit: creditSales, memo: 'Pendapatan penjualan kredit canvasser' })
     if (arCollected > 0 && piutangId) lines.push({ account_id: piutangId, debit: 0, credit: arCollected, memo: 'Pelunasan piutang oleh canvasser' })
 
     if (lines.length >= 2) {
@@ -597,10 +791,29 @@ export async function createOrder(orgId: string, payload: {
     return { error: 'Customer ini diblokir karena melebihi credit limit. Hanya transaksi TUNAI atau TRANSFER yang diizinkan.' }
   }
 
+  const { data: sessionRow, error: sessionErr } = await db
+    .from('canvasser_sessions')
+    .select('van_id')
+    .eq('id', payload.session_id)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  if (sessionErr || !sessionRow) return { error: 'Sesi tidak ditemukan.' }
+
+  const { data: vanRow, error: vanErr } = await db
+    .from('canvasser_vans')
+    .select('warehouse_id, branch_id')
+    .eq('id', String((sessionRow as Record<string, unknown>).van_id))
+    .eq('org_id', orgId)
+    .maybeSingle()
+  if (vanErr || !vanRow) return { error: 'Van tidak ditemukan.' }
+  const van = vanRow as Record<string, unknown>
+  const vanWarehouseId = van.warehouse_id ? String(van.warehouse_id) : null
+  if (!vanWarehouseId) return { error: 'Van ini belum punya gudang. Hubungi admin.' }
+
   const productIds = payload.items.map(i => i.product_id)
   const { data: productRows, error: productErr } = await db
     .from('products')
-    .select('id, name, unit, selling_price')
+    .select('id, name, unit, selling_price, average_cost, purchase_price')
     .eq('org_id', orgId)
     .in('id', productIds)
   if (productErr) return { error: productErr.message }
@@ -614,6 +827,19 @@ export async function createOrder(orgId: string, payload: {
       return { error: `Harga produk "${(product as Record<string, unknown>).name}" tidak sesuai price list. Harga HQ: ${formatRupiah(sellingPrice)}` }
     }
   }
+
+  // Validasi stok riil di gudang van — barang yang dijual canvasser harus benar-benar
+  // sudah dimuat ke van lewat "Muat Stok"/"Tambah Stok" sebelumnya.
+  const stockCheck = await ensureWarehouseStockAvailable(
+    orgId, vanWarehouseId,
+    payload.items.map(i => ({
+      productId: i.product_id,
+      productName: String((productsById.get(i.product_id) as Record<string, unknown> | undefined)?.name || ''),
+      qty: i.qty,
+      unit: String((productsById.get(i.product_id) as Record<string, unknown> | undefined)?.unit || ''),
+    }))
+  )
+  if (stockCheck.error) return { error: stockCheck.error }
 
   const orderItems = payload.items.map(item => {
     const product = productsById.get(item.product_id) as Record<string, unknown>
@@ -657,6 +883,25 @@ export async function createOrder(orgId: string, payload: {
     await db.from('canvasser_orders').delete().eq('id', orderId)
     return { error: 'Gagal menyimpan item order.' }
   }
+
+  // Barang sudah diserahkan ke pelanggan saat order ini dicatat — potong stok
+  // gudang van secara riil + jurnal HPP. Order sudah tersimpan; kegagalan di sini
+  // di-log tapi tidak membatalkan order (lihat komentar settleCanvasserOrderStock).
+  await settleCanvasserOrderStock(orgId, {
+    orderId,
+    orderNumber: String((order as Record<string, unknown>).order_number || ''),
+    branchId: van.branch_id ? String(van.branch_id) : null,
+    vanWarehouseId,
+    items: payload.items.filter(i => i.qty > 0).map(i => {
+      const product = productsById.get(i.product_id) as Record<string, unknown>
+      return {
+        productId: i.product_id,
+        productName: String(product?.name || ''),
+        qty: i.qty,
+        avgCost: Number(product?.average_cost ?? product?.purchase_price ?? 0),
+      }
+    }),
+  })
 
   revalidatePath('/sales/co-sales')
   return { data: mapOrder(order as Record<string, unknown>) }
