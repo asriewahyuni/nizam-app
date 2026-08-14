@@ -2213,21 +2213,71 @@ export async function requestPasswordReset(nik: string) {
 
 export async function resetEmployeePassword(employeeId: string, newPassword: string) {
   const adminClient = await createAdminClient()
-  
+
   const { data: emp, error: empErr } = await (adminClient as any)
     .from('employees')
-    .select('user_id, nik')
+    .select('id, org_id, nik, first_name, last_name, user_id, role_id, job_title, employment_status')
     .eq('id', employeeId)
     .single()
 
-  if (empErr || !emp.user_id) return { error: 'User tidak ditemukan.' }
+  if (empErr || !emp) return { error: 'Karyawan tidak ditemukan.' }
+
+  let targetUserId: string | null = emp.user_id || null
+
+  // Karyawan yang belum pernah aktivasi (user_id kosong, mis. hasil import massal)
+  // tidak punya akun untuk direset. Daripada gagal dgn pesan yg membingungkan
+  // ("User tidak ditemukan") dan memaksa HRD memakai alur Pusat Aktivasi Karyawan
+  // terpisah, "Reset Password" di sini sekaligus mengaktivasi akunnya.
+  if (!targetUserId) {
+    if (!isInternalAuthProvider()) {
+      return { error: 'Karyawan ini belum punya akun login. Gunakan Pusat Aktivasi Karyawan untuk membuat akunnya.' }
+    }
+
+    const nik = String(emp.nik || '').trim().toUpperCase()
+    if (!nik) return { error: 'Karyawan ini belum punya NIK, tidak bisa dibuatkan akun login.' }
+
+    const internalEmail = buildInternalStaffEmail(emp.org_id, nik)
+    const staffFullName = `${String(emp.first_name || '').trim()} ${String(emp.last_name || '').trim()}`
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    const existingInternalAccount = await findInternalStaffAccount(adminClient, { nik, internalEmail })
+    if (existingInternalAccount) {
+      const linkedUserId = resolveInternalStaffLinkedUserId(existingInternalAccount)
+      if (!linkedUserId) return { error: 'Akun internal ditemukan, tetapi identitas user-nya tidak valid. Hubungi admin.' }
+      const ensured = await ensureInternalAuthUserRecord({
+        userId: linkedUserId,
+        email: existingInternalAccount.login_email || internalEmail,
+        nik,
+        fullName: staffFullName || nik,
+        userType: 'staff',
+      })
+      if ('error' in ensured) return { error: ensured.error }
+      targetUserId = linkedUserId
+    } else {
+      const created = await createInternalAuthUser({
+        email: internalEmail,
+        nik,
+        password: newPassword,
+        fullName: staffFullName || nik,
+        userType: 'staff',
+        organizationId: emp.org_id,
+      })
+      if ('error' in created) return { error: created.error }
+      targetUserId = normalizeUuid(created.userId)
+      if (!targetUserId) return { error: 'Akun berhasil dibuat, tetapi user ID tidak valid.' }
+    }
+
+    const roleId = await resolveRoleIdForEmployee(adminClient, null, emp)
+    const linkResult = await linkEmployeeToUser(adminClient, emp, targetUserId, roleId)
+    if ('error' in linkResult) return linkResult
+  }
 
   if (isInternalAuthProvider()) {
-    const { resetInternalAuthPasswordById } = await import('@/lib/auth/internal-auth.server')
-    const { error: internalErr } = await resetInternalAuthPasswordById(emp.user_id, newPassword)
+    const { error: internalErr } = await resetInternalAuthPasswordById(targetUserId, newPassword)
     if (internalErr) return { error: internalErr }
   } else {
-    const { error: authErr } = await adminClient.auth.admin.updateUserById(emp.user_id, {
+    const { error: authErr } = await adminClient.auth.admin.updateUserById(targetUserId, {
       password: newPassword
     })
     if (authErr) return { error: 'Gagal mereset: ' + authErr.message }
