@@ -1117,11 +1117,12 @@ export async function getOrgLimits(orgId: string): Promise<{
   let maxUsers: number | null = null
 
   if (planName) {
+    // Sama seperti resolusi modul: is_active tidak relevan untuk org yang sudah
+    // berlangganan paket ini, hanya untuk penawaran paket baru.
     const { data: pkg } = await db
       .from('saas_packages')
       .select('max_branches, max_child_orgs, max_users')
       .eq('name', planName)
-      .eq('is_active', true)
       .maybeSingle()
 
     if (pkg) {
@@ -2167,11 +2168,15 @@ const getActiveOrgCached = cache(async () => {
 
   // DYNAMIC MODULE RESOLUTION + SUBSCRIPTION EXPIRY CHECK FROM SaaS PACKAGE
   if (planName) {
+    // Sengaja TIDAK filter is_active=true di sini: is_active hanya mengontrol apakah
+    // paket bisa DIBELI (pricing page, org creation), bukan apakah org yang SUDAH
+    // berlangganan paket ini masih berhak atas modulnya. Menonaktifkan paket lama
+    // untuk berhenti menjual ke pelanggan baru tidak boleh mencabut modul org yang
+    // sudah aktif memakainya.
     const { data: pkgData, error: pkgError } = await db
       .from('saas_packages')
       .select('modules, duration_days')
       .eq('name', planName)
-      .eq('is_active', true)
       .maybeSingle()
 
     // Bug #3 guard: paket di settings.plan tidak ketemu di tabel saas_packages.

@@ -102,7 +102,18 @@ export function useCanvasserSync({ orgId, vanId, initialSession, initialVisits, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, visits, hydrated])
 
-  const refreshOutbox = useCallback(() => setOutboxState(getOutbox(vanId)), [vanId])
+  // getOutbox() selalu JSON.parse ulang (array baru tiap panggilan). Loop drain
+  // 20 detik memanggil ini terus-menerus meski outbox kosong/tidak berubah —
+  // tanpa guard ini, tiap tick memaksa VanOperationalClient & semua VisitCard
+  // re-render (array reference berubah) walau isinya identik.
+  const refreshOutbox = useCallback(() => {
+    const next = getOutbox(vanId)
+    setOutboxState((prev) => {
+      const sameLength = prev.length === next.length
+      const sameContent = sameLength && prev.every((item, i) => item.id === next[i].id && item.status === next[i].status)
+      return sameContent ? prev : next
+    })
+  }, [vanId])
 
   function patchVisit(visitId: string, patch: (v: CanvasserVisit) => CanvasserVisit) {
     setVisits((prev) => prev.map((v) => (v.id === visitId ? patch(v) : v)))
