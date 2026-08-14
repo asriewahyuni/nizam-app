@@ -4,7 +4,9 @@ import {
   getCanvasserVans,
   getTodaySession,
   getSessionVisits,
+  getVanCustomerRoster,
 } from '@/modules/canvasser/actions/canvasser.actions'
+import { getOrgBrandColor } from '@/modules/canvasser/lib/canvasser-theme.server'
 import { queryPostgres } from '@/lib/db/postgres'
 import { VanOperationalClient } from './VanOperationalClient'
 
@@ -25,7 +27,7 @@ export default async function VanOperationalPage({
   if (!van) notFound()
 
   const session = await getTodaySession(orgId, vanId)
-  const [visits, contactsRes, productsRes] = await Promise.all([
+  const [visits, contactsRes, productsRes, roster, unassignedRes, brandColor] = await Promise.all([
     session ? getSessionVisits(orgId, session.id) : Promise.resolve([]),
     queryPostgres<{ id: string; name: string; address: string | null; credit_limit: string }>(
       `SELECT id, name, address, credit_limit FROM contacts
@@ -40,6 +42,15 @@ export default async function VanOperationalPage({
        ORDER BY name ASC`,
       [orgId]
     ),
+    getVanCustomerRoster(orgId, vanId),
+    queryPostgres<{ id: string; name: string }>(
+      `SELECT id, name FROM contacts
+       WHERE org_id = $1 AND is_active = true AND type IN ('CUSTOMER', 'BOTH')
+         AND assigned_van_id IS NULL
+       ORDER BY name ASC`,
+      [orgId]
+    ),
+    getOrgBrandColor(orgId),
   ])
 
   const contacts = contactsRes.rows.map(c => ({
@@ -54,6 +65,7 @@ export default async function VanOperationalPage({
     unit: p.unit,
     sellingPrice: Number(p.selling_price),
   }))
+  const unassignedContacts = unassignedRes.rows.map(c => ({ id: c.id, name: c.name }))
 
   return (
     <VanOperationalClient
@@ -64,6 +76,9 @@ export default async function VanOperationalPage({
       visits={visits}
       contacts={contacts}
       products={products}
+      roster={roster}
+      unassignedContacts={unassignedContacts}
+      brandColor={brandColor}
     />
   )
 }

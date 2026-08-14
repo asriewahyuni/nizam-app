@@ -7,6 +7,7 @@ export interface CanvasserVan {
   code: string
   name: string
   plateNumber: string | null
+  canvasserEmployeeId: string | null
   driverName: string
   driverPhone: string | null
   fixedAssetId: string | null
@@ -14,6 +15,12 @@ export interface CanvasserVan {
   notes: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface EmployeeOption {
+  id: string
+  name: string
+  phone: string | null
 }
 
 export type SessionStatus = 'AKTIF' | 'SELESAI'
@@ -138,4 +145,62 @@ export interface CanvasserTodayDashboard {
   totalCashCollected: number
   totalArCollected: number
   vans: CanvasserDashboardVan[]
+}
+
+// ─── Customer roster & ledger (AR per konsumen per canvasser) ─────────────────
+
+export interface CanvasserCustomerRosterEntry {
+  contactId: string
+  contactName: string
+  address: string | null
+  arOutstanding: number
+  creditLimit: number
+  arStatus: ARStatus
+  lifetimeOrderCount: number
+  lifetimeSalesTotal: number
+  lastVisitDate: string | null
+}
+
+export interface CanvasserCustomerLedger {
+  contact: ContactARSummary
+  orders: CanvasserOrder[]
+  arCollections: CanvasserARCollection[]
+}
+
+// ─── GPS lokasi terakhir van ────────────────────────────────────────────────
+
+export interface CanvasserVanLocation {
+  vanId: string
+  orgId: string
+  lat: number
+  lng: number
+  accuracyM: number | null
+  updatedAt: string
+}
+
+// ─── Laporan performa harian ────────────────────────────────────────────────
+
+export interface CanvasserPerformanceReportRow {
+  vanId: string
+  vanCode: string
+  vanName: string
+  sessionDate: string
+  salesTotal: number
+  cashCollected: number
+  arCollected: number
+  visitsDone: number
+  visitsTotal: number
+}
+
+export interface CanvasserPerformanceReport {
+  from: string
+  to: string
+  rows: CanvasserPerformanceReportRow[]
+  totals: {
+    salesTotal: number
+    cashCollected: number
+    arCollected: number
+    visitsDone: number
+    visitsTotal: number
+  }
 }

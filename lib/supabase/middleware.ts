@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { getSupabasePublicConfig } from '@/lib/supabase/config'
 import { getAuthProvider } from '@/lib/auth/provider'
 import { INTERNAL_AUTH_SESSION_COOKIE } from '@/lib/auth/internal-auth.shared'
+import { queryPostgres } from '@/lib/db/postgres'
 import type { Database } from '@/types/database.types'
 
 const AUTH_PAGE_PREFIXES = ['/login', '/register']
@@ -28,6 +29,7 @@ const PROTECTED_PAGE_PREFIXES = [
   '/settings',
   '/accounting',
   '/inventory',
+  '/kojasmat',
   '/sales',
   '/purchasing',
   '/saas',
@@ -83,6 +85,34 @@ function normalizeRedirectTarget(rawPath: string | null) {
   return path
 }
 
+const CANVASSER_VAN_LINK_RE = /^\/sales\/co-sales\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i
+
+/**
+ * Link van canvasser (mis. /sales/co-sales/{vanId}) dikirim manual ke PIC Van
+ * lewat WhatsApp dan dibuka langsung dari HP tanpa sesi aktif. Kalau tanpa ini,
+ * mereka jatuh ke /login generik (tab "Pemilik Bisnis", tanpa branding org) —
+ * membingungkan untuk staf lapangan yang cuma pegang NIK. Arahkan ke halaman
+ * login ber-slug org pemilik van supaya langsung tampil tab Karyawan + badge org.
+ */
+async function resolveCanvasserVanLoginSlug(pathname: string): Promise<string | null> {
+  const match = pathname.match(CANVASSER_VAN_LINK_RE)
+  if (!match) return null
+
+  try {
+    const { rows } = await queryPostgres<{ slug: string }>(
+      `select o.slug
+       from public.canvasser_vans v
+       join public.organizations o on o.id = v.org_id
+       where v.id = $1::uuid and o.is_active = true
+       limit 1`,
+      [match[1]],
+    )
+    return rows[0]?.slug || null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Supabase middleware — runs on every request.
  */
@@ -124,7 +154,8 @@ export async function updateSession(request: NextRequest) {
     )
 
     if (protectedPage && !hasInternalSession) {
-      const redirectUrl = new URL('/login', request.url)
+      const vanOrgSlug = await resolveCanvasserVanLoginSlug(pathname)
+      const redirectUrl = new URL(vanOrgSlug ? `/${vanOrgSlug}` : '/login', request.url)
       redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`)
       if (serverActionRequest) {
         return createServerActionRedirectResponse(redirectUrl)

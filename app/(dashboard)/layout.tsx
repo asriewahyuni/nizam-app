@@ -8,7 +8,6 @@ import { ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
 import { canAccessAllBranchesForOrg } from '@/modules/organization/lib/branch-access.server'
 import { queryPostgres } from '@/lib/db/postgres'
 import { isDemoSession } from '@/modules/demo/actions/demo.actions'
-import { saasModuleMatches } from '@/lib/saas/module-catalog'
 import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonationBanner'
@@ -22,7 +21,7 @@ import { RouteErrorToast } from '@/components/shared/RouteErrorToast'
 import { UserActivityTracker } from '@/components/shared/UserActivityTracker'
 import { GlobalApprovalNotifier } from '@/components/shared/GlobalApprovalNotifier'
 import { EduModeShell } from '@/components/edu/EduModeShell'
-import { hasEnabledModuleAccess, hasPosOnlyAccess } from '@/modules/organization/lib/navigation-access'
+import { hasPosOnlyAccess, checkModuleRouteAccess } from '@/modules/organization/lib/navigation-access'
 import { createClient } from '@/lib/supabase/server'
 import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
 import { resolveRuntimeDatabaseTarget } from '@/lib/db/runtime-target'
@@ -33,10 +32,6 @@ type RouteModuleEntry = {
   requiredModule: string
   aliases?: string[]
   permissionKeys?: string[]
-}
-
-function moduleNameMatches(enabledModuleRaw: string, candidateRaw: string) {
-  return saasModuleMatches(enabledModuleRaw, candidateRaw)
 }
 
 function isPosCashierRoute(pathname: string) {
@@ -216,35 +211,20 @@ export default async function DashboardLayout({
 
   // Identify which module is being accessed
   const accessedEntry = routeModuleMap.find((entry) => requestPathname.startsWith(entry.path))
-  
+
   if (accessedEntry) {
     const { requiredModule, aliases = [requiredModule], permissionKeys = [] } = accessedEntry
-    const allNames = Array.from(new Set([requiredModule, ...aliases])).map(s => s.toLowerCase().trim())
-    
-    // 1. SAAS MODULE GUARD (Check for EVERYONE, including owner)
-    const isModulePaid = !orgData.enabledModules || orgData.enabledModules.length === 0
-      ? true  // If no modules are configured, allow access (e.g. during setup)
-      : orgData.enabledModules.some((m: string) => allNames.some((candidate) => moduleNameMatches(m, candidate)))
-
-    if (!isModulePaid && !isSaasAssessorRouteAccess) {
-      console.warn(`[ACL] Redirecting - Module not paid: ${requiredModule} (checked aliases: ${allNames.join(', ')}) for path: ${requestPathname}`)
+    const allowed = isSaasAssessorRouteAccess || checkModuleRouteAccess({
+      enabledModules: orgData.enabledModules,
+      permissions: orgData.permissions,
+      role: orgData.role,
+      requiredModule,
+      aliases,
+      permissionKeys,
+    })
+    if (!allowed) {
+      console.warn(`[ACL] Redirecting - No module/permission access for: ${requiredModule} for path: ${requestPathname}`)
       return redirect('/')
-    }
-
-    // 2. RBAC PERMISSION GUARD (Only check if NOT owner/admin)
-    if (!isOwnerOrAdmin && !isSaasAssessorRouteAccess && permissionKeys.length > 0) {
-      const normalizedPermissions = Array.isArray(orgData.permissions)
-        ? orgData.permissions
-            .filter((permission): permission is string => typeof permission === 'string')
-            .map((permission) => permission.toLowerCase())
-        : []
-      const hasPermission = normalizedPermissions.some(
-        (permission) => permissionKeys.some((permissionKey) => permission.includes(permissionKey.toLowerCase()))
-      )
-      if (!hasPermission) {
-        console.warn(`[ACL] Redirecting - No permission for: ${requiredModule} for path: ${requestPathname}`)
-        return redirect('/')
-      }
     }
   }
 

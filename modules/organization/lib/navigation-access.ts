@@ -1,4 +1,4 @@
-import { normalizeSaasEntitlementName, saasModuleCoversCapability } from '@/lib/saas/module-catalog'
+import { normalizeSaasEntitlementName, saasModuleCoversCapability, saasModuleMatches } from '@/lib/saas/module-catalog'
 
 type NavigationAccessInput = {
   userRole?: string | null
@@ -121,7 +121,7 @@ export function resolveDefaultAuthorizedRoute(input: NavigationAccessInput) {
 
   if (hasPosOnlyAccess(input.userRole, input.permissions)) {
     if (hasRolePermission(input.userRole, input.permissions, 'canvassing') && hasEnabledModuleAccess(input.enabledModules, 'Mobile Canvassing')) {
-      return '/pos-mobile'
+      return '/sales/co-sales'
     }
     if (hasEnabledModuleAccess(input.enabledModules, 'POS')) {
       return '/pos'
@@ -141,4 +141,34 @@ export function resolveDefaultAuthorizedRoute(input: NavigationAccessInput) {
   }
 
   return '/profil-saya'
+}
+
+// Extracted verbatim from app/(dashboard)/layout.tsx's inline route-module
+// guard so a route can be moved out of that layout (e.g. into its own PWA
+// shell) without losing its access control. Intentionally uses
+// saasModuleMatches (exact alias match) rather than hasEnabledModuleAccess
+// (which also allows broader saasModuleCoversCapability matches) to keep
+// 100% identical behavior for the 25+ existing routeModuleMap entries.
+export function checkModuleRouteAccess(input: {
+  enabledModules?: string[] | null
+  permissions?: string[] | null
+  role?: string | null
+  requiredModule: string
+  aliases?: string[]
+  permissionKeys?: string[]
+}): boolean {
+  const aliasList = input.aliases && input.aliases.length > 0 ? input.aliases : [input.requiredModule]
+  const allNames = Array.from(new Set([input.requiredModule, ...aliasList])).map((s) => s.toLowerCase().trim())
+  const enabledModules = input.enabledModules
+
+  const isModulePaid = !enabledModules || enabledModules.length === 0
+    ? true
+    : enabledModules.some((m) => allNames.some((candidate) => saasModuleMatches(m, candidate)))
+
+  if (!isModulePaid) return false
+
+  const permissionKeys = input.permissionKeys || []
+  if (permissionKeys.length === 0) return true
+
+  return hasRolePermission(input.role, input.permissions, permissionKeys.join(','))
 }

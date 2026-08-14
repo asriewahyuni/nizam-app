@@ -23,6 +23,9 @@ import type {
   StockItem,
   CanvasserTodayDashboard,
   CanvasserDashboardVan,
+  CanvasserCustomerRosterEntry,
+  CanvasserCustomerLedger,
+  CanvasserVanLocation,
 } from '@/modules/canvasser/lib/canvasser-types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -65,6 +68,7 @@ function mapVan(r: Record<string, unknown>): CanvasserVan {
     code: String(r.code || ''),
     name: String(r.name || ''),
     plateNumber: r.plate_number ? String(r.plate_number) : null,
+    canvasserEmployeeId: r.canvasser_employee_id ? String(r.canvasser_employee_id) : null,
     driverName: String(r.driver_name || ''),
     driverPhone: r.driver_phone ? String(r.driver_phone) : null,
     fixedAssetId: r.fixed_asset_id ? String(r.fixed_asset_id) : null,
@@ -73,6 +77,18 @@ function mapVan(r: Record<string, unknown>): CanvasserVan {
     createdAt: String(r.created_at || ''),
     updatedAt: String(r.updated_at || ''),
   }
+}
+
+async function resolveEmployeeSnapshot(orgId: string, employeeId: string): Promise<{ name: string; phone: string | null } | { error: string }> {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const res = await queryPostgres<{ first_name: string; last_name: string | null; phone: string | null }>(
+    `SELECT first_name, last_name, phone FROM employees WHERE id = $1 AND org_id = $2`,
+    [employeeId, orgId]
+  )
+  const row = res.rows[0]
+  if (!row) return { error: 'Karyawan tidak ditemukan.' }
+  const name = [row.first_name, row.last_name].filter(Boolean).join(' ').trim()
+  return { name: name || '(Tanpa nama)', phone: row.phone || null }
 }
 
 function mapSession(r: Record<string, unknown>): CanvasserSession {
@@ -180,9 +196,8 @@ export async function getCanvasserVans(orgId: string): Promise<CanvasserVan[]> {
 export async function createCanvasserVan(orgId: string, payload: {
   code: string
   name: string
-  driver_name: string
+  canvasser_employee_id: string
   plate_number?: string
-  driver_phone?: string
   fixed_asset_id?: string
   notes?: string
 }): Promise<{ data?: CanvasserVan; error?: string }> {
@@ -191,6 +206,9 @@ export async function createCanvasserVan(orgId: string, payload: {
   const branch = await requireBranch(orgId)
   if ('error' in branch) return { error: branch.error }
 
+  const snapshot = await resolveEmployeeSnapshot(orgId, payload.canvasser_employee_id)
+  if ('error' in snapshot) return { error: snapshot.error }
+
   const { data, error } = await db
     .from('canvasser_vans')
     .insert({
@@ -198,9 +216,10 @@ export async function createCanvasserVan(orgId: string, payload: {
       branch_id: branch.branchId,
       code: payload.code,
       name: payload.name,
-      driver_name: payload.driver_name,
+      canvasser_employee_id: payload.canvasser_employee_id,
+      driver_name: snapshot.name,
+      driver_phone: snapshot.phone,
       plate_number: payload.plate_number || null,
-      driver_phone: payload.driver_phone || null,
       fixed_asset_id: payload.fixed_asset_id || null,
       notes: payload.notes || null,
     })
@@ -214,18 +233,25 @@ export async function createCanvasserVan(orgId: string, payload: {
 
 export async function updateCanvasserVan(orgId: string, vanId: string, payload: Partial<{
   name: string
-  driver_name: string
+  canvasser_employee_id: string
   plate_number: string
-  driver_phone: string
   is_active: boolean
   notes: string
 }>): Promise<{ data?: CanvasserVan; error?: string }> {
   const supabase = await createClient()
   const db = supabase as unknown as LooseDb
 
+  const updates: Record<string, unknown> = { ...payload }
+  if (payload.canvasser_employee_id) {
+    const snapshot = await resolveEmployeeSnapshot(orgId, payload.canvasser_employee_id)
+    if ('error' in snapshot) return { error: snapshot.error }
+    updates.driver_name = snapshot.name
+    updates.driver_phone = snapshot.phone
+  }
+
   const { data, error } = await db
     .from('canvasser_vans')
-    .update(payload)
+    .update(updates)
     .eq('id', vanId)
     .eq('org_id', orgId)
     .select('*')
@@ -274,8 +300,55 @@ export async function createSession(orgId: string, payload: {
     .insert({
       org_id: orgId,
       van_id: payload.van_id,
-      opening_stock: payload.opening_stock,
+      // JSON.stringify eksplisit: array kosong lolos tanpa di-stringify oleh
+      // _serializeDbParam (heuristik hasStructured vacuous-false utk array
+      // kosong), lalu ke-bind pg sebagai literal array Postgres alih-alih
+      // JSON — jadi kolom jsonb ini kebaca sebagai objek {} bukan array [].
+      opening_stock: JSON.stringify(payload.opening_stock),
     })
+    .select('*')
+    .single()
+
+  if (error) return { error: error.message }
+  revalidatePath('/sales/co-sales')
+  return { data: mapSession(data as Record<string, unknown>) }
+}
+
+// Menambah stok ke sesi yang sudah AKTIF (mis. canvasser lupa isi stok saat
+// Mulai Sesi, atau ambil tambahan stok di tengah hari). Di-merge ke
+// opening_stock yang sudah ada berdasarkan product_id, bukan menimpa.
+export async function addStockToSession(orgId: string, sessionId: string, items: StockItem[]): Promise<{ data?: CanvasserSession; error?: string }> {
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  const { data: sessionRow, error: sessionErr } = await db
+    .from('canvasser_sessions')
+    .select('*')
+    .eq('id', sessionId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  if (sessionErr || !sessionRow) return { error: 'Sesi tidak ditemukan.' }
+  const session = sessionRow as Record<string, unknown>
+  if (String(session.status) !== 'AKTIF') return { error: 'Sesi ini sudah ditutup, tidak bisa menambah stok.' }
+
+  const currentStock = (session.opening_stock as StockItem[]) || []
+  const merged = new Map<string, StockItem>()
+  for (const s of currentStock) merged.set(s.product_id, { ...s })
+  let addedAny = false
+  for (const item of items) {
+    if (item.qty_loaded <= 0) continue
+    addedAny = true
+    const existing = merged.get(item.product_id)
+    if (existing) existing.qty_loaded += item.qty_loaded
+    else merged.set(item.product_id, { ...item })
+  }
+  if (!addedAny) return { error: 'Isi minimal 1 qty produk yang ingin ditambahkan.' }
+
+  const { data, error } = await db
+    .from('canvasser_sessions')
+    .update({ opening_stock: JSON.stringify(Array.from(merged.values())) })
+    .eq('id', sessionId)
+    .eq('org_id', orgId)
     .select('*')
     .single()
 
@@ -366,7 +439,9 @@ export async function closeSession(orgId: string, sessionId: string, payload: {
     .from('canvasser_sessions')
     .update({
       status: 'SELESAI',
-      closing_stock: payload.closing_stock,
+      // Sama seperti opening_stock — stringify eksplisit agar array kosong
+      // tidak ke-bind sebagai literal array Postgres di kolom jsonb.
+      closing_stock: JSON.stringify(payload.closing_stock),
       total_cash_collected: cashSales,
       total_ar_collected: arCollected,
       total_sales: totalSales,
@@ -743,4 +818,149 @@ export async function getTodayDashboard(orgId: string): Promise<CanvasserTodayDa
     totalArCollected: sessions.reduce((s, sess) => s + sess.totalArCollected, 0),
     vans: dashboardVans,
   }
+}
+
+// ── Customer Roster & Ledger (AR per konsumen per canvasser) ───────────────────
+
+export async function getVanCustomerRoster(orgId: string, vanId: string): Promise<CanvasserCustomerRosterEntry[]> {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  const res = await queryPostgres<Record<string, unknown>>(
+    `SELECT
+       c.id, c.name, c.address,
+       COALESCE(o.order_count, 0) AS order_count,
+       COALESCE(o.sales_total, 0) AS sales_total,
+       lv.last_visit_date
+     FROM contacts c
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*) AS order_count, SUM(total) AS sales_total
+       FROM canvasser_orders
+       WHERE contact_id = c.id AND org_id = c.org_id AND status = 'SELESAI'
+     ) o ON true
+     LEFT JOIN LATERAL (
+       SELECT MAX(cs.session_date) AS last_visit_date
+       FROM canvasser_visits cv
+       JOIN canvasser_sessions cs ON cs.id = cv.session_id
+       WHERE cv.contact_id = c.id AND cv.org_id = c.org_id AND cv.status = 'SELESAI'
+     ) lv ON true
+     WHERE c.org_id = $1 AND c.assigned_van_id = $2
+     ORDER BY c.name ASC`,
+    [orgId, vanId]
+  )
+
+  return Promise.all(res.rows.map(async (row): Promise<CanvasserCustomerRosterEntry> => {
+    const summary = await getContactARSummary(orgId, String(row.id))
+    return {
+      contactId: String(row.id),
+      contactName: String(row.name || ''),
+      address: row.address ? String(row.address) : null,
+      arOutstanding: summary.outstandingTotal,
+      creditLimit: summary.creditLimit,
+      arStatus: summary.arStatus,
+      lifetimeOrderCount: Number(row.order_count || 0),
+      lifetimeSalesTotal: Number(row.sales_total || 0),
+      lastVisitDate: row.last_visit_date ? String(row.last_visit_date) : null,
+    }
+  }))
+}
+
+export async function getCustomerLedger(orgId: string, contactId: string): Promise<CanvasserCustomerLedger> {
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  const [contact, ordersRes, collectionsRes] = await Promise.all([
+    getContactARSummary(orgId, contactId),
+    db.from('canvasser_orders').select('*, items:canvasser_order_items(*)')
+      .eq('org_id', orgId).eq('contact_id', contactId).eq('status', 'SELESAI')
+      .order('created_at', { ascending: false }),
+    db.from('canvasser_ar_collections').select('*')
+      .eq('org_id', orgId).eq('contact_id', contactId)
+      .order('created_at', { ascending: false }),
+  ])
+
+  const orders = ((ordersRes.data || []) as Record<string, unknown>[]).map(row => {
+    const order = mapOrder(row)
+    order.items = ((row.items as Record<string, unknown>[]) || []).map(mapOrderItem)
+    return order
+  })
+  const arCollections = ((collectionsRes.data || []) as Record<string, unknown>[]).map(mapARCollection)
+
+  return { contact, orders, arCollections }
+}
+
+export async function assignCustomerToVan(orgId: string, contactId: string, vanId: string | null): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  const { error } = await db
+    .from('contacts')
+    .update({ assigned_van_id: vanId })
+    .eq('id', contactId)
+    .eq('org_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/sales/co-sales')
+  return {}
+}
+
+// ── Reorder kunjungan (manual, naik/turun) ──────────────────────────────────────
+
+export async function reorderVisits(orgId: string, sessionId: string, orderedVisitIds: string[]): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  for (let i = 0; i < orderedVisitIds.length; i++) {
+    const { error } = await db
+      .from('canvasser_visits')
+      .update({ visit_order: i + 1 })
+      .eq('id', orderedVisitIds[i])
+      .eq('org_id', orgId)
+      .eq('session_id', sessionId)
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/sales/co-sales')
+  return {}
+}
+
+// ── GPS lokasi terakhir van ──────────────────────────────────────────────────
+
+function mapVanLocation(r: Record<string, unknown>): CanvasserVanLocation {
+  return {
+    vanId: String(r.van_id || ''),
+    orgId: String(r.org_id || ''),
+    lat: Number(r.lat || 0),
+    lng: Number(r.lng || 0),
+    accuracyM: r.accuracy_m !== null && r.accuracy_m !== undefined ? Number(r.accuracy_m) : null,
+    updatedAt: String(r.updated_at || ''),
+  }
+}
+
+export async function pingVanLocation(orgId: string, vanId: string, lat: number, lng: number, accuracyM?: number): Promise<{ error?: string }> {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  try {
+    await queryPostgres(
+      `INSERT INTO canvasser_van_locations (van_id, org_id, lat, lng, accuracy_m, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (van_id) DO UPDATE SET
+         lat = EXCLUDED.lat, lng = EXCLUDED.lng, accuracy_m = EXCLUDED.accuracy_m, updated_at = NOW()`,
+      [vanId, orgId, lat, lng, accuracyM ?? null]
+    )
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Gagal menyimpan lokasi.' }
+  }
+  return {}
+}
+
+export async function getVanLocations(orgId: string): Promise<CanvasserVanLocation[]> {
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  const { data, error } = await db
+    .from('canvasser_van_locations')
+    .select('*')
+    .eq('org_id', orgId)
+  if (error) { console.error('getVanLocations:', error); return [] }
+  return (data || []).map(mapVanLocation)
 }

@@ -1,9 +1,17 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
+import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import KojasmatNavbar from './KojasmatNavbar'
 
 export default async function KojasmatLayout({ children }: { children: ReactNode }) {
+  const session = await getInternalAuthSession()
+  if (!session) {
+    const pathname = (await headers()).get('x-pathname') || '/kojasmat'
+    redirect(`/login?redirectTo=${encodeURIComponent(pathname)}`)
+  }
+
   const orgData = await getActiveOrg()
 
   if (!orgData) {
