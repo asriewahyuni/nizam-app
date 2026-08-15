@@ -27,7 +27,7 @@ import {
 } from '@/modules/kojasmat/actions/kojasmat-transfer.actions'
 import { type KojasmatAkadIjarah } from '@/modules/kojasmat/actions/kojasmat-ijarah.actions'
 import {
-  mulaiTestSahabat, submitTestSahabat, type KojasmatTestSahabat,
+  mulaiTestSahabat, submitTestSahabat, simpanProgressTestSahabat, type KojasmatTestSahabat,
 } from '@/modules/kojasmat/actions/kojasmat-sahabat.actions'
 import {
   kirimLaporanProyek, simpanDokumen, hapusDokumen, getDokumenByRef,
@@ -2881,11 +2881,20 @@ function SahabatUpgradeSheet({ open, onClose, testSahabat, onUpdated, anggotaId 
     startTransition(async () => {
       const res = await mulaiTestSahabat(anggotaId)
       if ('error' in res) { setError(res.error); return }
+      const savedJawaban = res.data.jawaban ?? {}
       setTestId(res.data.test_id)
       setSoal(res.data.soal)
-      setJawaban({})
-      setQIndex(0)
+      setJawaban(savedJawaban)
+      const resumeIndex = res.data.soal.findIndex(q => !savedJawaban[q.id])
+      setQIndex(resumeIndex === -1 ? res.data.soal.length - 1 : resumeIndex)
     })
+  }
+
+  // Simpan tiap jawaban ke server (fire-and-forget) supaya kalau tab
+  // ditutup/refresh di tengah test, progres tetap ada saat dibuka lagi.
+  function persistJawaban(next: Record<string, string>) {
+    if (!testId) return
+    simpanProgressTestSahabat(testId, next, anggotaId).catch(() => null)
   }
 
   return (
@@ -2939,11 +2948,16 @@ function SahabatUpgradeSheet({ open, onClose, testSahabat, onUpdated, anggotaId 
                   )}>
                     <input type="radio" name={`soal-${s.id}`} className="accent-amber-600"
                       checked={jawaban[s.id] === opt.toUpperCase()}
-                      onChange={() => setJawaban(j => ({ ...j, [s.id]: opt.toUpperCase() }))} />
+                      onChange={() => {
+                        const next = { ...jawaban, [s.id]: opt.toUpperCase() }
+                        setJawaban(next)
+                        persistJawaban(next)
+                      }} />
                     <span className="text-gray-700">{(s as any)[`pilihan_${opt}`]}</span>
                   </label>
                 ))}
               </div>
+              {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
               <div className="flex gap-2">
                 <button type="button" onClick={() => setQIndex(i => Math.max(0, i - 1))} disabled={qIndex === 0}
                   className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 disabled:opacity-40 cursor-pointer">

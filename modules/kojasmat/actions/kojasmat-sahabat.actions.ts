@@ -77,7 +77,7 @@ export async function getTestSahabatByAnggota(anggotaId: string): Promise<Kojasm
 }
 
 export async function mulaiTestSahabat(previewAnggotaId?: string): Promise<
-  { data: { test_id: string; attempt_number: number; soal: { id: string; pertanyaan: string; pilihan_a: string; pilihan_b: string; pilihan_c: string; pilihan_d: string }[] } }
+  { data: { test_id: string; attempt_number: number; soal: { id: string; pertanyaan: string; pilihan_a: string; pilihan_b: string; pilihan_c: string; pilihan_d: string }[]; jawaban: Record<string, string> | null } }
   | { error: string }
 > {
   const anggota = await getOwnAnggota(previewAnggotaId)
@@ -85,7 +85,7 @@ export async function mulaiTestSahabat(previewAnggotaId?: string): Promise<
   if (anggota.tingkat === 'SAHABAT') return { error: 'Anda sudah tingkat Sahabat.' }
 
   const { rows: [existing] } = await queryPostgres(
-    `SELECT id, status, status_approval FROM kojasmat_test_sahabat
+    `SELECT id, status, status_approval, jawaban FROM kojasmat_test_sahabat
      WHERE anggota_id=$1 ORDER BY created_at DESC LIMIT 1`,
     [anggota.id]
   )
@@ -97,7 +97,12 @@ export async function mulaiTestSahabat(previewAnggotaId?: string): Promise<
        WHERE t.id=$1 ORDER BY o.ord`,
       [existing.id]
     )
-    return { data: { test_id: existing.id, attempt_number: existing.attempt_number, soal: soalRows as any } }
+    return {
+      data: {
+        test_id: existing.id, attempt_number: existing.attempt_number, soal: soalRows as any,
+        jawaban: (existing.jawaban ?? null) as Record<string, string> | null,
+      }
+    }
   }
   if (existing?.status === 'LULUS' && existing.status_approval === 'BELUM') {
     return { error: 'Anda sudah lulus test kedua dan sedang menunggu persetujuan pengurus.' }
@@ -139,8 +144,28 @@ export async function mulaiTestSahabat(previewAnggotaId?: string): Promise<
       test_id: test.id,
       attempt_number: test.attempt_number,
       soal: soalRows as { id: string; pertanyaan: string; pilihan_a: string; pilihan_b: string; pilihan_c: string; pilihan_d: string }[],
+      jawaban: null,
     }
   }
+}
+
+// Autosave jawaban per-soal supaya progres tidak hilang kalau tab ditutup/refresh
+// sebelum sempat submit — anggota melanjutkan dari soal terakhir yang dijawab,
+// bukan mengulang dari soal 1.
+export async function simpanProgressTestSahabat(testId: string, jawaban: Record<string, string>, previewAnggotaId?: string): Promise<
+  { success: true } | { error: string }
+> {
+  const anggota = await getOwnAnggota(previewAnggotaId)
+  if ('error' in anggota) return anggota
+
+  const { rows: [updated] } = await queryPostgres(
+    `UPDATE kojasmat_test_sahabat SET jawaban=$2
+     WHERE id=$1 AND anggota_id=$3 AND status='BERLANGSUNG'
+     RETURNING id`,
+    [testId, JSON.stringify(jawaban), anggota.id]
+  )
+  if (!updated) return { error: 'Sesi test tidak aktif.' }
+  return { success: true }
 }
 
 export async function submitTestSahabat(testId: string, jawaban: Record<string, string>, previewAnggotaId?: string): Promise<
