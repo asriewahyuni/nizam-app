@@ -29,8 +29,6 @@ function isValidEmail(value: string) {
   return EMAIL_REGEX.test(value.trim())
 }
 
-const QUESTION_TIME_SECONDS = 20
-
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 type Step = 'data' | 'kontak_darurat' | 'dokumen' | 'tes' | 'layanan' | 'komitmen' | 'bayar' | 'selesai'
@@ -411,29 +409,6 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
   const [testResult, setTestResult] = useState<{ skor: number; jumlah_benar: number; total_soal: number; status: 'LULUS' | 'GAGAL'; passing_threshold: number; apresiasi: string | null } | null>(null)
   const [testLoading, setTestLoading] = useState(false)
   const [qIndex, setQIndex] = useState(0)
-  const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_SECONDS)
-
-  // Batas waktu per soal — reset tiap pindah soal (maju/mundur), habis waktu
-  // otomatis lanjut ke soal berikutnya, atau submit kalau ini soal terakhir.
-  useEffect(() => {
-    if (step !== 'tes' || testLoading || testResult || soal.length === 0) return
-    setTimeLeft(QUESTION_TIME_SECONDS)
-    const startedAt = Date.now()
-    const timer = setInterval(() => {
-      const remaining = Math.max(0, QUESTION_TIME_SECONDS - (Date.now() - startedAt) / 1000)
-      setTimeLeft(remaining)
-      if (remaining <= 0) {
-        clearInterval(timer)
-        if (qIndex >= soal.length - 1) {
-          submitTest()
-        } else {
-          setQIndex(i => Math.min(soal.length - 1, i + 1))
-        }
-      }
-    }, 100)
-    return () => clearInterval(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qIndex, step, testLoading, testResult, soal.length])
 
   function mulaiTest() {
     if (!pendaftaranId) return
@@ -1112,30 +1087,6 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
                     <div className="h-1.5 w-full rounded-full bg-gray-100">
                       <div className="h-1.5 rounded-full bg-emerald-500 transition-all"
                         style={{ width: `${((qIndex + 1) / soal.length) * 100}%` }} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className={cn(
-                      'flex items-center justify-between text-xs mb-1.5 font-medium',
-                      timeLeft <= 5 ? 'text-red-600' : timeLeft <= 10 ? 'text-amber-600' : 'text-gray-500'
-                    )}>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" /> Waktu tersisa
-                      </span>
-                      <span className="tabular-nums">{Math.ceil(timeLeft)} detik</span>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-                      <div
-                        className={cn(
-                          'h-1.5 rounded-full',
-                          timeLeft <= 5 ? 'bg-red-500' : timeLeft <= 10 ? 'bg-amber-500' : 'bg-emerald-500'
-                        )}
-                        style={{
-                          width: `${(timeLeft / QUESTION_TIME_SECONDS) * 100}%`,
-                          transition: 'width 100ms linear, background-color 300ms ease',
-                        }}
-                      />
                     </div>
                   </div>
 
