@@ -173,6 +173,11 @@ async function getEffectiveReferenceAccounts(
   }
 }
 
+// Tanggal efektif untuk laporan: pakai rentang periode fiskal (fp.start_date/end_date)
+// kalau journal_entries.period_id terisi, fallback ke entry_date kalau belum (org belum
+// setup fiscal_periods, atau data lama sebelum period_id ada). Ini konsisten dengan
+// "date entry" (created_at, kapan dicatat) vs "periode" (period_id, hasil override manual
+// bisa beda dari entry_date) — laporan TIDAK PERNAH pakai created_at.
 async function getPostedEntryIds(
   db: any,
   orgId: string,
@@ -186,29 +191,58 @@ async function getPostedEntryIds(
 ) {
   noStore()
   const orgIdsToSearch = await resolveOrgIdsForReport(db, orgId, Boolean(options.consolidated))
+  if (orgIdsToSearch.length === 0) return []
 
-  let query = db
-    .from('journal_entries')
-    .select('id')
-    .in('org_id', orgIdsToSearch)
-    .eq('status', 'POSTED')
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  const conditions: string[] = [`je.org_id = ANY($1::uuid[])`, `je.status = 'POSTED'`]
+  const params: any[] = [orgIdsToSearch]
 
   if (options.branchId && !options.consolidated) {
-    query = query.eq('branch_id', options.branchId)
-  }
-  if (options.startDate) {
-    query = query.gte('entry_date', options.startDate)
-  }
-  if (options.endDate) {
-    query = query.lte('entry_date', options.endDate)
-  }
-  if (options.asOfDate) {
-    query = query.lte('entry_date', options.asOfDate)
+    params.push(options.branchId)
+    conditions.push(`je.branch_id = $${params.length}::uuid`)
   }
 
-  const { data, error } = await query
-  if (error || !Array.isArray(data)) return []
-  return data.map((entry: any) => entry.id)
+  if (options.asOfDate) {
+    params.push(options.asOfDate)
+    const p = params.length
+    conditions.push(`(
+      (je.period_id IS NOT NULL AND fp.start_date <= $${p}::date)
+      OR (je.period_id IS NULL AND je.entry_date <= $${p}::date)
+    )`)
+  } else {
+    if (options.startDate) {
+      params.push(options.startDate)
+      const p = params.length
+      conditions.push(`(
+        (je.period_id IS NOT NULL AND fp.end_date >= $${p}::date)
+        OR (je.period_id IS NULL AND je.entry_date >= $${p}::date)
+      )`)
+    }
+    if (options.endDate) {
+      params.push(options.endDate)
+      const p = params.length
+      conditions.push(`(
+        (je.period_id IS NOT NULL AND fp.start_date <= $${p}::date)
+        OR (je.period_id IS NULL AND je.entry_date <= $${p}::date)
+      )`)
+    }
+  }
+
+  const sql = `
+    SELECT je.id
+    FROM public.journal_entries je
+    LEFT JOIN public.fiscal_periods fp ON fp.id = je.period_id
+    WHERE ${conditions.join(' AND ')}
+  `
+
+  try {
+    const { rows } = await queryPostgres<{ id: string }>(sql, params)
+    return (rows || []).map((row) => row.id)
+  } catch (e) {
+    ;(console as any).error('[getPostedEntryIds]', e)
+    return []
+  }
 }
 
 async function getAccountBalancesFromEntries(
