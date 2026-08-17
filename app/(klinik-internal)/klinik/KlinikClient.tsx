@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import {
   Landmark, CheckCircle2, AlertCircle, Stethoscope, Search, UserPlus, Plus,
   Users, PhoneCall, Ban, ChevronDown, ChevronUp, UserCog, CalendarCheck, LogIn,
+  Pill, PackagePlus, Send, Boxes,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { BranchSummary } from '@/modules/organization/lib/org-context'
@@ -16,7 +17,10 @@ import {
 import {
   getConfirmedBookingsToday, checkInBooking, type KlinikBookingRow,
 } from '@/modules/klinik/actions/klinik-booking.actions'
-import type { KlinikWarehouseOption } from '@/modules/klinik/actions/klinik-resep.actions'
+import {
+  dispenseResep, getPendingResepByBranch, getObatStockByBranch, receiveObat, searchKlinikObat,
+  type KlinikWarehouseOption, type KlinikPendingResep, type KlinikObatStockRow, type KlinikObatOption,
+} from '@/modules/klinik/actions/klinik-resep.actions'
 import {
   createKlinikPoli, createKlinikStafMedis, type KlinikPoli, type KlinikStafMedis, type KlinikTarifLayanan,
 } from '@/modules/klinik/actions/klinik.actions'
@@ -924,10 +928,313 @@ function TabTenagaMedis({
   )
 }
 
+// ─── TAB: APOTEK ──────────────────────────────────────────────────────────────
+
+function TabApotek({
+  orgId, branch, warehouses,
+}: {
+  orgId: string
+  branch: BranchSummary | null
+  warehouses: KlinikWarehouseOption[]
+}) {
+  const [pending, startTransition] = useTransition()
+  const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const [pendingResep, setPendingResep] = useState<KlinikPendingResep[]>([])
+  const [stock, setStock] = useState<KlinikObatStockRow[]>([])
+
+  const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? '')
+  const [obatQuery, setObatQuery] = useState('')
+  const [obatResults, setObatResults] = useState<KlinikObatOption[]>([])
+  const [selectedObat, setSelectedObat] = useState<KlinikObatOption | null>(null)
+  const [receiveForm, setReceiveForm] = useState({ jumlah: '1', batchNumber: '', expiryDate: '' })
+
+  async function loadData() {
+    if (!branch) {
+      setLoading(false)
+      return
+    }
+    const [resep, stockRows] = await Promise.all([
+      getPendingResepByBranch(orgId, branch.id),
+      getObatStockByBranch(orgId, branch.id),
+    ])
+    setPendingResep(resep)
+    setStock(stockRows)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branch?.id])
+
+  function handleDispense(resepId: string) {
+    if (!branch) return
+    setMessage(null)
+    startTransition(async () => {
+      const res = await dispenseResep(orgId, branch.id, resepId)
+      if ('error' in res) {
+        setMessage({ type: 'error', text: res.error })
+        return
+      }
+      setMessage({ type: 'success', text: 'Obat berhasil diserahkan ke pasien.' })
+      await loadData()
+    })
+  }
+
+  function handleObatSearch(q: string) {
+    setObatQuery(q)
+    setSelectedObat(null)
+    if (q.trim().length < 2) {
+      setObatResults([])
+      return
+    }
+    startTransition(async () => {
+      setObatResults(await searchKlinikObat(orgId, q))
+    })
+  }
+
+  function handleReceive() {
+    if (!branch) return
+    if (!selectedObat) {
+      setMessage({ type: 'error', text: 'Pilih obat terlebih dahulu.' })
+      return
+    }
+    if (!warehouseId) {
+      setMessage({ type: 'error', text: 'Pilih gudang terlebih dahulu.' })
+      return
+    }
+    setMessage(null)
+    startTransition(async () => {
+      const res = await receiveObat({
+        orgId,
+        branchId: branch.id,
+        productId: selectedObat.id,
+        warehouseId,
+        jumlah: Number(receiveForm.jumlah) || 0,
+        batchNumber: receiveForm.batchNumber,
+        expiryDate: receiveForm.expiryDate,
+      })
+      if ('error' in res) {
+        setMessage({ type: 'error', text: res.error })
+        return
+      }
+      setMessage({ type: 'success', text: 'Penerimaan obat tercatat.' })
+      setSelectedObat(null)
+      setObatQuery('')
+      setReceiveForm({ jumlah: '1', batchNumber: '', expiryDate: '' })
+      await loadData()
+    })
+  }
+
+  if (!branch) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+        Pilih Cabang aktif terlebih dahulu untuk mengelola apotek.
+      </div>
+    )
+  }
+
+  if (loading) {
+    return <p className="py-8 text-center text-sm text-slate-400">Memuat data apotek...</p>
+  }
+
+  return (
+    <div className="space-y-6">
+      {message && (
+        <div
+          role="status"
+          className={cn(
+            'flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold',
+            message.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-rose-200 bg-rose-50 text-rose-800'
+          )}
+        >
+          {message.type === 'success'
+            ? <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
+            : <AlertCircle className="size-4 shrink-0" aria-hidden="true" />}
+          {message.text}
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <Pill className="size-4 text-cyan-600" aria-hidden="true" />
+              <p className="text-sm font-bold text-slate-900">Resep Menunggu Diserahkan</p>
+            </div>
+
+            {pendingResep.length === 0 ? (
+              <p className="py-8 text-center text-sm text-slate-400">Tidak ada resep yang menunggu diserahkan.</p>
+            ) : (
+              <div className="space-y-2">
+                {pendingResep.map((resep) => (
+                  <div key={resep.id} className="rounded-xl border border-slate-100 p-3">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-900">
+                        No. {resep.no_antrian} · {resep.pasien_nama} <span className="font-normal text-slate-400">({resep.pasien_no_rm})</span>
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleDispense(resep.id)}
+                        disabled={pending}
+                        className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Send className="size-3.5" aria-hidden="true" />
+                        Serahkan Obat
+                      </button>
+                    </div>
+                    <ul className="space-y-0.5 text-xs text-slate-600">
+                      {resep.items.map((item) => (
+                        <li key={item.id}>{item.product_name} × {item.jumlah}{item.dosis ? ` — ${item.dosis}` : ''}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <Boxes className="size-4 text-slate-500" aria-hidden="true" />
+              <p className="text-sm font-bold text-slate-900">Stok Obat</p>
+            </div>
+            {stock.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-400">Belum ada stok obat tercatat.</p>
+            ) : (
+              <div className="max-h-80 overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-500">
+                      <th className="py-1.5 font-semibold">Obat</th>
+                      <th className="py-1.5 font-semibold">Batch</th>
+                      <th className="py-1.5 font-semibold">Kadaluarsa</th>
+                      <th className="py-1.5 text-right font-semibold">Stok</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stock.map((s, i) => (
+                      <tr key={`${s.product_id}-${s.batch_number}-${i}`} className="border-b border-slate-50">
+                        <td className="py-1.5 text-slate-800">{s.product_name}</td>
+                        <td className="py-1.5 text-slate-500">{s.batch_number || '—'}</td>
+                        <td className={cn('py-1.5', s.expiry_date && new Date(s.expiry_date) < new Date() ? 'font-semibold text-rose-600' : 'text-slate-500')}>
+                          {s.expiry_date ? new Date(s.expiry_date).toLocaleDateString('id-ID') : '—'}
+                        </td>
+                        <td className="py-1.5 text-right font-semibold tabular-nums text-slate-800">{s.quantity} {s.unit}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="lg:col-span-2">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <PackagePlus className="size-4 text-cyan-600" aria-hidden="true" />
+              <p className="text-sm font-bold text-slate-900">Penerimaan Obat</p>
+            </div>
+
+            {warehouses.length > 1 && (
+              <div className="mb-3 space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Gudang</label>
+                <select
+                  value={warehouseId}
+                  onChange={(e) => setWarehouseId(e.target.value)}
+                  className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                >
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="relative">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                <input
+                  type="text"
+                  value={selectedObat ? selectedObat.name : obatQuery}
+                  onChange={(e) => handleObatSearch(e.target.value)}
+                  placeholder="Cari nama obat..."
+                  className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none transition-colors duration-150 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                />
+              </div>
+              {obatResults.length > 0 && !selectedObat && (
+                <div className="absolute z-10 mt-1 w-full space-y-0.5 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                  {obatResults.map((obat) => (
+                    <button
+                      key={obat.id}
+                      type="button"
+                      onClick={() => { setSelectedObat(obat); setObatResults([]) }}
+                      className="flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors duration-150 hover:bg-slate-50"
+                    >
+                      <span>{obat.name}</span>
+                      <span className="text-xs text-slate-400">{obat.unit}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Jumlah</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={receiveForm.jumlah}
+                  onChange={(e) => setReceiveForm((f) => ({ ...f, jumlah: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">No. Batch</label>
+                <input
+                  type="text"
+                  value={receiveForm.batchNumber}
+                  onChange={(e) => setReceiveForm((f) => ({ ...f, batchNumber: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Tanggal Kadaluarsa</label>
+                <input
+                  type="date"
+                  value={receiveForm.expiryDate}
+                  onChange={(e) => setReceiveForm((f) => ({ ...f, expiryDate: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleReceive}
+              disabled={pending}
+              className="mt-4 w-full cursor-pointer rounded-xl bg-cyan-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {pending ? 'Memproses...' : 'Catat Penerimaan Obat'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── ROOT ──────────────────────────────────────────────────────────────────────
 
 const TABS = [
   { key: 'pendaftaran' as const, label: 'Pendaftaran & Antrian' },
+  { key: 'apotek' as const, label: 'Apotek' },
   { key: 'tenaga-medis' as const, label: 'Tenaga Medis' },
   { key: 'akun' as const, label: 'Pengaturan Akun' },
 ]
@@ -995,6 +1302,9 @@ export default function KlinikClient({
           dokterList={dokterList}
           tarifLayananList={tarifLayananList}
         />
+      )}
+      {activeTab === 'apotek' && (
+        <TabApotek orgId={orgId} branch={branch} warehouses={warehouses} />
       )}
       {activeTab === 'tenaga-medis' && (
         <TabTenagaMedis orgId={orgId} employees={employees} stafMedisList={stafMedisList} poliList={poliList} />

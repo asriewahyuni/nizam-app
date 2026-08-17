@@ -171,6 +171,70 @@ export async function dispenseResep(
   return { success: true, totalHpp }
 }
 
+export type KlinikPendingResep = {
+  id: string
+  warehouse_id: string
+  catatan: string | null
+  created_at: string
+  no_antrian: number
+  pasien_nama: string
+  pasien_no_rm: string
+  items: KlinikResepDetailRow[]
+}
+
+/** Antrian resep yang perlu diserahkan apoteker — lintas semua kunjungan di cabang, bukan per-pasien. */
+export async function getPendingResepByBranch(orgId: string, branchId: string): Promise<KlinikPendingResep[]> {
+  const { rows: resepRows } = await queryPostgres<Omit<KlinikPendingResep, 'items'>>(
+    `SELECT r.id::text, r.warehouse_id::text, r.catatan, r.created_at::text,
+            k.no_antrian, p.nama AS pasien_nama, p.no_rm AS pasien_no_rm
+     FROM public.klinik_resep r
+     JOIN public.klinik_kunjungan k ON k.id = r.kunjungan_id
+     JOIN public.klinik_pasien p ON p.id = k.pasien_id
+     WHERE r.org_id = $1 AND r.branch_id = $2 AND r.status = 'PENDING'
+     ORDER BY r.created_at ASC`,
+    [orgId, branchId],
+  )
+  if (resepRows.length === 0) return []
+
+  const { rows: detailRows } = await queryPostgres<KlinikResepDetailRow & { resep_id: string }>(
+    `SELECT d.id::text, d.resep_id::text, d.product_id::text, p.name AS product_name,
+            d.jumlah, d.dosis, d.batch_number, d.expiry_date::text
+     FROM public.klinik_resep_detail d
+     JOIN public.products p ON p.id = d.product_id
+     WHERE d.resep_id = ANY($1::uuid[])
+     ORDER BY d.created_at ASC`,
+    [resepRows.map((r) => r.id)],
+  )
+
+  return resepRows.map((resep) => ({
+    ...resep,
+    items: detailRows.filter((d) => d.resep_id === resep.id),
+  }))
+}
+
+export type KlinikObatStockRow = {
+  product_id: string
+  product_name: string
+  unit: string
+  batch_number: string | null
+  expiry_date: string | null
+  quantity: number
+}
+
+export async function getObatStockByBranch(orgId: string, branchId: string): Promise<KlinikObatStockRow[]> {
+  const { rows } = await queryPostgres<KlinikObatStockRow>(
+    `SELECT s.product_id::text, p.name AS product_name, p.unit, s.batch_number, s.expiry_date::text,
+            s.quantity
+     FROM public.inventory_stocks s
+     JOIN public.products p ON p.id = s.product_id
+     JOIN public.warehouses w ON w.id = s.warehouse_id
+     WHERE s.org_id = $1 AND w.branch_id = $2 AND p.type = 'INVENTORY' AND s.quantity > 0
+     ORDER BY p.name ASC, s.expiry_date ASC NULLS LAST`,
+    [orgId, branchId],
+  )
+  return rows
+}
+
 export async function receiveObat(input: {
   orgId: string
   productId: string
