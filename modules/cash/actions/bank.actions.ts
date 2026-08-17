@@ -8,7 +8,7 @@ import { checkCanManageCoA } from '@/modules/accounting/actions/coa.actions'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 import { createInterBranchBankTransfer } from './interbranch-transfer.server'
-import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
+import { checkClosedFiscalPeriod, buildClosedPeriodError, resolveFiscalPeriodId } from '@/lib/erp-bridge/fiscal-period'
 import type { Account, BankAccount } from '@/types/database.types'
 import type { CashBankAccount, RecentTransactionOption } from '@/modules/cash/types'
 
@@ -423,6 +423,7 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
   const categoryId = formData.get('category_id') as string // Opposite Ledger Account for IN/OUT
   const targetBankAccountId = (formData.get('target_bank_account_id') as string | null)?.trim() || null
   const referenceNumber = (formData.get('reference_number') as string | null)?.trim() || null
+  const explicitPeriodId = (formData.get('period_id') as string | null)?.trim() || null
 
   if (!bankAccountId || !transDate || !description || isNaN(amount) || amount <= 0 || !type) {
     return { error: 'Semua field wajib diisi.' }
@@ -508,9 +509,9 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
     return { error: 'Akun lawan tidak boleh sama dengan akun kas/bank sumber karena jurnal akan bernilai nol.' }
   }
 
-  const closedPeriodForBankTx = await checkClosedFiscalPeriod(orgId, transDate)
-  if (closedPeriodForBankTx) {
-    return { error: buildClosedPeriodError('Transaksi Kas/Bank', transDate, closedPeriodForBankTx) }
+  const periodResult = await resolveFiscalPeriodId(orgId, transDate, explicitPeriodId)
+  if ('error' in periodResult) {
+    return { error: periodResult.error }
   }
 
   const { error } = await (supabase as any).from('bank_transactions').insert({
@@ -523,7 +524,8 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
     type,
     category_id: oppositeAccountId,
     reference_number: referenceNumber,
-    status: 'POSTED' // Automatically post to GL via trigger
+    status: 'POSTED', // Automatically post to GL via trigger
+    period_id: periodResult.periodId,
   })
 
   if (error) {

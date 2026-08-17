@@ -114,6 +114,7 @@ interface CashClientProps {
     orgName: string
     accounts: TransferCategoryOption[]
   }[]
+  fiscalPeriods?: any[]
 }
 
 const container = {
@@ -146,6 +147,7 @@ export function CashClient({
   branches = [],
   placementNodes = [],
   transferCategoryNodes = [],
+  fiscalPeriods = [],
 }: CashClientProps) {
   const router = useRouter()
   const [showTransactionModal, setShowTransactionModal] = useState(false)
@@ -192,6 +194,8 @@ export function CashClient({
   const [txAmount, setTxAmount] = useState(0)
   const [txDescription, setTxDescription] = useState('')
   const [txDate, setTxDate] = useState(getDateInTimeZone('Asia/Jakarta'))
+  const [txPeriodId, setTxPeriodId] = useState('')
+  const [txPeriodManuallyOverridden, setTxPeriodManuallyOverridden] = useState(false)
   const [txCategoryId, setTxCategoryId] = useState('')
   const [txSourceCounterAccountId, setTxSourceCounterAccountId] = useState('')
   const [txTargetCounterAccountId, setTxTargetCounterAccountId] = useState('')
@@ -201,6 +205,26 @@ export function CashClient({
   const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const pathname = usePathname()
+  const openFiscalPeriods = fiscalPeriods.filter((period: any) => !period?.is_closed)
+  const getMatchingFiscalPeriod = (date?: string | null) => {
+    const normalizedDate = String(date || '').trim()
+    if (!normalizedDate) return null
+    return fiscalPeriods.find((period: any) =>
+      String(period?.start_date || '') <= normalizedDate &&
+      String(period?.end_date || '') >= normalizedDate
+    ) || null
+  }
+  const matchedPeriodForTxDate = getMatchingFiscalPeriod(txDate)
+  const handleTxDateChange = (nextDate: string) => {
+    setTxDate(nextDate)
+    if (txPeriodManuallyOverridden) return
+    const matched = getMatchingFiscalPeriod(nextDate)
+    setTxPeriodId(matched && !matched.is_closed ? matched.id : '')
+  }
+  const handleTxPeriodChange = (periodId: string) => {
+    setTxPeriodId(periodId)
+    setTxPeriodManuallyOverridden(true)
+  }
   const categoryNodeByOrg = new Map(transferCategoryNodes.map((node) => [node.orgId, node]))
   const selectedSourceBankAccount = bankAccounts.find((bankAccount) => bankAccount.id === txBankAccountId) || null
   const transferTargetBankOptions = transferBankAccounts.filter(
@@ -380,6 +404,11 @@ export function CashClient({
       return
     }
 
+    if (openFiscalPeriods.length > 0 && !txPeriodId) {
+      setError('Pilih periode fiskal terlebih dahulu.')
+      return
+    }
+
     setLoading(true)
     const formData = new FormData(e.currentTarget)
     const useInterOrgTransfer = txType === 'TRANSFER' && isInterOrgTransfer
@@ -402,6 +431,8 @@ export function CashClient({
       setTxTargetCounterAccountId('')
       setIsCategoryLocked(false)
       setTxDate(todayInJakarta)
+      setTxPeriodId('')
+      setTxPeriodManuallyOverridden(false)
       router.refresh()
       setTimeout(() => setSuccess(null), 3000)
     }
@@ -1350,8 +1381,25 @@ export function CashClient({
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Date</label>
-                      <input type="date" name="transaction_date" value={txDate} onChange={(e) => setTxDate(e.target.value)} required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all font-mono" />
+                      <input type="date" name="transaction_date" value={txDate} onChange={(e) => handleTxDateChange(e.target.value)} required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all font-mono" />
                     </div>
+                 </div>
+
+                 <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Periode Fiskal</label>
+                    <SearchableSelect
+                      options={openFiscalPeriods.map((period: any) => ({ id: period.id, name: period.name, code: `${period.start_date} – ${period.end_date}` }))}
+                      value={txPeriodId}
+                      onChange={handleTxPeriodChange}
+                      placeholder="-- Pilih Periode --"
+                      required={openFiscalPeriods.length > 0}
+                    />
+                    {matchedPeriodForTxDate && matchedPeriodForTxDate.id !== txPeriodId && (
+                      <p className="text-[10px] text-amber-600 font-medium ml-1">
+                        Periode berbeda dari tanggal transaksi ({matchedPeriodForTxDate.name}) — sengaja di-override.
+                      </p>
+                    )}
+                    <input type="hidden" name="period_id" value={txPeriodId} />
                  </div>
 
                  <div className="space-y-1">

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { hydratePurchaseTransparencyForEntries } from '@/modules/accounting/lib/purchase-ledger-transparency'
 import { createAuditLog } from '@/modules/settings/actions/audit.actions'
+import { checkClosedFiscalPeriod, resolveFiscalPeriodId } from '@/lib/erp-bridge/fiscal-period'
 import type { JournalReferenceType } from '@/types/database.types'
 
 export interface JournalLineInput {
@@ -30,6 +31,9 @@ export interface CreateJournalEntryInput {
   contact_id?: string | null
   /** Tanggal jatuh tempo — diisi untuk menentukan aging bucket pada laporan AP/AR */
   due_date?: string | null
+  /** Periode fiskal eksplisit — jika diisi, dipakai apa adanya (override manual).
+   *  Jika kosong, auto-derive dari entry_date. */
+  period_id?: string | null
 }
 
 const JOURNAL_ENTRY_MAX_INSERT_RETRIES = 5
@@ -89,7 +93,8 @@ async function insertJournalEntryHeaderWithRetry(
   supabase: any,
   input: CreateJournalEntryInput,
   branchId: string | null,
-  userId: string
+  userId: string,
+  periodId: string | null
 ) {
   let lastError: { message?: string; code?: string } | null = null
 
@@ -117,6 +122,7 @@ async function insertJournalEntryHeaderWithRetry(
         created_by: userId,
         contact_id: input.contact_id || null,
         due_date: input.due_date || null,
+        period_id: periodId,
       })
       .select()
       .single()
@@ -165,20 +171,7 @@ async function getClosedFiscalPeriodName(
 ): Promise<string | null> {
   const normalizedEntryDate = String(entryDate || '').trim()
   if (!normalizedEntryDate) return null
-
-  const { data, error } = await (supabase as any)
-    .from('fiscal_periods')
-    .select('name')
-    .eq('org_id', orgId)
-    .eq('is_closed', true)
-    .lte('start_date', normalizedEntryDate)
-    .gte('end_date', normalizedEntryDate)
-    .order('start_date', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (error || !data) return null
-  return String(data.name || '').trim() || null
+  return checkClosedFiscalPeriod(orgId, normalizedEntryDate)
 }
 
 function buildClosedPeriodMessage(entryDate: string, actionLabel: string, fiscalPeriodName?: string | null) {
@@ -1230,14 +1223,9 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
   const resolvedBranch = await resolveJournalBranchId(input)
   if ('error' in resolvedBranch) return resolvedBranch
 
-  const closedPeriodMessage = await getClosedPeriodMessageForJournalDate(
-    supabase,
-    input.org_id,
-    input.entry_date,
-    'dibuat'
-  )
-  if (closedPeriodMessage) {
-    return { error: closedPeriodMessage }
+  const periodResult = await resolveFiscalPeriodId(input.org_id, input.entry_date, input.period_id)
+  if ('error' in periodResult) {
+    return { error: periodResult.error }
   }
 
   // Insert header with explicit entry number so PO receipt is not blocked by
@@ -1246,7 +1234,8 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
     supabase,
     input,
     resolvedBranch.branchId,
-    user.id
+    user.id,
+    periodResult.periodId
   )
 
   if (entryError || !entry) {

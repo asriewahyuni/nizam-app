@@ -7,7 +7,7 @@ import { Product } from '@/types/database.types'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 import { getDateInTimeZone } from '@/lib/utils'
-import { checkClosedFiscalPeriod, buildClosedPeriodError } from '@/lib/erp-bridge/fiscal-period'
+import { checkClosedFiscalPeriod, buildClosedPeriodError, resolveFiscalPeriodId } from '@/lib/erp-bridge/fiscal-period'
 
 type ProductInventoryFields = Pick<
   Product,
@@ -390,12 +390,13 @@ export async function createInventoryAdjustment(
   orgId: string, 
   payload: {
     adj_date: string;
+    period_id?: string | null;
     type: 'STOCK_COUNT' | 'WRITE_OFF';
     notes: string;
     items: {
       product_id: string;
       warehouse_id: string;
-      actual_quantity: number; 
+      actual_quantity: number;
       diff_quantity: number;
       unit_cost: number;
       notes: string;
@@ -422,15 +423,16 @@ export async function createInventoryAdjustment(
     return { error: 'Gudang opname tidak tersedia pada unit aktif.' }
   }
 
-  // Guard: cek periode fiskal tertutup untuk tanggal penyesuaian inventori
-  const closedPeriodAdj = await checkClosedFiscalPeriod(orgId, payload.adj_date)
-  if (closedPeriodAdj) {
-    return { error: buildClosedPeriodError('Penyesuaian Inventori', payload.adj_date, closedPeriodAdj) }
+  // Guard: cek periode fiskal tertutup + resolve period_id untuk tanggal penyesuaian inventori
+  const periodResult = await resolveFiscalPeriodId(orgId, payload.adj_date, payload.period_id)
+  if ('error' in periodResult) {
+    return { error: periodResult.error }
   }
 
   const { data: adj, error: adjErr } = await insertAdjustmentWithRetry(supabase, {
     org_id: orgId,
     adj_date: payload.adj_date,
+    period_id: periodResult.periodId,
     type: payload.type,
     status: 'DRAFT',
     total_value: payload.items.reduce((sum: any, it: any) => sum + (Math.abs(it.diff_quantity) * it.unit_cost), 0),

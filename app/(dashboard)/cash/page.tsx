@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { CashClient } from './CashClient'
 import { checkCanManageCoA } from '@/modules/accounting/actions/coa.actions'
 import { getRecentBankTransactions } from '@/modules/cash/actions/bank.actions'
+import { getFiscalPeriods } from '@/modules/accounting/actions/closing.actions'
 import { canSelectAllBranches, getActiveBranch, getActiveOrg, getBranches, getChildOrgs } from '@/modules/organization/actions/org.actions'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { getPendingCoaRequestCount } from '@/modules/accounting/actions/coa-request.actions'
@@ -549,9 +550,10 @@ export default async function CashPage({
 
   const viewBranchId = canAccessAllBranches ? null : (activeBranch?.id ?? null)
 
-  const [bankAccounts, parentRecentTransactions] = await Promise.all([
+  const [bankAccounts, parentRecentTransactions, fiscalPeriods] = await Promise.all([
     getBankAccountsWithBalance(orgId, viewBranchId),
     getRecentBankTransactions(orgId, 20, viewBranchId),
+    getFiscalPeriods(orgId),
   ])
 
   const [pendingCoaRequests, childOrgs, managedBankAccounts, holdingRecentTransactions]: [
@@ -682,6 +684,7 @@ export default async function CashPage({
         branches={branches}
         placementNodes={placementNodes}
         transferCategoryNodes={transferCategoryNodes}
+        fiscalPeriods={fiscalPeriods}
       />
     </div>
   )

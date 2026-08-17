@@ -12,6 +12,7 @@ import { formatDate, formatRupiah } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeftRight, ArrowRight, CheckCircle2, ChevronDown, ListChecks, Printer } from 'lucide-react'
 import { BarcodeLabel } from '@/components/shared/BarcodeLabel'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 
 interface InventoryClientProps {
   orgId: string
@@ -21,6 +22,7 @@ interface InventoryClientProps {
   warehouseSnapshot: InventoryWarehouseStockRow[]
   recentMutations: InventoryMutationRow[]
   warehouses: any[]
+  fiscalPeriods?: any[]
 }
 
 type InventoryCategoryFilter = 'ALL' | 'RAW' | 'WIP' | 'FG' | 'OTHER'
@@ -276,6 +278,7 @@ export default function InventoryClient({
   warehouseSnapshot,
   recentMutations,
   warehouses = [],
+  fiscalPeriods = [],
 }: InventoryClientProps) {
   const [products, setProducts] = useState<ProductWithStock[]>(initialProducts)
   const { confirm, ConfirmUI } = useConfirm()
@@ -372,6 +375,7 @@ export default function InventoryClient({
   // Opname / Adjustment Form
   const [adjForm, setAdjForm] = useState({
     adj_date: new Date().toISOString().split('T')[0],
+    period_id: '',
     notes: 'Penyesuaian stok reguler / hasil opname',
     product_id: '',
     warehouse_id: warehouses[0]?.id || '',
@@ -379,6 +383,7 @@ export default function InventoryClient({
     current_qty: 0,
     unit_cost: 0
   })
+  const [adjPeriodManuallyOverridden, setAdjPeriodManuallyOverridden] = useState(false)
 
   // Transfer Form
   const [trfForm, setTrfForm] = useState({
@@ -393,6 +398,7 @@ export default function InventoryClient({
   // Write-off Form State
   const [writeOffForm, setWriteOffForm] = useState({
     adj_date: new Date().toISOString().split('T')[0],
+    period_id: '',
     notes: '',
     product_id: '',
     warehouse_id: warehouses[0]?.id || '',
@@ -400,6 +406,32 @@ export default function InventoryClient({
     unit_cost: 0,
     line_notes: 'Barang rusak/cacat setelah pengecekan return'
   })
+  const [writeOffPeriodManuallyOverridden, setWriteOffPeriodManuallyOverridden] = useState(false)
+
+  const openFiscalPeriods = fiscalPeriods.filter((period: any) => !period?.is_closed)
+  const getMatchingFiscalPeriod = (date?: string | null) => {
+    const normalizedDate = String(date || '').trim()
+    if (!normalizedDate) return null
+    return fiscalPeriods.find((period: any) =>
+      String(period?.start_date || '') <= normalizedDate &&
+      String(period?.end_date || '') >= normalizedDate
+    ) || null
+  }
+
+  const handleAdjDateChange = (nextDate: string) => {
+    setAdjForm((prev) => {
+      if (adjPeriodManuallyOverridden) return { ...prev, adj_date: nextDate }
+      const matched = getMatchingFiscalPeriod(nextDate)
+      return { ...prev, adj_date: nextDate, period_id: matched && !matched.is_closed ? matched.id : '' }
+    })
+  }
+  const handleWriteOffDateChange = (nextDate: string) => {
+    setWriteOffForm((prev) => {
+      if (writeOffPeriodManuallyOverridden) return { ...prev, adj_date: nextDate }
+      const matched = getMatchingFiscalPeriod(nextDate)
+      return { ...prev, adj_date: nextDate, period_id: matched && !matched.is_closed ? matched.id : '' }
+    })
+  }
 
   const handleOpenEdit = (product: ProductWithStock) => {
     setEditId(product.id)
@@ -442,10 +474,12 @@ export default function InventoryClient({
 
   const handleAdjustmentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (openFiscalPeriods.length > 0 && !adjForm.period_id) return alert('Pilih periode fiskal terlebih dahulu.')
     setIsSubmitting(true)
     const diff = Number(adjForm.actual_qty) - Number(adjForm.current_qty)
     const res = await createInventoryAdjustment(orgId, {
       adj_date: adjForm.adj_date,
+      period_id: adjForm.period_id || null,
       type: 'STOCK_COUNT',
       notes: adjForm.notes || `Stock Opname: ${products.find(p => p.id === adjForm.product_id)?.name}`,
       items: [{
@@ -482,9 +516,11 @@ export default function InventoryClient({
 
   const handleWriteOffSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (openFiscalPeriods.length > 0 && !writeOffForm.period_id) return alert('Pilih periode fiskal terlebih dahulu.')
     setIsSubmitting(true)
     const res = await createInventoryAdjustment(orgId, {
       adj_date: writeOffForm.adj_date,
+      period_id: writeOffForm.period_id || null,
       type: 'WRITE_OFF',
       notes: writeOffForm.notes || `Write-off: ${products.find(p => p.id === writeOffForm.product_id)?.name}`,
       items: [{
@@ -1267,7 +1303,7 @@ export default function InventoryClient({
                     <div className="grid grid-cols-2 gap-5">
                       <div className="space-y-1">
                           <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Tanggal</label>
-                          <input type="date" required value={adjForm.adj_date} onChange={e => setAdjForm({...adjForm, adj_date: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border border-slate-100 font-bold" />
+                          <input type="date" required value={adjForm.adj_date} onChange={e => handleAdjDateChange(e.target.value)} className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border border-slate-100 font-bold" />
                       </div>
                       <div className="space-y-1">
                           <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Gudang</label>
@@ -1275,6 +1311,17 @@ export default function InventoryClient({
                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                           </select>
                       </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Periode Fiskal</label>
+                        <SearchableSelect
+                          options={openFiscalPeriods.map((period: any) => ({ id: period.id, name: period.name, code: `${period.start_date} – ${period.end_date}` }))}
+                          value={adjForm.period_id}
+                          onChange={(periodId) => { setAdjForm({ ...adjForm, period_id: periodId }); setAdjPeriodManuallyOverridden(true) }}
+                          placeholder="-- Pilih Periode --"
+                          required={openFiscalPeriods.length > 0}
+                        />
                     </div>
 
                     <div className="space-y-1">
@@ -1453,7 +1500,7 @@ export default function InventoryClient({
                     <div className="grid grid-cols-2 gap-5">
                       <div className="space-y-1">
                           <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Tanggal</label>
-                          <input type="date" required value={writeOffForm.adj_date} onChange={e => setWriteOffForm({...writeOffForm, adj_date: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border border-slate-100 font-bold outline-none focus:border-rose-500 transition-all shadow-inner" />
+                          <input type="date" required value={writeOffForm.adj_date} onChange={e => handleWriteOffDateChange(e.target.value)} className="w-full px-5 py-3.5 bg-slate-50 rounded-xl border border-slate-100 font-bold outline-none focus:border-rose-500 transition-all shadow-inner" />
                       </div>
                       <div className="space-y-1">
                           <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Pilih Gudang</label>
@@ -1461,6 +1508,17 @@ export default function InventoryClient({
                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                           </select>
                       </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Periode Fiskal</label>
+                        <SearchableSelect
+                          options={openFiscalPeriods.map((period: any) => ({ id: period.id, name: period.name, code: `${period.start_date} – ${period.end_date}` }))}
+                          value={writeOffForm.period_id}
+                          onChange={(periodId) => { setWriteOffForm({ ...writeOffForm, period_id: periodId }); setWriteOffPeriodManuallyOverridden(true) }}
+                          placeholder="-- Pilih Periode --"
+                          required={openFiscalPeriods.length > 0}
+                        />
                     </div>
 
                     <div className="space-y-1">

@@ -128,12 +128,15 @@ export default function JournalClient({
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0])
   const [description, setDescription] = useState('')
   const [notes, setNotes] = useState('')
+  const [selectedPeriodId, setSelectedPeriodId] = useState('')
+  const [periodManuallyOverridden, setPeriodManuallyOverridden] = useState(false)
   const [lines, setLines] = useState<{ id: number, account_id: string, debit: number, credit: number, memo: string }[]>([
     { id: 1, account_id: '', debit: 0, credit: 0, memo: '' },
     { id: 2, account_id: '', debit: 0, credit: 0, memo: '' }
   ])
   const canCreateManualJournal = Boolean(activeBranchId)
   const closedFiscalPeriods = (fiscalPeriods || []).filter((period: any) => period?.is_closed)
+  const openFiscalPeriods = (fiscalPeriods || []).filter((period: any) => !period?.is_closed)
 
   const totalDebit = lines.reduce((sum: number, line: any) => sum + (line.debit || 0), 0)
   const totalCredit = lines.reduce((sum: number, line: any) => sum + (line.credit || 0), 0)
@@ -149,7 +152,30 @@ export default function JournalClient({
     ) || null
   }
 
+  const getMatchingPeriodForDate = (date?: string | null) => {
+    const normalizedDate = String(date || '').trim()
+    if (!normalizedDate) return null
+
+    return (fiscalPeriods || []).find((period: any) =>
+      String(period?.start_date || '') <= normalizedDate &&
+      String(period?.end_date || '') >= normalizedDate
+    ) || null
+  }
+
   const selectedClosedPeriod = getClosedPeriodForDate(entryDate)
+  const matchedPeriodForEntryDate = getMatchingPeriodForDate(entryDate)
+
+  const handleEntryDateChange = (nextDate: string) => {
+    setEntryDate(nextDate)
+    if (periodManuallyOverridden) return
+    const matched = getMatchingPeriodForDate(nextDate)
+    setSelectedPeriodId(matched && !matched.is_closed ? matched.id : '')
+  }
+
+  const handlePeriodChange = (periodId: string) => {
+    setSelectedPeriodId(periodId)
+    setPeriodManuallyOverridden(true)
+  }
   const statusEntries = entries.filter((entry) => entry.status === filterStatus)
   const visibleEntries = searchResults || statusEntries
   const canLoadMoreEntries = activeSearch ? searchHasMore : hasMoreByStatus[filterStatus]
@@ -403,12 +429,16 @@ export default function JournalClient({
     if (selectedClosedPeriod) {
       return alert(`Periode fiskal ${selectedClosedPeriod.name} sudah ditutup. Jurnal tanggal ${entryDate} tidak dapat dibuat.`)
     }
+    if (openFiscalPeriods.length > 0 && !selectedPeriodId) {
+      return alert("Pilih periode fiskal terlebih dahulu.")
+    }
 
     setIsSubmitting(true)
     try {
       const res = await createJournalEntry({
         org_id: orgId,
         entry_date: entryDate,
+        period_id: selectedPeriodId || null,
         description,
         notes,
         lines: lines.map((l: any) => ({
@@ -1080,9 +1110,24 @@ export default function JournalClient({
                    <div className="grid grid-cols-2 gap-6 mb-10 bg-slate-50 p-6 rounded-xl border border-slate-100 shadow-inner">
                       <div className="space-y-1">
                           <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Jurnal Date</label>
-                          <input type="date" required value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="w-full px-5 py-4 bg-white rounded-xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
+                          <input type="date" required value={entryDate} onChange={(e) => handleEntryDateChange(e.target.value)} className="w-full px-5 py-4 bg-white rounded-xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
                       </div>
                       <div className="space-y-1">
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Periode Fiskal</label>
+                          <SearchableSelect
+                            options={openFiscalPeriods.map((period: any) => ({ id: period.id, name: period.name, code: `${period.start_date} – ${period.end_date}` }))}
+                            value={selectedPeriodId}
+                            onChange={handlePeriodChange}
+                            placeholder="-- Pilih Periode --"
+                            required
+                          />
+                          {matchedPeriodForEntryDate && matchedPeriodForEntryDate.id !== selectedPeriodId && (
+                            <p className="text-[10px] text-amber-600 font-medium ml-1">
+                              Periode berbeda dari tanggal transaksi ({matchedPeriodForEntryDate.name}) — sengaja di-override.
+                            </p>
+                          )}
+                      </div>
+                      <div className="col-span-2 space-y-1">
                           <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide ml-1">Main Description</label>
                           <input required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Initial Capital Deposit" className="w-full px-5 py-4 bg-white rounded-xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
                       </div>
