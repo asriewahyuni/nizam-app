@@ -204,6 +204,22 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     requires: [],
   },
   {
+    key: 'Klinik Pratama',
+    name: 'Klinik Pratama',
+    tagline: 'Operasional klinik: pendaftaran, rekam medis, apotek, kasir',
+    description: 'Untuk klinik pratama & jaringan multi-cabang: pendaftaran pasien, antrian, rekam medis elektronik, jadwal praktik dokter/perawat, apotek dengan tracking batch/kadaluarsa, dan kasir yang terhubung ke buku besar keuangan.',
+    icon: '🩺',
+    color: 'bg-cyan-600',
+    href: '/klinik',
+    isCore: false,
+    category: 'business_type',
+    onboardingSteps: [
+      { id: 'settings', title: 'Pengaturan Akun', description: 'Petakan akun COA untuk pendapatan konsultasi/tindakan/obat dan HPP obat.' },
+    ],
+    tags: ['klinik', 'kesehatan', 'apotek', 'rekam medis', 'pasien'],
+    requires: ['Finance', 'Inventory'],
+  },
+  {
     key: 'Fleet & Rental',
     name: 'Fleet & Rental',
     tagline: 'Bisnis armada kendaraan dan sewa aset',

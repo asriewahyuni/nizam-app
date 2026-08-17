@@ -269,9 +269,16 @@ function normalizeInternalUserType(value: unknown) {
     || normalized === 'admin'
     || normalized === 'staff'
     || normalized === 'member'
+    || normalized === 'anggota'
     || normalized === 'tutor'
     || normalized === 'affiliate'
+    || normalized === 'pasien'
   ) return normalized
+  // Fallback ke 'staff' HANYA untuk value yang benar-benar tidak dikenal.
+  // 'anggota' dan 'pasien' WAJIB ada di whitelist ini — kalau tidak, akun
+  // anggota/pasien yang lewat ensureInternalAuthUserRecord() diam-diam
+  // berubah jadi 'staff' dan lolos guard dashboard ERP (lihat
+  // supabase/migrations/1424_klinik_pratama_user_type.sql).
   return 'staff'
 }
 

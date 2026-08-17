@@ -53,6 +53,11 @@ export default async function DashboardLayout({
     redirect('/anggota/login')
   }
 
+  // Akun pasien klinik HANYA boleh mengakses Portal Pasien, bukan area ERP staf ini.
+  if (loginType === 'pasien') {
+    redirect('/pasien/login')
+  }
+
   // Member LMS tidak punya baris org_members, jadi getActiveOrg() di bawah akan
   // gagal untuknya — arahkan langsung ke portal member, bukan ke /anggota/login
   // (itu portal koperasi yang tidak terkait) atau /onboarding.
