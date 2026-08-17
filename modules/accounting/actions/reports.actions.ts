@@ -173,11 +173,15 @@ async function getEffectiveReferenceAccounts(
   }
 }
 
-// Tanggal efektif untuk laporan: pakai rentang periode fiskal (fp.start_date/end_date)
-// kalau journal_entries.period_id terisi, fallback ke entry_date kalau belum (org belum
-// setup fiscal_periods, atau data lama sebelum period_id ada). Ini konsisten dengan
-// "date entry" (created_at, kapan dicatat) vs "periode" (period_id, hasil override manual
-// bisa beda dari entry_date) — laporan TIDAK PERNAH pakai created_at.
+// Tanggal efektif untuk laporan: journal_entries.period_id (override manual) dipakai
+// SAPU PENUH hanya kalau rentang laporan yang diminta mencakup seluruh periode entri itu
+// (mis. laporan "1-31 Juli" utuh terhadap entri ber-period_id Juli). Kalau rentangnya cuma
+// SEBAGIAN dari periode itu (mis. "18-31 Juli"), turun ke entry_date presisi supaya tidak
+// menyapu seluruh isi periode. Entri yang periodenya sama sekali tidak bersinggungan dengan
+// rentang diminta dikecualikan langsung (mencegah entri ber-override period_id "bocor" ke
+// laporan periode lain lewat entry_date mentahnya). entry_date dipakai apa adanya kalau
+// period_id NULL (org belum setup fiscal_periods, atau data lama). created_at TIDAK PERNAH
+// dipakai untuk laporan.
 async function getPostedEntryIds(
   db: any,
   orgId: string,
@@ -207,26 +211,35 @@ async function getPostedEntryIds(
     params.push(options.asOfDate)
     const p = params.length
     conditions.push(`(
-      (je.period_id IS NOT NULL AND fp.start_date <= $${p}::date)
-      OR (je.period_id IS NULL AND je.entry_date <= $${p}::date)
+      (je.period_id IS NULL AND je.entry_date <= $${p}::date)
+      OR (
+        je.period_id IS NOT NULL AND fp.start_date <= $${p}::date
+        AND (fp.end_date <= $${p}::date OR je.entry_date <= $${p}::date)
+      )
     )`)
-  } else {
-    if (options.startDate) {
-      params.push(options.startDate)
-      const p = params.length
-      conditions.push(`(
-        (je.period_id IS NOT NULL AND fp.end_date >= $${p}::date)
-        OR (je.period_id IS NULL AND je.entry_date >= $${p}::date)
-      )`)
-    }
-    if (options.endDate) {
-      params.push(options.endDate)
-      const p = params.length
-      conditions.push(`(
-        (je.period_id IS NOT NULL AND fp.start_date <= $${p}::date)
-        OR (je.period_id IS NULL AND je.entry_date <= $${p}::date)
-      )`)
-    }
+  } else if (options.startDate || options.endDate) {
+    const startParam = options.startDate ? (params.push(options.startDate), params.length) : null
+    const endParam = options.endDate ? (params.push(options.endDate), params.length) : null
+    const entryDateInRange = [
+      startParam ? `je.entry_date >= $${startParam}::date` : null,
+      endParam ? `je.entry_date <= $${endParam}::date` : null,
+    ].filter(Boolean).join(' AND ')
+    const periodOverlapsRange = [
+      startParam ? `fp.end_date >= $${startParam}::date` : null,
+      endParam ? `fp.start_date <= $${endParam}::date` : null,
+    ].filter(Boolean).join(' AND ')
+    const periodFullyContained = [
+      startParam ? `fp.start_date >= $${startParam}::date` : null,
+      endParam ? `fp.end_date <= $${endParam}::date` : null,
+    ].filter(Boolean).join(' AND ')
+
+    conditions.push(`(
+      (je.period_id IS NULL AND ${entryDateInRange})
+      OR (
+        je.period_id IS NOT NULL AND ${periodOverlapsRange}
+        AND ((${periodFullyContained}) OR (${entryDateInRange}))
+      )
+    )`)
   }
 
   const sql = `
