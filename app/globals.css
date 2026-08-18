@@ -126,6 +126,16 @@ button, a, input, select, textarea {
   50% { opacity: 0.6; }
 }
 
+@keyframes antrianFlash {
+  0%   { box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.35); border-color: rgb(34 211 238); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); border-color: rgb(226 232 240 / 0.8); }
+}
+
 .animate-fade-in  { animation: fadeIn 200ms ease forwards; }
 .animate-slide-in { animation: slideIn 200ms ease forwards; }
 .animate-pulse-slow { animation: pulse-slow 2s ease-in-out infinite; }
+.animate-antrian-flash { animation: antrianFlash 2.5s ease-out forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-antrian-flash { animation: none; }
+}

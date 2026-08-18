@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import {
   Landmark, CheckCircle2, AlertCircle, Stethoscope, Search, UserPlus, Plus,
   Users, PhoneCall, Ban, ChevronDown, ChevronUp, UserCog, CalendarCheck, LogIn,
-  Pill, PackagePlus, Send, Boxes,
+  Pill, PackagePlus, Send, Boxes, MonitorPlay,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { BranchSummary } from '@/modules/organization/lib/org-context'
@@ -481,9 +481,20 @@ function TabPendaftaran({
           )}
 
           <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <Users className="size-4 text-slate-500" aria-hidden="true" />
-              <p className="text-sm font-bold text-slate-900">Antrian Hari Ini</p>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Users className="size-4 text-slate-500" aria-hidden="true" />
+                <p className="text-sm font-bold text-slate-900">Antrian Hari Ini</p>
+              </div>
+              <a
+                href={`/klinik/antrian/${branch.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors duration-150 hover:bg-slate-50"
+              >
+                <MonitorPlay className="size-3.5" aria-hidden="true" />
+                Buka Layar Antrian
+              </a>
             </div>
 
             {antrian.length === 0 ? (

@@ -98,6 +98,41 @@ export async function getAntrianHariIni(branchId: string, poliId: string): Promi
   return rows
 }
 
+export type KlinikAntrianDisplayPoli = {
+  poli_id: string
+  poli_nama: string
+  sedang_dipanggil: number | null
+  menunggu: number[]
+}
+
+/**
+ * Data untuk layar antrian publik (TV/monitor ruang tunggu) — sengaja HANYA
+ * nomor antrian, tanpa nama pasien (halaman ini tanpa login, jangan bocorkan
+ * data pribadi ke layar publik).
+ */
+export async function getAntrianDisplayBoard(branchId: string): Promise<KlinikAntrianDisplayPoli[]> {
+  const today = todayDateString()
+  const { rows } = await queryPostgres<KlinikAntrianDisplayPoli>(
+    `SELECT
+        p.id::text AS poli_id,
+        p.nama AS poli_nama,
+        (
+          SELECT k.no_antrian FROM public.klinik_kunjungan k
+          WHERE k.branch_id = $1 AND k.poli_id = p.id AND k.tanggal = $2::date AND k.status = 'DIPERIKSA'
+          ORDER BY k.updated_at DESC LIMIT 1
+        ) AS sedang_dipanggil,
+        COALESCE((
+          SELECT array_agg(k.no_antrian ORDER BY k.no_antrian ASC) FROM public.klinik_kunjungan k
+          WHERE k.branch_id = $1 AND k.poli_id = p.id AND k.tanggal = $2::date AND k.status = 'MENUNGGU'
+        ), ARRAY[]::int[]) AS menunggu
+     FROM public.klinik_poli p
+     WHERE p.branch_id = $1 AND p.is_active = TRUE
+     ORDER BY p.nama ASC`,
+    [branchId, today],
+  )
+  return rows
+}
+
 export async function updateStatusKunjungan(
   kunjunganId: string,
   status: 'MENUNGGU' | 'DIPERIKSA' | 'SELESAI' | 'BATAL',
