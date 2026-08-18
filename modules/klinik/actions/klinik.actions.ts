@@ -19,16 +19,76 @@ export type KlinikPoli = {
   id: string
   kode: string
   nama: string
+  is_active: boolean
 }
 
-export async function getKlinikPoliByBranch(orgId: string, branchId: string): Promise<KlinikPoli[]> {
+export async function getKlinikPoliByBranch(
+  orgId: string,
+  branchId: string,
+  includeInactive = false,
+): Promise<KlinikPoli[]> {
   const { rows } = await queryPostgres<KlinikPoli>(
-    `SELECT id::text, kode, nama FROM public.klinik_poli
-     WHERE org_id = $1 AND branch_id = $2 AND is_active = TRUE
+    `SELECT id::text, kode, nama, is_active FROM public.klinik_poli
+     WHERE org_id = $1 AND branch_id = $2 ${includeInactive ? '' : 'AND is_active = TRUE'}
      ORDER BY nama ASC`,
     [orgId, branchId]
   )
   return rows
+}
+
+export async function updateKlinikPoli(
+  orgId: string,
+  poliId: string,
+  payload: { kode: string; nama: string },
+): Promise<{ data: KlinikPoli } | { error: string }> {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi.' }
+  if (!(await isKlinikOrgAdmin(session.user.id, orgId))) {
+    return { error: 'Hanya owner/admin/manager yang dapat mengubah poli.' }
+  }
+
+  const kode = payload.kode.trim().toUpperCase()
+  const nama = payload.nama.trim()
+  if (!kode) return { error: 'Kode poli wajib diisi.' }
+  if (!nama) return { error: 'Nama poli wajib diisi.' }
+
+  try {
+    const { rows } = await queryPostgres<KlinikPoli>(
+      `UPDATE public.klinik_poli SET kode = $3, nama = $4, updated_at = NOW()
+       WHERE id = $2 AND org_id = $1
+       RETURNING id::text, kode, nama, is_active`,
+      [orgId, poliId, kode, nama],
+    )
+    if (rows.length === 0) return { error: 'Poli tidak ditemukan.' }
+    return { data: rows[0] }
+  } catch (error) {
+    const err = error as { code?: string; message?: string }
+    if (err.code === '23505') {
+      return { error: 'Kode poli sudah dipakai di cabang ini.' }
+    }
+    return { error: err.message || 'Gagal mengubah poli.' }
+  }
+}
+
+export async function setKlinikPoliActive(
+  orgId: string,
+  poliId: string,
+  isActive: boolean,
+): Promise<{ data: KlinikPoli } | { error: string }> {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi.' }
+  if (!(await isKlinikOrgAdmin(session.user.id, orgId))) {
+    return { error: 'Hanya owner/admin/manager yang dapat mengubah status poli.' }
+  }
+
+  const { rows } = await queryPostgres<KlinikPoli>(
+    `UPDATE public.klinik_poli SET is_active = $3, updated_at = NOW()
+     WHERE id = $2 AND org_id = $1
+     RETURNING id::text, kode, nama, is_active`,
+    [orgId, poliId, isActive],
+  )
+  if (rows.length === 0) return { error: 'Poli tidak ditemukan.' }
+  return { data: rows[0] }
 }
 
 export async function createKlinikPoli(

@@ -15,6 +15,7 @@ import {
   getTagihanByKunjungan, createTagihan, markTagihanLunas, voidTagihan,
   type KlinikTagihan, type KlinikTagihanDetailRow,
 } from '@/modules/klinik/actions/klinik-tagihan.actions'
+import { getRawatInapByKunjungan, type KlinikRawatInapDetail } from '@/modules/klinik/actions/klinik-kamar.actions'
 import type { KlinikStafMedis, KlinikTarifLayanan } from '@/modules/klinik/actions/klinik.actions'
 
 type ResepWithItems = KlinikResepRow & { items: KlinikResepDetailRow[] }
@@ -56,13 +57,16 @@ export default function PemeriksaanPanel({
   const [tagihan, setTagihan] = useState<{ tagihan: KlinikTagihan; items: KlinikTagihanDetailRow[] } | null>(null)
   const [selectedLayananIds, setSelectedLayananIds] = useState<string[]>([])
   const [metodeBayar, setMetodeBayar] = useState<'tunai' | 'bpjs' | 'asuransi'>('tunai')
+  const [rawatInap, setRawatInap] = useState<KlinikRawatInapDetail | null>(null)
 
   async function loadData() {
-    const [rm, resep, tagihanData] = await Promise.all([
+    const [rm, resep, tagihanData, rawatInapData] = await Promise.all([
       getRekamMedisByKunjungan(kunjunganId),
       getResepByKunjungan(kunjunganId),
       getTagihanByKunjungan(kunjunganId),
+      getRawatInapByKunjungan(kunjunganId),
     ])
+    setRawatInap(rawatInapData)
     setRekamMedis(rm.rekamMedis)
     if (rm.rekamMedis) {
       setForm({
@@ -519,6 +523,11 @@ export default function PemeriksaanPanel({
 
               {resepList.some((r) => r.status === 'DISPENSED') && (
                 <p className="text-xs text-slate-500">Obat yang sudah diserahkan akan otomatis ditambahkan ke tagihan.</p>
+              )}
+              {rawatInap && rawatInap.status === 'PULANG' && (
+                <p className="rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs text-cyan-800">
+                  Kamar {rawatInap.kamar_nama} ({rawatInap.tempat_tidur_kode}) — {rawatInap.malam} malam × Rp {rawatInap.tarif_per_malam_snapshot.toLocaleString('id-ID')} akan otomatis ditambahkan ke tagihan.
+                </p>
               )}
 
               <div className="space-y-1.5">

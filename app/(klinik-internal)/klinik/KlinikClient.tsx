@@ -34,6 +34,7 @@ import {
   type KlinikAccountOption,
 } from '@/modules/klinik/lib/klinik-account-mapping.shared'
 import PemeriksaanPanel from './PemeriksaanPanel'
+import { TabDaftarPoli, TabRawatInap, TabMutasiObat, TabDaftarPasien } from './KlinikTabsExtra'
 
 // ─── TAB: PENDAFTARAN & ANTRIAN ───────────────────────────────────────────────
 
@@ -584,7 +585,7 @@ const ACCOUNT_TYPE_LABEL: Record<KlinikAccountOption['type'], string> = {
 
 const ACCOUNT_ROLE_GROUPS: { title: string; roles: KlinikAccountRole[] }[] = [
   { title: 'Umum', roles: ['kas'] },
-  { title: 'Pendapatan', roles: ['pendapatan_konsultasi', 'pendapatan_tindakan', 'pendapatan_obat'] },
+  { title: 'Pendapatan', roles: ['pendapatan_konsultasi', 'pendapatan_tindakan', 'pendapatan_obat', 'pendapatan_kamar_inap'] },
   { title: 'Apotek & Persediaan', roles: ['hpp_obat', 'persediaan_obat', 'kerugian_obat_kadaluarsa'] },
   { title: 'BPJS (disiapkan untuk fase integrasi berikutnya)', roles: ['piutang_bpjs'] },
 ]
@@ -1247,6 +1248,10 @@ function TabApotek({
 const TABS = [
   { key: 'pendaftaran' as const, label: 'Pendaftaran & Antrian' },
   { key: 'apotek' as const, label: 'Apotek' },
+  { key: 'mutasi-obat' as const, label: 'Mutasi Obat' },
+  { key: 'rawat-inap' as const, label: 'Rawat Inap' },
+  { key: 'poli' as const, label: 'Daftar Poli' },
+  { key: 'pasien' as const, label: 'Daftar Pasien' },
   { key: 'tenaga-medis' as const, label: 'Tenaga Medis' },
   { key: 'akun' as const, label: 'Pengaturan Akun' },
 ]
@@ -1285,14 +1290,14 @@ export default function KlinikClient({
         </div>
       </div>
 
-      <div className="flex gap-1 border-b border-slate-200">
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             type="button"
             onClick={() => setActiveTab(tab.key)}
             className={cn(
-              'cursor-pointer rounded-t-lg px-4 py-2.5 text-sm font-semibold transition-colors duration-150',
+              'cursor-pointer whitespace-nowrap rounded-t-lg px-4 py-2.5 text-sm font-semibold transition-colors duration-150',
               activeTab === tab.key
                 ? 'border-b-2 border-cyan-600 text-cyan-700'
                 : 'text-slate-500 hover:text-slate-900'
@@ -1317,6 +1322,18 @@ export default function KlinikClient({
       )}
       {activeTab === 'apotek' && (
         <TabApotek orgId={orgId} branch={branch} warehouses={warehouses} />
+      )}
+      {activeTab === 'mutasi-obat' && (
+        <TabMutasiObat orgId={orgId} branch={branch} />
+      )}
+      {activeTab === 'rawat-inap' && (
+        <TabRawatInap orgId={orgId} branch={branch} poliList={poliList} dokterList={dokterList} />
+      )}
+      {activeTab === 'poli' && (
+        <TabDaftarPoli orgId={orgId} branch={branch} />
+      )}
+      {activeTab === 'pasien' && (
+        <TabDaftarPasien orgId={orgId} />
       )}
       {activeTab === 'tenaga-medis' && (
         <TabTenagaMedis orgId={orgId} employees={employees} stafMedisList={stafMedisList} poliList={poliList} />

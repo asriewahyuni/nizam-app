@@ -78,6 +78,87 @@ export async function searchKlinikPasien(orgId: string, query: string): Promise<
   return rows
 }
 
+export type KlinikPasienListRow = {
+  id: string
+  no_rm: string
+  nama: string
+  nik: string | null
+  no_hp: string | null
+  tgl_lahir: string | null
+  jenis_kelamin: 'L' | 'P' | null
+  registered_branch_nama: string | null
+}
+
+/** Direktori pasien lengkap (bukan cuma search ≥2 karakter) — dipakai tab Daftar Pasien. */
+export async function getKlinikPasienPage(
+  orgId: string,
+  options: { search?: string; page?: number; limit?: number } = {},
+): Promise<{ rows: KlinikPasienListRow[]; total: number; page: number; totalPages: number }> {
+  const page = Math.max(1, options.page || 1)
+  const limit = Math.min(100, Math.max(1, options.limit || 20))
+  const offset = (page - 1) * limit
+  const search = (options.search || '').trim()
+
+  const scope = await getBranchAccessScope(orgId)
+  const branchFilter = scope.canAccessAllBranches
+    ? ''
+    : `AND (
+        p.registered_branch_id = ANY($branchParam::uuid[])
+        OR EXISTS (
+          SELECT 1 FROM public.klinik_kunjungan k
+          WHERE k.pasien_id = p.id AND k.branch_id = ANY($branchParam::uuid[])
+        )
+      )`
+
+  const params: unknown[] = [orgId]
+  let searchClause = ''
+  if (search) {
+    params.push(`%${search}%`)
+    searchClause = `AND (p.nama ILIKE $${params.length} OR p.no_rm ILIKE $${params.length})`
+  }
+  let branchParamIdx = -1
+  if (!scope.canAccessAllBranches) {
+    params.push(scope.accessibleBranchIds)
+    branchParamIdx = params.length
+  }
+  const resolvedBranchFilter = branchFilter.replace(/\$branchParam/g, `$${branchParamIdx}`)
+
+  params.push(limit, offset)
+  const limitIdx = params.length - 1
+  const offsetIdx = params.length
+
+  const { rows } = await queryPostgres<KlinikPasienListRow & { total_count: string }>(
+    `SELECT p.id::text, p.no_rm, p.nama, p.nik, p.no_hp, p.tgl_lahir::text, p.jenis_kelamin,
+            b.nama AS registered_branch_nama,
+            COUNT(*) OVER() AS total_count
+     FROM public.klinik_pasien p
+     LEFT JOIN public.branches b ON b.id = p.registered_branch_id
+     WHERE p.org_id = $1 AND p.is_active = TRUE
+       ${searchClause}
+       ${resolvedBranchFilter}
+     ORDER BY p.nama ASC
+     LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+    params,
+  )
+
+  const total = rows.length > 0 ? Number(rows[0].total_count) : 0
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      no_rm: r.no_rm,
+      nama: r.nama,
+      nik: r.nik,
+      no_hp: r.no_hp,
+      tgl_lahir: r.tgl_lahir,
+      jenis_kelamin: r.jenis_kelamin,
+      registered_branch_nama: r.registered_branch_nama,
+    })),
+    total,
+    page,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  }
+}
+
 export async function createKlinikPasien(
   orgId: string,
   payload: {

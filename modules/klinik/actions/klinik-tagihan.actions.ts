@@ -53,16 +53,37 @@ export async function createTagihan(input: {
     [input.kunjunganId],
   )
 
+  // Rawat inap yang sudah PULANG untuk kunjungan ini — tarik otomatis sebagai
+  // baris "kamar" (qty = malam, harga = tarif snapshot saat admisi). Lihat
+  // modules/klinik/actions/klinik-kamar.actions.ts.
+  const { rows: rawatInapRows } = await queryPostgres<{
+    id: string; admitted_at: string; discharged_at: string | null; tarif_per_malam_snapshot: string; kamar_nama: string
+  }>(
+    `SELECT ri.id::text, ri.admitted_at::text, ri.discharged_at::text, ri.tarif_per_malam_snapshot::text, k.nama AS kamar_nama
+     FROM public.klinik_rawat_inap ri
+     JOIN public.klinik_kamar k ON k.id = ri.kamar_id
+     WHERE ri.kunjungan_id = $1 AND ri.status = 'PULANG'`,
+    [input.kunjunganId],
+  )
+  const kamarDetails = rawatInapRows.map((r) => {
+    const admitted = new Date(r.admitted_at).getTime()
+    const discharged = new Date(r.discharged_at as string).getTime()
+    const malam = Math.max(1, Math.ceil((discharged - admitted) / 86_400_000))
+    const harga = Number(r.tarif_per_malam_snapshot)
+    return { deskripsi: `Kamar ${r.kamar_nama} (${malam} malam)`, refId: r.id, qty: malam, harga }
+  })
+
   const totalLayanan = layananDetails.reduce((s, d) => s + d.qty * d.harga, 0)
   const totalObat = obatRows.reduce((s, r) => s + Number(r.jumlah) * Number(r.selling_price), 0)
-  const totalTagihan = totalLayanan + totalObat
+  const totalKamar = kamarDetails.reduce((s, d) => s + d.qty * d.harga, 0)
+  const totalTagihan = totalLayanan + totalObat + totalKamar
 
   try {
     const { rows: tagihanRows } = await queryPostgres<{ id: string }>(
-      `INSERT INTO public.klinik_tagihan (org_id, branch_id, kunjungan_id, pasien_id, total_layanan, total_obat, total_tagihan, metode_bayar)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO public.klinik_tagihan (org_id, branch_id, kunjungan_id, pasien_id, total_layanan, total_obat, total_kamar, total_tagihan, metode_bayar)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id::text`,
-      [input.orgId, input.branchId, input.kunjunganId, input.pasienId, totalLayanan, totalObat, totalTagihan, input.metodeBayar],
+      [input.orgId, input.branchId, input.kunjunganId, input.pasienId, totalLayanan, totalObat, totalKamar, totalTagihan, input.metodeBayar],
     )
     const tagihanId = tagihanRows[0].id
 
@@ -82,6 +103,13 @@ export async function createTagihan(input: {
         [tagihanId, r.product_name, r.id, jumlah, hargaSatuan, jumlah * hargaSatuan],
       )
     }
+    for (const d of kamarDetails) {
+      await queryPostgres(
+        `INSERT INTO public.klinik_tagihan_detail (tagihan_id, jenis, deskripsi, ref_id, qty, harga_satuan, subtotal)
+         VALUES ($1, 'kamar', $2, $3, $4, $5, $6)`,
+        [tagihanId, d.deskripsi, d.refId, d.qty, d.harga, d.qty * d.harga],
+      )
+    }
 
     revalidatePath('/klinik')
     return { data: { id: tagihanId, totalTagihan } }
@@ -95,6 +123,7 @@ export type KlinikTagihan = {
   kunjungan_id: string
   total_layanan: number
   total_obat: number
+  total_kamar: number
   total_tagihan: number
   metode_bayar: 'tunai' | 'bpjs' | 'asuransi'
   status: 'BELUM_BAYAR' | 'LUNAS' | 'VOID'
@@ -103,7 +132,7 @@ export type KlinikTagihan = {
 
 export type KlinikTagihanDetailRow = {
   id: string
-  jenis: 'layanan' | 'obat'
+  jenis: 'layanan' | 'obat' | 'kamar'
   deskripsi: string
   qty: number
   harga_satuan: number
@@ -112,7 +141,7 @@ export type KlinikTagihanDetailRow = {
 
 export async function getTagihanByKunjungan(kunjunganId: string): Promise<{ tagihan: KlinikTagihan; items: KlinikTagihanDetailRow[] } | null> {
   const { rows } = await queryPostgres<KlinikTagihan>(
-    `SELECT id::text, kunjungan_id::text, total_layanan, total_obat, total_tagihan, metode_bayar, status, tanggal_bayar::text
+    `SELECT id::text, kunjungan_id::text, total_layanan, total_obat, total_kamar, total_tagihan, metode_bayar, status, tanggal_bayar::text
      FROM public.klinik_tagihan WHERE kunjungan_id = $1 LIMIT 1`,
     [kunjunganId],
   )
@@ -136,6 +165,7 @@ async function buildTagihanRevenueLines(
   tagihanId: string,
   metodeBayar: 'tunai' | 'bpjs' | 'asuransi',
   totalObat: number,
+  totalKamar: number,
 ): Promise<KlinikJournalLine[]> {
   const { rows: layananByKategori } = await queryPostgres<{ kategori: string; total: string }>(
     `SELECT t.kategori, SUM(d.subtotal)::text AS total
@@ -151,7 +181,7 @@ async function buildTagihanRevenueLines(
     .reduce((s, r) => s + Number(r.total), 0)
 
   const debitRole = metodeBayar === 'bpjs' ? 'piutang_bpjs' : 'kas'
-  const totalTagihan = totalKonsultasi + totalTindakanLain + totalObat
+  const totalTagihan = totalKonsultasi + totalTindakanLain + totalObat + totalKamar
 
   const lines: KlinikJournalLine[] = [
     { role: debitRole, debit: totalTagihan, credit: 0, memo: `Pembayaran tagihan ${tagihanId}` },
@@ -159,6 +189,7 @@ async function buildTagihanRevenueLines(
   if (totalKonsultasi > 0) lines.push({ role: 'pendapatan_konsultasi', debit: 0, credit: totalKonsultasi, memo: 'Pendapatan konsultasi' })
   if (totalTindakanLain > 0) lines.push({ role: 'pendapatan_tindakan', debit: 0, credit: totalTindakanLain, memo: 'Pendapatan tindakan' })
   if (totalObat > 0) lines.push({ role: 'pendapatan_obat', debit: 0, credit: totalObat, memo: 'Pendapatan obat' })
+  if (totalKamar > 0) lines.push({ role: 'pendapatan_kamar_inap', debit: 0, credit: totalKamar, memo: 'Pendapatan kamar rawat inap' })
   return lines
 }
 
@@ -167,15 +198,15 @@ export async function markTagihanLunas(
   branchId: string,
   tagihanId: string,
 ): Promise<{ success: true } | { error: string }> {
-  const { rows } = await queryPostgres<{ id: string; status: string; total_obat: number; metode_bayar: 'tunai' | 'bpjs' | 'asuransi' }>(
-    `SELECT id::text, status, total_obat, metode_bayar FROM public.klinik_tagihan WHERE id = $1 AND org_id = $2`,
+  const { rows } = await queryPostgres<{ id: string; status: string; total_obat: number; total_kamar: number; metode_bayar: 'tunai' | 'bpjs' | 'asuransi' }>(
+    `SELECT id::text, status, total_obat, total_kamar, metode_bayar FROM public.klinik_tagihan WHERE id = $1 AND org_id = $2`,
     [tagihanId, orgId],
   )
   const tagihan = rows[0]
   if (!tagihan) return { error: 'Tagihan tidak ditemukan.' }
   if (tagihan.status !== 'BELUM_BAYAR') return { error: 'Tagihan ini sudah tidak berstatus belum bayar.' }
 
-  const lines = await buildTagihanRevenueLines(tagihanId, tagihan.metode_bayar, Number(tagihan.total_obat))
+  const lines = await buildTagihanRevenueLines(tagihanId, tagihan.metode_bayar, Number(tagihan.total_obat), Number(tagihan.total_kamar))
   await postJurnal(orgId, branchId, lines, `Pembayaran tagihan klinik ${tagihanId}`, 'KLINIK_PEMBAYARAN', tagihanId)
 
   await queryPostgres(
@@ -302,11 +333,11 @@ export async function voidTagihan(
 
 /** Cari transaksi klinik yang jurnalnya masih ter-skip (role akun belum lengkap dipetakan saat itu). */
 export async function getUnpostedKlinikTransactions(orgId: string): Promise<{
-  tagihanPending: Array<{ id: string; total_obat: number; metode_bayar: 'tunai' | 'bpjs' | 'asuransi' }>
+  tagihanPending: Array<{ id: string; total_obat: number; total_kamar: number; metode_bayar: 'tunai' | 'bpjs' | 'asuransi' }>
   resepPending: Array<{ id: string; total_hpp: number }>
 }> {
-  const { rows: tagihanPending } = await queryPostgres<{ id: string; total_obat: number; metode_bayar: 'tunai' | 'bpjs' | 'asuransi' }>(
-    `SELECT tg.id::text, tg.total_obat, tg.metode_bayar
+  const { rows: tagihanPending } = await queryPostgres<{ id: string; total_obat: number; total_kamar: number; metode_bayar: 'tunai' | 'bpjs' | 'asuransi' }>(
+    `SELECT tg.id::text, tg.total_obat, tg.total_kamar, tg.metode_bayar
      FROM public.klinik_tagihan tg
      WHERE tg.org_id = $1 AND tg.status = 'LUNAS'
        AND NOT EXISTS (SELECT 1 FROM public.journal_entries je WHERE je.org_id = $1 AND je.reference_type = 'KLINIK_PEMBAYARAN' AND je.reference_id = tg.id)`,
@@ -339,7 +370,7 @@ export async function retryPostUnpostedJournals(orgId: string, branchId: string)
   let posted = 0
 
   for (const t of tagihanPending) {
-    const lines = await buildTagihanRevenueLines(t.id, t.metode_bayar, Number(t.total_obat))
+    const lines = await buildTagihanRevenueLines(t.id, t.metode_bayar, Number(t.total_obat), Number(t.total_kamar))
     const entryId = await postJurnal(orgId, branchId, lines, `Pembayaran tagihan klinik ${t.id}`, 'KLINIK_PEMBAYARAN', t.id)
     if (entryId) posted += 1
   }

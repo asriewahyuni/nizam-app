@@ -197,6 +197,45 @@ export async function finalizeRekamMedis(
   }
 }
 
+export type KlinikRekamMedisHistoryByPasienRow = KlinikRekamMedis & {
+  tanggal: string
+  poli_nama: string
+  staf_medis_nama: string | null
+}
+
+/** Riwayat RM lengkap 1 pasien lintas semua kunjungan — dipakai tab Daftar Pasien. */
+export async function getRekamMedisHistoryByPasien(pasienId: string): Promise<KlinikRekamMedisHistoryByPasienRow[]> {
+  const { rows } = await queryPostgres<KlinikRekamMedisHistoryByPasienRow>(
+    `SELECT rm.id::text, rm.kunjungan_id::text, rm.staf_medis_id::text, rm.anamnesis, rm.diagnosis_icd10,
+            rm.diagnosis_text, rm.terapi, rm.catatan, rm.status, rm.finalized_at::text,
+            k.tanggal::text, po.nama AS poli_nama,
+            TRIM(CONCAT(e.first_name, ' ', COALESCE(e.last_name, ''))) AS staf_medis_nama
+     FROM public.klinik_rekam_medis rm
+     JOIN public.klinik_kunjungan k ON k.id = rm.kunjungan_id
+     JOIN public.klinik_poli po ON po.id = k.poli_id
+     LEFT JOIN public.klinik_staf_medis sm ON sm.id = rm.staf_medis_id
+     LEFT JOIN public.employees e ON e.id = sm.employee_id
+     WHERE k.pasien_id = $1
+     ORDER BY k.tanggal DESC, k.created_at DESC`,
+    [pasienId],
+  )
+  return rows
+}
+
+/** Catat akses ke riwayat lengkap rekam medis pasien (audit trail — klinik_akses_rekam_log). */
+export async function logAksesRekamMedis(
+  orgId: string,
+  pasienId: string,
+  actorEmployeeId: string | null,
+  alasan: string,
+): Promise<void> {
+  await queryPostgres(
+    `INSERT INTO public.klinik_akses_rekam_log (org_id, actor_employee_id, pasien_id, alasan)
+     VALUES ($1, $2, $3, $4)`,
+    [orgId, actorEmployeeId, pasienId, alasan],
+  )
+}
+
 /** Tambah addendum setelah rekam medis FINAL — append-only, tidak overwrite. */
 export async function addRekamMedisAddendum(
   rekamMedisId: string,
