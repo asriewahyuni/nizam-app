@@ -22,14 +22,61 @@ interface LineChartProps {
 
 const PAD = { top: 16, right: 16, bottom: 28, left: 8 }
 
+// Tangen monotone cubic Hermite (Fritsch-Carlson) — dipakai smoothPath() di
+// bawah. Beda dari kurva S naif (control point di y yang sama dengan titik),
+// metode ini menjaga kurva tidak pernah overshoot melewati rentang y dua
+// titik bertetangga. Tanpa ini, data yang datar lama lalu naik tajam di
+// ujung (pola umum di grafik tren keuangan) menghasilkan kurva "mleyot" —
+// bergelombang/overshoot sebelum akhirnya sampai di titik data.
+function monotoneTangents(pts: [number, number][]): number[] {
+  const n = pts.length
+  const secants: number[] = []
+  for (let i = 0; i < n - 1; i++) {
+    const dx = pts[i + 1][0] - pts[i][0]
+    secants.push(dx === 0 ? 0 : (pts[i + 1][1] - pts[i][1]) / dx)
+  }
+
+  const tangents: number[] = new Array(n)
+  tangents[0] = secants[0] ?? 0
+  tangents[n - 1] = secants[n - 2] ?? 0
+  for (let i = 1; i < n - 1; i++) {
+    const left = secants[i - 1]
+    const right = secants[i]
+    tangents[i] = left === 0 || right === 0 || (left > 0) !== (right > 0) ? 0 : (left + right) / 2
+  }
+
+  for (let i = 0; i < n - 1; i++) {
+    const secant = secants[i]
+    if (secant === 0) {
+      tangents[i] = 0
+      tangents[i + 1] = 0
+      continue
+    }
+    const a = tangents[i] / secant
+    const b = tangents[i + 1] / secant
+    const s = a * a + b * b
+    if (s > 9) {
+      const tau = 3 / Math.sqrt(s)
+      tangents[i] = tau * a * secant
+      tangents[i + 1] = tau * b * secant
+    }
+  }
+  return tangents
+}
+
 function smoothPath(pts: [number, number][]): string {
   if (pts.length < 2) return ''
+  const tangents = monotoneTangents(pts)
   const d: string[] = [`M ${pts[0][0]},${pts[0][1]}`]
-  for (let i = 1; i < pts.length; i++) {
-    const [x0, y0] = pts[i - 1]
-    const [x1, y1] = pts[i]
-    const cx = (x0 + x1) / 2
-    d.push(`C ${cx},${y0} ${cx},${y1} ${x1},${y1}`)
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i]
+    const [x1, y1] = pts[i + 1]
+    const step = (x1 - x0) / 3
+    const cp1x = x0 + step
+    const cp1y = y0 + tangents[i] * step
+    const cp2x = x1 - step
+    const cp2y = y1 - tangents[i + 1] * step
+    d.push(`C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x1},${y1}`)
   }
   return d.join(' ')
 }
