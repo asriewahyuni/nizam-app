@@ -316,9 +316,11 @@ export default function SalesClient({
   orgSettings = {},
   activeBranchName,
   userRole,
+  employees = [],
 }: any) {
   const canVoidSale = userRole === 'owner' || userRole === 'admin'
   const [showModal, setShowModal] = useState(false)
+  const [salespersonId, setSalespersonId] = useState('')
   const { confirm, ConfirmUI } = useConfirm()
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
@@ -496,6 +498,7 @@ export default function SalesClient({
     setDpPercent('0')
     setDpAmount('0')
     setDpAccountId('')
+    setSalespersonId('')
     setError(null)
   }
 
@@ -547,6 +550,7 @@ export default function SalesClient({
     setEditingDraftSaleId(String(sale.id))
     setCustomerId(String(sale.customer_id || ''))
     setResellerId(String(sale.reseller_id || ''))
+    setSalespersonId(String(sale?.salesperson_id || ''))
     setSaleDate(normalizeDateInputValue(sale.sale_date) || new Date().toISOString().split('T')[0])
     setDueDate(normalizeDateInputValue(sale?.due_date))
     setNotes(String(sale?.notes || ''))
@@ -684,6 +688,7 @@ export default function SalesClient({
     const payload = {
       customer_id: customerId,
       reseller_id: resellerId || null,
+      salesperson_id: salespersonId || null,
       sale_date: saleDate,
       due_date: (resolvedPaymentTerm === 'TEMPO' || resolvedShariahMode === 'SALAM' || resolvedShariahMode === 'ISTISHNA') ? dueDate : null,
       notes,
@@ -1167,15 +1172,21 @@ export default function SalesClient({
                        <div className="text-[10px] font-bold text-slate-500 mt-1">
                          Diproses: <span className="text-slate-700">{s.processor_name || '-'}</span>
                        </div>
+                       {s.salesperson_name && (
+                         <div className="text-[10px] font-bold text-emerald-600 mt-0.5">
+                           Sales: <span className="font-extrabold">{s.salesperson_name}</span>
+                         </div>
+                       )}
                     </td>
                     <td className="px-8 py-6">
                        <div className="text-sm font-bold text-slate-900">{s.contacts?.name || 'Unknown Client'}</div>
                        <div className="flex gap-2 mt-1.5 overflow-hidden max-w-[300px]">
                           <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200 uppercase tracking-tighter">
-                            {s.sales_items?.length || 0} Item
+                            {s.sales_items?.length || 0} Item ({s.sales_items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0)} Qty)
                           </span>
                           <span className="text-[10px] text-slate-400 truncate font-medium italic">
-                            {s.sales_items?.[0]?.description}{s.sales_items?.length > 1 ? ` & ${s.sales_items.length - 1} lainnya` : ''}
+                            {s.sales_items?.[0]?.description} ({s.sales_items?.[0]?.quantity} {s.sales_items?.[0]?.products?.unit || s.sales_items?.[0]?.unit || 'Pcs'})
+                            {s.sales_items?.length > 1 ? ` & ${s.sales_items.length - 1} lainnya` : ''}
                           </span>
                        </div>
                        {pickRelation(s.sales_resellers) && (
@@ -1308,8 +1319,8 @@ export default function SalesClient({
                 <form onSubmit={handleCreateSale} className="space-y-6">
                   {/* HEADER SALES */}
                   {/* HEADER SALES & PAYMENT GUARDRAIL */}
-                  <div className="flex flex-col md:flex-row gap-4 p-5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
-                    <div className="flex-1 space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
+                    <div className="space-y-2">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Mode Transaksi</label>
                       <select value={shariahMode} onChange={(e) => setShariahMode(e.target.value as any)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-xl outline-none text-sm bg-white font-semibold text-blue-600 shadow-sm focus:border-blue-500 transition-all">
                          <option value="CASH">PENJUALAN LANGSUNG / STOK SIAP</option>
@@ -1321,7 +1332,7 @@ export default function SalesClient({
                       {shariahMode === 'ISTISHNA' && <p className="text-[9px] font-bold text-indigo-500 italic mt-1 leading-tight px-1">* Pesanan manufaktur/konstruksi, pembayaran boleh dicicil di awal.</p>}
                     </div>
 
-                    <div className="flex-1 space-y-2">
+                    <div className="space-y-2">
                        <SearchableSelect
                          label="Customer / Klien"
                          required
@@ -1338,7 +1349,26 @@ export default function SalesClient({
                        />
                     </div>
 
-                    <div className="w-full md:w-48 space-y-2">
+                    <div className="space-y-2">
+                       <SearchableSelect
+                         label="Salesperson / Sales"
+                         value={salespersonId}
+                         onChange={setSalespersonId}
+                         placeholder="Cari dan pilih sales..."
+                         searchPlaceholder="Cari nama atau NIK sales..."
+                         maxVisibleOptions={5}
+                         options={employees.map((emp: { id: string; name?: string | null; first_name?: string | null; last_name?: string | null; nik?: string | null }) => {
+                           const fullName = emp.name || [emp.first_name, emp.last_name].filter(Boolean).join(' ').trim() || 'Tanpa nama'
+                           return {
+                             id: String(emp.id),
+                             name: fullName,
+                             code: String(emp.nik || ''),
+                           }
+                         })}
+                       />
+                    </div>
+
+                    <div className="space-y-2">
                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Metode Bayar</label>
                        <div className="flex p-1 bg-white border border-slate-200 rounded-xl h-[52px]">
                           <button 
@@ -1365,16 +1395,18 @@ export default function SalesClient({
                        )}
                     </div>
 
-                    <div className="w-full md:w-40 space-y-2">
+                    <div className="space-y-2">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block px-1">Tgl Faktur</label>
                       <input type="date" required value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-blue-500 transition-all" />
                     </div>
 
-                    {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM' || shariahMode === 'ISTISHNA') && (
-                       <div className="w-full md:w-40 space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                    {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM' || shariahMode === 'ISTISHNA') ? (
+                       <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
                          <label className="text-[10px] font-semibold text-amber-500 uppercase tracking-wide block px-1">{shariahMode === 'SALAM' || shariahMode === 'ISTISHNA' ? 'Target Kirim' : 'Jatuh Tempo'}</label>
                          <input type="date" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-xl outline-none text-sm bg-amber-50/50 font-bold text-slate-900 shadow-sm focus:border-amber-500 transition-all" />
                        </div>
+                    ) : (
+                       <div />
                     )}
                   </div>
 
