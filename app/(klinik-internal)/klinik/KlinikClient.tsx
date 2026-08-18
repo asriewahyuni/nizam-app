@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import {
   Landmark, CheckCircle2, AlertCircle, Stethoscope, Search, UserPlus, Plus,
   Users, PhoneCall, Ban, ChevronDown, ChevronUp, UserCog, CalendarCheck, LogIn,
-  Pill, PackagePlus, Send, Boxes, MonitorPlay,
+  Pill, PackagePlus, Send, Boxes, MonitorPlay, ExternalLink, Copy, Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { BranchSummary } from '@/modules/organization/lib/org-context'
@@ -76,6 +76,7 @@ function TabPendaftaran({
   const [antrian, setAntrian] = useState(initialAntrian)
   const [expandedKunjunganId, setExpandedKunjunganId] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [antrianLinkCopied, setAntrianLinkCopied] = useState(false)
 
   const [showNewPoliForm, setShowNewPoliForm] = useState(poliList.length === 0)
   const [newPoli, setNewPoli] = useState({ kode: '', nama: '' })
@@ -109,6 +110,15 @@ function TabPendaftaran({
   function handlePoliChange(id: string) {
     setPoliId(id)
     startTransition(async () => { await refreshAntrian(id) })
+  }
+
+  function handleCopyAntrianLink() {
+    if (!branch) return
+    const url = `${window.location.origin}/klinik/antrian/${branch.id}`
+    navigator.clipboard.writeText(url).then(() => {
+      setAntrianLinkCopied(true)
+      setTimeout(() => setAntrianLinkCopied(false), 2000)
+    })
   }
 
   function handleCheckIn(bookingId: string) {
@@ -486,15 +496,31 @@ function TabPendaftaran({
                 <Users className="size-4 text-slate-500" aria-hidden="true" />
                 <p className="text-sm font-bold text-slate-900">Antrian Hari Ini</p>
               </div>
-              <a
-                href={`/klinik/antrian/${branch.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors duration-150 hover:bg-slate-50"
-              >
-                <MonitorPlay className="size-3.5" aria-hidden="true" />
-                Buka Layar Antrian
-              </a>
+              <div className="flex items-center gap-1">
+                <span className="hidden items-center gap-1.5 pr-1 text-xs font-semibold text-slate-500 sm:flex">
+                  <MonitorPlay className="size-3.5" aria-hidden="true" />
+                  Layar Antrian
+                </span>
+                <a
+                  href={`/klinik/antrian/${branch.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Buka layar antrian (tab baru)"
+                  className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-cyan-700"
+                >
+                  <ExternalLink className="size-4" aria-hidden="true" />
+                </a>
+                <button
+                  type="button"
+                  onClick={handleCopyAntrianLink}
+                  title="Salin link layar antrian"
+                  className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-cyan-700"
+                >
+                  {antrianLinkCopied
+                    ? <Check className="size-4 text-emerald-600" aria-hidden="true" />
+                    : <Copy className="size-4" aria-hidden="true" />}
+                </button>
+              </div>
             </div>
 
             {antrian.length === 0 ? (

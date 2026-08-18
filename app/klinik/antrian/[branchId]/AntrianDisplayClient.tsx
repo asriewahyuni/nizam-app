@@ -31,8 +31,11 @@ function PoliCard({ poli }: { poli: KlinikAntrianDisplayPoli }) {
       className="animate-antrian-flash rounded-3xl border border-slate-200/80 bg-white p-8 shadow-sm"
     >
       <p className="text-center text-lg font-bold uppercase tracking-wide text-slate-500">{poli.poli_nama}</p>
+      {poli.dokter_praktik && (
+        <p className="mt-0.5 text-center text-sm font-semibold text-cyan-700">{poli.dokter_praktik}</p>
+      )}
 
-      <p className="mt-1 text-center text-xs font-semibold uppercase tracking-widest text-slate-400">Sedang Dipanggil</p>
+      <p className="mt-3 text-center text-xs font-semibold uppercase tracking-widest text-slate-400">Sedang Dipanggil</p>
       <p className="mt-2 text-center text-8xl font-extrabold tabular-nums text-cyan-700 sm:text-9xl">
         {poli.sedang_dipanggil ?? '–'}
       </p>

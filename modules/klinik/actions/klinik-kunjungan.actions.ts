@@ -103,15 +103,26 @@ export type KlinikAntrianDisplayPoli = {
   poli_nama: string
   sedang_dipanggil: number | null
   menunggu: number[]
+  dokter_praktik: string | null
 }
 
 /**
  * Data untuk layar antrian publik (TV/monitor ruang tunggu) — sengaja HANYA
  * nomor antrian, tanpa nama pasien (halaman ini tanpa login, jangan bocorkan
- * data pribadi ke layar publik).
+ * data pribadi ke layar publik). Nama dokter yang ditampilkan diambil dari
+ * klinik_jadwal_praktik yang aktif SEKARANG (weekday + jam berjalan), bukan
+ * dari kunjungan.staf_medis_id (kosong untuk walk-in) atau rekam_medis
+ * (baru terisi setelah dokter mulai periksa) — supaya selalu ada nama dokter
+ * begitu poli buka, bukan cuma pas ada pasien lagi diperiksa. Jadwal yang
+ * lagi diblokir klinik_jadwal_pengecualian (cuti/rapat) ikut dikecualikan,
+ * pola sama seperti getAvailableSlots().
  */
 export async function getAntrianDisplayBoard(branchId: string): Promise<KlinikAntrianDisplayPoli[]> {
   const today = todayDateString()
+  const now = new Date()
+  const weekday = now.getDay()
+  const nowTime = now.toTimeString().slice(0, 8)
+
   const { rows } = await queryPostgres<KlinikAntrianDisplayPoli>(
     `SELECT
         p.id::text AS poli_id,
@@ -124,11 +135,26 @@ export async function getAntrianDisplayBoard(branchId: string): Promise<KlinikAn
         COALESCE((
           SELECT array_agg(k.no_antrian ORDER BY k.no_antrian ASC) FROM public.klinik_kunjungan k
           WHERE k.branch_id = $1 AND k.poli_id = p.id AND k.tanggal = $2::date AND k.status = 'MENUNGGU'
-        ), ARRAY[]::int[]) AS menunggu
+        ), ARRAY[]::int[]) AS menunggu,
+        (
+          SELECT TRIM(CONCAT(e.first_name, ' ', COALESCE(e.last_name, '')))
+          FROM public.klinik_jadwal_praktik jp
+          JOIN public.klinik_staf_medis sm ON sm.id = jp.staf_medis_id
+          JOIN public.employees e ON e.id = sm.employee_id
+          WHERE jp.branch_id = $1 AND jp.poli_id = p.id AND jp.weekday = $3 AND jp.is_active = TRUE
+            AND jp.valid_from <= $2::date AND (jp.valid_until IS NULL OR jp.valid_until >= $2::date)
+            AND jp.start_local <= $4::time AND jp.end_local > $4::time
+            AND NOT EXISTS (
+              SELECT 1 FROM public.klinik_jadwal_pengecualian pe
+              WHERE pe.staf_medis_id = jp.staf_medis_id AND pe.status = 'BLOCKED'
+                AND pe.starts_at <= NOW() AND pe.ends_at > NOW()
+            )
+          ORDER BY jp.start_local ASC LIMIT 1
+        ) AS dokter_praktik
      FROM public.klinik_poli p
      WHERE p.branch_id = $1 AND p.is_active = TRUE
      ORDER BY p.nama ASC`,
-    [branchId, today],
+    [branchId, today, weekday, nowTime],
   )
   return rows
 }
