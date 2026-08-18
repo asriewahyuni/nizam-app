@@ -22,9 +22,12 @@ import {
   type KlinikKamar, type KlinikTempatTidur,
 } from '@/modules/klinik/actions/klinik-kamar.actions'
 import {
-  getKlinikStockMovementsPage, KLINIK_STOCK_REFERENCE_TYPES,
-  type KlinikStockMovementRow, type KlinikStockReferenceType,
+  getKlinikStockMovementsPage,
+  type KlinikStockMovementRow,
 } from '@/modules/klinik/actions/klinik-mutasi-obat.actions'
+import {
+  KLINIK_STOCK_REFERENCE_TYPES, type KlinikStockReferenceType,
+} from '@/modules/klinik/lib/klinik-mutasi-obat.shared'
 import {
   searchKlinikPasien, getKlinikPasienPage, type KlinikPasienSearchResult, type KlinikPasienListRow,
 } from '@/modules/klinik/actions/klinik-pasien.actions'

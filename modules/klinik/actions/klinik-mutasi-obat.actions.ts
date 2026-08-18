@@ -5,9 +5,7 @@
 // tapi dibatasi ke reference_type milik Apotek Klinik saja.
 
 import { queryPostgres } from '@/lib/db/postgres'
-
-export const KLINIK_STOCK_REFERENCE_TYPES = ['KLINIK_RECEIPT', 'KLINIK_RESEP', 'KLINIK_VOID_RETURN'] as const
-export type KlinikStockReferenceType = (typeof KLINIK_STOCK_REFERENCE_TYPES)[number]
+import type { KlinikStockReferenceType } from '@/modules/klinik/lib/klinik-mutasi-obat.shared'
 
 export type KlinikStockMovementRow = {
   id: string
