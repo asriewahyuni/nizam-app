@@ -75,8 +75,10 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
          si.quantity
        FROM public.sales_items si
        JOIN public.products p ON p.id = si.product_id
+       JOIN public.sales    s ON s.id = si.sale_id
        WHERE si.org_id = $1
          AND si.created_at >= $2
+         AND s.status IS DISTINCT FROM 'VOIDED'
          ${branchId ? 'AND si.branch_id = $3' : ''}`,
       branchId ? [orgId, paretoStartDate, branchId] : [orgId, paretoStartDate]
     ).catch(() => ({ rows: [] as any[] })),
@@ -101,6 +103,7 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
        LEFT JOIN public.products p ON p.id = si.product_id
        WHERE si.org_id = $1
          AND s.sale_date >= $2
+         AND s.status IS DISTINCT FROM 'VOIDED'
          ${branchId ? 'AND si.branch_id = $3' : ''}`,
       branchId ? [orgId, paretoStartDate, branchId] : [orgId, paretoStartDate]
     ).catch(() => ({ rows: [] as any[] })),
@@ -247,7 +250,7 @@ export async function getCogsRevenueTrend(orgId: string, branchId?: string | nul
          SUM(s.grand_total)               AS revenue
        FROM public.sales s
        WHERE s.org_id = $1
-         AND COALESCE(s.payment_status, '') != 'CANCELLED'
+         AND s.status IS DISTINCT FROM 'VOIDED'
          ${revBranch}
        GROUP BY 1
      ),
@@ -259,7 +262,7 @@ export async function getCogsRevenueTrend(orgId: string, branchId?: string | nul
        JOIN public.sales    s ON s.id = si.sale_id
        LEFT JOIN public.products p ON p.id = si.product_id
        WHERE si.org_id = $1
-         AND COALESCE(s.payment_status, '') != 'CANCELLED'
+         AND s.status IS DISTINCT FROM 'VOIDED'
          ${cogsBranch}
        GROUP BY 1
      )
