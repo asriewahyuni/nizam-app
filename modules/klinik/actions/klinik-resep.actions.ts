@@ -243,10 +243,12 @@ export async function receiveObat(input: {
   batchNumber: string
   expiryDate: string
   branchId: string
+  hargaBeli: number
 }): Promise<{ success: true } | { error: string }> {
   if (input.jumlah <= 0) return { error: 'Jumlah wajib lebih dari 0.' }
   if (!input.batchNumber.trim()) return { error: 'Nomor batch wajib diisi.' }
   if (!input.expiryDate) return { error: 'Tanggal kadaluarsa wajib diisi.' }
+  if (input.hargaBeli <= 0) return { error: 'Harga beli per unit wajib diisi.' }
 
   try {
     await queryPostgres(
@@ -258,10 +260,15 @@ export async function receiveObat(input: {
        WHERE org_id = $1 AND product_id = $2 AND warehouse_id = $3 AND batch_number = $5 AND bin_id IS NULL`,
       [input.orgId, input.productId, input.warehouseId, input.expiryDate, input.batchNumber.trim()],
     )
+    // unit_price WAJIB harga beli sesungguhnya — trigger trg_recalculate_average_cost
+    // (supabase/migrations/033_ultimate_security_and_avg_cost.sql) menghitung ulang
+    // products.average_cost dari SUM(quantity*unit_price)/SUM(quantity) setiap kali
+    // ada baris stock_movements baru. Mengirim 0 di sini diam-diam menghancurkan HPP
+    // yang dipakai saat dispensing (ditemukan lewat data seed demo yang HPP-nya Rp0).
     await queryPostgres(
       `INSERT INTO public.stock_movements (org_id, branch_id, product_id, quantity, unit_price, reference_type, reference_id, notes)
-       VALUES ($1, $2, $3, $4, 0, 'KLINIK_RECEIPT', gen_random_uuid(), $5)`,
-      [input.orgId, input.branchId, input.productId, input.jumlah, `Penerimaan obat batch ${input.batchNumber}`],
+       VALUES ($1, $2, $3, $4, $5, 'KLINIK_RECEIPT', gen_random_uuid(), $6)`,
+      [input.orgId, input.branchId, input.productId, input.jumlah, input.hargaBeli, `Penerimaan obat batch ${input.batchNumber}`],
     )
     revalidatePath('/klinik')
     return { success: true }

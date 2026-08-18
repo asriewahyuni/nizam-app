@@ -21,6 +21,7 @@
     "db:clone:local": "node scripts/clone-railway-to-local.mjs",
     "db:runtime:show": "node scripts/show-runtime-db.mjs",
     "db:seed:catering-demo": "node scripts/seed-catering-demo-store.mjs",
+    "db:seed:klinik-demo": "node scripts/seed-klinik-demo.mjs",
     "db:railway:sync": "node scripts/sync-supabase-to-railway.mjs",
     "db:railway:sync:apply": "node scripts/sync-supabase-to-railway.mjs --apply",
     "db:railway:sync:all": "node scripts/sync-supabase-to-railway.mjs --apply --include-all",

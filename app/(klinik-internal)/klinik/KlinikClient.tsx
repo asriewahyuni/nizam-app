@@ -948,7 +948,7 @@ function TabApotek({
   const [obatQuery, setObatQuery] = useState('')
   const [obatResults, setObatResults] = useState<KlinikObatOption[]>([])
   const [selectedObat, setSelectedObat] = useState<KlinikObatOption | null>(null)
-  const [receiveForm, setReceiveForm] = useState({ jumlah: '1', batchNumber: '', expiryDate: '' })
+  const [receiveForm, setReceiveForm] = useState({ jumlah: '1', batchNumber: '', expiryDate: '', hargaBeli: '' })
 
   async function loadData() {
     if (!branch) {
@@ -1015,6 +1015,7 @@ function TabApotek({
         jumlah: Number(receiveForm.jumlah) || 0,
         batchNumber: receiveForm.batchNumber,
         expiryDate: receiveForm.expiryDate,
+        hargaBeli: Number(receiveForm.hargaBeli) || 0,
       })
       if ('error' in res) {
         setMessage({ type: 'error', text: res.error })
@@ -1023,7 +1024,7 @@ function TabApotek({
       setMessage({ type: 'success', text: 'Penerimaan obat tercatat.' })
       setSelectedObat(null)
       setObatQuery('')
-      setReceiveForm({ jumlah: '1', batchNumber: '', expiryDate: '' })
+      setReceiveForm({ jumlah: '1', batchNumber: '', expiryDate: '', hargaBeli: '' })
       await loadData()
     })
   }
@@ -1201,6 +1202,17 @@ function TabApotek({
                   type="text"
                   value={receiveForm.batchNumber}
                   onChange={(e) => setReceiveForm((f) => ({ ...f, batchNumber: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Harga Beli per Unit (Rp)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={receiveForm.hargaBeli}
+                  onChange={(e) => setReceiveForm((f) => ({ ...f, hargaBeli: e.target.value }))}
+                  placeholder="Dipakai untuk hitung HPP saat obat diserahkan ke pasien"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
                 />
               </div>
