@@ -14,7 +14,7 @@ import {
 import { cn, formatRupiah, formatDate } from '@/lib/utils'
 import type { BranchSummary } from '@/modules/organization/lib/org-context'
 import {
-  getKlinikPoliByBranch, updateKlinikPoli, setKlinikPoliActive, type KlinikPoli, type KlinikStafMedis,
+  getKlinikPoliByBranch, createKlinikPoli, updateKlinikPoli, setKlinikPoliActive, type KlinikPoli, type KlinikStafMedis,
 } from '@/modules/klinik/actions/klinik.actions'
 import {
   getKlinikKamarByBranch, createKlinikKamar, setKlinikKamarActive, setTempatTidurMaintenance,
@@ -79,7 +79,6 @@ export function TabDaftarPoli({ orgId, branch }: { orgId: string; branch: Branch
     if (!branch) return
     setMessage(null)
     startTransition(async () => {
-      const { createKlinikPoli } = await import('@/modules/klinik/actions/klinik.actions')
       const res = await createKlinikPoli(orgId, branch.id, newPoli)
       if ('error' in res) { setMessage({ type: 'error', text: res.error }); return }
       setNewPoli({ kode: '', nama: '' })
