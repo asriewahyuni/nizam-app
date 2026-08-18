@@ -16,11 +16,13 @@ export type WaCrmContact = {
   id: string
   name: string
   phone: string
-  stage: 'masuk' | 'follow_up' | 'negosiasi' | 'closing'
+  stage: string
   product_interest: string | null
   notes: string | null
   last_message_at: string | null
   created_at: string
+  subtasks?: { id: string; title: string; completed: boolean }[]
+  checklist?: { id: string; title: string; completed: boolean }[]
 }
 
 export type WaCrmMessage = {
@@ -54,7 +56,7 @@ export default async function WaCrmPage() {
   const [contactsResult, messagesResult, connectionResult] = await Promise.all([
     queryPostgres<WaCrmContact>(
       `SELECT id, name, phone, stage, product_interest, notes,
-              last_message_at, created_at
+              last_message_at, created_at, subtasks, checklist
        FROM wacrm_contacts
        WHERE org_id = $1
        ORDER BY last_message_at DESC NULLS LAST, created_at DESC`,
