@@ -172,9 +172,9 @@ export function TabDaftarPoli({ orgId, branch }: { orgId: string; branch: Branch
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-100 text-slate-500">
-                <th className="py-1.5 font-semibold">Kode</th>
-                <th className="py-1.5 font-semibold">Nama</th>
-                <th className="py-1.5 font-semibold">Status</th>
+                <th className="py-1.5 pr-3 font-semibold">Kode</th>
+                <th className="py-1.5 pr-3 font-semibold">Nama</th>
+                <th className="py-1.5 pr-3 font-semibold">Status</th>
                 <th className="py-1.5 text-right font-semibold">Aksi</th>
               </tr>
             </thead>
@@ -210,11 +210,11 @@ export function TabDaftarPoli({ orgId, branch }: { orgId: string; branch: Branch
                     </td>
                   ) : (
                     <>
-                      <td className="py-2 font-semibold text-slate-900">{poli.kode}</td>
-                      <td className="py-2 text-slate-700">{poli.nama}</td>
-                      <td className="py-2">
+                      <td className="py-2 pr-3 font-semibold text-slate-900">{poli.kode}</td>
+                      <td className="py-2 pr-3 text-slate-700">{poli.nama}</td>
+                      <td className="py-2 pr-3">
                         <span className={cn(
-                          'rounded-full border px-2.5 py-1 text-xs font-semibold',
+                          'rounded-full border px-2.5 py-1 text-xs font-semibold whitespace-nowrap',
                           poli.is_active ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-500'
                         )}>
                           {poli.is_active ? 'Aktif' : 'Nonaktif'}
@@ -764,12 +764,12 @@ export function TabMutasiObat({ orgId, branch }: { orgId: string; branch: Branch
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-100 text-slate-500">
-                    <th className="py-1.5 font-semibold">Tanggal</th>
-                    <th className="py-1.5 font-semibold">Produk</th>
-                    <th className="py-1.5 font-semibold">Jenis</th>
-                    <th className="py-1.5 text-right font-semibold">Qty</th>
-                    <th className="py-1.5 text-right font-semibold">HPP/Unit</th>
-                    <th className="py-1.5 text-right font-semibold">Nilai</th>
+                    <th className="py-1.5 pr-3 font-semibold">Tanggal</th>
+                    <th className="py-1.5 pr-3 font-semibold">Produk</th>
+                    <th className="py-1.5 pr-3 font-semibold">Jenis</th>
+                    <th className="py-1.5 pr-3 text-right font-semibold">Qty</th>
+                    <th className="py-1.5 pr-3 text-right font-semibold">HPP/Unit</th>
+                    <th className="py-1.5 pr-3 text-right font-semibold">Nilai</th>
                     <th className="py-1.5 font-semibold">Catatan</th>
                   </tr>
                 </thead>
@@ -779,21 +779,21 @@ export function TabMutasiObat({ orgId, branch }: { orgId: string; branch: Branch
                     const isIn = r.quantity > 0
                     return (
                       <tr key={r.id} className="border-b border-slate-50">
-                        <td className="py-2 text-slate-700">{formatDate(r.movement_date, 'short')}</td>
-                        <td className="py-2">
+                        <td className="py-2 pr-3 whitespace-nowrap text-slate-700">{formatDate(r.movement_date, 'short')}</td>
+                        <td className="py-2 pr-3">
                           <p className="font-medium text-slate-900">{r.product_name}</p>
                           {r.product_sku && <p className="text-[11px] text-slate-400">{r.product_sku}</p>}
                         </td>
-                        <td className="py-2">
-                          <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold', meta?.badge)}>
+                        <td className="py-2 pr-3">
+                          <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap', meta?.badge)}>
                             {meta?.label ?? r.reference_type}
                           </span>
                         </td>
-                        <td className={cn('py-2 text-right tabular-nums font-semibold', isIn ? 'text-emerald-700' : 'text-rose-700')}>
+                        <td className={cn('py-2 pr-3 whitespace-nowrap text-right tabular-nums font-semibold', isIn ? 'text-emerald-700' : 'text-rose-700')}>
                           {isIn ? '+' : ''}{r.quantity.toLocaleString('id-ID')} {r.product_unit || ''}
                         </td>
-                        <td className="py-2 text-right tabular-nums text-slate-600">{formatRupiah(r.unit_price)}</td>
-                        <td className="py-2 text-right tabular-nums font-semibold text-slate-900">{formatRupiah(Math.abs(r.quantity) * r.unit_price)}</td>
+                        <td className="py-2 pr-3 whitespace-nowrap text-right tabular-nums text-slate-600">{formatRupiah(r.unit_price)}</td>
+                        <td className="py-2 pr-3 whitespace-nowrap text-right tabular-nums font-semibold text-slate-900">{formatRupiah(Math.abs(r.quantity) * r.unit_price)}</td>
                         <td className="py-2 text-slate-500">{r.notes || '-'}</td>
                       </tr>
                     )
