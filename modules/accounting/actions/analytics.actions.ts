@@ -226,9 +226,33 @@ export type CogsRevenueTrendRow = {
 export async function getCogsRevenueTrend(orgId: string, branchId?: string | null): Promise<CogsRevenueTrendRow[]> {
   // Revenue dan COGS dipisah agar grand_total tidak terhitung berkali-kali
   // saat satu sale memiliki banyak items (INNER JOIN menyebabkan double count).
-  const revBranch  = branchId ? 'AND s.branch_id = $2' : ''
-  const cogsBranch = branchId ? 'AND si.branch_id = $2' : ''
-  const params     = branchId ? [orgId, branchId] : [orgId]
+  //
+  // Modul operasional standalone (Klinik, Kojasmat, Workshop, PO Bus, dst)
+  // tidak pernah menyentuh tabel `sales` — transaksinya langsung ke buku
+  // besar (journal_entries) lewat bridge modul masing-masing. Tanpa baris
+  // *_gl di bawah, chart ini selalu 0 untuk org yang murni pakai modul
+  // semacam itu, padahal Laporan Keuangan (P&L/Neraca) sudah benar karena
+  // itu baca langsung dari buku besar.
+  //
+  // Revenue digeneralisasi lewat TIPE akun (accounts.type = 'REVENUE'),
+  // bukan whitelist reference_type per modul — supaya otomatis mencakup
+  // modul apa pun yang posting ke akun Pendapatan tanpa perlu didaftar
+  // manual di sini tiap ada modul baru. reference_type='SALE' di-exclude
+  // supaya tidak dobel hitung dengan monthly_revenue_sales (sudah dihitung
+  // dari sales.grand_total). Void/reversal (mis. KLINIK_VOID) otomatis
+  // ikut ternetkan karena baris itu men-debit akun Pendapatan yang sama.
+  //
+  // COGS TIDAK bisa digeneralisasi dengan cara yang sama (accounts.type =
+  // 'EXPENSE' juga mencakup gaji, sewa, pajak, dst — bukan cuma harga
+  // pokok) — jadi sengaja whitelist eksplisit per reference_type yang
+  // sudah diverifikasi representasikan HPP sungguhan. Baru KLINIK_DISPENSING
+  // (+ pembalikannya KLINIK_VOID_HPP) yang terverifikasi saat ini; tambahkan
+  // reference_type modul lain di sini kalau sudah dikonfirmasi jalur HPP-nya.
+  const revBranch    = branchId ? 'AND s.branch_id = $2' : ''
+  const cogsBranch   = branchId ? 'AND si.branch_id = $2' : ''
+  const revBranchJe  = branchId ? 'AND je.branch_id = $2' : ''
+  const cogsBranchJe = branchId ? 'AND je.branch_id = $2' : ''
+  const params       = branchId ? [orgId, branchId] : [orgId]
 
   const result = await queryPostgres<{
     month_key:   string
@@ -244,7 +268,7 @@ export async function getCogsRevenueTrend(orgId: string, branchId?: string | nul
          '1 month'::interval
        ) AS month
      ),
-     monthly_revenue AS (
+     monthly_revenue_sales AS (
        SELECT
          date_trunc('month', s.sale_date) AS month,
          SUM(s.grand_total)               AS revenue
@@ -254,7 +278,21 @@ export async function getCogsRevenueTrend(orgId: string, branchId?: string | nul
          ${revBranch}
        GROUP BY 1
      ),
-     monthly_cogs AS (
+     monthly_revenue_gl AS (
+       SELECT
+         date_trunc('month', je.entry_date) AS month,
+         SUM(jl.credit - jl.debit)          AS revenue
+       FROM public.journal_lines jl
+       JOIN public.journal_entries je ON je.id = jl.entry_id
+       JOIN public.accounts       a  ON a.id  = jl.account_id
+       WHERE je.org_id = $1
+         AND je.status = 'POSTED'
+         AND a.type = 'REVENUE'
+         AND je.reference_type NOT IN ('SALE')
+         ${revBranchJe}
+       GROUP BY 1
+     ),
+     monthly_cogs_sales AS (
        SELECT
          date_trunc('month', s.sale_date)                       AS month,
          SUM(si.quantity * COALESCE(p.average_cost, 0))          AS cogs
@@ -265,16 +303,33 @@ export async function getCogsRevenueTrend(orgId: string, branchId?: string | nul
          AND s.status IS DISTINCT FROM 'VOIDED'
          ${cogsBranch}
        GROUP BY 1
+     ),
+     monthly_cogs_gl AS (
+       SELECT
+         date_trunc('month', je.entry_date) AS month,
+         SUM(jl.debit - jl.credit)          AS cogs
+       FROM public.journal_lines jl
+       JOIN public.journal_entries je ON je.id = jl.entry_id
+       JOIN public.accounts       a  ON a.id  = jl.account_id
+       WHERE je.org_id = $1
+         AND je.status = 'POSTED'
+         AND a.type = 'EXPENSE'
+         AND je.reference_type IN ('KLINIK_DISPENSING', 'KLINIK_VOID_HPP')
+         ${cogsBranchJe}
+       GROUP BY 1
      )
      SELECT
        TO_CHAR(m.month, 'YYYY-MM') AS month_key,
        TO_CHAR(m.month, 'Mon YY')  AS month_label,
-       COALESCE(mr.revenue, 0)     AS revenue,
-       COALESCE(mc.cogs, 0)        AS cogs,
-       COALESCE(mr.revenue, 0) - COALESCE(mc.cogs, 0) AS gross_profit
+       COALESCE(mrs.revenue, 0) + COALESCE(mrg.revenue, 0) AS revenue,
+       COALESCE(mcs.cogs, 0)    + COALESCE(mcg.cogs, 0)    AS cogs,
+       (COALESCE(mrs.revenue, 0) + COALESCE(mrg.revenue, 0))
+         - (COALESCE(mcs.cogs, 0) + COALESCE(mcg.cogs, 0)) AS gross_profit
      FROM months m
-     LEFT JOIN monthly_revenue mr ON mr.month = m.month
-     LEFT JOIN monthly_cogs    mc ON mc.month = m.month
+     LEFT JOIN monthly_revenue_sales mrs ON mrs.month = m.month
+     LEFT JOIN monthly_revenue_gl    mrg ON mrg.month = m.month
+     LEFT JOIN monthly_cogs_sales    mcs ON mcs.month = m.month
+     LEFT JOIN monthly_cogs_gl       mcg ON mcg.month = m.month
      ORDER BY m.month`,
     params
   ).catch(() => ({ rows: [] as any[] }))

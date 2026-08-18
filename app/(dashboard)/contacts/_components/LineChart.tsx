@@ -145,9 +145,13 @@ export default function LineChart({
 
         {/* X labels */}
         {labels.map((label, i) => {
-          // Show every Nth label to avoid overlap
+          // Show every Nth label to avoid overlap, dihitung mundur dari label
+          // TERAKHIR (bukan dari awal) — supaya titik data terbaru selalu
+          // kelihatan tanpa merusak jarak antar-label jadi tidak rata di ujung
+          // (mis. ...Mar, May, Jul lalu Aug nempel karena dipaksa tampil).
           const skip = Math.ceil(labels.length / 8)
-          if (i % skip !== 0 && i !== labels.length - 1) return null
+          const lastIdx = labels.length - 1
+          if ((lastIdx - i) % skip !== 0) return null
           return (
             <text key={`lbl-${i}`}
               x={toX(i)} y={H - 4}
