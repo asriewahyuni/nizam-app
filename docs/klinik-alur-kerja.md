@@ -60,6 +60,14 @@ Klik **"Check-in"** → `checkInBooking` ([`klinik-booking.actions.ts:171`](../m
 
 Tab **Daftar Poli** — beda dari "+ Poli Baru" di §2a yang cuma tambah cepat, tab ini layar manajemen penuh: `getKlinikPoliByBranch(orgId, branchId, includeInactive=true)` menampilkan semua poli termasuk yang nonaktif, `updateKlinikPoli` (ubah kode/nama) dan `setKlinikPoliActive` (aktif/nonaktifkan) — semua admin-gated (`isKlinikOrgAdmin`), di [`klinik.actions.ts`](../modules/klinik/actions/klinik.actions.ts). Menonaktifkan poli tidak menghapus data historis (kunjungan lama tetap tertaut), cuma menyembunyikannya dari dropdown pendaftaran.
 
+### 2e. Layar Antrian Publik (Display Board)
+
+Halaman publik tanpa login: `app/klinik/antrian/[branchId]/page.tsx` + [`AntrianDisplayClient.tsx`](<../app/klinik/antrian/[branchId]/AntrianDisplayClient.tsx>) — dibuka di TV/monitor ruang tunggu, ditautkan lewat tombol **"Buka Layar Antrian"** di kartu "Antrian Hari Ini" (tab Pendaftaran & Antrian).
+
+- `getAntrianDisplayBoard(branchId)` ([`klinik-kunjungan.actions.ts`](../modules/klinik/actions/klinik-kunjungan.actions.ts)) — untuk tiap poli aktif, mengembalikan nomor **"Sedang Dipanggil"** (kunjungan `DIPERIKSA` yang terakhir diupdate) dan daftar nomor **"Menunggu"** (`MENUNGGU`, urut naik). **Sengaja tidak pernah mengembalikan nama pasien** — halaman ini publik tanpa autentikasi, jadi cuma nomor antrian yang aman ditampilkan.
+- Poll setiap 8 detik (bukan WebSocket/realtime — cukup untuk layar yang menyala statis berjam-jam, jauh lebih sederhana).
+- Highlight "flash" saat nomor sedang-dipanggil berubah dibuat lewat CSS keyframe (`animate-antrian-flash` di `app/globals.css`) yang di-replay lewat teknik **key-remount** (elemen diberi `key={sedang_dipanggil}`, jadi React memasang ulang DOM node-nya begitu nilainya berubah, otomatis mengulang animasinya) — **bukan** `useState`+`setTimeout` di dalam `useEffect`, karena project ini mengaktifkan `react-hooks/set-state-in-effect` yang menolak pola itu (dianggap bisa memicu cascading render).
+
 ---
 
 ## 3. Rekam Medis
@@ -246,7 +254,6 @@ Kalau saat transaksi terjadi ada peran akun (`klinik_account_mapping`) yang belu
 - **Portal pasien (`/pasien/*`)** — baru halaman login stub. Booking online tidak butuh akun (guest booking by nama+kontak); pasien ditautkan otomatis lewat nomor HP saat check-in. Kalau nanti pasien perlu login untuk lihat riwayat sendiri, itu pekerjaan terpisah.
 - **BPJS P-Care/Vclaim & SATUSEHAT** — field sudah disiapkan (`klinik_pasien.no_bpjs`, `klinik_kunjungan.jenis_kunjungan`, `klinik_tagihan.no_klaim_bpjs`, `klinik_account_mapping.piutang_bpjs_account_id`), tapi integrasi API-nya sengaja ditunda (butuh kredensial resmi & sertifikasi).
 - **Pemecahan resep multi-batch** — kalau 1 item resep diambil dari lebih dari satu batch (batch A habis, lanjut batch B), `klinik_resep_detail.batch_number` cuma menyimpan batch **terakhir** yang disentuh. Jejak lengkap tetap ada di `stock_movements` (satu baris per batch, `reference_id` = id resep), cuma tidak nyaman ditampilkan di UI resep. Ditunda karena kompleksitas UI-nya tidak sepadan untuk kasus yang jarang terjadi.
-- **Nomor antrian tampilan publik (display board)** — belum ada layar TV/nomor panggil untuk ruang tunggu.
 - **Billing rawat inap berjalan (mid-stay)** — tagihan kamar baru ditarik otomatis **setelah** pasien dipulangkan (§5c/§6a). Belum ada estimasi tagihan berjalan/uang muka selama pasien masih `DIRAWAT`, dan belum ada laporan okupansi kamar (tingkat hunian, rata-rata lama inap) — data mentahnya sudah ada di `klinik_rawat_inap`, tinggal laporannya belum dibangun.
 - **Perawatan/tindakan selama rawat inap** — resep obat & rekam medis tetap bisa dicatat normal (nempel ke `kunjungan_id` yang sama, §3-§4), tapi belum ada konsep "billing harian per tindakan rawat inap" terpisah dari tarif kamar per malam — semua tindakan selama masa inap masuk sebagai baris `layanan` biasa di tagihan yang sama.
 
