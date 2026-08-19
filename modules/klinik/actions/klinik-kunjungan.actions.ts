@@ -36,6 +36,7 @@ export async function createKunjunganWalkIn(input: {
   branchId: string
   pasienId: string
   poliId: string
+  stafMedisId?: string | null
   jenisKunjungan?: 'umum' | 'bpjs' | 'asuransi'
   keluhan?: string | null
 }): Promise<{ data: { id: string; no_antrian: number } } | { error: string }> {
@@ -46,14 +47,15 @@ export async function createKunjunganWalkIn(input: {
     try {
       const { rows } = await queryPostgres<{ id: string; no_antrian: number }>(
         `INSERT INTO public.klinik_kunjungan
-           (org_id, branch_id, pasien_id, poli_id, tanggal, no_antrian, jenis_kunjungan, sumber, keluhan)
-         VALUES ($1, $2, $3, $4, $5::date, $6, $7, 'WALK_IN', $8)
+           (org_id, branch_id, pasien_id, poli_id, staf_medis_id, tanggal, no_antrian, jenis_kunjungan, sumber, keluhan)
+         VALUES ($1, $2, $3, $4, $5, $6::date, $7, $8, 'WALK_IN', $9)
          RETURNING id::text, no_antrian`,
         [
           input.orgId,
           input.branchId,
           input.pasienId,
           input.poliId,
+          input.stafMedisId || null,
           today,
           noAntrian,
           input.jenisKunjungan || 'umum',
@@ -87,6 +89,8 @@ export type KlinikAntrianRow = {
   // SELESAI jadi kolom "Kasir" (belum lunas) vs "Selesai" (lunas), tanpa
   // menambah nilai baru ke CHECK constraint klinik_kunjungan.status.
   tagihan_status: 'BELUM_BAYAR' | 'LUNAS' | 'VOID' | null
+  staf_medis_id: string | null
+  staf_medis_nama: string | null
 }
 
 export async function getAntrianHariIni(branchId: string, poliId: string): Promise<KlinikAntrianRow[]> {
@@ -94,10 +98,15 @@ export async function getAntrianHariIni(branchId: string, poliId: string): Promi
   const { rows } = await queryPostgres<KlinikAntrianRow>(
     `SELECT k.id::text, k.no_antrian, k.status, k.jenis_kunjungan, k.keluhan, k.created_at::text,
             p.id::text AS pasien_id, p.nama AS pasien_nama, p.no_rm AS pasien_no_rm,
-            t.status AS tagihan_status
+            t.status AS tagihan_status,
+            k.staf_medis_id::text,
+            CASE WHEN k.staf_medis_id IS NULL THEN NULL
+                 ELSE TRIM(CONCAT(e.first_name, ' ', COALESCE(e.last_name, ''))) END AS staf_medis_nama
      FROM public.klinik_kunjungan k
      JOIN public.klinik_pasien p ON p.id = k.pasien_id
      LEFT JOIN public.klinik_tagihan t ON t.kunjungan_id = k.id
+     LEFT JOIN public.klinik_staf_medis sm ON sm.id = k.staf_medis_id
+     LEFT JOIN public.employees e ON e.id = sm.employee_id
      WHERE k.branch_id = $1 AND k.poli_id = $2 AND k.tanggal = $3::date
      ORDER BY k.no_antrian ASC`,
     [branchId, poliId, today],

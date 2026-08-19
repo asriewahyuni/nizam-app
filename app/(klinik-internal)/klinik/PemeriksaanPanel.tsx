@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { FileText, Pill, Plus, Trash2, CheckCircle2, AlertCircle, Send, Receipt, Undo2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
-  getRekamMedisByKunjungan, saveRekamMedisDraft, finalizeRekamMedis,
+  getRekamMedisByKunjungan, saveRekamMedisDraft, finalizeRekamMedis, logAksesRekamMedis,
   type KlinikRekamMedis,
 } from '@/modules/klinik/actions/klinik-rekam-medis.actions'
 import {
@@ -16,7 +16,7 @@ import {
   type KlinikTagihan, type KlinikTagihanDetailRow,
 } from '@/modules/klinik/actions/klinik-tagihan.actions'
 import { getRawatInapByKunjungan, type KlinikRawatInapDetail } from '@/modules/klinik/actions/klinik-kamar.actions'
-import type { KlinikStafMedis, KlinikTarifLayanan } from '@/modules/klinik/actions/klinik.actions'
+import { canAccessKlinikKunjungan, type KlinikStafMedis, type KlinikTarifLayanan } from '@/modules/klinik/actions/klinik.actions'
 
 type ResepWithItems = KlinikResepRow & { items: KlinikResepDetailRow[] }
 
@@ -41,6 +41,7 @@ export default function PemeriksaanPanel({
 }) {
   const [pending, startTransition] = useTransition()
   const [loading, setLoading] = useState(true)
+  const [accessDenied, setAccessDenied] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const [rekamMedis, setRekamMedis] = useState<KlinikRekamMedis | null>(null)
@@ -60,6 +61,14 @@ export default function PemeriksaanPanel({
   const [rawatInap, setRawatInap] = useState<KlinikRawatInapDetail | null>(null)
 
   async function loadData() {
+    const access = await canAccessKlinikKunjungan(orgId, kunjunganId)
+    if (!access.allowed) {
+      setAccessDenied(access.reason)
+      setLoading(false)
+      return
+    }
+    setAccessDenied(null)
+
     const [rm, resep, tagihanData, rawatInapData] = await Promise.all([
       getRekamMedisByKunjungan(kunjunganId),
       getResepByKunjungan(kunjunganId),
@@ -84,11 +93,18 @@ export default function PemeriksaanPanel({
   }
 
   useEffect(() => {
+    // Log sekali per kunjungan dibuka (bukan di loadData() — itu juga dipanggil
+    // ulang tiap kali aksi di panel ini selesai, akan bikin log dobel-dobel).
+    logAksesRekamMedis(orgId, pasienId, 'Buka detail kunjungan (kanban Antrian Hari Ini)')
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kunjunganId])
 
   const isLocked = rekamMedis?.status === 'FINAL'
+  // Obat baru boleh diserahkan apotek setelah tagihan kunjungan ini LUNAS —
+  // bayar dulu, baru ambil obat. Lihat gate yang sama di dispenseResep()
+  // (klinik-resep.actions.ts), disini cuma dipakai buat nonaktifkan tombol.
+  const canDispenseObat = tagihan?.tagihan.status === 'LUNAS'
 
   function handleSaveDraft() {
     setMessage(null)
@@ -244,6 +260,17 @@ export default function PemeriksaanPanel({
     return <p className="py-4 text-center text-sm text-slate-400">Memuat rekam medis...</p>
   }
 
+  if (accessDenied) {
+    return (
+      <div className="border-t border-slate-100 pt-4">
+        <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+          <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
+          {accessDenied}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4 border-t border-slate-100 pt-4">
       {message && (
@@ -375,6 +402,12 @@ export default function PemeriksaanPanel({
           Resep & Apotek
         </p>
 
+        {resepList.some((r) => r.status === 'PENDING') && !canDispenseObat && (
+          <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Buat &amp; lunasi tagihan di Kasir dulu (bagian bawah) sebelum obat bisa diserahkan.
+          </p>
+        )}
+
         {resepList.length > 0 && (
           <div className="mb-3 space-y-2">
             {resepList.map((resep) => (
@@ -390,7 +423,8 @@ export default function PemeriksaanPanel({
                     <button
                       type="button"
                       onClick={() => handleDispense(resep.id)}
-                      disabled={pending}
+                      disabled={pending || !canDispenseObat}
+                      title={!canDispenseObat ? 'Tagihan belum lunas — buat & lunasi tagihan di Kasir dulu.' : undefined}
                       className="flex cursor-pointer items-center gap-1 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Send className="size-3" aria-hidden="true" />
@@ -527,8 +561,8 @@ export default function PemeriksaanPanel({
                 </div>
               )}
 
-              {resepList.some((r) => r.status === 'DISPENSED') && (
-                <p className="text-xs text-slate-500">Obat yang sudah diserahkan akan otomatis ditambahkan ke tagihan.</p>
+              {resepList.some((r) => r.status === 'PENDING' || r.status === 'DISPENSED') && (
+                <p className="text-xs text-slate-500">Obat dari resep kunjungan ini akan otomatis ditambahkan ke tagihan — apotek baru bisa menyerahkan obat setelah tagihan lunas.</p>
               )}
               {rawatInap && rawatInap.status === 'PULANG' && (
                 <p className="rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs text-cyan-800">

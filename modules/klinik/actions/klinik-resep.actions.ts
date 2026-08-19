@@ -7,6 +7,11 @@
 // 2) postJurnal() (layer TS, setelah RPC sukses) — posting HPP obat.
 // Jangan digabung jadi satu transaksi SQL — lihat komentar di
 // supabase/migrations/1428_klinik_pratama_apotek.sql soal kenapa.
+//
+// dispenseResep() juga menggerbang pembayaran: obat cuma boleh diserahkan
+// setelah klinik_tagihan kunjungan ini berstatus LUNAS (lihat
+// klinik-tagihan.actions.ts — createTagihan() sengaja menarik obat dari
+// resep PENDING, karena urutan alurnya bayar dulu baru ambil obat).
 
 import { revalidatePath } from 'next/cache'
 import { queryPostgres } from '@/lib/db/postgres'
@@ -135,6 +140,22 @@ export async function dispenseResep(
   branchId: string,
   resepId: string,
 ): Promise<{ success: true; totalHpp: number } | { error: string }> {
+  // Gate pembayaran: obat baru boleh diserahkan setelah tagihan kunjungan ini
+  // LUNAS (lihat catatan di klinik-tagihan.actions.ts — createTagihan() narik
+  // obat dari resep PENDING, bukan menunggu obat diserahkan lebih dulu).
+  const { rows: gateRows } = await queryPostgres<{ tagihan_status: string | null }>(
+    `SELECT t.status AS tagihan_status
+     FROM public.klinik_resep r
+     LEFT JOIN public.klinik_tagihan t ON t.kunjungan_id = r.kunjungan_id
+     WHERE r.id = $1`,
+    [resepId],
+  )
+  const gate = gateRows[0]
+  if (!gate) return { error: 'Resep tidak ditemukan.' }
+  if (gate.tagihan_status !== 'LUNAS') {
+    return { error: 'Tagihan kunjungan ini belum lunas — buat & lunasi tagihan di Kasir dulu sebelum obat bisa diserahkan.' }
+  }
+
   let dispensingResult: { success: boolean; error?: string; already_dispensed?: boolean; total_hpp?: number }
 
   try {

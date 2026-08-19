@@ -22,7 +22,7 @@ import {
   type KlinikWarehouseOption, type KlinikPendingResep, type KlinikObatStockRow, type KlinikObatOption,
 } from '@/modules/klinik/actions/klinik-resep.actions'
 import {
-  createKlinikPoli, createKlinikStafMedis, type KlinikPoli, type KlinikStafMedis, type KlinikTarifLayanan,
+  createKlinikPoli, createKlinikStafMedis, updateKlinikStafMedisPoli, type KlinikPoli, type KlinikStafMedis, type KlinikTarifLayanan,
 } from '@/modules/klinik/actions/klinik.actions'
 import { saveKlinikAccountMappingAction } from '@/modules/klinik/actions/klinik-account-mapping.actions'
 import { retryPostUnpostedJournals } from '@/modules/klinik/actions/klinik-tagihan.actions'
@@ -109,6 +109,13 @@ function TabPendaftaran({
   const [newPasien, setNewPasien] = useState({ nama: '', nik: '', tglLahir: '', jenisKelamin: '', noHp: '' })
   const [jenisKunjungan, setJenisKunjungan] = useState<'umum' | 'bpjs' | 'asuransi'>('umum')
   const [keluhan, setKeluhan] = useState('')
+  const [stafMedisId, setStafMedisId] = useState('')
+
+  // Dokter/perawat/bidan yang poli utamanya cocok dengan poli yang dipilih —
+  // fallback ke daftar lengkap kalau tidak ada satupun staf medis yang
+  // ditautkan ke poli ini (poli_id opsional saat menautkan staf medis).
+  const dokterOptionsForPoli = dokterList.filter((d) => d.poli_id === poliId)
+  const dokterOptions = dokterOptionsForPoli.length > 0 ? dokterOptionsForPoli : dokterList
 
   async function refreshAntrian(targetPoliId: string) {
     const rows = await getAntrianHariIni(branch!.id, targetPoliId)
@@ -128,6 +135,7 @@ function TabPendaftaran({
 
   function handlePoliChange(id: string) {
     setPoliId(id)
+    setStafMedisId('')
     startTransition(async () => { await refreshAntrian(id) })
   }
 
@@ -221,7 +229,7 @@ function TabPendaftaran({
       }
 
       const result = await createKunjunganWalkIn({
-        orgId, branchId: branch.id, pasienId, poliId: poliId as string, jenisKunjungan, keluhan: keluhan || null,
+        orgId, branchId: branch.id, pasienId, poliId: poliId as string, stafMedisId: stafMedisId || null, jenisKunjungan, keluhan: keluhan || null,
       })
       if ('error' in result) {
         setMessage({ type: 'error', text: result.error })
@@ -235,6 +243,7 @@ function TabPendaftaran({
       setShowNewPasienForm(false)
       setNewPasien({ nama: '', nik: '', tglLahir: '', jenisKelamin: '', noHp: '' })
       setKeluhan('')
+      setStafMedisId('')
       await refreshAntrian(poliId as string)
     })
   }
@@ -456,6 +465,20 @@ function TabPendaftaran({
               </select>
             </div>
             <div className="mt-3 space-y-1.5">
+              <label htmlFor="klinik-staf-medis" className="text-xs font-semibold text-slate-700">Dokter/Perawat (opsional)</label>
+              <select
+                id="klinik-staf-medis"
+                value={stafMedisId}
+                onChange={(e) => setStafMedisId(e.target.value)}
+                className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+              >
+                <option value="">— Belum ditentukan —</option>
+                {dokterOptions.map((d) => (
+                  <option key={d.id} value={d.id}>{d.employee_name} ({d.jenis})</option>
+                ))}
+              </select>
+            </div>
+            <div className="mt-3 space-y-1.5">
               <label htmlFor="klinik-keluhan" className="text-xs font-semibold text-slate-700">Keluhan (opsional)</label>
               <textarea
                 id="klinik-keluhan"
@@ -589,6 +612,12 @@ function TabPendaftaran({
                                     </p>
                                   </div>
                                 </div>
+                                {row.staf_medis_nama && (
+                                  <p className="mt-1.5 flex items-center gap-1 truncate text-xs text-cyan-700">
+                                    <UserCog className="size-3 shrink-0" aria-hidden="true" />
+                                    {row.staf_medis_nama}
+                                  </p>
+                                )}
                                 {row.keluhan && (
                                   <p className="mt-2 truncate text-xs text-slate-500" title={row.keluhan}>{row.keluhan}</p>
                                 )}
@@ -916,6 +945,18 @@ function TabTenagaMedis({
     })
   }
 
+  function handleUpdatePoli(stafMedisId: string, poliId: string) {
+    setMessage(null)
+    startTransition(async () => {
+      const res = await updateKlinikStafMedisPoli(orgId, stafMedisId, poliId || null)
+      if ('error' in res) {
+        setMessage({ type: 'error', text: res.error })
+        return
+      }
+      setStafMedisList((prev) => prev.map((s) => (s.id === stafMedisId ? res.data : s)))
+    })
+  }
+
   return (
     <div className="space-y-4">
       {message && (
@@ -1022,7 +1063,7 @@ function TabTenagaMedis({
         ) : (
           <div className="space-y-2">
             {stafMedisList.map((s) => (
-              <div key={s.id} className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2.5">
+              <div key={s.id} className="flex flex-col gap-2 rounded-xl border border-slate-100 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{s.employee_name}</p>
                   <p className="text-xs text-slate-500">
@@ -1030,6 +1071,21 @@ function TabTenagaMedis({
                     {s.str_number ? ` · STR ${s.str_number}` : ''}
                     {s.spesialisasi ? ` · ${s.spesialisasi}` : ''}
                   </p>
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor={`klinik-staf-poli-${s.id}`} className="text-[11px] font-semibold text-slate-500 sm:sr-only">Poli</label>
+                  <select
+                    id={`klinik-staf-poli-${s.id}`}
+                    value={s.poli_id ?? ''}
+                    onChange={(e) => handleUpdatePoli(s.id, e.target.value)}
+                    disabled={pending}
+                    className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs outline-none transition-colors duration-150 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-48"
+                  >
+                    <option value="">— Belum ada poli —</option>
+                    {poliList.map((p) => (
+                      <option key={p.id} value={p.id}>{p.kode} — {p.nama}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             ))}

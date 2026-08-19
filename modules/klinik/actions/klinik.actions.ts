@@ -15,6 +15,60 @@ export async function isKlinikOrgAdmin(userId: string, orgId: string): Promise<b
   return role === 'owner' || role === 'admin' || role === 'manager'
 }
 
+/** employees.id milik sesi yang sedang login di org ini, atau null kalau sesi tidak ada / tidak tertaut ke baris employees (mis. akun tanpa data HRIS). Dipakai buat audit log & access control rekam medis. */
+export async function getCurrentKlinikEmployeeId(orgId: string): Promise<string | null> {
+  const session = await getInternalAuthSession()
+  if (!session) return null
+  const { rows } = await queryPostgres<{ id: string }>(
+    `SELECT id::text FROM public.employees WHERE org_id = $1 AND user_id = $2 LIMIT 1`,
+    [orgId, session.user.id],
+  )
+  return rows[0]?.id ?? null
+}
+
+export type KlinikCurrentStafMedis = { id: string; employeeId: string; jenis: KlinikStafMedis['jenis']; poliId: string | null }
+
+/** Baris klinik_staf_medis milik sesi yang login, atau null kalau dia bukan tenaga medis tertaut (mis. admin/owner/loket murni) — kasus null itu sengaja TIDAK dianggap error, lihat canAccessKlinikKunjungan(). */
+export async function getCurrentStafMedis(orgId: string): Promise<KlinikCurrentStafMedis | null> {
+  const employeeId = await getCurrentKlinikEmployeeId(orgId)
+  if (!employeeId) return null
+  const { rows } = await queryPostgres<{ id: string; jenis: KlinikStafMedis['jenis']; poli_id: string | null }>(
+    `SELECT id::text, jenis, poli_id::text FROM public.klinik_staf_medis WHERE employee_id = $1 AND is_active = TRUE LIMIT 1`,
+    [employeeId],
+  )
+  const row = rows[0]
+  return row ? { id: row.id, employeeId, jenis: row.jenis, poliId: row.poli_id } : null
+}
+
+/**
+ * Gate akses rekam medis per kunjungan: tenaga medis (dokter/perawat/bidan/
+ * apoteker, punya baris klinik_staf_medis) cuma boleh buka kunjungan di poli
+ * miliknya ATAU kunjungan yang staf_medis_id-nya dia sendiri. Staf tanpa
+ * baris klinik_staf_medis (admin/owner/loket) tetap dapat akses penuh —
+ * mereka butuh visibilitas lintas-poli untuk pendaftaran/billing/laporan.
+ */
+export async function canAccessKlinikKunjungan(
+  orgId: string,
+  kunjunganId: string,
+): Promise<{ allowed: true } | { allowed: false; reason: string }> {
+  const { rows } = await queryPostgres<{ org_id: string; poli_id: string; staf_medis_id: string | null }>(
+    `SELECT org_id::text, poli_id::text, staf_medis_id::text FROM public.klinik_kunjungan WHERE id = $1`,
+    [kunjunganId],
+  )
+  const kunjungan = rows[0]
+  if (!kunjungan || kunjungan.org_id !== orgId) {
+    return { allowed: false, reason: 'Kunjungan tidak ditemukan.' }
+  }
+
+  const current = await getCurrentStafMedis(orgId)
+  if (!current) return { allowed: true }
+
+  if (current.poliId === kunjungan.poli_id || current.id === kunjungan.staf_medis_id) {
+    return { allowed: true }
+  }
+  return { allowed: false, reason: 'Kunjungan ini bukan di poli Anda dan bukan pasien yang Anda tangani.' }
+}
+
 export type KlinikPoli = {
   id: string
   kode: string
@@ -184,6 +238,29 @@ export async function createKlinikStafMedis(
     }
     return { error: err.message || 'Gagal menambah tenaga medis.' }
   }
+}
+
+/** Ubah poli utama seorang tenaga medis — dipakai UI Tenaga Medis untuk assign/reassign poli setelah staf ditautkan (createKlinikStafMedis cuma set sekali saat pertama kali ditautkan). */
+export async function updateKlinikStafMedisPoli(
+  orgId: string,
+  stafMedisId: string,
+  poliId: string | null,
+): Promise<{ data: KlinikStafMedis } | { error: string }> {
+  const session = await getInternalAuthSession()
+  if (!session) return { error: 'Tidak terautentikasi.' }
+  if (!(await isKlinikOrgAdmin(session.user.id, orgId))) {
+    return { error: 'Hanya owner/admin/manager yang dapat mengubah poli tenaga medis.' }
+  }
+
+  await queryPostgres(
+    `UPDATE public.klinik_staf_medis SET poli_id = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
+    [poliId, stafMedisId, orgId],
+  )
+
+  const list = await getKlinikStafMedis(orgId)
+  const updated = list.find((s) => s.id === stafMedisId)
+  if (!updated) return { error: 'Poli tersimpan tapi gagal dimuat ulang.' }
+  return { data: updated }
 }
 
 export type KlinikTarifLayanan = {

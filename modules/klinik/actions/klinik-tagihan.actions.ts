@@ -1,9 +1,15 @@
 'use server'
 
 // Klinik Pratama — kasir & billing. Tagihan menggabungkan layanan (dipilih
-// manual dari klinik_tarif_layanan) + obat (auto-tarik dari resep yang sudah
-// DISPENSED untuk kunjungan yang sama, harga pakai products.selling_price —
-// BUKAN average_cost yang dipakai HPP saat dispensing).
+// manual dari klinik_tarif_layanan) + obat (auto-tarik dari SEMUA resep
+// kunjungan yang sama yang belum dibatalkan — PENDING maupun DISPENSED,
+// harga pakai products.selling_price, BUKAN average_cost yang dipakai HPP
+// saat dispensing).
+//
+// Obat sengaja ditarik sebelum diserahkan (bukan cuma yang sudah DISPENSED):
+// alur klinik ini mewajibkan tagihan lunas dulu sebelum apotek boleh
+// menyerahkan obat (lihat gate di dispenseResep(), klinik-resep.actions.ts)
+// — jadi saat tagihan dibuat, resep obatnya hampir pasti masih PENDING.
 //
 // HPP obat SUDAH diposting terpisah saat dispensing (Fase Apotek,
 // reference_type='KLINIK_DISPENSING'). Di sini HANYA revenue yang diposting
@@ -49,7 +55,7 @@ export async function createTagihan(input: {
      FROM public.klinik_resep r
      JOIN public.klinik_resep_detail rd ON rd.resep_id = r.id
      JOIN public.products p ON p.id = rd.product_id
-     WHERE r.kunjungan_id = $1 AND r.status = 'DISPENSED'`,
+     WHERE r.kunjungan_id = $1 AND r.status IN ('PENDING', 'DISPENSED')`,
     [input.kunjunganId],
   )
 

@@ -9,6 +9,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { connectPostgresClient, queryPostgres } from '@/lib/db/postgres'
+import { getCurrentKlinikEmployeeId } from './klinik.actions'
 
 export type KlinikRekamMedisPayload = {
   anamnesis?: string | null
@@ -222,13 +223,19 @@ export async function getRekamMedisHistoryByPasien(pasienId: string): Promise<Kl
   return rows
 }
 
-/** Catat akses ke riwayat lengkap rekam medis pasien (audit trail — klinik_akses_rekam_log). */
+/**
+ * Catat akses ke riwayat lengkap rekam medis pasien (audit trail —
+ * klinik_akses_rekam_log). actor_employee_id sengaja DIAMBIL DARI SESI
+ * SERVER (getCurrentKlinikEmployeeId), bukan parameter dari client — kalau
+ * dipercaya dari client, siapapun bisa memalsukan/mengosongkan siapa yang
+ * tercatat mengakses.
+ */
 export async function logAksesRekamMedis(
   orgId: string,
   pasienId: string,
-  actorEmployeeId: string | null,
   alasan: string,
 ): Promise<void> {
+  const actorEmployeeId = await getCurrentKlinikEmployeeId(orgId)
   await queryPostgres(
     `INSERT INTO public.klinik_akses_rekam_log (org_id, actor_employee_id, pasien_id, alasan)
      VALUES ($1, $2, $3, $4)`,

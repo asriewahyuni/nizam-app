@@ -866,7 +866,7 @@ export function TabDaftarPasien({ orgId }: { orgId: string }) {
     setExpandedPasienId(pasienId)
     setHistoryLoading(true)
     startTransition(async () => {
-      await logAksesRekamMedis(orgId, pasienId, null, 'Lihat riwayat rekam medis dari Daftar Pasien')
+      await logAksesRekamMedis(orgId, pasienId, 'Lihat riwayat rekam medis dari Daftar Pasien')
       setHistory(await getRekamMedisHistoryByPasien(pasienId))
       setHistoryLoading(false)
     })
