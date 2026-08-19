@@ -18,6 +18,8 @@ interface JournalVoucherPrintProps {
       id?: string
       account_id?: string
       accounts?: { code?: string; name?: string }
+      account_code?: string
+      account_name?: string
       debit?: number | string
       credit?: number | string
       memo?: string | null
@@ -45,8 +47,43 @@ export function JournalVoucherPrint({
 
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 print:p-0 print:bg-white print:static print:inset-auto">
+      <style>{`
+        @media print {
+          @page { size: A4 portrait; margin: 10mm 12mm; }
+          html, body {
+            background: #fff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          #voucher-print-area, #voucher-print-area * {
+            visibility: visible !important;
+          }
+          #voucher-print-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+            background: #fff !important;
+          }
+          .voucher-no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       {/* Control Bar (Hidden on Print) */}
-      <div className="fixed top-4 right-4 z-[110] flex items-center gap-3 print:hidden">
+      <div className="fixed top-4 right-4 z-[110] flex items-center gap-3 print:hidden voucher-no-print">
         <button
           type="button"
           onClick={handlePrint}
@@ -66,7 +103,10 @@ export function JournalVoucherPrint({
       </div>
 
       {/* Printable Sheet (Standard A4 / Letter) */}
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl p-8 sm:p-12 print:shadow-none print:border-0 print:p-6 print:max-w-none text-slate-900">
+      <div
+        id="voucher-print-area"
+        className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl p-8 sm:p-12 print:shadow-none print:border-0 print:p-6 print:max-w-none text-slate-900"
+      >
         {/* Header Kop */}
         <div className="border-b-2 border-slate-900 pb-4 mb-6 flex items-start justify-between">
           <div>
@@ -83,7 +123,7 @@ export function JournalVoucherPrint({
         </div>
 
         {/* Info Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs mb-6 print:bg-slate-50">
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tanggal Transaksi</span>
             <span className="font-bold text-slate-800">
@@ -113,7 +153,7 @@ export function JournalVoucherPrint({
         {/* Deskripsi */}
         <div className="mb-6">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Deskripsi / Perihal:</span>
-          <p className="text-sm font-semibold text-slate-800 bg-slate-50/50 p-3 rounded-lg border border-slate-100">
+          <p className="text-sm font-semibold text-slate-800 bg-slate-50/50 p-3 rounded-lg border border-slate-100 print:bg-slate-50">
             {entry.description || '-'}
           </p>
         </div>
@@ -134,12 +174,14 @@ export function JournalVoucherPrint({
               {lines.map((line, idx) => {
                 const debit = Number(line.debit || 0)
                 const credit = Number(line.credit || 0)
+                const accCode = line.accounts?.code || line.account_code || '-'
+                const accName = line.accounts?.name || line.account_name || '-'
                 return (
                   <tr key={line.id || idx} className="hover:bg-slate-50">
                     <td className="p-2.5 border-r border-slate-200 text-center font-medium text-slate-500">{idx + 1}</td>
-                    <td className="p-2.5 border-r border-slate-200 font-mono font-bold text-blue-900">{line.accounts?.code || '-'}</td>
+                    <td className="p-2.5 border-r border-slate-200 font-mono font-bold text-blue-900">{accCode}</td>
                     <td className="p-2.5 border-r border-slate-200 font-medium text-slate-800">
-                      <div>{line.accounts?.name || '-'}</div>
+                      <div>{accName}</div>
                       {line.memo && (
                         <div className="text-[10px] text-slate-500 italic mt-0.5">{line.memo}</div>
                       )}
@@ -168,31 +210,39 @@ export function JournalVoucherPrint({
           </table>
         </div>
 
-        {/* Terbilang */}
-        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs mb-8">
-          <span className="font-bold text-slate-600">Terbilang : </span>
-          <span className="italic font-semibold text-slate-800">{angkaKeTerbilang(totalDebit)}</span>
+        {/* Terbilang Box */}
+        <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200 text-xs mb-8 print:bg-slate-50 print:border-slate-300">
+          <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block mb-1">
+            Terbilang (Nilai Transaksi):
+          </span>
+          <p className="font-serif italic font-bold text-slate-800 text-sm capitalize">
+            {angkaKeTerbilang(totalDebit || totalCredit)} Rupiah
+          </p>
         </div>
 
-        {/* Kolom Tanda Tangan 3 Kolom Standar Indonesia */}
-        <div className="grid grid-cols-3 gap-6 text-center text-xs mt-12 pt-4 border-t border-slate-200">
-          <div className="flex flex-col justify-between h-32 border border-slate-200 rounded-xl p-3 bg-slate-50/50">
-            <span className="font-bold text-slate-600 uppercase text-[10px] tracking-wider">Dibuat Oleh,</span>
+        {/* 3-Column Authorization Signature Boxes */}
+        <div className="grid grid-cols-3 gap-6 pt-4 border-t border-slate-200 text-center text-xs">
+          <div className="space-y-16">
+            <p className="font-bold text-slate-600 uppercase tracking-wide text-[10px]">Dibuat Oleh:</p>
             <div className="border-b border-slate-400 w-3/4 mx-auto" />
-            <span className="text-[11px] font-semibold text-slate-700">Staff / Pembuat Jurnal</span>
+            <p className="text-[10px] text-slate-400 italic">( Staff / Pembuat )</p>
           </div>
+          <div className="space-y-16">
+            <p className="font-bold text-slate-600 uppercase tracking-wide text-[10px]">Diperiksa Oleh:</p>
+            <div className="border-b border-slate-400 w-3/4 mx-auto" />
+            <p className="text-[10px] text-slate-400 italic">( Akuntan / Supervisor )</p>
+          </div>
+          <div className="space-y-16">
+            <p className="font-bold text-slate-600 uppercase tracking-wide text-[10px]">Disetujui Oleh:</p>
+            <div className="border-b border-slate-400 w-3/4 mx-auto" />
+            <p className="text-[10px] text-slate-400 italic">( Direktur / Manager Keuangan )</p>
+          </div>
+        </div>
 
-          <div className="flex flex-col justify-between h-32 border border-slate-200 rounded-xl p-3 bg-slate-50/50">
-            <span className="font-bold text-slate-600 uppercase text-[10px] tracking-wider">Diperiksa Oleh,</span>
-            <div className="border-b border-slate-400 w-3/4 mx-auto" />
-            <span className="text-[11px] font-semibold text-slate-700">Akuntan / Supervisor</span>
-          </div>
-
-          <div className="flex flex-col justify-between h-32 border border-slate-200 rounded-xl p-3 bg-slate-50/50">
-            <span className="font-bold text-slate-600 uppercase text-[10px] tracking-wider">Disetujui Oleh,</span>
-            <div className="border-b border-slate-400 w-3/4 mx-auto" />
-            <span className="text-[11px] font-semibold text-slate-700">Direktur / Manajer Keuangan</span>
-          </div>
+        {/* Footer Note */}
+        <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-400">
+          <span>Dicetak otomatis melalui Nizam ERP</span>
+          <span>Halaman 1 dari 1</span>
         </div>
       </div>
     </div>

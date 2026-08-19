@@ -72,47 +72,73 @@ export default function PurchasingClient({
      if (requestedTab === 'PURCHASES' || payId) return 'PURCHASES'
      return purchaseRequests.some((request: { status?: unknown }) => request?.status === 'PENDING') ? 'REQUESTS' : 'PURCHASES'
    })
-   const [purchaseRows, setPurchaseRows] = useState<any[]>(() => purchases || [])
-   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
-   const [filterStatus, setFilterStatus] = useState<'ALL' | 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'VOIDED'>('ALL')
-   const [searchPO, setSearchPO] = useState('')
-   const sortedPurchaseRows = [...purchaseRows]
-     .filter((p: any) => {
-       if (filterStatus !== 'ALL' && p.status !== filterStatus) return false
-       if (searchPO.trim()) {
-         const q = searchPO.toLowerCase()
-         const num = (p.purchase_number || '').toLowerCase()
-         const vendor = (p.contacts?.name || '').toLowerCase()
-         if (!num.includes(q) && !vendor.includes(q)) return false
-       }
-       return true
-     })
-     .sort((a, b) => {
-       const da = String(a.purchase_date || a.created_at || '')
-       const db = String(b.purchase_date || b.created_at || '')
-       return sortOrder === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
-     })
-   const orgSettings = org?.settings || {}
-   const companyProfile = {
-     name: orgSettings.brand_name || orgName || 'Perusahaan',
-     logo: org?.logo_url || '/logo.png',
-     address: orgSettings.company_address || 'Alamat perusahaan belum diatur (Update di Pengaturan Bisnis).',
-     hotline: orgSettings.hotline || '',
-     email: orgSettings.email || '',
-     website: orgSettings.website || '',
-   }
-  const [showModal, setShowModal] = useState(false)
-  const [showBulkImport, setShowBulkImport] = useState(false)
-  const [showContactModal, setShowContactModal] = useState(false)
-   const [loading, setLoading] = useState(false)
-   useEffect(() => {
-     if (payId && purchaseRows.length > 0) {
-       const purchase = purchaseRows.find((p: any) => p.id === payId)
-       if (purchase && purchase.payment_status !== 'PAID') {
-         handleOpenPayment(purchase)
-       }
-     }
-   }, [payId, purchaseRows])
+    const [purchaseRows, setPurchaseRows] = useState<any[]>(() => purchases || [])
+    const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+    const [filterStatus, setFilterStatus] = useState<'ALL' | 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'VOIDED'>('ALL')
+    const initialSearchParam = searchParams.get('search') || searchParams.get('q') || ''
+    const [searchPO, setSearchPO] = useState(initialSearchParam)
+    const sortedPurchaseRows = [...purchaseRows]
+      .filter((p: any) => {
+        if (filterStatus !== 'ALL' && p.status !== filterStatus) return false
+        if (searchPO.trim()) {
+          const q = searchPO.toLowerCase()
+          const num = (p.purchase_number || '').toLowerCase()
+          const vendor = (p.contacts?.name || '').toLowerCase()
+          if (!num.includes(q) && !vendor.includes(q)) return false
+        }
+        return true
+      })
+      .sort((a, b) => {
+        const da = String(a.purchase_date || a.created_at || '')
+        const db = String(b.purchase_date || b.created_at || '')
+        return sortOrder === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
+      })
+    const orgSettings = org?.settings || {}
+    const companyProfile = {
+      name: orgSettings.brand_name || orgName || 'Perusahaan',
+      logo: org?.logo_url || '/logo.png',
+      address: orgSettings.company_address || 'Alamat perusahaan belum diatur (Update di Pengaturan Bisnis).',
+      hotline: orgSettings.hotline || '',
+      email: orgSettings.email || '',
+      website: orgSettings.website || '',
+    }
+   const [showModal, setShowModal] = useState(false)
+   const [showBulkImport, setShowBulkImport] = useState(false)
+   const [showContactModal, setShowContactModal] = useState(false)
+    const [loading, setLoading] = useState(false)
+    useEffect(() => {
+      if (payId && purchaseRows.length > 0) {
+        const purchase = purchaseRows.find((p: any) => p.id === payId)
+        if (purchase && purchase.payment_status !== 'PAID') {
+          handleOpenPayment(purchase)
+        }
+      }
+    }, [payId, purchaseRows])
+
+    // Auto-hydrate from incoming URL parameters (e.g. from Buku Besar)
+    useEffect(() => {
+      const q = searchParams.get('search') || searchParams.get('q')
+      const id = searchParams.get('id') || searchParams.get('view')
+      if (q) {
+        setSearchPO(q)
+        setActiveTab('PURCHASES')
+      }
+      if (id && Array.isArray(purchaseRows) && purchaseRows.length > 0) {
+        const matched = purchaseRows.find((p: any) => p.id === id || p.purchase_number === id || p.purchase_number?.toLowerCase() === q?.toLowerCase())
+        if (matched) {
+          setSelectedDetailPurchase(matched)
+          setShowDetailModal(true)
+          setActiveTab('PURCHASES')
+        }
+      } else if (q && Array.isArray(purchaseRows) && purchaseRows.length > 0) {
+        const exactMatch = purchaseRows.find((p: any) => p.purchase_number?.toLowerCase() === q.toLowerCase())
+        if (exactMatch) {
+          setSelectedDetailPurchase(exactMatch)
+          setShowDetailModal(true)
+          setActiveTab('PURCHASES')
+        }
+      }
+    }, [searchParams, purchaseRows])
 
    useEffect(() => {
      setPurchaseRows(purchases || [])
@@ -1057,7 +1083,7 @@ export default function PurchasingClient({
                               </button>
                               <button type="button" 
                                 onClick={async () => {
-                                  if (confirm('Tolak permintaan ini?')) {
+                                  if (await confirm('Tolak permintaan ini?')) {
                                     await updatePurchaseRequestStatus(orgId, r.id, 'REJECTED', activeBranchId || undefined)
                                   }
                                 }}

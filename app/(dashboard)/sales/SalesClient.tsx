@@ -324,7 +324,10 @@ export default function SalesClient({
   const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'DRAFT' | 'ORDERED' | 'FINISHED' | 'VOIDED'>('ALL')
-  const [searchSales, setSearchSales] = useState('')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const initialSearchParam = searchParams.get('search') || searchParams.get('q') || ''
+  const [searchSales, setSearchSales] = useState(initialSearchParam)
   const sortedSales = [...(sales || [])]
     .filter((s: any) => {
       if (filterStatus !== 'ALL' && s.status !== filterStatus) return false
@@ -342,8 +345,6 @@ export default function SalesClient({
       return sortOrder === 'desc' ? db.localeCompare(da) : da.localeCompare(db)
     })
    const [loading, setLoading] = useState(false)
-   const searchParams = useSearchParams()
-   const router = useRouter()
 
   // QR Approval state
   const [approvalQr, setApprovalQr] = useState<string | null>(null)
@@ -357,6 +358,26 @@ export default function SalesClient({
        }
      }
    }, [payId, sales])
+
+   // Auto-hydrate from incoming URL parameters (e.g. from Buku Besar)
+   useEffect(() => {
+     const q = searchParams.get('search') || searchParams.get('q')
+     const id = searchParams.get('id') || searchParams.get('view')
+     if (q) {
+       setSearchSales(q)
+     }
+     if (id && Array.isArray(sales) && sales.length > 0) {
+       const matched = sales.find((s: any) => s.id === id || s.sale_number === id || s.sale_number?.toLowerCase() === q?.toLowerCase())
+       if (matched) {
+         setViewSale(matched)
+       }
+     } else if (q && Array.isArray(sales) && sales.length > 0) {
+       const exactMatch = sales.find((s: any) => s.sale_number?.toLowerCase() === q.toLowerCase())
+       if (exactMatch) {
+         setViewSale(exactMatch)
+       }
+     }
+   }, [searchParams, sales])
 
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -771,25 +792,26 @@ export default function SalesClient({
   const executeDelivery = async (saleId: string, warehouseId?: string | null) => {
     setLoading(true)
     const res = await deliverSale(orgId, saleId, warehouseId || null)
-    if (res?.code === 'DELIVERY_STOCK_SHORTAGE') {
-      setError(res.error)
+    if (res && 'code' in res && (res as any).code === 'DELIVERY_STOCK_SHORTAGE') {
+      const shortageRes = res as { error: string; code: string; shortages: any[] }
+      setError(shortageRes.error)
 
-      const wantsDrafts = await confirm(`${res.error}\n\n${buildDeliveryShortagePrompt(res.shortages || [])}`)
+      const wantsDrafts = await confirm(`${shortageRes.error}\n\n${buildDeliveryShortagePrompt(shortageRes.shortages || [])}`)
       if (!wantsDrafts) {
         setLoading(false)
         return
       }
 
       const followUpRes = await createSaleFulfillmentDrafts(orgId, saleId, warehouseId || null)
-      if (followUpRes?.error) {
+      if (followUpRes && 'error' in followUpRes && followUpRes.error) {
         setError(followUpRes.error)
       } else {
-        const cleanMessage = String(followUpRes.message || 'Tindak lanjut stok berhasil dibuat').replace(/\.+$/, '')
+        const cleanMessage = String((followUpRes as any)?.message || 'Tindak lanjut stok berhasil dibuat').replace(/\.+$/, '')
         const routeHint =
-          Array.isArray(followUpRes?.routes) && followUpRes.routes.length > 0
-            ? ` Cek menu ${followUpRes.routes.includes('/factory') && followUpRes.routes.includes('/purchasing')
+          Array.isArray((followUpRes as any)?.routes) && (followUpRes as any).routes.length > 0
+            ? ` Cek menu ${(followUpRes as any).routes.includes('/factory') && (followUpRes as any).routes.includes('/purchasing')
               ? 'Factory dan Purchasing'
-              : followUpRes.routes.includes('/factory')
+              : (followUpRes as any).routes.includes('/factory')
                 ? 'Factory'
                 : 'Purchasing'
             }.`
@@ -803,11 +825,11 @@ export default function SalesClient({
         router.refresh()
         setTimeout(() => setSuccess(null), 4500)
       }
-    } else if ('warning' in (res ?? {}) && (res as any)?.warning) {
+    } else if (res && 'warning' in res && (res as any).warning) {
       setWarning((res as any).warning)
       setTimeout(() => setWarning(null), 6000)
-    } else if (res?.error) {
-      setError(res.error)
+    } else if (res && 'error' in res && (res as any).error) {
+      setError((res as any).error)
     } else {
       setError(null)
       setSuccess('Penjualan berhasil diselesaikan (FINISHED)! Jurnal COGS telah dibukukan otomatis.')
