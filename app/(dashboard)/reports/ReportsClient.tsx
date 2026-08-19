@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileText,
@@ -266,7 +266,38 @@ export default function ReportsClient({
   const searchParams = useSearchParams()
   const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
   const currentMonthStart = `${todayInJakarta.slice(0, 7)}-01`
-  const [activeTab, setActiveTab] = useState<'PL' | 'BS' | 'CF'>('PL')
+
+  const tabParam = (searchParams.get('tab') || '').trim().toUpperCase()
+  const resolvedInitialTab: 'PL' | 'BS' | 'CF' =
+    tabParam === 'BS' || tabParam === 'NERACA'
+      ? 'BS'
+      : tabParam === 'CF' || tabParam === 'CASHFLOW' || tabParam === 'ARUSKAS' || tabParam === 'ARUS-KAS'
+      ? 'CF'
+      : 'PL'
+
+  const [activeTab, setActiveTab] = useState<'PL' | 'BS' | 'CF'>(resolvedInitialTab)
+
+  // Sync activeTab when searchParams changes (e.g. browser back/forward or deep links)
+  useEffect(() => {
+    const nextTabParam = (searchParams.get('tab') || '').trim().toUpperCase()
+    if (nextTabParam === 'BS' || nextTabParam === 'NERACA') {
+      setActiveTab('BS')
+    } else if (nextTabParam === 'CF' || nextTabParam === 'CASHFLOW' || nextTabParam === 'ARUSKAS' || nextTabParam === 'ARUS-KAS') {
+      setActiveTab('CF')
+    } else if (nextTabParam === 'PL' || nextTabParam === 'LABARUGI' || nextTabParam === 'LABA-RUGI') {
+      setActiveTab('PL')
+    }
+  }, [searchParams])
+
+  const handleTabChange = (newTab: 'PL' | 'BS' | 'CF') => {
+    setActiveTab(newTab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', newTab)
+    const queryString = params.toString()
+    const newUrl = `/reports${queryString ? `?${queryString}` : ''}`
+    window.history.replaceState(null, '', newUrl)
+  }
+
   const [showEmptyAccounts, setShowEmptyAccounts] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
 
@@ -398,6 +429,7 @@ export default function ReportsClient({
     const params = new URLSearchParams(searchParams.toString())
     params.set('startDate', s)
     params.set('endDate', e)
+    params.set('tab', activeTab)
     router.push(`/reports?${params.toString()}`)
   }
 
@@ -409,6 +441,7 @@ export default function ReportsClient({
     } else {
       params.set('consolidated', 'true')
     }
+    params.set('tab', activeTab)
     router.push(`/reports?${params.toString()}`)
   }
 
@@ -560,7 +593,7 @@ export default function ReportsClient({
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => handleTabChange(tab.key)}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${activeTab === tab.key ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
               >
                 {tab.icon}
