@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
+import { resolveSourceDocumentLink, extractDocumentNumber } from '@/lib/utils/document-links'
 import LineChart from '../contacts/_components/LineChart'
 import type { CogsRevenueTrendRow } from '@/modules/accounting/actions/analytics.actions'
 import { getAccountLedger, type AccountLedgerResult } from '@/modules/accounting/actions/journal.actions'
@@ -1137,37 +1138,66 @@ export default function ReportsClient({
                         )
                       }
 
-                      return filteredRows.map((row) => (
-                        <div
-                          key={row.line_id}
-                          className="p-3.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs hover:border-blue-200 hover:shadow-xs transition-all space-y-2"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-900">
-                                  {row.entry_date ? formatDate(row.entry_date, 'short') : '-'}
-                                </span>
-                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-mono text-[10px] font-bold">
-                                  {row.entry_number}
-                                </span>
-                                {row.reference_type && (
-                                  <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[9px] font-semibold uppercase tracking-wider border border-amber-100">
-                                    {row.reference_type.replaceAll('_', ' ')}
+                      return filteredRows.map((row) => {
+                        const docLink = resolveSourceDocumentLink(row.reference_type, row.reference_id, row.description, row.memo)
+                        const docCode = docLink?.documentCode || extractDocumentNumber(row.description)
+
+                        return (
+                          <div
+                            key={row.line_id}
+                            className="p-3.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs hover:border-blue-200 hover:shadow-xs transition-all space-y-2"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-slate-900">
+                                    {row.entry_date ? formatDate(row.entry_date, 'short') : '-'}
                                   </span>
-                                )}
+                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-mono text-[10px] font-bold">
+                                    {row.entry_number}
+                                  </span>
+                                  {row.reference_type && (
+                                    docLink ? (
+                                      <a
+                                        href={docLink.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 text-[9px] font-semibold uppercase tracking-wider border border-amber-200 shadow-2xs transition-all cursor-pointer"
+                                        title={`Buka Dokumen di Modul ${docLink.module}`}
+                                      >
+                                        <span>{row.reference_type.replaceAll('_', ' ')}</span>
+                                        <ExternalLink size={9} className="text-amber-600" />
+                                      </a>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[9px] font-semibold uppercase tracking-wider border border-amber-100">
+                                        {row.reference_type.replaceAll('_', ' ')}
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                                <div className="text-xs font-semibold text-slate-700 flex items-center flex-wrap gap-1.5 leading-snug">
+                                  <span>{row.description || '-'}</span>
+                                  {docLink && docCode && (
+                                    <a
+                                      href={docLink.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[9px] font-bold border border-emerald-200/80 shadow-2xs transition-all cursor-pointer"
+                                      title={`Buka Dokumen ${docCode} di Modul ${docLink.module}`}
+                                    >
+                                      <span>{docCode}</span>
+                                      <ExternalLink size={9} className="text-emerald-600" />
+                                    </a>
+                                  )}
+                                </div>
                               </div>
-                              <p className="text-xs font-semibold text-slate-700 mt-1 leading-snug">
-                                {row.description || '-'}
-                              </p>
+                              <div className="text-right shrink-0">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Saldo</span>
+                                <span className={`text-xs font-extrabold tabular-nums ${row.running_balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                                  {formatRupiah(row.running_balance)}
+                                </span>
+                              </div>
                             </div>
-                            <div className="text-right shrink-0">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Saldo</span>
-                              <span className={`text-xs font-extrabold tabular-nums ${row.running_balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
-                                {formatRupiah(row.running_balance)}
-                              </span>
-                            </div>
-                          </div>
 
                           <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
                             <div className="text-[11px] text-slate-500 font-medium truncate max-w-[240px]">
@@ -1187,8 +1217,9 @@ export default function ReportsClient({
                             </div>
                           </div>
                         </div>
-                      ))
-                    })()
+                      )
+                    })
+                  })()
                   )}
                 </div>
 

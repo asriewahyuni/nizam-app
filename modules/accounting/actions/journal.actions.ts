@@ -1801,6 +1801,7 @@ export type AccountLedgerRow = {
   entry_date: string | Date | null
   description: string | null
   reference_type: string | null
+  reference_id?: string | null
   notes: string | null
   memo: string | null
   debit: number
@@ -1994,6 +1995,7 @@ export async function getAccountLedger(
           je.created_at,
           je.description,
           je.reference_type::text AS reference_type,
+          je.reference_id::text AS reference_id,
           je.notes,
           jl.memo,
           COALESCE(jl.debit, 0) AS debit,
@@ -2036,6 +2038,7 @@ export async function getAccountLedger(
         entry_date,
         description,
         reference_type,
+        reference_id,
         notes,
         memo,
         debit,
@@ -2055,6 +2058,7 @@ export async function getAccountLedger(
       entry_date: row.entry_date as string | Date | null,
       description: String(row.description || ''),
       reference_type: String(row.reference_type || ''),
+      reference_id: row.reference_id ? String(row.reference_id) : null,
       notes: String(row.notes || ''),
       memo: String(row.memo || ''),
       debit: toNumber(row.debit),

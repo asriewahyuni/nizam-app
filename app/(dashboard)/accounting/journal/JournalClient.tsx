@@ -10,6 +10,7 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { BulkJournalSection } from '@/components/bulk-import/BulkJournalSection'
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatRupiah, formatDate } from '@/lib/utils'
+import { resolveSourceDocumentLink, extractDocumentNumber } from '@/lib/utils/document-links'
 import { format } from 'date-fns'
 
 type JournalEntryItem = {
@@ -1026,17 +1027,54 @@ export default function JournalClient({
                             <div className="text-[10px] font-mono font-bold text-blue-600 mt-1 tabular-nums uppercase tracking-tighter">{row.entry_number}</div>
                           </td>
                           <td className="px-6 py-5 align-top">
-                            <div className="text-sm font-semibold text-slate-800 leading-tight group-hover:text-blue-900 transition-colors">{row.description || '-'}</div>
-                            <div className="mt-1 flex items-center gap-2">
-                              {row.reference_type && (
-                                <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700 border border-amber-100">
-                                  {row.reference_type.replaceAll('_', ' ')}
-                                </span>
-                              )}
-                              {row.memo && (
-                                <span className="text-[10px] font-medium text-slate-400 italic truncate max-w-xs">{row.memo}</span>
-                              )}
-                            </div>
+                            {(() => {
+                              const docLink = resolveSourceDocumentLink(row.reference_type, row.reference_id, row.description, row.memo)
+                              const docCode = docLink?.documentCode || extractDocumentNumber(row.description)
+                              return (
+                                <div className="space-y-1">
+                                  <div className="text-sm font-semibold text-slate-800 leading-tight group-hover:text-blue-900 transition-colors flex items-center flex-wrap gap-1.5">
+                                    <span>{row.description || '-'}</span>
+                                    {docLink && docCode && (
+                                      <a
+                                        href={docLink.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200/80 shadow-2xs transition-all cursor-pointer"
+                                        title={`Buka Dokumen ${docCode} di Modul ${docLink.module}`}
+                                      >
+                                        <span>{docCode}</span>
+                                        <ExternalLink size={10} className="text-emerald-600" />
+                                      </a>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {row.reference_type && (
+                                      docLink ? (
+                                        <a
+                                          href={docLink.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="inline-flex items-center gap-1 rounded-md bg-amber-50 hover:bg-amber-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-800 border border-amber-200 shadow-2xs transition-all cursor-pointer"
+                                          title={`Buka Dokumen di Modul ${docLink.module}`}
+                                        >
+                                          <span>{row.reference_type.replaceAll('_', ' ')}</span>
+                                          <ExternalLink size={9} className="text-amber-600" />
+                                        </a>
+                                      ) : (
+                                        <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700 border border-amber-100">
+                                          {row.reference_type.replaceAll('_', ' ')}
+                                        </span>
+                                      )
+                                    )}
+                                    {row.memo && (
+                                      <span className="text-[10px] font-medium text-slate-400 italic truncate max-w-xs">{row.memo}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })()}
                           </td>
                           <td className="px-6 py-5 align-top text-xs font-bold text-slate-600">
                             {row.counterparty_accounts && row.counterparty_accounts !== '-' ? (
@@ -1562,7 +1600,7 @@ export default function JournalClient({
               {/* Header */}
               <div className="p-6 bg-slate-50/80 border-b border-slate-100 flex items-start justify-between gap-4">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 font-mono text-xs font-bold">
                       {selectedVoucherEntry.entry_number}
                     </span>
@@ -1576,14 +1614,60 @@ export default function JournalClient({
                             : 'warning'
                       }
                     />
-                    {selectedVoucherEntry.reference_type && (
-                      <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-semibold uppercase tracking-wider border border-amber-100">
-                        {selectedVoucherEntry.reference_type.replaceAll('_', ' ')}
-                      </span>
-                    )}
+                    {(() => {
+                      const docLink = resolveSourceDocumentLink(
+                        selectedVoucherEntry.reference_type,
+                        selectedVoucherEntry.reference_id,
+                        selectedVoucherEntry.description,
+                        selectedVoucherEntry.memo
+                      )
+                      if (selectedVoucherEntry.reference_type) {
+                        return docLink ? (
+                          <a
+                            href={docLink.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase tracking-wider border border-amber-200 shadow-2xs transition-all cursor-pointer"
+                            title={`Buka Dokumen Asal di Modul ${docLink.module}`}
+                          >
+                            <span>{selectedVoucherEntry.reference_type.replaceAll('_', ' ')}</span>
+                            <ExternalLink size={10} className="text-amber-600" />
+                          </a>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-semibold uppercase tracking-wider border border-amber-100">
+                            {selectedVoucherEntry.reference_type.replaceAll('_', ' ')}
+                          </span>
+                        )
+                      }
+                      return null
+                    })()}
                   </div>
-                  <h3 className="text-lg font-bold text-slate-900 leading-tight pt-1">
-                    {selectedVoucherEntry.description || 'Entri Jurnal Voucher'}
+                  <h3 className="text-lg font-bold text-slate-900 leading-tight pt-1 flex items-center flex-wrap gap-2">
+                    <span>{selectedVoucherEntry.description || 'Entri Jurnal Voucher'}</span>
+                    {(() => {
+                      const docLink = resolveSourceDocumentLink(
+                        selectedVoucherEntry.reference_type,
+                        selectedVoucherEntry.reference_id,
+                        selectedVoucherEntry.description,
+                        selectedVoucherEntry.memo
+                      )
+                      const docCode = docLink?.documentCode || extractDocumentNumber(selectedVoucherEntry.description)
+                      if (docLink && docCode) {
+                        return (
+                          <a
+                            href={docLink.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 shadow-2xs transition-all cursor-pointer"
+                            title={`Buka Dokumen ${docCode} di Modul ${docLink.module}`}
+                          >
+                            <span>{docCode}</span>
+                            <ExternalLink size={11} className="text-emerald-600" />
+                          </a>
+                        )
+                      }
+                      return null
+                    })()}
                   </h3>
                   <p className="text-xs text-slate-400 font-medium">
                     Tanggal Entri: {selectedVoucherEntry.entry_date ? formatDate(selectedVoucherEntry.entry_date) : '-'}
