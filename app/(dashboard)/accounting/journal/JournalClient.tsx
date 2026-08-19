@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2, Calculator, ArrowRightLeft, ArrowUp, ArrowDown, ArrowRight, Eye, ExternalLink, Filter, Calendar, Printer } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries, getAccountLedger, bulkPostJournalEntries, getAllMatchingJournalEntryIds } from '@/modules/accounting/actions/journal.actions'
@@ -35,6 +36,16 @@ interface JournalClientProps {
   initialAccountCode?: string | null
   initialStartDate?: string | null
   initialEndDate?: string | null
+  initialEntryNumber?: string | null
+  initialFlow?: 'ALL' | 'DEBIT' | 'CREDIT' | null
+  initialMinAmount?: string | number | null
+  initialMaxAmount?: string | number | null
+  initialCounterparty?: string | null
+  initialModule?: string | null
+  initialQuery?: string | null
+  initialSortOrder?: 'desc' | 'asc' | null
+  initialPrint?: boolean | null
+  initialCompare?: boolean | null
 }
 
 type JournalStatusFilter = 'POSTED' | 'VOIDED' | 'DRAFT'
@@ -90,10 +101,41 @@ export default function JournalClient({
   initialAccountCode,
   initialStartDate,
   initialEndDate,
+  initialEntryNumber,
+  initialFlow = 'ALL',
+  initialMinAmount,
+  initialMaxAmount,
+  initialCounterparty,
+  initialModule,
+  initialQuery,
+  initialSortOrder = 'desc',
+  initialPrint = false,
+  initialCompare = false,
 }: JournalClientProps) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
   const toAmount = (value: unknown) => {
     const parsed = Number(value ?? 0)
     return Number.isFinite(parsed) ? parsed : 0
+  }
+
+  const syncUrlParams = (updates: Record<string, string | number | boolean | null | undefined>) => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+
+    Object.entries(updates).forEach(([key, val]) => {
+      if (val === null || val === undefined || val === '' || val === false) {
+        params.delete(key)
+      } else {
+        params.set(key, String(val))
+      }
+    })
+
+    const qs = params.toString()
+    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname
+    window.history.replaceState(null, '', newUrl)
   }
 
   const initialMatchedAccount = accounts.find((a: any) =>
@@ -109,9 +151,9 @@ export default function JournalClient({
   const [filterStatus, setFilterStatus] = useState<JournalStatusFilter>(initialFilterStatus)
   const [startDate, setStartDate] = useState(initialStartDate || '')
   const [endDate, setEndDate] = useState(initialEndDate || '')
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
-  const [searchText, setSearchText] = useState('')
-  const [activeSearch, setActiveSearch] = useState('')
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>(initialSortOrder || 'desc')
+  const [searchText, setSearchText] = useState(initialQuery || '')
+  const [activeSearch, setActiveSearch] = useState(initialQuery || '')
   const [searchResults, setSearchResults] = useState<JournalEntryItem[] | null>(null)
   const [searchHasMore, setSearchHasMore] = useState(false)
   const [accountSearch, setAccountSearch] = useState(
@@ -123,15 +165,15 @@ export default function JournalClient({
   const [isLoadingEntries, setIsLoadingEntries] = useState(false)
   const [selectedVoucherEntry, setSelectedVoucherEntry] = useState<any | null>(null)
   const [isLoadingVoucher, setIsLoadingVoucher] = useState(false)
-  const [ledgerSearchText, setLedgerSearchText] = useState('')
-  const [ledgerTypeFilter, setLedgerTypeFilter] = useState<'ALL' | 'DEBIT' | 'CREDIT'>('ALL')
-  const [showPrintVoucher, setShowPrintVoucher] = useState(false)
-  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false)
-  const [minAmount, setMinAmount] = useState('')
-  const [maxAmount, setMaxAmount] = useState('')
-  const [selectedCounterpartyFilter, setSelectedCounterpartyFilter] = useState('')
-  const [selectedModuleFilter, setSelectedModuleFilter] = useState('')
-  const [showMoMComparison, setShowMoMComparison] = useState(false)
+  const [ledgerSearchText, setLedgerSearchText] = useState(initialQuery || '')
+  const [ledgerTypeFilter, setLedgerTypeFilter] = useState<'ALL' | 'DEBIT' | 'CREDIT'>(initialFlow || 'ALL')
+  const [showPrintVoucher, setShowPrintVoucher] = useState(Boolean(initialPrint))
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(Boolean(initialMinAmount || initialMaxAmount || initialCounterparty || initialModule))
+  const [minAmount, setMinAmount] = useState(initialMinAmount ? String(initialMinAmount) : '')
+  const [maxAmount, setMaxAmount] = useState(initialMaxAmount ? String(initialMaxAmount) : '')
+  const [selectedCounterpartyFilter, setSelectedCounterpartyFilter] = useState(initialCounterparty || '')
+  const [selectedModuleFilter, setSelectedModuleFilter] = useState(initialModule || '')
+  const [showMoMComparison, setShowMoMComparison] = useState(Boolean(initialCompare))
   const [loadedCountByStatus, setLoadedCountByStatus] = useState<Record<JournalStatusFilter, number>>(initialLoadedCounts)
   const [hasMoreByStatus, setHasMoreByStatus] = useState<Record<JournalStatusFilter, boolean>>(() => ({
     POSTED: initialLoadedCounts.POSTED >= JOURNAL_PAGE_SIZE,
@@ -139,15 +181,81 @@ export default function JournalClient({
     DRAFT: initialLoadedCounts.DRAFT >= JOURNAL_PAGE_SIZE,
   }))
 
-  React.useEffect(() => {
-    if (initialMatchedAccount?.id) {
-      loadAccountLedgerPage(initialMatchedAccount.id, {
-        reset: true,
-        newStart: initialStartDate || undefined,
-        newEnd: initialEndDate || undefined,
-      })
+  // URL State Synchronizer & Reset on Sidebar Navigation
+  useEffect(() => {
+    const currentAccountCode = searchParams.get('accountCode')
+    const currentAccountId = searchParams.get('accountId')
+    const currentEntry = searchParams.get('entry') || searchParams.get('voucher')
+    const currentPrint = searchParams.get('print') === 'true' || searchParams.get('print') === '1'
+    const currentStatus = searchParams.get('status')
+    const currentStart = searchParams.get('startDate')
+    const currentEnd = searchParams.get('endDate')
+    const currentFlow = searchParams.get('flow')
+    const currentMin = searchParams.get('min')
+    const currentMax = searchParams.get('max')
+    const currentCounterparty = searchParams.get('counterparty')
+    const currentModule = searchParams.get('module')
+    const currentQ = searchParams.get('q') || searchParams.get('search')
+    const currentCompare = searchParams.get('compare') === 'true' || searchParams.get('compare') === '1'
+
+    // Reset when navigating from Sidebar (no account parameters in URL)
+    if (!currentAccountCode && !currentAccountId) {
+      setSelectedAccountId('')
+      setAccountSearch('')
+      setAccountLedger(EMPTY_ACCOUNT_LEDGER)
+      setSelectedVoucherEntry(null)
+      setShowPrintVoucher(false)
+      setShowAdvancedFilter(false)
+      setMinAmount('')
+      setMaxAmount('')
+      setSelectedCounterpartyFilter('')
+      setSelectedModuleFilter('')
+      setLedgerTypeFilter('ALL')
+      setLedgerSearchText('')
+      setShowMoMComparison(false)
+    } else {
+      const matched = accounts.find((a: any) =>
+        (currentAccountId && String(a.id) === String(currentAccountId)) ||
+        (currentAccountCode && String(a.code) === String(currentAccountCode))
+      )
+      const targetId = matched?.id || currentAccountId || currentAccountCode
+      if (targetId) {
+        setSelectedAccountId(targetId)
+        setAccountSearch(matched ? `${matched.code} - ${matched.name}` : (currentAccountCode || ''))
+        loadAccountLedgerPage(targetId, {
+          reset: true,
+          newStart: currentStart || undefined,
+          newEnd: currentEnd || undefined,
+        })
+      }
     }
-  }, [initialMatchedAccount?.id])
+
+    if (currentStart !== null && currentStart !== undefined) setStartDate(currentStart)
+    if (currentEnd !== null && currentEnd !== undefined) setEndDate(currentEnd)
+    if (currentStatus && ['POSTED', 'VOIDED', 'DRAFT'].includes(currentStatus.toUpperCase())) {
+      setFilterStatus(currentStatus.toUpperCase() as JournalStatusFilter)
+    }
+    if (currentFlow && ['ALL', 'DEBIT', 'CREDIT'].includes(currentFlow.toUpperCase())) {
+      setLedgerTypeFilter(currentFlow.toUpperCase() as any)
+    }
+    if (currentMin !== null && currentMin !== undefined) setMinAmount(currentMin)
+    if (currentMax !== null && currentMax !== undefined) setMaxAmount(currentMax)
+    if (currentCounterparty !== null && currentCounterparty !== undefined) setSelectedCounterpartyFilter(currentCounterparty)
+    if (currentModule !== null && currentModule !== undefined) setSelectedModuleFilter(currentModule)
+    if (currentQ !== null && currentQ !== undefined) {
+      setSearchText(currentQ)
+      setLedgerSearchText(currentQ)
+    }
+    if (currentCompare) setShowMoMComparison(true)
+
+    // Auto open voucher modal if entry/voucher param exists
+    if (currentEntry) {
+      handleOpenVoucherModal({ entry_number: currentEntry })
+      if (currentPrint) {
+        setShowPrintVoucher(true)
+      }
+    }
+  }, [searchParams])
   
   const isOwner = userRole === 'owner' || userRole === 'admin'
 
@@ -236,6 +344,7 @@ export default function JournalClient({
     setEndDate(newEnd)
     setEntries([])
     setLoadedCountByStatus({ POSTED: 0, VOIDED: 0, DRAFT: 0 })
+    syncUrlParams({ startDate: newStart || null, endDate: newEnd || null })
     
     if (isAccountLedgerMode && selectedAccountId) {
       await loadAccountLedgerPage(selectedAccountId, { reset: true, newStart, newEnd })
@@ -252,6 +361,21 @@ export default function JournalClient({
     setSearchHasMore(false)
     resetAccountLedger()
     setSelectedEntryIds([])
+    syncUrlParams({
+      status,
+      accountCode: null,
+      accountId: null,
+      flow: null,
+      min: null,
+      max: null,
+      counterparty: null,
+      module: null,
+      q: null,
+      entry: null,
+      voucher: null,
+      print: null,
+      compare: null,
+    })
   }
 
   function resetAccountLedger() {
@@ -268,10 +392,25 @@ export default function JournalClient({
     setShowMoMComparison(false)
     setSelectedVoucherEntry(null)
     setShowPrintVoucher(false)
+    syncUrlParams({
+      accountCode: null,
+      accountId: null,
+      flow: null,
+      min: null,
+      max: null,
+      counterparty: null,
+      module: null,
+      q: null,
+      entry: null,
+      voucher: null,
+      print: null,
+      compare: null,
+    })
   }
 
   const handleOpenVoucherModal = async (row: any) => {
     setIsLoadingVoucher(true)
+    syncUrlParams({ entry: row.entry_number || null })
     const existing = entries.find((e) => e.id === row.entry_id || e.entry_number === row.entry_number)
     if (existing && Array.isArray(existing.journal_lines) && existing.journal_lines.length > 0) {
       setSelectedVoucherEntry(existing)
@@ -1905,7 +2044,11 @@ export default function JournalClient({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSelectedVoucherEntry(null)}
+                    onClick={() => {
+                      setSelectedVoucherEntry(null)
+                      setShowPrintVoucher(false)
+                      syncUrlParams({ entry: null, voucher: null, print: null })
+                    }}
                     className="p-2 rounded-xl hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                   >
                     <X size={18} />
@@ -2048,7 +2191,11 @@ export default function JournalClient({
               <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
                 <button
                   type="button"
-                  onClick={() => setSelectedVoucherEntry(null)}
+                  onClick={() => {
+                    setSelectedVoucherEntry(null)
+                    setShowPrintVoucher(false)
+                    syncUrlParams({ entry: null, voucher: null, print: null })
+                  }}
                   className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
                 >
                   Tutup Rincian
@@ -2064,7 +2211,10 @@ export default function JournalClient({
         <JournalVoucherPrint
           entry={selectedVoucherEntry}
           branchName={activeBranchName}
-          onClose={() => setShowPrintVoucher(false)}
+          onClose={() => {
+            setShowPrintVoucher(false)
+            syncUrlParams({ print: null })
+          }}
         />
       )}
 

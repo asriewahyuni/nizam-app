@@ -40,10 +40,21 @@ export default async function JournalPage({
   searchParams?: Promise<{
     status?: string | string[]
     entry?: string | string[]
+    voucher?: string | string[]
     accountId?: string | string[]
     accountCode?: string | string[]
     startDate?: string | string[]
     endDate?: string | string[]
+    flow?: string | string[]
+    min?: string | string[]
+    max?: string | string[]
+    counterparty?: string | string[]
+    module?: string | string[]
+    q?: string | string[]
+    search?: string | string[]
+    sort?: string | string[]
+    print?: string | string[]
+    compare?: string | string[]
   }>
 }) {
   const orgData = await getActiveOrg()
@@ -53,7 +64,9 @@ export default async function JournalPage({
   const requestedStatus = normalizeStatusFilter(resolvedSearchParams.status)
   const requestedEntry = Array.isArray(resolvedSearchParams.entry)
     ? resolvedSearchParams.entry[0]
-    : resolvedSearchParams.entry
+    : Array.isArray(resolvedSearchParams.voucher)
+      ? resolvedSearchParams.voucher[0]
+      : resolvedSearchParams.entry || resolvedSearchParams.voucher
   const requestedAccountId = Array.isArray(resolvedSearchParams.accountId)
     ? resolvedSearchParams.accountId[0]
     : resolvedSearchParams.accountId
@@ -66,6 +79,35 @@ export default async function JournalPage({
   const requestedEndDate = Array.isArray(resolvedSearchParams.endDate)
     ? resolvedSearchParams.endDate[0]
     : resolvedSearchParams.endDate
+  const requestedFlow = Array.isArray(resolvedSearchParams.flow)
+    ? resolvedSearchParams.flow[0]
+    : resolvedSearchParams.flow
+  const requestedMin = Array.isArray(resolvedSearchParams.min)
+    ? resolvedSearchParams.min[0]
+    : resolvedSearchParams.min
+  const requestedMax = Array.isArray(resolvedSearchParams.max)
+    ? resolvedSearchParams.max[0]
+    : resolvedSearchParams.max
+  const requestedCounterparty = Array.isArray(resolvedSearchParams.counterparty)
+    ? resolvedSearchParams.counterparty[0]
+    : resolvedSearchParams.counterparty
+  const requestedModule = Array.isArray(resolvedSearchParams.module)
+    ? resolvedSearchParams.module[0]
+    : resolvedSearchParams.module
+  const requestedQuery = Array.isArray(resolvedSearchParams.q)
+    ? resolvedSearchParams.q[0]
+    : Array.isArray(resolvedSearchParams.search)
+      ? resolvedSearchParams.search[0]
+      : resolvedSearchParams.q || resolvedSearchParams.search
+  const requestedSort = Array.isArray(resolvedSearchParams.sort)
+    ? resolvedSearchParams.sort[0]
+    : resolvedSearchParams.sort
+  const requestedPrint = Array.isArray(resolvedSearchParams.print)
+    ? resolvedSearchParams.print[0] === 'true' || resolvedSearchParams.print[0] === '1'
+    : resolvedSearchParams.print === 'true' || resolvedSearchParams.print === '1'
+  const requestedCompare = Array.isArray(resolvedSearchParams.compare)
+    ? resolvedSearchParams.compare[0] === 'true' || resolvedSearchParams.compare[0] === '1'
+    : resolvedSearchParams.compare === 'true' || resolvedSearchParams.compare === '1'
 
   // Fetch master data first (lightweight)
   const [accounts, fiscalPeriods] = await Promise.all([
@@ -106,6 +148,16 @@ export default async function JournalPage({
       initialAccountCode={requestedAccountCode}
       initialStartDate={requestedStartDate}
       initialEndDate={requestedEndDate}
+      initialEntryNumber={requestedEntry}
+      initialFlow={requestedFlow as any}
+      initialMinAmount={requestedMin}
+      initialMaxAmount={requestedMax}
+      initialCounterparty={requestedCounterparty}
+      initialModule={requestedModule}
+      initialQuery={requestedQuery}
+      initialSortOrder={requestedSort === 'asc' ? 'asc' : 'desc'}
+      initialPrint={requestedPrint}
+      initialCompare={requestedCompare}
     />
   )
 }
