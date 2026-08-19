@@ -325,12 +325,15 @@ export async function getPendaftaranResumeData(orgId: string, pendaftaranId: str
      WHERE pendaftaran_id = $1 ORDER BY created_at DESC LIMIT 1`,
     [pendaftaranId]
   )
-  const testTerakhir = testRows[0] as { status: 'LULUS' | 'GAGAL'; skor: number; jumlah_benar: number; passing_threshold: number } | undefined
+  const testTerakhir = testRows[0] as { status: 'BERLANGSUNG' | 'LULUS' | 'GAGAL'; skor: number; jumlah_benar: number; passing_threshold: number } | undefined
 
   const dokumen = await getDokumenByRef('PENDAFTARAN', pendaftaranId)
 
+  // Jika ada tes yang masih BERLANGSUNG (user refresh di tengah tes),
+  // selalu arahkan ke step tes supaya bisa dilanjutkan.
   let step: PendaftaranResumeStep = 'tes'
-  if (pendaftaran.komitmen_disetujui_at) step = 'bayar'
+  if (testTerakhir?.status === 'BERLANGSUNG') step = 'tes'
+  else if (pendaftaran.komitmen_disetujui_at) step = 'bayar'
   else if (pendaftaran.layanan_diinginkan != null) step = 'komitmen'
   else if (testTerakhir?.status === 'LULUS') step = 'layanan'
 

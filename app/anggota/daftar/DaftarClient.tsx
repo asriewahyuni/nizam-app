@@ -17,7 +17,8 @@ import {
   type KojasmatDokumen,
 } from '@/modules/kojasmat/actions/kojasmat-membership.actions'
 import {
-  mulaiTestMasuk, submitTestMasuk, forceLulusTestMasuk, getInfoPembayaran, submitPembayaranPendaftaran,
+  mulaiTestMasuk, submitTestMasuk, forceLulusTestMasuk, simpanProgressTestMasuk,
+  getInfoPembayaran, submitPembayaranPendaftaran,
   getKomitmenSections, type KomitmenSection,
 } from '@/modules/kojasmat/actions/kojasmat-test.actions'
 import { normalizeWhatsappPhone } from '@/modules/sales/lib/pos-whatsapp'
@@ -423,6 +424,25 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
       if (res.error) { setError(res.error); return }
       setTestMasukId(res.data!.test_masuk_id)
       setSoal(res.data!.soal)
+      // Restore jawaban & posisi soal dari sesi yang di-resume (autosave)
+      const savedJawaban = res.data!.jawaban
+      if (savedJawaban && Object.keys(savedJawaban).length > 0) {
+        setJawaban(savedJawaban)
+        // Posisikan ke soal pertama yang belum dijawab
+        const firstUnanswered = res.data!.soal.findIndex(s => !savedJawaban[s.id])
+        setQIndex(firstUnanswered >= 0 ? firstUnanswered : res.data!.soal.length - 1)
+      }
+    })
+  }
+
+  // Fire-and-forget autosave jawaban ke server — kegagalan tidak memblokir UX
+  function handleJawab(soalId: string, pilihan: string) {
+    setJawaban(prev => {
+      const next = { ...prev, [soalId]: pilihan }
+      if (testMasukId) {
+        simpanProgressTestMasuk(testMasukId, next).catch(() => {})
+      }
+      return next
     })
   }
 
@@ -470,7 +490,12 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
     startTransition(async () => {
       const res = await getPendaftaranResumeData(orgId, id)
       setResumeLoading(false)
-      if (res.error || !res.data) { setError(res.error ?? 'Pendaftaran tidak ditemukan.'); return }
+      if (res.error || !res.data) {
+        // Pendaftaran sudah selesai/tidak ditemukan — bersihkan localStorage
+        try { localStorage.removeItem(`kojasmat_pendaftaran_${orgId}`) } catch {}
+        setError(res.error ?? 'Pendaftaran tidak ditemukan.')
+        return
+      }
       const { pendaftaran, dokumen, step: resumeStep } = res.data
       setForm(f => ({
         ...f,
@@ -501,6 +526,27 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
     if (resumeId) resumeFromPendaftaran(resumeId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeId])
+
+  // Auto-resume dari localStorage saat halaman dimuat ulang (refresh/reopen tab)
+  // — sehingga user yang sudah melewati Step 1 tidak perlu mengisi ulang data diri.
+  useEffect(() => {
+    if (resumeId || pendaftaranId) return
+    try {
+      const saved = localStorage.getItem(`kojasmat_pendaftaran_${orgId}`)
+      if (saved && /^[0-9a-f-]{36}$/i.test(saved)) {
+        resumeFromPendaftaran(saved)
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Peringatan browser saat user akan menutup/refresh tab di tengah tes
+  useEffect(() => {
+    if (step !== 'tes' || testResult) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [step, testResult])
 
   function muatKomitmenSections() {
     startTransition(async () => {
@@ -589,6 +635,8 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
       if (res.error) { setError(res.error); return }
       setAktivasiResult(res.data as typeof aktivasiResult)
       setStep('selesai')
+      // Pendaftaran selesai — bersihkan localStorage agar tidak auto-resume lagi
+      try { localStorage.removeItem(`kojasmat_pendaftaran_${orgId}`) } catch {}
     })
   }
 
@@ -640,6 +688,8 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
       })
       if (res.error) { setError(res.error); return }
       setPendaftaranId(res.data!.id)
+      // Simpan ke localStorage agar refresh/reopen tab langsung resume, bukan ulang Step 1
+      try { localStorage.setItem(`kojasmat_pendaftaran_${orgId}`, res.data!.id) } catch {}
       setStep('dokumen')
     })
   }
@@ -1097,7 +1147,7 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
                         <label key={opt} className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 transition-colors">
                           <input type="radio" name={`soal-${s.id}`} className="h-4 w-4 cursor-pointer accent-emerald-600"
                             checked={jawaban[s.id] === opt.toUpperCase()}
-                            onChange={() => setJawaban(j => ({ ...j, [s.id]: opt.toUpperCase() }))} />
+                            onChange={() => handleJawab(s.id, opt.toUpperCase())} />
                           {s[`pilihan_${opt}` as 'pilihan_a']}
                         </label>
                       ))}

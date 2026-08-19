@@ -262,6 +262,34 @@ export async function mulaiTestMasuk(orgId: string, pendaftaranId: string) {
       return { error: 'Pendaftaran sudah diproses, test tidak dapat dimulai lagi' }
     }
 
+    // ── Resume sesi BERLANGSUNG yang sudah ada (pola Test Sahabat) ──
+    // Kalau user refresh browser di tengah tes, sesi yang sama dikembalikan
+    // beserta jawaban yang sudah di-autosave, bukan membuat sesi baru.
+    const { rows: [existing] } = await queryPostgres(
+      `SELECT id, soal_ids, jawaban, attempt_number FROM kojasmat_test_masuk
+       WHERE pendaftaran_id = $1 AND status = 'BERLANGSUNG'
+       ORDER BY created_at DESC LIMIT 1`,
+      [pendaftaranId]
+    )
+    if (existing) {
+      const { rows: soalRowsExisting } = await queryPostgres(
+        `SELECT s.id, s.pertanyaan, s.pilihan_a, s.pilihan_b, s.pilihan_c, s.pilihan_d
+         FROM unnest($1::uuid[]) WITH ORDINALITY AS o(soal_id, ord)
+         JOIN kojasmat_bank_soal s ON s.id = o.soal_id
+         ORDER BY o.ord`,
+        [existing.soal_ids]
+      )
+      return {
+        data: {
+          test_masuk_id: existing.id as string,
+          attempt_number: existing.attempt_number as number,
+          soal: soalRowsExisting as { id: string; pertanyaan: string; pilihan_a: string; pilihan_b: string; pilihan_c: string; pilihan_d: string }[],
+          jawaban: (existing.jawaban && typeof existing.jawaban === 'object' && Object.keys(existing.jawaban).length > 0
+            ? existing.jawaban : null) as Record<string, string> | null,
+        }
+      }
+    }
+
     const { rows: countRows } = await queryPostgres(
       `SELECT COUNT(*)::int AS n FROM kojasmat_bank_soal WHERE org_id=$1 AND is_active=TRUE AND jenis='MASUK'`,
       [orgId]
@@ -299,6 +327,7 @@ export async function mulaiTestMasuk(orgId: string, pendaftaranId: string) {
         test_masuk_id: testMasuk.id as string,
         attempt_number: testMasuk.attempt_number as number,
         soal: soalRows as { id: string; pertanyaan: string; pilihan_a: string; pilihan_b: string; pilihan_c: string; pilihan_d: string }[],
+        jawaban: null,
       }
     }
   } catch (err) {
@@ -358,6 +387,27 @@ export async function submitTestMasuk(testMasukId: string, jawaban: Record<strin
     }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Gagal submit test' }
+  }
+}
+
+// Autosave jawaban per-soal supaya progres tidak hilang kalau tab ditutup/refresh
+// sebelum sempat submit — calon anggota melanjutkan dari soal terakhir yang dijawab,
+// bukan mengulang dari soal 1. Tidak butuh auth — bagian wizard publik pendaftaran.
+export async function simpanProgressTestMasuk(
+  testMasukId: string,
+  jawaban: Record<string, string>
+): Promise<{ success: true } | { error: string }> {
+  try {
+    const { rows: [updated] } = await queryPostgres(
+      `UPDATE kojasmat_test_masuk SET jawaban = $2
+       WHERE id = $1 AND status = 'BERLANGSUNG'
+       RETURNING id`,
+      [testMasukId, JSON.stringify(jawaban)]
+    )
+    if (!updated) return { error: 'Sesi test tidak aktif.' }
+    return { success: true }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Gagal menyimpan progres' }
   }
 }
 
