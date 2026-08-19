@@ -209,43 +209,21 @@ async function getPostedEntryIds(
 
   if (options.asOfDate) {
     params.push(options.asOfDate)
-    const p = params.length
-    conditions.push(`(
-      (je.period_id IS NULL AND je.entry_date <= $${p}::date)
-      OR (
-        je.period_id IS NOT NULL AND fp.start_date <= $${p}::date
-        AND (fp.end_date <= $${p}::date OR je.entry_date <= $${p}::date)
-      )
-    )`)
+    conditions.push(`je.entry_date <= $${params.length}::date`)
   } else if (options.startDate || options.endDate) {
-    const startParam = options.startDate ? (params.push(options.startDate), params.length) : null
-    const endParam = options.endDate ? (params.push(options.endDate), params.length) : null
-    const entryDateInRange = [
-      startParam ? `je.entry_date >= $${startParam}::date` : null,
-      endParam ? `je.entry_date <= $${endParam}::date` : null,
-    ].filter(Boolean).join(' AND ')
-    const periodOverlapsRange = [
-      startParam ? `fp.end_date >= $${startParam}::date` : null,
-      endParam ? `fp.start_date <= $${endParam}::date` : null,
-    ].filter(Boolean).join(' AND ')
-    const periodFullyContained = [
-      startParam ? `fp.start_date >= $${startParam}::date` : null,
-      endParam ? `fp.end_date <= $${endParam}::date` : null,
-    ].filter(Boolean).join(' AND ')
-
-    conditions.push(`(
-      (je.period_id IS NULL AND ${entryDateInRange})
-      OR (
-        je.period_id IS NOT NULL AND ${periodOverlapsRange}
-        AND ((${periodFullyContained}) OR (${entryDateInRange}))
-      )
-    )`)
+    if (options.startDate) {
+      params.push(options.startDate)
+      conditions.push(`je.entry_date >= $${params.length}::date`)
+    }
+    if (options.endDate) {
+      params.push(options.endDate)
+      conditions.push(`je.entry_date <= $${params.length}::date`)
+    }
   }
 
   const sql = `
     SELECT je.id
     FROM public.journal_entries je
-    LEFT JOIN public.fiscal_periods fp ON fp.id = je.period_id
     WHERE ${conditions.join(' AND ')}
   `
 

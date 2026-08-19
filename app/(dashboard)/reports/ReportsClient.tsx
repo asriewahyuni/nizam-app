@@ -1022,29 +1022,62 @@ export default function ReportsClient({
                   </div>
                 </div>
 
-                {/* KPI Summary Cards */}
-                {ledgerData && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-100 bg-slate-50/40 divide-x divide-y sm:divide-y-0 divide-slate-100 text-xs">
-                    <div className="p-4 space-y-1">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Saldo Awal</span>
-                      <p className="font-bold text-slate-800 tabular-nums">{formatRupiah(ledgerData.summary.openingBalance)}</p>
+                {/* KPI Summary & Net Movement Badge */}
+                {ledgerData && (() => {
+                  const normalBalance = ledgerData.account?.normal_balance || (
+                    ['REVENUE', 'LIABILITY', 'EQUITY'].includes(selectedLedgerAccount.type || '') ||
+                    ['2', '3', '4', '7', '8'].includes(selectedLedgerAccount.code[0])
+                      ? 'CREDIT'
+                      : 'DEBIT'
+                  )
+                  const netMovement = normalBalance === 'CREDIT'
+                    ? ledgerData.summary.totalCredit - ledgerData.summary.totalDebit
+                    : ledgerData.summary.totalDebit - ledgerData.summary.totalCredit
+
+                  return (
+                    <div className="border-b border-slate-200/80 bg-slate-50/60">
+                      {/* Primary Net Mutation Highlight Banner Badge */}
+                      <div className="px-6 py-3.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50/50 border-b border-blue-100/70 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                              Mutasi Bersih Periode Ini
+                            </span>
+                            <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-full w-fit">
+                              {activeTab === 'BS' ? `Posisi s/d ${formatDate(endDate)}` : `Laba Rugi (${formatDate(startDate, 'short')} — ${formatDate(endDate, 'short')})`}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`text-base font-extrabold tabular-nums ${netMovement >= 0 ? 'text-blue-700' : 'text-rose-600'}`}>
+                          {formatRupiah(netMovement)}
+                        </span>
+                      </div>
+
+                      {/* Breakdown KPI Cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-slate-200/70 text-xs">
+                        <div className="p-4 space-y-1">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Saldo Awal</span>
+                          <p className="font-bold text-slate-800 tabular-nums">{formatRupiah(ledgerData.summary.openingBalance)}</p>
+                        </div>
+                        <div className="p-4 space-y-1">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Debit</span>
+                          <p className="font-bold text-emerald-600 tabular-nums">+{formatRupiah(ledgerData.summary.totalDebit)}</p>
+                        </div>
+                        <div className="p-4 space-y-1">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Kredit</span>
+                          <p className="font-bold text-rose-600 tabular-nums">-{formatRupiah(ledgerData.summary.totalCredit)}</p>
+                        </div>
+                        <div className="p-4 space-y-1">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Saldo Akhir</span>
+                          <p className={`font-extrabold tabular-nums ${ledgerData.summary.endingBalance >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
+                            {formatRupiah(ledgerData.summary.endingBalance)}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="p-4 space-y-1">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Debit</span>
-                      <p className="font-bold text-emerald-600 tabular-nums">{formatRupiah(ledgerData.summary.totalDebit)}</p>
-                    </div>
-                    <div className="p-4 space-y-1">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Kredit</span>
-                      <p className="font-bold text-rose-600 tabular-nums">{formatRupiah(ledgerData.summary.totalCredit)}</p>
-                    </div>
-                    <div className="p-4 space-y-1">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Saldo Akhir</span>
-                      <p className={`font-extrabold tabular-nums ${ledgerData.summary.endingBalance >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
-                        {formatRupiah(ledgerData.summary.endingBalance)}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                  )
+                })()}
 
                 {/* Search Input Filter */}
                 <div className="p-4 border-b border-slate-100 bg-white">
