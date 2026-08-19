@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import {
   Landmark, CheckCircle2, AlertCircle, Stethoscope, Search, UserPlus, Plus,
   Users, PhoneCall, Ban, ChevronRight, X, UserCog, CalendarCheck, LogIn,
-  Pill, PackagePlus, Send, Boxes, MonitorPlay, ExternalLink, Copy, Check,
+  Pill, PackagePlus, Send, Boxes, MonitorPlay, ExternalLink, Copy, Check, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { BranchSummary } from '@/modules/organization/lib/org-context'
@@ -296,7 +296,7 @@ function TabPendaftaran({
               <button
                 type="button"
                 onClick={() => setShowNewPoliForm((v) => !v)}
-                className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:text-cyan-800"
+                className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:text-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
               >
                 <Plus className="size-3.5" aria-hidden="true" />
                 Poli Baru
@@ -338,7 +338,7 @@ function TabPendaftaran({
                   type="button"
                   onClick={handleCreatePoli}
                   disabled={pending}
-                  className="cursor-pointer rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="cursor-pointer rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                 >
                   Simpan Poli
                 </button>
@@ -369,7 +369,7 @@ function TabPendaftaran({
                 <button
                   type="button"
                   onClick={() => setSelectedPasien(null)}
-                  className="cursor-pointer text-xs font-semibold text-cyan-700 underline transition-colors duration-150 hover:text-cyan-900"
+                  className="cursor-pointer text-xs font-semibold text-cyan-700 underline transition-colors duration-150 hover:text-cyan-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                 >
                   Ganti
                 </button>
@@ -383,7 +383,7 @@ function TabPendaftaran({
                         key={p.id}
                         type="button"
                         onClick={() => { setSelectedPasien(p); setSearchResults([]); setSearchQuery('') }}
-                        className="flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-slate-50"
+                        className="flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                       >
                         <span className="font-medium text-slate-900">{p.nama}</span>
                         <span className="text-xs text-slate-500">{p.no_rm}</span>
@@ -395,7 +395,7 @@ function TabPendaftaran({
                 <button
                   type="button"
                   onClick={() => setShowNewPasienForm((v) => !v)}
-                  className="mt-3 flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:text-cyan-800"
+                  className="mt-3 flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:text-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                 >
                   <UserPlus className="size-3.5" aria-hidden="true" />
                   {showNewPasienForm ? 'Batal daftar pasien baru' : 'Pasien belum terdaftar? Daftarkan baru'}
@@ -521,7 +521,7 @@ function TabPendaftaran({
                       type="button"
                       onClick={() => handleCheckIn(b.id)}
                       disabled={pending}
-                      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                     >
                       <LogIn className="size-3.5" aria-hidden="true" />
                       Check-in
@@ -548,7 +548,7 @@ function TabPendaftaran({
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Buka layar antrian (tab baru)"
-                  className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-cyan-700"
+                  className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-cyan-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                 >
                   <ExternalLink className="size-4" aria-hidden="true" />
                 </a>
@@ -556,7 +556,7 @@ function TabPendaftaran({
                   type="button"
                   onClick={handleCopyAntrianLink}
                   title="Salin link layar antrian"
-                  className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-cyan-700"
+                  className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-cyan-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                 >
                   {antrianLinkCopied
                     ? <Check className="size-4 text-emerald-600" aria-hidden="true" />
@@ -629,7 +629,7 @@ function TabPendaftaran({
                                       onClick={() => handleStatusChange(row.id, 'DIPERIKSA')}
                                       disabled={pending}
                                       title="Panggil pasien"
-                                      className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-cyan-50 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                      className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-cyan-50 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                                     >
                                       <PhoneCall className="size-3.5" aria-hidden="true" />
                                       Panggil
@@ -639,7 +639,7 @@ function TabPendaftaran({
                                       onClick={() => handleStatusChange(row.id, 'BATAL')}
                                       disabled={pending}
                                       title="Batalkan"
-                                      className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-rose-600 transition-colors duration-150 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                      className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-rose-600 transition-colors duration-150 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
                                     >
                                       <Ban className="size-4" aria-hidden="true" />
                                     </button>
@@ -687,7 +687,7 @@ function TabPendaftaran({
                   type="button"
                   onClick={() => setModalKunjunganId(null)}
                   title="Tutup"
-                  className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-600"
+                  className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                 >
                   <X className="size-4" aria-hidden="true" />
                 </button>
@@ -828,7 +828,7 @@ function TabPengaturanAkun({ orgId, branchId, accountMapping, accounts, unposted
             type="button"
             onClick={handleRetryPosting}
             disabled={pending || !branchId}
-            className="shrink-0 cursor-pointer rounded-lg bg-amber-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="shrink-0 cursor-pointer rounded-lg bg-amber-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
           >
             Posting Jurnal Tertunda
           </button>
@@ -983,7 +983,7 @@ function TabTenagaMedis({
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
-            className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:text-cyan-800"
+            className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:text-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
           >
             <Plus className="size-3.5" aria-hidden="true" />
             Tautkan Karyawan
@@ -1051,7 +1051,7 @@ function TabTenagaMedis({
               type="button"
               onClick={handleCreate}
               disabled={pending}
-              className="cursor-pointer rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
             >
               Simpan
             </button>
@@ -1206,7 +1206,12 @@ function TabApotek({
   }
 
   if (loading) {
-    return <p className="py-8 text-center text-sm text-slate-400">Memuat data apotek...</p>
+    return (
+      <p className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400">
+        <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        Memuat data apotek...
+      </p>
+    )
   }
 
   return (
@@ -1250,7 +1255,7 @@ function TabApotek({
                         type="button"
                         onClick={() => handleDispense(resep.id)}
                         disabled={pending}
-                        className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                       >
                         <Send className="size-3.5" aria-hidden="true" />
                         Serahkan Obat
@@ -1287,7 +1292,7 @@ function TabApotek({
                   </thead>
                   <tbody>
                     {stock.map((s, i) => (
-                      <tr key={`${s.product_id}-${s.batch_number}-${i}`} className="border-b border-slate-50">
+                      <tr key={`${s.product_id}-${s.batch_number}-${i}`} className="border-b border-slate-50 transition-colors duration-150 hover:bg-slate-50/60">
                         <td className="py-1.5 text-slate-800">{s.product_name}</td>
                         <td className="py-1.5 text-slate-500">{s.batch_number || '—'}</td>
                         <td className={cn('py-1.5', s.expiry_date && new Date(s.expiry_date) < new Date() ? 'font-semibold text-rose-600' : 'text-slate-500')}>
@@ -1343,7 +1348,7 @@ function TabApotek({
                       key={obat.id}
                       type="button"
                       onClick={() => { setSelectedObat(obat); setObatResults([]) }}
-                      className="flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors duration-150 hover:bg-slate-50"
+                      className="flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors duration-150 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                     >
                       <span>{obat.name}</span>
                       <span className="text-xs text-slate-400">{obat.unit}</span>
@@ -1399,7 +1404,7 @@ function TabApotek({
               type="button"
               onClick={handleReceive}
               disabled={pending}
-              className="mt-4 w-full cursor-pointer rounded-xl bg-cyan-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-4 w-full cursor-pointer rounded-xl bg-cyan-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
             >
               {pending ? 'Memproses...' : 'Catat Penerimaan Obat'}
             </button>

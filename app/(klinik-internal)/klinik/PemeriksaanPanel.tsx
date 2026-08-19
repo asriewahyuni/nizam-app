@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { FileText, Pill, Plus, Trash2, CheckCircle2, AlertCircle, Send, Receipt, Undo2 } from 'lucide-react'
+import { FileText, Pill, Plus, Trash2, CheckCircle2, AlertCircle, Send, Receipt, Undo2, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   getRekamMedisByKunjungan, saveRekamMedisDraft, finalizeRekamMedis, logAksesRekamMedis,
@@ -257,7 +257,12 @@ export default function PemeriksaanPanel({
   }
 
   if (loading) {
-    return <p className="py-4 text-center text-sm text-slate-400">Memuat rekam medis...</p>
+    return (
+      <p className="flex items-center justify-center gap-2 py-4 text-sm text-slate-400">
+        <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        Memuat rekam medis...
+      </p>
+    )
   }
 
   if (accessDenied) {
@@ -378,7 +383,7 @@ export default function PemeriksaanPanel({
               type="button"
               onClick={handleSaveDraft}
               disabled={pending}
-              className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors duration-150 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors duration-150 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
             >
               Simpan Draft
             </button>
@@ -387,7 +392,7 @@ export default function PemeriksaanPanel({
               onClick={handleFinalize}
               disabled={pending || !rekamMedis}
               title={!rekamMedis ? 'Simpan draft terlebih dahulu' : undefined}
-              className="cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
             >
               Selesaikan Pemeriksaan
             </button>
@@ -425,7 +430,7 @@ export default function PemeriksaanPanel({
                       onClick={() => handleDispense(resep.id)}
                       disabled={pending || !canDispenseObat}
                       title={!canDispenseObat ? 'Tagihan belum lunas — buat & lunasi tagihan di Kasir dulu.' : undefined}
-                      className="flex cursor-pointer items-center gap-1 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex cursor-pointer items-center gap-1 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                     >
                       <Send className="size-3" aria-hidden="true" />
                       Serahkan Obat
@@ -477,7 +482,7 @@ export default function PemeriksaanPanel({
                       key={obat.id}
                       type="button"
                       onClick={() => addDraftItem(obat)}
-                      className="flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors duration-150 hover:bg-slate-50"
+                      className="flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors duration-150 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                     >
                       <span>{obat.name}</span>
                       <span className="text-xs text-slate-400">{obat.unit}</span>
@@ -510,7 +515,7 @@ export default function PemeriksaanPanel({
                       type="button"
                       onClick={() => removeDraftItem(index)}
                       title="Hapus"
-                      className="flex size-7 cursor-pointer items-center justify-center rounded-md text-rose-500 transition-colors duration-150 hover:bg-rose-50"
+                      className="flex size-7 cursor-pointer items-center justify-center rounded-md text-rose-500 transition-colors duration-150 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
                     >
                       <Trash2 className="size-3.5" aria-hidden="true" />
                     </button>
@@ -520,7 +525,7 @@ export default function PemeriksaanPanel({
                   type="button"
                   onClick={handleCreateResep}
                   disabled={pending}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                 >
                   <Plus className="size-3.5" aria-hidden="true" />
                   Simpan Resep
@@ -587,7 +592,7 @@ export default function PemeriksaanPanel({
                 type="button"
                 onClick={handleCreateTagihan}
                 disabled={pending}
-                className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
               >
                 <Receipt className="size-3.5" aria-hidden="true" />
                 Buat Tagihan
@@ -628,7 +633,7 @@ export default function PemeriksaanPanel({
                     type="button"
                     onClick={handleMarkLunas}
                     disabled={pending}
-                    className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                   >
                     <CheckCircle2 className="size-3.5" aria-hidden="true" />
                     Tandai Lunas
@@ -639,7 +644,7 @@ export default function PemeriksaanPanel({
                     type="button"
                     onClick={handleVoidTagihan}
                     disabled={pending}
-                    className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-700 transition-colors duration-150 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-700 transition-colors duration-150 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
                   >
                     <Undo2 className="size-3.5" aria-hidden="true" />
                     Batalkan Tagihan

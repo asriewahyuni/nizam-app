@@ -6,7 +6,7 @@
 // yang dibuka statis berjam-jam di satu layar.
 
 import { useEffect, useState } from 'react'
-import { Stethoscope, Clock } from 'lucide-react'
+import { Stethoscope, Clock, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getAntrianDisplayBoard, type KlinikAntrianDisplayPoli } from '@/modules/klinik/actions/klinik-kunjungan.actions'
 
@@ -146,7 +146,7 @@ export default function AntrianDisplayClient({
         </header>
 
         {!loaded ? (
-          <p className="py-24 text-center text-sm text-slate-400">Memuat data antrian...</p>
+          <p className="flex items-center justify-center gap-2 py-24 text-sm text-slate-400"><Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />Memuat data antrian...</p>
         ) : poliList.length === 0 ? (
           <p className="py-24 text-center text-sm text-slate-400">Belum ada poli aktif di cabang ini.</p>
         ) : (
@@ -176,7 +176,7 @@ export default function AntrianDisplayClient({
                     title={`Halaman ${i + 1}`}
                     aria-label={`Tampilkan halaman ${i + 1} dari ${pages.length}`}
                     aria-current={i === pageIndex}
-                    className="flex size-11 cursor-pointer items-center justify-center"
+                    className="flex size-11 cursor-pointer items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                   >
                     <span
                       className={cn(

@@ -155,7 +155,7 @@ export default function BookingClient({
             type="button"
             onClick={handleCariSlot}
             disabled={pending || !poliId}
-            className="w-full cursor-pointer rounded-xl bg-cyan-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full cursor-pointer rounded-xl bg-cyan-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
           >
             {pending && !slotsLoaded ? 'Mencari jadwal...' : 'Lihat Jadwal Tersedia'}
           </button>
@@ -224,7 +224,7 @@ export default function BookingClient({
               type="button"
               onClick={handleSubmit}
               disabled={pending}
-              className="w-full cursor-pointer rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full cursor-pointer rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
             >
               {pending ? 'Memproses...' : `Konfirmasi Booking ${formatTime(selectedSlot.startsAt)}`}
             </button>

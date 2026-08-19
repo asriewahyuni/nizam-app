@@ -9,7 +9,7 @@ import { useEffect, useState, useTransition } from 'react'
 import {
   CheckCircle2, AlertCircle, Plus, Pencil, Power, DoorOpen, BedDouble, UserPlus2,
   LogOut, Ban, Search, ArrowDownCircle, ArrowUpCircle, ChevronDown, ChevronUp,
-  Users, FileText,
+  Users, FileText, Loader2,
 } from 'lucide-react'
 import { cn, formatRupiah, formatDate } from '@/lib/utils'
 import type { BranchSummary } from '@/modules/organization/lib/org-context'
@@ -134,7 +134,7 @@ export function TabDaftarPoli({ orgId, branch }: { orgId: string; branch: Branch
           <button
             type="button"
             onClick={() => setShowNewForm((v) => !v)}
-            className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:text-cyan-800"
+            className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:text-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
           >
             <Plus className="size-3.5" aria-hidden="true" />
             Poli Baru
@@ -157,7 +157,7 @@ export function TabDaftarPoli({ orgId, branch }: { orgId: string; branch: Branch
             </div>
             <button
               type="button" onClick={handleCreate} disabled={pending}
-              className="cursor-pointer rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
             >
               Simpan Poli
             </button>
@@ -165,7 +165,7 @@ export function TabDaftarPoli({ orgId, branch }: { orgId: string; branch: Branch
         )}
 
         {loading ? (
-          <p className="py-8 text-center text-sm text-slate-400">Memuat poli...</p>
+          <p className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400"><Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />Memuat poli...</p>
         ) : poliList.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-400">Belum ada poli. Tambahkan poli pertama.</p>
         ) : (
@@ -180,7 +180,7 @@ export function TabDaftarPoli({ orgId, branch }: { orgId: string; branch: Branch
             </thead>
             <tbody>
               {poliList.map((poli) => (
-                <tr key={poli.id} className="border-b border-slate-50">
+                <tr key={poli.id} className="border-b border-slate-50 transition-colors duration-150 hover:bg-slate-50/60">
                   {editingId === poli.id ? (
                     <td colSpan={4} className="py-2">
                       <div className="flex flex-wrap items-center gap-2">
@@ -196,13 +196,13 @@ export function TabDaftarPoli({ orgId, branch }: { orgId: string; branch: Branch
                         />
                         <button
                           type="button" onClick={() => handleSaveEdit(poli.id)} disabled={pending}
-                          className="cursor-pointer rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700 disabled:opacity-50"
+                          className="cursor-pointer rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                         >
                           Simpan
                         </button>
                         <button
                           type="button" onClick={() => setEditingId(null)}
-                          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                         >
                           Batal
                         </button>
@@ -223,14 +223,14 @@ export function TabDaftarPoli({ orgId, branch }: { orgId: string; branch: Branch
                       <td className="py-2 text-right">
                         <button
                           type="button" onClick={() => handleStartEdit(poli)}
-                          className="mr-1 inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-cyan-600 hover:bg-cyan-50"
+                          className="mr-1 inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-cyan-600 hover:bg-cyan-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                           title="Edit poli"
                         >
                           <Pencil className="size-3.5" aria-hidden="true" />
                         </button>
                         <button
                           type="button" onClick={() => handleToggleActive(poli)} disabled={pending}
-                          className="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+                          className="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                           title={poli.is_active ? 'Nonaktifkan' : 'Aktifkan'}
                         >
                           <Power className="size-3.5" aria-hidden="true" />
@@ -402,7 +402,7 @@ export function TabRawatInap({
           <button
             type="button"
             onClick={() => setShowNewKamarForm((v) => !v)}
-            className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:text-cyan-800"
+            className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:text-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
           >
             <Plus className="size-3.5" aria-hidden="true" />
             Kamar Baru
@@ -445,7 +445,7 @@ export function TabRawatInap({
             </div>
             <button
               type="button" onClick={handleCreateKamar} disabled={pending}
-              className="cursor-pointer rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
             >
               Simpan Kamar
             </button>
@@ -453,7 +453,7 @@ export function TabRawatInap({
         )}
 
         {loading ? (
-          <p className="py-8 text-center text-sm text-slate-400">Memuat kamar...</p>
+          <p className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400"><Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />Memuat kamar...</p>
         ) : kamarList.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-400">Belum ada kamar. Tambahkan kamar pertama.</p>
         ) : (
@@ -474,7 +474,7 @@ export function TabRawatInap({
                     type="button" disabled={pending}
                     onClick={() => startTransition(async () => { await setKlinikKamarActive(orgId, kamar.id, !kamar.is_active); await loadData() })}
                     className={cn(
-                      'shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold cursor-pointer',
+                      'shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500',
                       kamar.is_active ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-500'
                     )}
                   >
@@ -505,14 +505,14 @@ export function TabRawatInap({
                           <div className="flex items-center gap-2">
                             <button
                               type="button" onClick={() => { setAdmitBedId(bed.id); setAdmitPoliId(poliList[0]?.id ?? '') }}
-                              className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-cyan-700 hover:text-cyan-800"
+                              className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-cyan-700 hover:text-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                             >
                               <UserPlus2 className="size-3.5" aria-hidden="true" />
                               Rawat Pasien
                             </button>
                             <button
                               type="button" onClick={() => handleToggleMaintenance(bed)} disabled={pending}
-                              className="text-xs font-semibold text-slate-500 hover:text-slate-700 disabled:opacity-50"
+                              className="cursor-pointer text-xs font-semibold text-slate-500 transition-colors duration-150 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                             >
                               Perbaikan
                             </button>
@@ -521,7 +521,7 @@ export function TabRawatInap({
                         {bed.status === 'MAINTENANCE' && (
                           <button
                             type="button" onClick={() => handleToggleMaintenance(bed)} disabled={pending}
-                            className="cursor-pointer text-xs font-semibold text-emerald-700 hover:text-emerald-800 disabled:opacity-50"
+                            className="cursor-pointer text-xs font-semibold text-emerald-700 hover:text-emerald-800 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                           >
                             Tandai Tersedia
                           </button>
@@ -530,14 +530,14 @@ export function TabRawatInap({
                           <div className="flex items-center gap-2">
                             <button
                               type="button" onClick={() => handleDischarge(bed.rawat_inap_id as string, bed.pasien_nama)} disabled={pending}
-                              className="flex cursor-pointer items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                              className="flex cursor-pointer items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                             >
                               <LogOut className="size-3.5" aria-hidden="true" />
                               Pulangkan
                             </button>
                             <button
                               type="button" onClick={() => handleCancelAdmisi(bed.rawat_inap_id as string)} disabled={pending}
-                              className="cursor-pointer text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50"
+                              className="cursor-pointer text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
                               title="Batalkan admisi (kesalahan input)"
                             >
                               <Ban className="size-3.5" aria-hidden="true" />
@@ -559,7 +559,7 @@ export function TabRawatInap({
                                 <p className="text-xs font-semibold text-cyan-900">{admitPasien.nama}</p>
                                 <p className="text-[11px] text-cyan-700">{admitPasien.no_rm}</p>
                               </div>
-                              <button type="button" onClick={() => setAdmitPasien(null)} className="cursor-pointer text-[11px] font-semibold text-cyan-700 underline">Ganti</button>
+                              <button type="button" onClick={() => setAdmitPasien(null)} className="cursor-pointer text-[11px] font-semibold text-cyan-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500">Ganti</button>
                             </div>
                           ) : (
                             <div className="relative">
@@ -575,7 +575,7 @@ export function TabRawatInap({
                                     <button
                                       key={p.id} type="button"
                                       onClick={() => { setAdmitPasien(p); setAdmitPasienResults([]); setAdmitPasienQuery('') }}
-                                      className="flex w-full cursor-pointer items-center justify-between rounded px-2 py-1.5 text-left text-xs hover:bg-slate-50"
+                                      className="flex w-full cursor-pointer items-center justify-between rounded px-2 py-1.5 text-left text-xs hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                                     >
                                       <span className="font-medium text-slate-900">{p.nama}</span>
                                       <span className="text-slate-500">{p.no_rm}</span>
@@ -610,13 +610,13 @@ export function TabRawatInap({
                           <div className="flex gap-2">
                             <button
                               type="button" onClick={handleAdmit} disabled={pending}
-                              className="cursor-pointer rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700 disabled:opacity-50"
+                              className="cursor-pointer rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                             >
                               Admisi Pasien
                             </button>
                             <button
                               type="button" onClick={resetAdmitForm}
-                              className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                             >
                               Batal
                             </button>
@@ -748,14 +748,14 @@ export function TabMutasiObat({ orgId, branch }: { orgId: string; branch: Branch
           />
           <button
             type="button" onClick={applyFilters} disabled={pending}
-            className="cursor-pointer rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="cursor-pointer rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
           >
             Terapkan
           </button>
         </div>
 
         {loading ? (
-          <p className="py-8 text-center text-sm text-slate-400">Memuat mutasi obat...</p>
+          <p className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400"><Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />Memuat mutasi obat...</p>
         ) : rows.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-400">Belum ada mutasi obat untuk filter ini.</p>
         ) : (
@@ -778,7 +778,7 @@ export function TabMutasiObat({ orgId, branch }: { orgId: string; branch: Branch
                     const meta = REF_TYPE_META[r.reference_type as KlinikStockReferenceType]
                     const isIn = r.quantity > 0
                     return (
-                      <tr key={r.id} className="border-b border-slate-50">
+                      <tr key={r.id} className="border-b border-slate-50 transition-colors duration-150 hover:bg-slate-50/60">
                         <td className="py-2 pr-3 whitespace-nowrap text-slate-700">{formatDate(r.movement_date, 'short')}</td>
                         <td className="py-2 pr-3">
                           <p className="font-medium text-slate-900">{r.product_name}</p>
@@ -808,14 +808,14 @@ export function TabMutasiObat({ orgId, branch }: { orgId: string; branch: Branch
                 <button
                   type="button" disabled={page <= 1 || pending}
                   onClick={() => startTransition(async () => { await loadData(page - 1) })}
-                  className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                 >
                   Sebelumnya
                 </button>
                 <button
                   type="button" disabled={page >= totalPages || pending}
                   onClick={() => startTransition(async () => { await loadData(page + 1) })}
-                  className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                 >
                   Berikutnya
                 </button>
@@ -887,7 +887,7 @@ export function TabDaftarPasien({ orgId }: { orgId: string }) {
         </div>
 
         {loading ? (
-          <p className="py-8 text-center text-sm text-slate-400">Memuat pasien...</p>
+          <p className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400"><Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />Memuat pasien...</p>
         ) : rows.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-400">Tidak ada pasien ditemukan.</p>
         ) : (
@@ -896,7 +896,7 @@ export function TabDaftarPasien({ orgId }: { orgId: string }) {
               <div key={p.id} className="rounded-xl border border-slate-100">
                 <button
                   type="button" onClick={() => handleToggleExpand(p.id)}
-                  className="flex w-full cursor-pointer items-center justify-between px-4 py-3 text-left transition-colors duration-150 hover:bg-slate-50"
+                  className="flex w-full cursor-pointer items-center justify-between px-4 py-3 text-left transition-colors duration-150 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex size-9 items-center justify-center rounded-full bg-cyan-50 text-cyan-600">
@@ -919,7 +919,7 @@ export function TabDaftarPasien({ orgId }: { orgId: string }) {
                       Riwayat Rekam Medis
                     </div>
                     {historyLoading ? (
-                      <p className="py-4 text-center text-xs text-slate-400">Memuat riwayat...</p>
+                      <p className="flex items-center justify-center gap-2 py-4 text-xs text-slate-400"><Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />Memuat riwayat...</p>
                     ) : history.length === 0 ? (
                       <p className="py-4 text-center text-xs text-slate-400">Belum ada rekam medis untuk pasien ini.</p>
                     ) : (
@@ -958,14 +958,14 @@ export function TabDaftarPasien({ orgId }: { orgId: string }) {
               <button
                 type="button" disabled={page <= 1 || pending}
                 onClick={() => startTransition(async () => { await loadData(page - 1) })}
-                className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
               >
                 Sebelumnya
               </button>
               <button
                 type="button" disabled={page >= totalPages || pending}
                 onClick={() => startTransition(async () => { await loadData(page + 1) })}
-                className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
               >
                 Berikutnya
               </button>
