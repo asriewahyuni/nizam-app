@@ -3,7 +3,7 @@
 // Kojasmat — alur keanggotaan lengkap: pendaftaran, dokumen, laporan proyek, tindakan/sanksi
 
 import { queryPostgres } from '@/lib/db/postgres'
-import { getInternalAuthSession, createInternalAuthUser } from '@/lib/auth/internal-auth.server'
+import { getInternalAuthSession, createInternalAuthUser, updateInternalAuthCredentials } from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
 import { postSimpananMutasi, requireSahabatOrStaff } from './kojasmat.actions'
 import { jurnalPendapatanBiayaAdmin } from '@/lib/erp-bridge/kojasmat-journals'
@@ -108,7 +108,7 @@ export type KojasmatTindakan = {
   created_at: string
 }
 
-// ─── PENDAFTARAN ──────────────────────────────────────────────────────────────
+// ─── PENDAFTARAN (publik) ─────────────────────────────────────────────────────
 
 export async function getAllPendaftaran(orgId: string): Promise<KojasmatPendaftaran[]> {
   const { rows } = await queryPostgres(
@@ -160,11 +160,11 @@ export async function buatPendaftaran(payload: {
   try {
     // Cek dulu apakah calon anggota ini sudah pernah mendaftar di koperasi ini
     // (email/NIK sama) — supaya submit ganda (network lambat, klik dua kali,
-    // reload di tengah wizard) melanjutkan pendaftaran yang sama, bukan gagal
-    // dengan pesan generik dari constraint UNIQUE global internal_auth_users.
+    // reload di tengah wizard, atau revisi data) memperbarui pendaftaran yang sama,
+    // bukan gagal dengan pesan generik dari constraint UNIQUE global internal_auth_users.
     if (payload.email || payload.nik) {
       const { rows: existingRows } = await queryPostgres(
-        `SELECT id, status, created_at FROM kojasmat_pendaftaran
+        `SELECT id, user_id, status, created_at FROM kojasmat_pendaftaran
          WHERE org_id = $1
            AND ((email IS NOT NULL AND email = $2) OR (nik IS NOT NULL AND nik = $3))
          ORDER BY created_at DESC LIMIT 1`,
@@ -173,7 +173,68 @@ export async function buatPendaftaran(payload: {
       const existing = existingRows[0]
       if (existing) {
         if (existing.status === 'MENUNGGU' || existing.status === 'DIREVISI') {
-          return { data: existing as { id: string; status: string; created_at: string } }
+          // ── SMART RE-SYNC: Update data pendaftaran & kredensial auth jika diedit ──
+          let authUserId = existing.user_id as string | null
+
+          if (authUserId) {
+            // Update auth credentials jika ada password/email/nik baru
+            await updateInternalAuthCredentials({
+              userId: authUserId,
+              email: payload.email,
+              nik: payload.nik,
+              password: payload.password,
+              fullName: payload.nama_lengkap,
+            })
+          } else if (payload.email && payload.password) {
+            // Buat akun baru jika sebelumnya belum ada auth user_id
+            const authResult = await createInternalAuthUser({
+              email: payload.email,
+              nik: payload.nik ?? null,
+              password: payload.password,
+              fullName: payload.nama_lengkap,
+              userType: 'anggota',
+              organizationId: payload.org_id,
+            })
+            if ('internalUserId' in authResult && authResult.internalUserId) {
+              authUserId = authResult.internalUserId
+            }
+          }
+
+          const { rows: [updated] } = await queryPostgres(
+            `UPDATE kojasmat_pendaftaran
+             SET user_id = COALESCE($2, user_id),
+                 nama_lengkap = $3,
+                 nik = $4,
+                 email = $5,
+                 phone = $6,
+                 alamat = $7,
+                 pekerjaan = $8,
+                 alasan_bergabung = $9,
+                 kontak_darurat_nama = $10,
+                 kontak_darurat_hubungan = $11,
+                 kontak_darurat_phone = $12,
+                 kontak_darurat_alamat = $13,
+                 updated_at = NOW()
+             WHERE id = $1
+             RETURNING id, status, created_at`,
+            [
+              existing.id,
+              authUserId,
+              payload.nama_lengkap,
+              payload.nik ?? null,
+              payload.email ?? null,
+              payload.phone ?? null,
+              payload.alamat ?? null,
+              payload.pekerjaan ?? null,
+              payload.alasan_bergabung ?? null,
+              payload.kontak_darurat_nama ?? null,
+              payload.kontak_darurat_hubungan ?? null,
+              payload.kontak_darurat_phone ?? null,
+              payload.kontak_darurat_alamat ?? null,
+            ]
+          )
+
+          return { data: (updated || existing) as { id: string; status: string; created_at: string } }
         }
         if (existing.status === 'DISETUJUI') {
           return { error: 'Email/NIK ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
@@ -265,9 +326,13 @@ export async function cekEmailPendaftaran(orgId: string, email: string, nik?: st
   try {
     const { rows } = await queryPostgres(
       `SELECT id, status FROM kojasmat_pendaftaran
-       WHERE org_id = $1 AND email IS NOT NULL AND LOWER(email) = $2
+       WHERE org_id = $1 
+         AND (
+           (email IS NOT NULL AND LOWER(email) = $2)
+           OR ($3 <> '' AND nik IS NOT NULL AND UPPER(nik) = $3)
+         )
        ORDER BY created_at DESC LIMIT 1`,
-      [orgId, normalized]
+      [orgId, normalized, normalizedNik]
     )
     const existing = rows[0]
     if (existing) {

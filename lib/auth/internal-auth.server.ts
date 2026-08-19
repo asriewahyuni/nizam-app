@@ -841,6 +841,69 @@ export async function createInternalAuthUser(input: {
   }
 }
 
+export async function updateInternalAuthCredentials(input: {
+  userId: string
+  email?: string | null
+  nik?: string | null
+  password?: string | null
+  fullName?: string | null
+}) {
+  const userId = normalizeUuid(input.userId)
+  if (!userId) return { error: 'User ID tidak valid.' as const }
+
+  const normalizedEmail = input.email !== undefined ? normalizeEmail(input.email) : undefined
+  const normalizedNik = input.nik !== undefined ? normalizeNik(input.nik) : undefined
+  const normalizedFullName = input.fullName !== undefined ? normalizeInput(input.fullName) : undefined
+  const normalizedPassword = input.password ? normalizeInput(input.password) : null
+
+  if (normalizedPassword && normalizedPassword.length < 8) {
+    return { error: 'Password minimal 8 karakter.' as const }
+  }
+
+  const updates: string[] = []
+  const params: any[] = [userId]
+  let paramIdx = 2
+
+  if (normalizedEmail !== undefined) {
+    updates.push(`login_email = $${paramIdx++}`)
+    params.push(normalizedEmail)
+  }
+  if (normalizedNik !== undefined) {
+    updates.push(`login_nik = $${paramIdx++}`)
+    params.push(normalizedNik)
+  }
+  if (normalizedFullName !== undefined) {
+    updates.push(`display_name = $${paramIdx++}`)
+    params.push(normalizedFullName || null)
+  }
+  if (normalizedPassword) {
+    const passwordHash = hashPasswordWithScrypt(normalizedPassword)
+    updates.push(`password_hash = $${paramIdx++}`)
+    params.push(passwordHash)
+  }
+
+  if (updates.length === 0) return { success: true as const }
+
+  try {
+    const res = await queryPostgres(
+      `UPDATE public.internal_auth_users
+       SET ${updates.join(', ')}
+       WHERE id = $1::uuid
+       RETURNING id, login_email, login_nik`,
+      params
+    )
+    if (res.rows.length === 0) {
+      return { error: 'User tidak ditemukan.' as const }
+    }
+    return { success: true as const, data: res.rows[0] }
+  } catch (error) {
+    console.error('updateInternalAuthCredentials failed:', getErrorMessage(error))
+    return {
+      error: resolveInternalAuthDatabaseError(error, 'Gagal memperbarui kredensial user.'),
+    }
+  }
+}
+
 export async function verifyInternalAuthNikForOrg(input: {
   orgId: string
   nik: string

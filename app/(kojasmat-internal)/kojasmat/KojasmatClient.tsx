@@ -4407,14 +4407,37 @@ function TabPermohonan({ orgId, pendaftaran, moduleSettings }: { orgId: string; 
   const [testRiwayat, setTestRiwayat] = useState<KojasmatTestMasukRingkas[]>([])
   const [catatanForm, setCatatanForm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('MENUNGGU')
+  const [filterUsia, setFilterUsia] = useState<'SEMUA' | 'AKTIF' | 'TERBENGKALAI'>('SEMUA')
+  const [searchQuery, setSearchQuery] = useState('')
   const [actionResult, setActionResult] = useState<string | null>(null)
   const [kredensial, setKredensial] = useState<KredensialAnggota | null>(null)
   const [copied, setCopied] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
 
-  const filtered = pendaftaran.filter(p =>
-    filterStatus === 'SEMUA' || p.status === filterStatus
-  )
+  const now = new Date().getTime()
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+
+  const filtered = pendaftaran.filter(p => {
+    if (filterStatus !== 'SEMUA' && p.status !== filterStatus) return false
+    
+    // Filter usia pendaftaran (Aktif < 30 hari vs Terbengkalai > 30 hari)
+    const ageMs = now - new Date(p.created_at).getTime()
+    const isTerbengkalai = ageMs > THIRTY_DAYS_MS && (p.status === 'MENUNGGU' || p.status === 'DIREVISI') && p.status_bayar !== 'SUDAH'
+    if (filterUsia === 'AKTIF' && isTerbengkalai) return false
+    if (filterUsia === 'TERBENGKALAI' && !isTerbengkalai) return false
+
+    // Search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      const matchNama = (p.nama_lengkap || '').toLowerCase().includes(q)
+      const matchEmail = (p.email || '').toLowerCase().includes(q)
+      const matchNik = (p.nik || '').toLowerCase().includes(q)
+      const matchPhone = (p.phone || '').toLowerCase().includes(q)
+      if (!matchNama && !matchEmail && !matchNik && !matchPhone) return false
+    }
+
+    return true
+  })
 
   async function openDetail(p: KojasmatPendaftaran) {
     setSelected(p)
@@ -4487,28 +4510,50 @@ function TabPermohonan({ orgId, pendaftaran, moduleSettings }: { orgId: string; 
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1">
-          {(['MENUNGGU', 'DIREVISI', 'DISETUJUI', 'DITOLAK', 'SEMUA'] as const).map(s => (
-            <button key={s} onClick={() => setFilterStatus(s)}
-              className={cn('rounded-lg px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer',
-                filterStatus === s ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700')}>
-              {s === 'SEMUA' ? 'Semua' : STATUS_PEND[s]?.label ?? s}
-              {s !== 'SEMUA' && (
-                <span className="ml-1 text-gray-400">
-                  ({pendaftaran.filter(p => p.status === s).length})
-                </span>
-              )}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+            {(['MENUNGGU', 'DIREVISI', 'DISETUJUI', 'DITOLAK', 'SEMUA'] as const).map(s => (
+              <button key={s} onClick={() => setFilterStatus(s)}
+                className={cn('rounded-lg px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer',
+                  filterStatus === s ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700')}>
+                {s === 'SEMUA' ? 'Semua' : STATUS_PEND[s]?.label ?? s}
+                {s !== 'SEMUA' && (
+                  <span className="ml-1 text-gray-400">
+                    ({pendaftaran.filter(p => p.status === s).length})
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+            {(['SEMUA', 'AKTIF', 'TERBENGKALAI'] as const).map(u => (
+              <button key={u} onClick={() => setFilterUsia(u)}
+                className={cn('rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
+                  filterUsia === u ? 'bg-white shadow-sm text-emerald-800 font-semibold' : 'text-gray-500 hover:text-gray-700')}>
+                {u === 'SEMUA' ? 'Semua Usia' : u === 'AKTIF' ? 'Aktif (<30h)' : 'Terbengkalai (>30h)'}
+              </button>
+            ))}
+          </div>
         </div>
-        <a
-          href={`/anggota/daftar?org=${orgId}`}
-          target="_blank"
-          className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-        >
-          <Link2 className="h-3.5 w-3.5" /> Link Daftar
-        </a>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Cari nama / email / NIK..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs outline-none focus:border-emerald-500 w-44 sm:w-56"
+          />
+          <a
+            href={`/anggota/daftar?org=${orgId}`}
+            target="_blank"
+            className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer shrink-0"
+          >
+            <Link2 className="h-3.5 w-3.5" /> Link Daftar
+          </a>
+        </div>
       </div>
 
       <SahabatApprovalPanel orgId={orgId} />
@@ -4539,9 +4584,18 @@ function TabPermohonan({ orgId, pendaftaran, moduleSettings }: { orgId: string; 
               )}
               {filtered.map(p => {
                 const sp = STATUS_PEND[p.status] ?? { label: p.status, color: 'bg-gray-100 text-gray-600' }
+                const ageMs = now - new Date(p.created_at).getTime()
+                const isStale = ageMs > THIRTY_DAYS_MS && (p.status === 'MENUNGGU' || p.status === 'DIREVISI') && p.status_bayar !== 'SUDAH'
                 return (
                   <tr key={p.id} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-900">{p.nama_lengkap}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      <div>{p.nama_lengkap}</div>
+                      {isStale && (
+                        <span className="inline-block rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200 mt-0.5">
+                          &gt;30 hari draft
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">
                       {p.phone && <div>{p.phone}</div>}
                       {p.email && <div>{p.email}</div>}

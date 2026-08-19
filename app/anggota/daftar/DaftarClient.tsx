@@ -385,8 +385,9 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
     const res = await cekEmailPendaftaran(orgId, email, nik)
     if (!res.available) {
       setEmailCheck({ status: 'taken', message: res.error, checkedEmail: email, checkedNik: nik })
-      if ('resumable' in res && res.resumable) {
-        setResumePrompt({ pendaftaranId: res.pendaftaranId, message: res.error ?? '' })
+      if ('resumable' in res && res.resumable && res.pendaftaranId) {
+        // Auto-resume data lama secara seamless
+        resumeFromPendaftaran(res.pendaftaranId)
       } else {
         setResumePrompt(null)
       }
@@ -518,7 +519,25 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
       setLayananSelected(pendaftaran.layanan_diinginkan ?? [])
       setPendaftaranId(pendaftaran.id)
       setResumePrompt(null)
-      setStep(resumeStep)
+
+      // Catat hasil tes jika sudah pernah LULUS sebelumnya
+      if (res.data.testTerakhir && res.data.testTerakhir.status === 'LULUS') {
+        setTestResult({
+          skor: Number(res.data.testTerakhir.skor) || 100,
+          jumlah_benar: res.data.testTerakhir.jumlah_benar || 15,
+          total_soal: 15,
+          status: 'LULUS',
+          passing_threshold: res.data.testTerakhir.passing_threshold || 70,
+          apresiasi: null,
+        })
+      }
+
+      // Jika tes sudah LULUS dan resumeStep adalah 'tes', auto-skip ke 'layanan'
+      if (resumeStep === 'tes' && res.data.testTerakhir?.status === 'LULUS') {
+        setStep('layanan')
+      } else {
+        setStep(resumeStep)
+      }
     })
   }
 
@@ -641,7 +660,13 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
   }
 
   useEffect(() => {
-    if (step === 'tes' && !testMasukId && !testLoading) mulaiTest()
+    if (step === 'tes') {
+      if (testResult?.status === 'LULUS') {
+        setStep('layanan')
+      } else if (!testMasukId && !testLoading) {
+        mulaiTest()
+      }
+    }
     if (step === 'komitmen' && !komitmenSections) muatKomitmenSections()
     if (step === 'bayar' && !infoBayar) muatInfoBayar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1043,15 +1068,24 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
                   Upload KTP terlebih dahulu untuk melanjutkan
                 </p>
               )}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep('kontak_darurat')}
+                  className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Kembali
+                </button>
+                <button
+                  onClick={() => setStep(testResult?.status === 'LULUS' ? 'layanan' : 'tes')}
+                  disabled={!ktpUploaded}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  Lanjut <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
               <button
-                onClick={() => setStep('tes')}
-                disabled={!ktpUploaded}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
-              >
-                Lanjut ke Test Masuk <ChevronRight className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setStep('tes')}
+                onClick={() => setStep(testResult?.status === 'LULUS' ? 'layanan' : 'tes')}
                 className="w-full text-center text-xs text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
               >
                 Lewati dulu, lengkapi nanti
@@ -1224,12 +1258,21 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
               ))}
             </div>
 
-            <button
-              onClick={() => setStep('komitmen')}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer"
-            >
-              Lanjut <ChevronRight className="h-4 w-4" />
-            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setStep('dokumen')}
+                className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Kembali
+              </button>
+              <button
+                onClick={() => setStep('komitmen')}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer"
+              >
+                Lanjut <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1278,13 +1321,23 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
             )}
 
             {komitmenSections && (
-              <button
-                onClick={handleSubmitKomitmen}
-                disabled={komitmenChecked.some(c => !c) || pending}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
-              >
-                {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Menyimpan...</> : <>Lanjut ke Pembayaran <ChevronRight className="h-4 w-4" /></>}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep('layanan')}
+                  disabled={pending}
+                  className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
+                >
+                  Kembali
+                </button>
+                <button
+                  onClick={handleSubmitKomitmen}
+                  disabled={komitmenChecked.some(c => !c) || pending}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Menyimpan...</> : <>Lanjut ke Bayar <ChevronRight className="h-4 w-4" /></>}
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -1506,13 +1559,23 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
                   </div>
                 )}
 
-                <button
-                  onClick={submitBayar}
-                  disabled={!buktiFile || !setujuIjarah || pending || (topupSukarelaChecked && Number(topupSukarelaAmount) < infoBayar.ijarah_sukarela_opsional_minimal)}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
-                >
-                  {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Memproses...</> : <>Konfirmasi Pembayaran <ChevronRight className="h-4 w-4" /></>}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep('komitmen')}
+                    disabled={pending}
+                    className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors cursor-pointer"
+                  >
+                    Kembali
+                  </button>
+                  <button
+                    onClick={submitBayar}
+                    disabled={!buktiFile || !setujuIjarah || pending || (topupSukarelaChecked && Number(topupSukarelaAmount) < infoBayar.ijarah_sukarela_opsional_minimal)}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
+                  >
+                    {pending ? <><Loader2 className="h-4 w-4 animate-spin" /> Memproses...</> : <>Konfirmasi Bayar <ChevronRight className="h-4 w-4" /></>}
+                  </button>
+                </div>
               </>
               )
             })()}
