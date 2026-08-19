@@ -571,7 +571,7 @@ export default function ReportsClient({
                   <span className={kpi.accent}>{kpi.icon}</span>
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{kpi.label}</span>
                 </div>
-                <span className="text-sm font-bold text-white leading-tight">{formatRupiah(kpi.value)}</span>
+                <span className="text-sm font-bold text-white leading-tight text-right tabular-nums">{formatRupiah(kpi.value)}</span>
               </div>
             ))}
           </div>
@@ -743,7 +743,7 @@ export default function ReportsClient({
                     </div>
                     <div className="space-y-1 relative z-10">
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">{m.title}</p>
-                      <h4 className={`text-2xl font-semibold ${m.value >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
+                      <h4 className={`text-2xl font-semibold text-right tabular-nums ${m.value >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
                         {formatRupiah(m.value)}
                       </h4>
                       <p className="text-[10px] text-slate-400 font-medium leading-relaxed h-8">{m.hint}</p>
@@ -837,7 +837,7 @@ export default function ReportsClient({
                     {renderBalanceRows(assetTreeRows)}
                     <div className="flex justify-between items-center pt-4 pr-12 text-emerald-600">
                       <span className="font-semibold uppercase text-xs">Total Aktiva</span>
-                      <span className="font-semibold text-lg w-24 text-right shrink-0">{formatRupiah(balanceSheet.assets.reduce((s: any, x: any) => s + (x.balance || 0), 0))}</span>
+                      <span className="font-semibold text-lg w-24 text-right shrink-0 tabular-nums">{formatRupiah(balanceSheet.assets.reduce((s: any, x: any) => s + (x.balance || 0), 0))}</span>
                     </div>
                   </div>
                 </div>
@@ -868,7 +868,7 @@ export default function ReportsClient({
 
                     <div className="flex justify-between items-center pt-6 pr-10 text-blue-600 border-t-2 border-slate-100">
                       <span className="font-semibold uppercase text-xs">Total Pasiva & Ekuitas</span>
-                      <span className="font-semibold text-lg w-24 text-right shrink-0">
+                      <span className="font-semibold text-lg w-24 text-right shrink-0 tabular-nums">
                         {formatRupiah(
                           balanceSheet.liabilities.reduce((s: any, x: any) => s + (x.balance || 0), 0) +
                           balanceSheet.equity.reduce((s: any, x: any) => s + (x.balance || 0), 0)
