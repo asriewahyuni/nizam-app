@@ -80,23 +80,32 @@ const JENIS_DOK: { value: KojasmatDokumen['jenis_dokumen']; label: string; wajib
 
 // ─── PROGRESS INDICATOR ───────────────────────────────────────────────────────
 
-function StepProgress({ step }: { step: Step }) {
+function StepProgress({ step, onNavigate }: { step: Step; onNavigate?: (s: Step) => void }) {
   const idx = STEPS.indexOf(step)
   return (
     <div className="flex items-center gap-2 mb-6">
-      {STEPS.map((s, i) => (
-        <div key={s} className="flex items-center flex-1">
-          <div className={cn(
-            'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold shrink-0',
-            step === s ? 'bg-emerald-600 text-white'
-              : i < idx ? 'bg-emerald-100 text-emerald-700'
-              : 'bg-gray-100 text-gray-400'
-          )}>
-            {i + 1}
+      {STEPS.map((s, i) => {
+        const canClick = !!onNavigate && i < idx && step !== 'selesai'
+        return (
+          <div key={s} className="flex items-center flex-1">
+            <button
+              type="button"
+              disabled={!canClick}
+              onClick={() => canClick && onNavigate(s)}
+              title={canClick ? `Kembali ke Langkah ${i + 1}` : undefined}
+              className={cn(
+                'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold shrink-0 transition-all',
+                step === s ? 'bg-emerald-600 text-white shadow-sm'
+                  : i < idx ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 cursor-pointer'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              )}
+            >
+              {i + 1}
+            </button>
+            {i < STEPS.length - 1 && <div className={cn('h-0.5 flex-1 mx-1', i < idx ? 'bg-emerald-300' : 'bg-gray-200')} />}
           </div>
-          {i < STEPS.length - 1 && <div className={cn('h-0.5 flex-1 mx-1', i < idx ? 'bg-emerald-300' : 'bg-gray-200')} />}
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -380,9 +389,12 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
   }
 
   async function checkEmailNow(email: string, nik: string) {
-    if (!email || !isValidEmail(email)) return { ok: true as const }
+    if (!nik && !email) return { ok: true as const }
+    if (nik && nik.length !== 16) return { ok: true as const }
+    if (email && !isValidEmail(email)) return { ok: true as const }
+
     setEmailCheck({ status: 'checking' })
-    const res = await cekEmailPendaftaran(orgId, email, nik)
+    const res = await cekEmailPendaftaran(orgId, email || undefined, nik || undefined)
     if (!res.available) {
       setEmailCheck({ status: 'taken', message: res.error, checkedEmail: email, checkedNik: nik })
       if ('resumable' in res && res.resumable && res.pendaftaranId) {
@@ -396,6 +408,20 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
     setResumePrompt(null)
     setEmailCheck({ status: 'ok', checkedEmail: email, checkedNik: nik })
     return { ok: true as const }
+  }
+
+  function handleNikChange(val: string) {
+    const clean = val.replace(/\D/g, '').slice(0, 16)
+    setField('nik', clean)
+    if (clean.length === 16) {
+      checkEmailNow(form.email, clean)
+    }
+  }
+
+  function handleNikBlur() {
+    if (form.nik && form.nik.length === 16 && emailCheckIsStale()) {
+      checkEmailNow(form.email, form.nik)
+    }
   }
 
   function handleEmailBlur() {
@@ -674,14 +700,14 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
 
   async function handleLanjutData() {
     if (!form.nama_lengkap.trim()) { setError('Nama lengkap wajib diisi'); return }
-    if (form.nik && form.nik.length !== 16) { setError('NIK harus 16 digit angka'); return }
+    if (!form.nik || form.nik.length !== 16) { setError('NIK wajib diisi 16 digit angka'); return }
     if (form.phone && form.phone.length < 9) { setError('Nomor HP/WhatsApp tidak valid'); return }
     if (form.email && !isValidEmail(form.email)) { setError('Format email tidak valid'); return }
-    if (form.email && emailCheckIsStale()) {
+    if ((form.nik || form.email) && emailCheckIsStale()) {
       const check = await checkEmailNow(form.email, form.nik)
-      if (!check.ok) { setError(check.message || 'Email ini sudah terdaftar.'); return }
+      if (!check.ok) { setError(check.message || 'NIK atau Email ini sudah terdaftar.'); return }
     }
-    if (form.email && emailCheck.status === 'taken') { setError(emailCheck.message || 'Email ini sudah terdaftar.'); return }
+    if (emailCheck.status === 'taken') { setError(emailCheck.message || 'NIK atau Email ini sudah terdaftar.'); return }
     if (form.email && !form.password) { setError('Masukkan kata sandi untuk akun Anda'); return }
     if (form.password && form.password.length < 8) { setError('Kata sandi minimal 8 karakter'); return }
     if (form.password && form.password !== form.confirm_password) { setError('Konfirmasi kata sandi tidak cocok'); return }
@@ -751,7 +777,7 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
           </div>
 
           {/* Progress */}
-          <StepProgress step={step} />
+          <StepProgress step={step} onNavigate={setStep} />
 
           <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
             <div>
@@ -764,7 +790,9 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">NIK</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  NIK <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text" inputMode="numeric" pattern="[0-9]*"
                   className={cn(
@@ -773,12 +801,14 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
                       ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
                       : 'border-gray-200 focus:border-emerald-500 focus:ring-emerald-100'
                   )}
-                  placeholder="16 digit"
+                  placeholder="16 digit angka"
                   maxLength={16}
-                  value={form.nik} onChange={e => setField('nik', e.target.value.replace(/\D/g, '').slice(0, 16))}
+                  value={form.nik}
+                  onChange={e => handleNikChange(e.target.value)}
+                  onBlur={handleNikBlur}
                 />
                 {form.nik && form.nik.length !== 16 && (
-                  <p className="mt-1 text-xs text-red-500">NIK harus 16 digit angka</p>
+                  <p className="mt-1 text-xs text-red-500">NIK wajib 16 digit</p>
                 )}
               </div>
               <div>
@@ -918,7 +948,8 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
               onClick={handleLanjutData}
               disabled={
                 !form.nama_lengkap.trim()
-                || (!!form.nik && form.nik.length !== 16)
+                || !form.nik
+                || form.nik.length !== 16
                 || (!!form.phone && form.phone.length < 9)
                 || (!!form.email && !isValidEmail(form.email))
                 || emailCheck.status === 'checking'
@@ -927,7 +958,7 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer"
             >
               {emailCheck.status === 'checking'
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> Memeriksa email...</>
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Memeriksa data...</>
                 : <>Lanjut <ChevronRight className="h-4 w-4" /></>
               }
             </button>
@@ -953,7 +984,7 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
           </div>
 
           {/* Progress */}
-          <StepProgress step={step} />
+          <StepProgress step={step} onNavigate={setStep} />
 
           <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
             <div>
@@ -1041,7 +1072,7 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
           </div>
 
           {/* Progress */}
-          <StepProgress step={step} />
+          <StepProgress step={step} onNavigate={setStep} />
 
           <div className="rounded-2xl bg-white p-6 shadow-sm">
             <p className="text-xs text-gray-500 mb-4">
@@ -1112,7 +1143,7 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
             </p>
           </div>
 
-          <StepProgress step={step} />
+          <StepProgress step={step} onNavigate={setStep} />
 
           <div className="rounded-2xl bg-white p-6 shadow-sm">
             {testLoading && (
@@ -1242,7 +1273,7 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
             <p className="text-sm text-gray-500 mt-1">Boleh pilih satu atau lebih (opsional).</p>
           </div>
 
-          <StepProgress step={step} />
+          <StepProgress step={step} onNavigate={setStep} />
 
           <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
             <div className="space-y-2">
@@ -1292,7 +1323,7 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
             <p className="text-sm text-gray-500 mt-1">Mohon baca dan centang setiap bagian sebelum melanjutkan.</p>
           </div>
 
-          <StepProgress step={step} />
+          <StepProgress step={step} onNavigate={setStep} />
 
           <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
             {!komitmenSections && (
@@ -1358,7 +1389,7 @@ export default function DaftarClient({ orgId, orgNama, resumeId }: { orgId: stri
             <p className="text-sm text-gray-500 mt-1">Selamat, Anda lulus test masuk! Selesaikan pembayaran berikut.</p>
           </div>
 
-          <StepProgress step={step} />
+          <StepProgress step={step} onNavigate={setStep} />
 
           <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
             {!infoBayar && (

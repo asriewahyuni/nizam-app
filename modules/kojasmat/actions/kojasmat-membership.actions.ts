@@ -158,36 +158,49 @@ export async function buatPendaftaran(payload: {
   kontak_darurat_alamat?: string
 }) {
   try {
-    // Cek dulu apakah sudah terdaftar sebagai anggota resmi di koperasi ini
-    if (payload.email || payload.nik) {
+    // Cek dulu apakah sudah terdaftar sebagai anggota resmi di koperasi ini (Kunci: NIK)
+    if (payload.nik) {
       const { rows: anggotaRows } = await queryPostgres(
         `SELECT id, kode_anggota, nama FROM kojasmat_anggota
-         WHERE org_id = $1
-           AND (
-             (email IS NOT NULL AND LOWER(email) = $2)
-             OR ($3 <> '' AND nik IS NOT NULL AND UPPER(nik) = $3)
-           )
+         WHERE org_id = $1 AND nik IS NOT NULL AND UPPER(nik) = $2
          LIMIT 1`,
-        [payload.org_id, payload.email ?? null, payload.nik ?? null]
+        [payload.org_id, payload.nik.trim().toUpperCase()]
       )
       if (anggotaRows[0]) {
         return {
-          error: `Email/NIK ini sudah terdaftar sebagai Anggota Resmi (${anggotaRows[0].nama} - ${anggotaRows[0].kode_anggota}). Silakan langsung masuk di halaman Login Anggota.`,
+          error: `NIK ini sudah terdaftar sebagai Anggota Resmi (${anggotaRows[0].nama} - ${anggotaRows[0].kode_anggota}). Silakan langsung masuk di halaman Login Anggota.`,
+        }
+      }
+    } else if (payload.email) {
+      const { rows: anggotaRows } = await queryPostgres(
+        `SELECT id, kode_anggota, nama FROM kojasmat_anggota
+         WHERE org_id = $1 AND email IS NOT NULL AND LOWER(email) = $2
+         LIMIT 1`,
+        [payload.org_id, payload.email.trim().toLowerCase()]
+      )
+      if (anggotaRows[0]) {
+        return {
+          error: `Email ini sudah terdaftar sebagai Anggota Resmi (${anggotaRows[0].nama} - ${anggotaRows[0].kode_anggota}). Silakan langsung masuk di halaman Login Anggota.`,
         }
       }
     }
 
-    // Cek apakah calon anggota ini sudah pernah mendaftar di koperasi ini
-    // (email/NIK sama) — supaya submit ganda (network lambat, klik dua kali,
-    // reload di tengah wizard, atau revisi data) memperbarui pendaftaran yang sama,
-    // bukan gagal dengan pesan generik dari constraint UNIQUE global internal_auth_users.
-    if (payload.email || payload.nik) {
+    // Cek apakah calon anggota ini sudah pernah mendaftar di koperasi ini (Kunci: NIK)
+    // Supaya submit ganda atau revisi data memperbarui pendaftaran yang sama
+    if (payload.nik || payload.email) {
       const { rows: existingRows } = await queryPostgres(
         `SELECT id, user_id, status, created_at FROM kojasmat_pendaftaran
          WHERE org_id = $1
-           AND ((email IS NOT NULL AND email = $2) OR (nik IS NOT NULL AND nik = $3))
+           AND (
+             ($2 <> '' AND nik IS NOT NULL AND UPPER(nik) = $2)
+             OR ($3 <> '' AND email IS NOT NULL AND LOWER(email) = $3)
+           )
          ORDER BY created_at DESC LIMIT 1`,
-        [payload.org_id, payload.email ?? null, payload.nik ?? null]
+        [
+          payload.org_id,
+          payload.nik ? payload.nik.trim().toUpperCase() : '',
+          payload.email ? payload.email.trim().toLowerCase() : '',
+        ]
       )
       const existing = existingRows[0]
       if (existing) {
@@ -196,7 +209,6 @@ export async function buatPendaftaran(payload: {
           let authUserId = existing.user_id as string | null
 
           if (authUserId) {
-            // Update auth credentials jika ada password/email/nik baru
             await updateInternalAuthCredentials({
               userId: authUserId,
               email: payload.email,
@@ -205,7 +217,6 @@ export async function buatPendaftaran(payload: {
               fullName: payload.nama_lengkap,
             })
           } else if (payload.email && payload.password) {
-            // Buat akun baru jika sebelumnya belum ada auth user_id
             const authResult = await createInternalAuthUser({
               email: payload.email,
               nik: payload.nik ?? null,
@@ -256,9 +267,9 @@ export async function buatPendaftaran(payload: {
           return { data: (updated || existing) as { id: string; status: string; created_at: string } }
         }
         if (existing.status === 'DISETUJUI') {
-          return { error: 'Email/NIK ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
+          return { error: 'NIK/Email ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
         }
-        return { error: 'Pendaftaran sebelumnya dengan email/NIK ini telah ditolak. Hubungi pengurus koperasi untuk info lebih lanjut.' }
+        return { error: 'Pendaftaran sebelumnya dengan NIK/Email ini telah ditolak. Hubungi pengurus koperasi untuk info lebih lanjut.' }
       }
     }
 
@@ -275,10 +286,8 @@ export async function buatPendaftaran(payload: {
         organizationId: payload.org_id,
       })
       if ('error' in authResult) {
-        // Email/NIK sudah dipakai akun lain di platform Nizam (bukan pendaftaran
-        // koperasi ini — sudah dicek di atas) — kemungkinan akun organisasi lain.
         if ((authResult.error ?? '').toLowerCase().includes('sudah terdaftar')) {
-          return { error: 'Email atau NIK ini sudah terpakai untuk akun lain di sistem. Gunakan email/NIK berbeda' }
+          return { error: 'NIK atau Email ini sudah terpakai untuk akun lain di sistem. Gunakan NIK/Email berbeda' }
         }
         return { error: authResult.error }
       }
@@ -303,8 +312,7 @@ export async function buatPendaftaran(payload: {
     )
     const created = rows[0] as { id: string; status: string; created_at: string }
 
-    // Kabari CS otomatis via WA begitu permohonan baru masuk — best-effort,
-    // tidak boleh menggagalkan pendaftaran kalau nomor CS belum disetel.
+    // Kabari CS otomatis via WA begitu permohonan baru masuk
     const settings = await getModuleSettings(payload.org_id)
     const tmplBaru = settings.pesan_otomatis.pendaftaran_baru_masuk
     const adminWa = String(settings.admin_whatsapp || '').trim()
@@ -332,71 +340,98 @@ export async function buatPendaftaran(payload: {
   }
 }
 
-// Tidak butuh auth — form publik untuk calon anggota. Cek cepat email/NIK di
-// step "Data Pribadi" (sebelum kontak darurat & dokumen diisi) supaya
-// duplikasi ketahuan di awal, bukan baru gagal setelah wizard hampir selesai
-// — mencakup dua sumber konflik: pendaftaran koperasi ini sendiri, dan akun
-// internal_auth_users platform-wide (dicek ulang oleh createInternalAuthUser
-// di buatPendaftaran(), tapi di sini cuma SELECT — belum bikin akun apapun).
-export async function cekEmailPendaftaran(orgId: string, email: string, nik?: string) {
-  const normalized = email.trim().toLowerCase()
+// Tidak butuh auth — form publik untuk calon anggota. Cek cepat NIK & Email di
+// step "Data Pribadi" — Kunci Utama: NIK.
+export async function cekEmailPendaftaran(orgId: string, email?: string, nik?: string) {
   const normalizedNik = (nik ?? '').trim().toUpperCase()
-  if (!normalized) return { available: true }
+  const normalizedEmail = (email ?? '').trim().toLowerCase()
+  if (!normalizedNik && !normalizedEmail) return { available: true }
   try {
-    // 1. Cek apakah sudah terdaftar sebagai anggota resmi di koperasi ini
-    const { rows: anggotaRows } = await queryPostgres(
-      `SELECT id, kode_anggota, nama FROM kojasmat_anggota
-       WHERE org_id = $1 
-         AND (
-           (email IS NOT NULL AND LOWER(email) = $2)
-           OR ($3 <> '' AND nik IS NOT NULL AND UPPER(nik) = $3)
-         )
-       LIMIT 1`,
-      [orgId, normalized, normalizedNik]
-    )
-    if (anggotaRows[0]) {
-      return {
-        available: false,
-        error: `Email atau NIK ini sudah terdaftar sebagai Anggota Resmi (${anggotaRows[0].nama} - ${anggotaRows[0].kode_anggota}). Silakan login di Portal Anggota.`,
-      }
-    }
-
-    // 2. Cek apakah ada antrean pendaftaran di kojasmat_pendaftaran
-    const { rows } = await queryPostgres(
-      `SELECT id, status FROM kojasmat_pendaftaran
-       WHERE org_id = $1 
-         AND (
-           (email IS NOT NULL AND LOWER(email) = $2)
-           OR ($3 <> '' AND nik IS NOT NULL AND UPPER(nik) = $3)
-         )
-       ORDER BY created_at DESC LIMIT 1`,
-      [orgId, normalized, normalizedNik]
-    )
-    const existing = rows[0]
-    if (existing) {
-      if (existing.status === 'MENUNGGU' || existing.status === 'DIREVISI' || existing.status === 'DITOLAK') {
+    // 1. Cek apakah sudah terdaftar sebagai anggota resmi di kojasmat_anggota (Kunci: NIK)
+    if (normalizedNik) {
+      const { rows: anggotaByNik } = await queryPostgres(
+        `SELECT id, kode_anggota, nama FROM kojasmat_anggota
+         WHERE org_id = $1 AND nik IS NOT NULL AND UPPER(nik) = $2
+         LIMIT 1`,
+        [orgId, normalizedNik]
+      )
+      if (anggotaByNik[0]) {
         return {
           available: false,
-          resumable: true as const,
-          pendaftaranId: existing.id as string,
-          error: existing.status === 'DITOLAK'
-            ? 'Pendaftaran sebelumnya dengan email ini pernah ditolak. Anda tetap bisa melanjutkan dengan data yang sama untuk diajukan ulang.'
-            : 'Email ini sudah dipakai untuk pendaftaran yang sedang berjalan. Lanjutkan pendaftaran sebelumnya, bukan mulai dari awal.',
+          error: `NIK ini sudah terdaftar sebagai Anggota Resmi (${anggotaByNik[0].nama} - ${anggotaByNik[0].kode_anggota}). Silakan langsung masuk di halaman Login Anggota.`,
         }
       }
-      return { available: false, error: 'Email ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
+    } else if (normalizedEmail) {
+      const { rows: anggotaByEmail } = await queryPostgres(
+        `SELECT id, kode_anggota, nama FROM kojasmat_anggota
+         WHERE org_id = $1 AND email IS NOT NULL AND LOWER(email) = $2
+         LIMIT 1`,
+        [orgId, normalizedEmail]
+      )
+      if (anggotaByEmail[0]) {
+        return {
+          available: false,
+          error: `Email ini sudah terdaftar sebagai Anggota Resmi (${anggotaByEmail[0].nama} - ${anggotaByEmail[0].kode_anggota}). Silakan login di Portal Anggota.`,
+        }
+      }
     }
 
+    // 2. Cek apakah ada antrean pendaftaran di kojasmat_pendaftaran (Kunci: NIK)
+    if (normalizedNik) {
+      const { rows: pendByNik } = await queryPostgres(
+        `SELECT id, status, nama_lengkap FROM kojasmat_pendaftaran
+         WHERE org_id = $1 AND nik IS NOT NULL AND UPPER(nik) = $2
+         ORDER BY created_at DESC LIMIT 1`,
+        [orgId, normalizedNik]
+      )
+      const existing = pendByNik[0]
+      if (existing) {
+        if (existing.status === 'MENUNGGU' || existing.status === 'DIREVISI' || existing.status === 'DITOLAK') {
+          return {
+            available: false,
+            resumable: true as const,
+            pendaftaranId: existing.id as string,
+            error: existing.status === 'DITOLAK'
+              ? 'Pendaftaran sebelumnya dengan NIK ini pernah ditolak. Anda tetap bisa melanjutkan dengan data yang sama untuk diajukan ulang.'
+              : 'NIK ini sudah memiliki pendaftaran yang sedang berjalan. Lanjutkan pendaftaran Anda.',
+          }
+        }
+        return { available: false, error: 'NIK ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
+      }
+    } else if (normalizedEmail) {
+      const { rows: pendByEmail } = await queryPostgres(
+        `SELECT id, status, nama_lengkap FROM kojasmat_pendaftaran
+         WHERE org_id = $1 AND email IS NOT NULL AND LOWER(email) = $2
+         ORDER BY created_at DESC LIMIT 1`,
+        [orgId, normalizedEmail]
+      )
+      const existing = pendByEmail[0]
+      if (existing) {
+        if (existing.status === 'MENUNGGU' || existing.status === 'DIREVISI' || existing.status === 'DITOLAK') {
+          return {
+            available: false,
+            resumable: true as const,
+            pendaftaranId: existing.id as string,
+            error: existing.status === 'DITOLAK'
+              ? 'Pendaftaran sebelumnya dengan email ini pernah ditolak. Anda tetap bisa melanjutkan dengan data yang sama untuk diajukan ulang.'
+              : 'Email ini sudah dipakai untuk pendaftaran yang sedang berjalan. Lanjutkan pendaftaran Anda.',
+          }
+        }
+        return { available: false, error: 'Email ini sudah terdaftar sebagai anggota. Silakan login di halaman Login Anggota.' }
+      }
+    }
+
+    // 3. Cek User Auth Global
     const { rows: authRows } = await queryPostgres(
       `SELECT id FROM internal_auth_users
        WHERE is_active = true
-         AND ((login_email IS NOT NULL AND LOWER(login_email) = $1)
-              OR ($2 <> '' AND login_nik IS NOT NULL AND UPPER(login_nik) = $2))
+         AND (($1 <> '' AND login_nik IS NOT NULL AND UPPER(login_nik) = $1)
+              OR ($2 <> '' AND login_email IS NOT NULL AND LOWER(login_email) = $2))
        LIMIT 1`,
-      [normalized, normalizedNik]
+      [normalizedNik, normalizedEmail]
     )
     if (authRows[0]) {
-      return { available: false, error: 'Email atau NIK ini sudah terpakai untuk akun lain di sistem. Gunakan email/NIK berbeda' }
+      return { available: false, error: 'NIK atau Email ini sudah terpakai untuk akun lain di sistem. Gunakan NIK/Email berbeda.' }
     }
 
     return { available: true }
@@ -406,11 +441,9 @@ export async function cekEmailPendaftaran(orgId: string, email: string, nik?: st
 }
 
 // Tidak butuh auth — dipanggil setelah calon anggota memilih "Lanjutkan
-// pendaftaran sebelumnya" (dari cekEmailPendaftaran) atau lewat link WA
-// ?resume=<id> yang dikirim saat pendaftaran ditolak/diminta revisi. Ambil
-// seluruh data pendaftaran + progres test + dokumen supaya wizard bisa
-// lompat langsung ke step terakhir yang belum selesai, bukan mulai ulang.
-export type PendaftaranResumeStep = 'dokumen' | 'tes' | 'layanan' | 'komitmen' | 'bayar'
+// pendaftaran sebelumnya" (dari cekEmailPendaftaran) atau lewat link WA / localStorage.
+// Evaluasi kelengkapan data secara berurutan untuk menentukan step yang tepat.
+export type PendaftaranResumeStep = 'data' | 'kontak_darurat' | 'dokumen' | 'tes' | 'layanan' | 'komitmen' | 'bayar' | 'selesai'
 
 export async function getPendaftaranResumeData(orgId: string, pendaftaranId: string) {
   const { rows: pendRows } = await queryPostgres(
@@ -431,14 +464,27 @@ export async function getPendaftaranResumeData(orgId: string, pendaftaranId: str
   const testTerakhir = testRows[0] as { status: 'BERLANGSUNG' | 'LULUS' | 'GAGAL'; skor: number; jumlah_benar: number; passing_threshold: number } | undefined
 
   const dokumen = await getDokumenByRef('PENDAFTARAN', pendaftaranId)
+  const ktpUploaded = dokumen.some(d => d.jenis_dokumen === 'KTP')
 
-  // Jika ada tes yang masih BERLANGSUNG (user refresh di tengah tes),
-  // selalu arahkan ke step tes supaya bisa dilanjutkan.
-  let step: PendaftaranResumeStep = 'tes'
-  if (testTerakhir?.status === 'BERLANGSUNG') step = 'tes'
-  else if (pendaftaran.komitmen_disetujui_at) step = 'bayar'
-  else if (pendaftaran.layanan_diinginkan != null) step = 'komitmen'
-  else if (testTerakhir?.status === 'LULUS') step = 'layanan'
+  // ── Penentuan Step Berdasarkan Kelengkapan Data Nyata di Database ──
+  let step: PendaftaranResumeStep = 'data'
+  if (!pendaftaran.nama_lengkap || !pendaftaran.nik || pendaftaran.nik.length !== 16) {
+    step = 'data'
+  } else if (!pendaftaran.kontak_darurat_nama || !pendaftaran.kontak_darurat_phone) {
+    step = 'kontak_darurat'
+  } else if (!ktpUploaded) {
+    step = 'dokumen'
+  } else if (!testTerakhir || testTerakhir.status !== 'LULUS') {
+    step = 'tes'
+  } else if (!pendaftaran.layanan_diinginkan || pendaftaran.layanan_diinginkan.length === 0) {
+    step = 'layanan'
+  } else if (!pendaftaran.komitmen_disetujui_at) {
+    step = 'komitmen'
+  } else if (pendaftaran.status_bayar !== 'SUDAH') {
+    step = 'bayar'
+  } else {
+    step = 'selesai'
+  }
 
   return {
     data: {
