@@ -158,7 +158,26 @@ export async function buatPendaftaran(payload: {
   kontak_darurat_alamat?: string
 }) {
   try {
-    // Cek dulu apakah calon anggota ini sudah pernah mendaftar di koperasi ini
+    // Cek dulu apakah sudah terdaftar sebagai anggota resmi di koperasi ini
+    if (payload.email || payload.nik) {
+      const { rows: anggotaRows } = await queryPostgres(
+        `SELECT id, kode_anggota, nama FROM kojasmat_anggota
+         WHERE org_id = $1
+           AND (
+             (email IS NOT NULL AND LOWER(email) = $2)
+             OR ($3 <> '' AND nik IS NOT NULL AND UPPER(nik) = $3)
+           )
+         LIMIT 1`,
+        [payload.org_id, payload.email ?? null, payload.nik ?? null]
+      )
+      if (anggotaRows[0]) {
+        return {
+          error: `Email/NIK ini sudah terdaftar sebagai Anggota Resmi (${anggotaRows[0].nama} - ${anggotaRows[0].kode_anggota}). Silakan langsung masuk di halaman Login Anggota.`,
+        }
+      }
+    }
+
+    // Cek apakah calon anggota ini sudah pernah mendaftar di koperasi ini
     // (email/NIK sama) — supaya submit ganda (network lambat, klik dua kali,
     // reload di tengah wizard, atau revisi data) memperbarui pendaftaran yang sama,
     // bukan gagal dengan pesan generik dari constraint UNIQUE global internal_auth_users.
@@ -324,6 +343,25 @@ export async function cekEmailPendaftaran(orgId: string, email: string, nik?: st
   const normalizedNik = (nik ?? '').trim().toUpperCase()
   if (!normalized) return { available: true }
   try {
+    // 1. Cek apakah sudah terdaftar sebagai anggota resmi di koperasi ini
+    const { rows: anggotaRows } = await queryPostgres(
+      `SELECT id, kode_anggota, nama FROM kojasmat_anggota
+       WHERE org_id = $1 
+         AND (
+           (email IS NOT NULL AND LOWER(email) = $2)
+           OR ($3 <> '' AND nik IS NOT NULL AND UPPER(nik) = $3)
+         )
+       LIMIT 1`,
+      [orgId, normalized, normalizedNik]
+    )
+    if (anggotaRows[0]) {
+      return {
+        available: false,
+        error: `Email atau NIK ini sudah terdaftar sebagai Anggota Resmi (${anggotaRows[0].nama} - ${anggotaRows[0].kode_anggota}). Silakan login di Portal Anggota.`,
+      }
+    }
+
+    // 2. Cek apakah ada antrean pendaftaran di kojasmat_pendaftaran
     const { rows } = await queryPostgres(
       `SELECT id, status FROM kojasmat_pendaftaran
        WHERE org_id = $1 
