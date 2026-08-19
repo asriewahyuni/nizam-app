@@ -375,6 +375,18 @@ export default function JournalClient({
     setActiveSearch('')
     setSearchResults(null)
     setSearchHasMore(false)
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (account.code) {
+        params.set('accountCode', account.code)
+        params.delete('accountId')
+      }
+      if (startDate) params.set('startDate', startDate)
+      if (endDate) params.set('endDate', endDate)
+      window.history.replaceState(null, '', `?${params.toString()}`)
+    }
+
     await loadAccountLedgerPage(accountId, { reset: true })
   }
 
@@ -1027,7 +1039,36 @@ export default function JournalClient({
                             </div>
                           </td>
                           <td className="px-6 py-5 align-top text-xs font-bold text-slate-600">
-                            {row.counterparty_accounts || '-'}
+                            {row.counterparty_accounts && row.counterparty_accounts !== '-' ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {row.counterparty_accounts.split(', ').map((accLabel: string, idx: number) => {
+                                  const trimmed = accLabel.trim()
+                                  const code = trimmed.split(' - ')[0]
+                                  const matchedAcc = accounts.find((a: any) => String(a.code) === code)
+                                  if (matchedAcc) {
+                                    return (
+                                      <button
+                                        key={`${code}-${idx}`}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleSelectAccount(matchedAcc)
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50/80 hover:bg-blue-100/90 text-blue-700 hover:text-blue-800 text-[10px] font-semibold border border-blue-200/60 shadow-2xs transition-all cursor-pointer"
+                                        title={`Buka Buku Besar ${matchedAcc.code} - ${matchedAcc.name}`}
+                                      >
+                                        <span className="font-mono">{code}</span>
+                                        <span className="truncate max-w-[120px]">- {matchedAcc.name}</span>
+                                        <ArrowRightLeft size={10} className="text-blue-500 shrink-0" />
+                                      </button>
+                                    )
+                                  }
+                                  return <span key={idx} className="text-slate-600">{trimmed}</span>
+                                })}
+                              </div>
+                            ) : (
+                              '-'
+                            )}
                           </td>
                           <td className="px-6 py-5 align-top text-right tabular-nums text-xs font-semibold text-emerald-600">
                             {row.debit > 0 ? formatRupiah(row.debit) : '-'}
@@ -1243,10 +1284,30 @@ export default function JournalClient({
                         {entry.journal_lines?.map((line: any) => {
                            const debitAmount = toAmount(line.debit)
                            const creditAmount = toAmount(line.credit)
+                           const matchedAcc = accounts.find((a: any) => String(a.id) === String(line.account_id) || String(a.code) === String(line.accounts?.code))
+
                            return (
                            <div key={line.id} className="grid grid-cols-12 gap-2 text-[10px] items-center border-b border-slate-50 pb-2 pt-0.5 last:border-0 last:pb-0">
-                             <div className="col-span-6 font-bold text-slate-600 truncate" title={line.accounts?.name}>
-                               {line.accounts?.code} - {line.accounts?.name}
+                             <div className="col-span-6 min-w-0">
+                               {matchedAcc ? (
+                                 <button
+                                   type="button"
+                                   onClick={(e) => {
+                                     e.stopPropagation()
+                                     handleSelectAccount(matchedAcc)
+                                   }}
+                                   className="group/acc flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 truncate text-left cursor-pointer transition-colors w-full"
+                                   title={`Buka Buku Besar ${matchedAcc.code} - ${matchedAcc.name}`}
+                                 >
+                                   <span className="font-mono text-blue-600 group-hover/acc:underline shrink-0">{line.accounts?.code || matchedAcc.code}</span>
+                                   <span className="truncate group-hover/acc:underline">- {line.accounts?.name || matchedAcc.name}</span>
+                                   <ArrowRightLeft size={10} className="text-slate-300 group-hover/acc:text-blue-500 opacity-0 group-hover/acc:opacity-100 transition-all shrink-0 ml-1" />
+                                 </button>
+                               ) : (
+                                 <div className="font-bold text-slate-600 truncate" title={line.accounts?.name}>
+                                   {line.accounts?.code} - {line.accounts?.name}
+                                 </div>
+                               )}
                              </div>
                              <div className={`col-span-3 text-right tabular-nums font-semibold tracking-tight ${debitAmount > 0 ? 'text-emerald-600' : 'text-slate-200'}`}>
                                 {debitAmount > 0 ? formatRupiah(debitAmount) : '-'}
@@ -1564,8 +1625,32 @@ export default function JournalClient({
                         return (
                           <tr key={line.id || Math.random()} className="hover:bg-slate-50/60 transition-colors">
                             <td className="py-3.5 pr-4 font-medium text-slate-800">
-                              <span className="font-mono font-bold text-blue-600 mr-2">{line.accounts?.code || '-'}</span>
-                              <span>{line.accounts?.name || '-'}</span>
+                              {(() => {
+                                const matchedAcc = accounts.find((a: any) => String(a.id) === String(line.account_id) || String(a.code) === String(line.accounts?.code))
+                                if (matchedAcc) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedVoucherEntry(null)
+                                        handleSelectAccount(matchedAcc)
+                                      }}
+                                      className="group/modalAcc text-left hover:text-blue-600 cursor-pointer flex items-center gap-1.5 transition-colors"
+                                      title={`Buka Buku Besar ${matchedAcc.code} - ${matchedAcc.name}`}
+                                    >
+                                      <span className="font-mono font-bold text-blue-600 group-hover/modalAcc:underline">{line.accounts?.code || matchedAcc.code}</span>
+                                      <span className="group-hover/modalAcc:underline">{line.accounts?.name || matchedAcc.name}</span>
+                                      <ArrowRightLeft size={11} className="text-slate-300 group-hover/modalAcc:text-blue-500 opacity-0 group-hover/modalAcc:opacity-100 transition-all ml-1" />
+                                    </button>
+                                  )
+                                }
+                                return (
+                                  <>
+                                    <span className="font-mono font-bold text-blue-600 mr-2">{line.accounts?.code || '-'}</span>
+                                    <span>{line.accounts?.name || '-'}</span>
+                                  </>
+                                )
+                              })()}
                             </td>
                             <td className="py-3.5 pr-4 text-slate-500 text-[11px] italic">
                               {line.memo || '-'}
