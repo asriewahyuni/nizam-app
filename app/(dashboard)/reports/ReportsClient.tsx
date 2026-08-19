@@ -311,12 +311,14 @@ export default function ReportsClient({
   const [ledgerData, setLedgerData] = useState<AccountLedgerResult | null>(null)
   const [isLoadingLedger, setIsLoadingLedger] = useState(false)
   const [ledgerSearch, setLedgerSearch] = useState('')
+  const [showDrawerMoM, setShowDrawerMoM] = useState(false)
 
   const openAccountLedger = async (account: { code: string; name: string; balance: number; type?: string; id?: string }) => {
     setSelectedLedgerAccount(account)
     setIsLoadingLedger(true)
     setLedgerData(null)
     setLedgerSearch('')
+    setShowDrawerMoM(false)
 
     try {
       const isBalanceSheet = activeTab === 'BS'
@@ -1038,22 +1040,47 @@ export default function ReportsClient({
                   return (
                     <div className="border-b border-slate-200/80 bg-slate-50/60">
                       {/* Primary Net Mutation Highlight Banner Badge */}
-                      <div className="px-6 py-3.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50/50 border-b border-blue-100/70 flex items-center justify-between gap-4">
+                      <div className="px-6 py-3.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50/50 border-b border-blue-100/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div className="flex items-center gap-2.5">
                           <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 flex-wrap">
                             <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
                               Mutasi Bersih Periode Ini
                             </span>
                             <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-full w-fit">
                               {activeTab === 'BS' ? `Posisi s/d ${formatDate(endDate)}` : `Laba Rugi (${formatDate(startDate, 'short')} — ${formatDate(endDate, 'short')})`}
                             </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowDrawerMoM(!showDrawerMoM)}
+                              className={`text-[9px] font-bold px-2 py-0.5 rounded-full border transition-all cursor-pointer ${showDrawerMoM ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                            >
+                              📊 {showDrawerMoM ? 'Tutup Varians' : 'Bandingkan Periode Lalu'}
+                            </button>
                           </div>
                         </div>
                         <span className={`text-base font-extrabold tabular-nums ${netMovement >= 0 ? 'text-blue-700' : 'text-rose-600'}`}>
                           {formatRupiah(netMovement)}
                         </span>
                       </div>
+
+                      {/* MoM Variance Comparison Box */}
+                      {showDrawerMoM && (
+                        <div className="px-6 py-3 bg-blue-50/50 border-b border-blue-100 flex items-center justify-between gap-4 text-xs">
+                          <div>
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Selisih Arus vs Saldo Awal (Δ)</span>
+                            <span className="font-extrabold text-slate-900 tabular-nums">
+                              {formatRupiah(Math.abs(netMovement - ledgerData.summary.openingBalance))}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Dinamika Aliran</span>
+                            <span className={`font-extrabold tabular-nums ${netMovement >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                              {netMovement >= 0 ? '▲ Arus Masuk' : '▼ Arus Keluar'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Breakdown KPI Cards */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-slate-200/70 text-xs">

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2, Calculator, ArrowRightLeft, ArrowUp, ArrowDown, ArrowRight, Eye, ExternalLink, Filter, Calendar } from 'lucide-react'
+import { Plus, X, Trash2, Download, FileText, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus, Search, Loader2, Calculator, ArrowRightLeft, ArrowUp, ArrowDown, ArrowRight, Eye, ExternalLink, Filter, Calendar, Printer } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton, useConfirm} from '@/components/ui/NizamUI'
 import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal, getJournalEntries, getAccountLedger, bulkPostJournalEntries, getAllMatchingJournalEntryIds } from '@/modules/accounting/actions/journal.actions'
 import type { AccountLedgerResult } from '@/modules/accounting/actions/journal.actions'
@@ -11,6 +11,8 @@ import { BulkJournalSection } from '@/components/bulk-import/BulkJournalSection'
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { resolveSourceDocumentLink, extractDocumentNumber } from '@/lib/utils/document-links'
+import { DocumentFlowStepper } from '@/components/accounting/DocumentFlowStepper'
+import { JournalVoucherPrint } from '@/components/accounting/JournalVoucherPrint'
 import { format } from 'date-fns'
 
 type JournalEntryItem = {
@@ -123,6 +125,13 @@ export default function JournalClient({
   const [isLoadingVoucher, setIsLoadingVoucher] = useState(false)
   const [ledgerSearchText, setLedgerSearchText] = useState('')
   const [ledgerTypeFilter, setLedgerTypeFilter] = useState<'ALL' | 'DEBIT' | 'CREDIT'>('ALL')
+  const [showPrintVoucher, setShowPrintVoucher] = useState(false)
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false)
+  const [minAmount, setMinAmount] = useState('')
+  const [maxAmount, setMaxAmount] = useState('')
+  const [selectedCounterpartyFilter, setSelectedCounterpartyFilter] = useState('')
+  const [selectedModuleFilter, setSelectedModuleFilter] = useState('')
+  const [showMoMComparison, setShowMoMComparison] = useState(false)
   const [loadedCountByStatus, setLoadedCountByStatus] = useState<Record<JournalStatusFilter, number>>(initialLoadedCounts)
   const [hasMoreByStatus, setHasMoreByStatus] = useState<Record<JournalStatusFilter, boolean>>(() => ({
     POSTED: initialLoadedCounts.POSTED >= JOURNAL_PAGE_SIZE,
@@ -251,7 +260,14 @@ export default function JournalClient({
     setAccountLedger(EMPTY_ACCOUNT_LEDGER)
     setLedgerSearchText('')
     setLedgerTypeFilter('ALL')
+    setMinAmount('')
+    setMaxAmount('')
+    setSelectedCounterpartyFilter('')
+    setSelectedModuleFilter('')
+    setShowAdvancedFilter(false)
+    setShowMoMComparison(false)
     setSelectedVoucherEntry(null)
+    setShowPrintVoucher(false)
   }
 
   const handleOpenVoucherModal = async (row: any) => {
@@ -846,9 +862,30 @@ export default function JournalClient({
             ? accountLedger.summary.totalCredit - accountLedger.summary.totalDebit
             : accountLedger.summary.totalDebit - accountLedger.summary.totalCredit
 
+          const activeAdvancedFilterCount = [
+            Boolean(minAmount),
+            Boolean(maxAmount),
+            Boolean(selectedCounterpartyFilter),
+            Boolean(selectedModuleFilter),
+          ].filter(Boolean).length
+
           const filteredRows = accountLedger.rows.filter((row) => {
             if (ledgerTypeFilter === 'DEBIT' && row.debit <= 0) return false
             if (ledgerTypeFilter === 'CREDIT' && row.credit <= 0) return false
+
+            const rowAmount = Math.max(row.debit, row.credit)
+            if (minAmount && rowAmount < Number(minAmount)) return false
+            if (maxAmount && rowAmount > Number(maxAmount)) return false
+
+            if (selectedCounterpartyFilter && !row.counterparty_accounts?.toLowerCase().includes(selectedCounterpartyFilter.toLowerCase())) {
+              return false
+            }
+
+            if (selectedModuleFilter) {
+              const combined = `${row.reference_type} ${row.description}`.toLowerCase()
+              if (!combined.includes(selectedModuleFilter.toLowerCase())) return false
+            }
+
             if (!ledgerSearchText.trim()) return true
             const q = ledgerSearchText.toLowerCase()
             return (
@@ -868,13 +905,20 @@ export default function JournalClient({
                   <div className="flex items-center gap-3">
                     <span className="w-3 h-3 rounded-full bg-blue-600 animate-pulse" />
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
                           Mutasi Bersih Periode Ini
                         </span>
                         <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/70 px-2.5 py-0.5 rounded-full">
                           {startDate || endDate ? `${startDate || 'Awal'} — ${endDate || 'Sekarang'}` : 'Semua Periode'}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowMoMComparison(!showMoMComparison)}
+                          className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border transition-all cursor-pointer ${showMoMComparison ? 'bg-blue-600 text-white border-blue-600 shadow-2xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                        >
+                          📊 {showMoMComparison ? 'Tutup Varians' : 'Bandingkan Periode Lalu'}
+                        </button>
                       </div>
                       <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                         {normalBalance === 'CREDIT' ? 'Total Kredit - Total Debit (Kredit Murni)' : 'Total Debit - Total Kredit (Debit Murni)'}
@@ -888,6 +932,32 @@ export default function JournalClient({
                     </span>
                   </div>
                 </div>
+
+                {/* MoM Variance Comparison Box */}
+                {showMoMComparison && (
+                  <div className="px-8 py-4 bg-blue-50/40 border-b border-blue-100/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Estimasi Perbandingan Periode Sebelumnya (MoM)</span>
+                      <p className="text-xs font-semibold text-slate-700">
+                        Membandingkan mutasi berjalan ({formatRupiah(netMovement)}) terhadap saldo awal periode ({formatRupiah(accountLedger.summary.openingBalance)}).
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-6 shrink-0">
+                      <div>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Selisih (Δ)</span>
+                        <span className="text-sm font-extrabold tabular-nums text-slate-800">
+                          {formatRupiah(Math.abs(netMovement - accountLedger.summary.openingBalance))}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Dinamika Aliran</span>
+                        <span className={`text-sm font-extrabold tabular-nums ${netMovement >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          {netMovement >= 0 ? '▲ Arus Masuk Bersih' : '▼ Arus Keluar Bersih'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Breakdown KPI Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-slate-200/70 text-xs">
@@ -937,6 +1007,25 @@ export default function JournalClient({
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                  {/* Toggle Advanced Filter Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      showAdvancedFilter || activeAdvancedFilterCount > 0
+                        ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-2xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Filter size={13} className={activeAdvancedFilterCount > 0 ? 'text-blue-600' : 'text-slate-400'} />
+                    <span>Filter Lanjutan</span>
+                    {activeAdvancedFilterCount > 0 && (
+                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-bold flex items-center justify-center">
+                        {activeAdvancedFilterCount}
+                      </span>
+                    )}
+                  </button>
+
                   {/* Type Filter Chips */}
                   <div className="flex bg-slate-100/80 p-1 rounded-xl gap-1 text-[11px] font-bold">
                     <button
@@ -975,6 +1064,79 @@ export default function JournalClient({
                   </button>
                 </div>
               </div>
+
+              {/* Collapsible Advanced Filter Panel */}
+              {showAdvancedFilter && (
+                <div className="px-8 py-4 bg-slate-50/80 border-b border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Nominal Minimum (Rp)</label>
+                    <input
+                      type="number"
+                      value={minAmount}
+                      onChange={(e) => setMinAmount(e.target.value)}
+                      placeholder="Contoh: 1000000"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Nominal Maksimum (Rp)</label>
+                    <input
+                      type="number"
+                      value={maxAmount}
+                      onChange={(e) => setMaxAmount(e.target.value)}
+                      placeholder="Contoh: 50000000"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Cari Lawan Akun</label>
+                    <input
+                      type="text"
+                      value={selectedCounterpartyFilter}
+                      onChange={(e) => setSelectedCounterpartyFilter(e.target.value)}
+                      placeholder="Kode/nama (misal: 1101 atau Kas)"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Modul / Jenis Transaksi</label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={selectedModuleFilter}
+                        onChange={(e) => setSelectedModuleFilter(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      >
+                        <option value="">Semua Modul</option>
+                        <option value="SALE">Penjualan (Sales)</option>
+                        <option value="PURCHASE">Pembelian (Purchasing)</option>
+                        <option value="EXPENSE">Beban / Kas Keluar</option>
+                        <option value="INVENTORY">Inventori / Stok</option>
+                        <option value="PAYROLL">Payroll / HRIS</option>
+                        <option value="FLEET">Armada / Logistik</option>
+                        <option value="SYIRKAH">Syirkah</option>
+                      </select>
+                      {activeAdvancedFilterCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMinAmount('')
+                            setMaxAmount('')
+                            setSelectedCounterpartyFilter('')
+                            setSelectedModuleFilter('')
+                          }}
+                          className="p-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 transition-all cursor-pointer shrink-0"
+                          title="Reset Filter Lanjutan"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Transactions Table */}
               <div className="overflow-x-auto">
@@ -1673,14 +1835,36 @@ export default function JournalClient({
                     Tanggal Entri: {selectedVoucherEntry.entry_date ? formatDate(selectedVoucherEntry.entry_date) : '-'}
                   </p>
                 </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowPrintVoucher(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 shadow-2xs transition-all cursor-pointer"
+                    title="Cetak Bukti Jurnal Resmi"
+                  >
+                    <Printer size={13} />
+                    <span>Cetak Bukti</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedVoucherEntry(null)}
+                    className="p-2 rounded-xl hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={() => setSelectedVoucherEntry(null)}
-                  className="w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
+              {/* Stepper Pipeline: Document Flow */}
+              <div className="p-6 pb-2">
+                <DocumentFlowStepper
+                  referenceType={selectedVoucherEntry.reference_type}
+                  referenceId={selectedVoucherEntry.reference_id}
+                  description={selectedVoucherEntry.description}
+                  memo={selectedVoucherEntry.memo}
+                  entryNumber={selectedVoucherEntry.entry_number}
+                  status={selectedVoucherEntry.status}
+                />
               </div>
 
               {/* Memo Note if any */}
