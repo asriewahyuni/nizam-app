@@ -1373,27 +1373,45 @@ export async function getBalanceSheet(
     .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
   const fiscalYearStart = `${finalAsOfDate.slice(0, 4)}-01-01`
-  const { data: latestClosedPeriod } = await db
-    .from('fiscal_periods')
-    .select('end_date')
-    .eq('org_id', orgId)
-    .eq('is_closed', true)
-    .lte('end_date', finalAsOfDate)
-    .order('end_date', { ascending: false })
-    .limit(1)
+
+  const { data: orgRow } = await db
+    .from('organizations')
+    .select('settings')
+    .eq('id', orgId)
     .maybeSingle()
+  const isShariahOrg = (orgRow?.settings as any)?.is_shariah_enabled === true
 
-  const latestClosedEnd = String(latestClosedPeriod?.end_date || '').trim() || null
-  const nextOpenDate = latestClosedEnd ? addDaysToDateString(latestClosedEnd, 1) : null
-  const currentPeriodStart = nextOpenDate && nextOpenDate > fiscalYearStart ? nextOpenDate : fiscalYearStart
-  const retainedEarningsEnd = addDaysToDateString(currentPeriodStart, -1)
+  // Syariah tidak mengenal konsep laba ditahan (retained earnings) sebagai cadangan
+  // permanen — laba yang belum dibagi tetap berstatus laba berjalan sampai dieksekusi
+  // bagi hasilnya. Jadi org syariah tidak dipecah retained vs current; satu akumulasi
+  // sejak awal langsung masuk ke 3003 "Laba Periode Berjalan", dan 3002 tidak disentuh.
+  let retainedProfit = 0
+  let currentProfit = 0
+  if (isShariahOrg) {
+    currentProfit = (await getProfitLoss(orgId, '1970-01-01', finalAsOfDate, branchId, consolidated)).netProfit
+  } else {
+    const { data: latestClosedPeriod } = await db
+      .from('fiscal_periods')
+      .select('end_date')
+      .eq('org_id', orgId)
+      .eq('is_closed', true)
+      .lte('end_date', finalAsOfDate)
+      .order('end_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-  const retainedProfit = retainedEarningsEnd >= '1970-01-01'
-    ? (await getProfitLoss(orgId, '1970-01-01', retainedEarningsEnd, branchId, consolidated)).netProfit
-    : 0
-  const currentProfit = currentPeriodStart <= finalAsOfDate
-    ? (await getProfitLoss(orgId, currentPeriodStart, finalAsOfDate, branchId, consolidated)).netProfit
-    : 0
+    const latestClosedEnd = String(latestClosedPeriod?.end_date || '').trim() || null
+    const nextOpenDate = latestClosedEnd ? addDaysToDateString(latestClosedEnd, 1) : null
+    const currentPeriodStart = nextOpenDate && nextOpenDate > fiscalYearStart ? nextOpenDate : fiscalYearStart
+    const retainedEarningsEnd = addDaysToDateString(currentPeriodStart, -1)
+
+    retainedProfit = retainedEarningsEnd >= '1970-01-01'
+      ? (await getProfitLoss(orgId, '1970-01-01', retainedEarningsEnd, branchId, consolidated)).netProfit
+      : 0
+    currentProfit = currentPeriodStart <= finalAsOfDate
+      ? (await getProfitLoss(orgId, currentPeriodStart, finalAsOfDate, branchId, consolidated)).netProfit
+      : 0
+  }
 
   const referenceByCode = new Map<string, any>(accounts.map((account: any) => [String(account?.code || ''), account]))
   const equityParent = referenceByCode.get('3000')
@@ -1420,7 +1438,9 @@ export async function getBalanceSheet(
     })
   }
 
-  upsertDerivedEquity('3002', 'Laba Ditahan', retainedProfit)
+  if (!isShariahOrg) {
+    upsertDerivedEquity('3002', 'Laba Ditahan', retainedProfit)
+  }
   upsertDerivedEquity('3003', 'Laba Periode Berjalan', currentProfit)
   equity.sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
