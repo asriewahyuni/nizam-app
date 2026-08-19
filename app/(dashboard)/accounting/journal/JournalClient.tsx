@@ -1517,13 +1517,14 @@ export default function JournalClient({
                     className="inline-flex items-center gap-1.5 hover:text-slate-700 transition-colors cursor-pointer"
                     title={sortOrder === 'desc' ? 'Terbaru ke Terlama (klik untuk balik)' : 'Terlama ke Terbaru (klik untuk balik)'}
                   >
-                    Tanggal & No
+                    Tanggal Transaksi & No
                     {sortOrder === 'desc'
                       ? <ArrowDown size={12} className="text-blue-500" />
                       : <ArrowUp size={12} className="text-blue-500" />
                     }
                   </button>
                 </th>
+                <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Dicatat Pada</th>
                 <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Deskripsi & Ref</th>
                 <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Detail Transaksi</th>
                 <th className="px-6 py-5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Status</th>
@@ -1532,7 +1533,7 @@ export default function JournalClient({
             </thead>
             <tbody className="divide-y divide-slate-50">
               {visibleEntries.length === 0 ? (
-                <tr><td colSpan={filterStatus === 'DRAFT' ? 6 : 5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Tidak ada data jurnal {filterStatus.toLowerCase()}.</td></tr>
+                <tr><td colSpan={filterStatus === 'DRAFT' ? 7 : 6} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Tidak ada data jurnal {filterStatus.toLowerCase()}.</td></tr>
               ) : (
 	                visibleEntries.map((entry: any) => {
                       const lockedPeriod = getClosedPeriodForDate(entry.entry_date)
@@ -1564,6 +1565,10 @@ export default function JournalClient({
 	                    <td className="px-8 py-6 align-top sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-slate-50 transition-colors">
 	                       <div className="text-sm font-semibold text-slate-900 tracking-tight">{entry.entry_date ? format(new Date(entry.entry_date), 'yyyy-MM-dd') : ''}</div>
 	                       <div className="text-[10px] font-bold text-slate-400 mt-1 tabular-nums uppercase tracking-tighter">{entry.entry_number}</div>
+                    </td>
+                    <td className="px-6 py-6 align-top">
+                       <div className="text-xs font-semibold text-slate-600 tabular-nums">{entry.created_at ? format(new Date(entry.created_at), 'yyyy-MM-dd') : '-'}</div>
+                       <div className="text-[10px] font-medium text-slate-400 mt-0.5 tabular-nums">{entry.created_at ? format(new Date(entry.created_at), 'HH:mm') : ''}</div>
                     </td>
                     <td className="px-6 py-6 align-top">
                       {(() => {
