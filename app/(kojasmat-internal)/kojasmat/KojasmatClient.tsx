@@ -12,7 +12,7 @@ import {
   AlertTriangle, ClipboardList, Eye, Link2, ExternalLink,
   BookOpen, ArrowDownCircle, X, Copy, Check, Pencil, Trash2, Upload, FolderOpen,
   TrendingDown, Scale, Loader2, CalendarClock, FileSignature, History, Lock, MessageCircle,
-  Download, FileSpreadsheet, Landmark, Key, ShieldCheck, RotateCcw,
+  Download, FileSpreadsheet, Landmark, Key, ShieldCheck, RotateCcw, Megaphone,
   Home, Bell, Coins, Smartphone,
 } from 'lucide-react'
 import {
@@ -53,6 +53,10 @@ import {
   type KojasmatBankSoal, type ApresiasiTier, type KojasmatTestMasukRingkas, type KomitmenSection,
 } from '@/modules/kojasmat/actions/kojasmat-test.actions'
 import { saveKojasmatAccountMappingAction } from '@/modules/kojasmat/actions/kojasmat-account-mapping.actions'
+import {
+  createPortalBanner, updatePortalBanner, toggleAktifPortalBanner, deletePortalBanner,
+  type KojasmatPortalBanner,
+} from '@/modules/kojasmat/actions/kojasmat-banner.actions'
 import {
   KOJASMAT_ACCOUNT_ROLES, KOJASMAT_ACCOUNT_ROLE_LABEL,
   type KojasmatAccountMapping, type KojasmatAccountOption, type KojasmatAccountRole,
@@ -105,6 +109,7 @@ type Props = {
   qrisPreviewUrl: string | null
   setoranPending: KojasmatSetoranPending[]
   accountMapping: KojasmatAccountMapping
+  banner: KojasmatPortalBanner[]
   chartOfAccounts: KojasmatAccountOption[]
   whatsappSettings: TenantWhatsappConfig
 }
@@ -5814,6 +5819,242 @@ function TabPengaturanAkun({ orgId, accountMapping, accounts }: {
   )
 }
 
+// ─── TAB: BANNER PORTAL ────────────────────────────────────────────────────────
+
+function TabPengaturanBanner({ orgId, banners, proyek }: {
+  orgId: string; banners: KojasmatPortalBanner[]; proyek: KojasmatProyek[]
+}) {
+  const [pending, startTransition] = useTransition()
+  const [list, setList] = useState(banners)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<KojasmatPortalBanner | null>(null)
+  const [form, setForm] = useState({
+    judul: '', subjudul: '', gambar_url: '', warna_mulai: '#0f766e', warna_akhir: '#164e63',
+    link_type: 'NONE' as 'NONE' | 'PROYEK' | 'URL', proyek_id: '', url: '', urutan: 0,
+    tanggal_mulai: '', tanggal_selesai: '',
+  })
+  const [error, setError] = useState<string | null>(null)
+
+  function openCreate() {
+    setEditing(null)
+    setForm({
+      judul: '', subjudul: '', gambar_url: '', warna_mulai: '#0f766e', warna_akhir: '#164e63',
+      link_type: 'NONE', proyek_id: '', url: '', urutan: list.length, tanggal_mulai: '', tanggal_selesai: '',
+    })
+    setError(null)
+    setFormOpen(true)
+  }
+
+  function openEdit(b: KojasmatPortalBanner) {
+    setEditing(b)
+    setForm({
+      judul: b.judul, subjudul: b.subjudul || '', gambar_url: b.gambar_url || '',
+      warna_mulai: b.warna_mulai, warna_akhir: b.warna_akhir,
+      link_type: b.link_type, proyek_id: b.proyek_id || '', url: b.url || '',
+      urutan: b.urutan, tanggal_mulai: b.tanggal_mulai || '', tanggal_selesai: b.tanggal_selesai || '',
+    })
+    setError(null)
+    setFormOpen(true)
+  }
+
+  function handleSave() {
+    setError(null)
+    startTransition(async () => {
+      const payload = {
+        org_id: orgId, judul: form.judul, subjudul: form.subjudul || undefined,
+        gambar_url: form.gambar_url || undefined, warna_mulai: form.warna_mulai, warna_akhir: form.warna_akhir,
+        link_type: form.link_type, proyek_id: form.proyek_id || undefined, url: form.url || undefined,
+        urutan: form.urutan, tanggal_mulai: form.tanggal_mulai || undefined, tanggal_selesai: form.tanggal_selesai || undefined,
+      }
+      const res = editing
+        ? await updatePortalBanner(editing.id, { ...payload, aktif: editing.aktif })
+        : await createPortalBanner(payload)
+      if (!('data' in res) || !res.data) {
+        setError('error' in res && res.error ? res.error : 'Gagal menyimpan banner.')
+        return
+      }
+      const saved = res.data
+      setList(prev => editing ? prev.map(b => b.id === saved.id ? saved : b) : [...prev, saved])
+      setFormOpen(false)
+    })
+  }
+
+  function handleToggleAktif(b: KojasmatPortalBanner) {
+    startTransition(async () => {
+      const res = await toggleAktifPortalBanner(b.id, orgId, !b.aktif)
+      if (!('error' in res)) setList(prev => prev.map(x => x.id === b.id ? { ...x, aktif: !x.aktif } : x))
+    })
+  }
+
+  function handleDelete(b: KojasmatPortalBanner) {
+    if (!confirm(`Hapus banner "${b.judul}"?`)) return
+    startTransition(async () => {
+      const res = await deletePortalBanner(b.id, orgId)
+      if (!('error' in res)) setList(prev => prev.filter(x => x.id !== b.id))
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3">
+        <p className="text-sm font-semibold text-blue-900">Banner Beranda Portal Anggota</p>
+        <p className="text-xs text-blue-700 mt-0.5">
+          Tampil sebagai carousel di halaman utama portal anggota. Bisa dihubungkan ke proyek yang
+          sedang funding, atau ke link eksternal (mis. pengumuman, artikel — sebelum modul Artikel
+          tersedia, pakai tipe &quot;URL Lain&quot;).
+        </p>
+      </div>
+
+      <div className="flex justify-end">
+        <button onClick={openCreate}
+          className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors cursor-pointer">
+          <Plus className="h-4 w-4" /> Tambah Banner
+        </button>
+      </div>
+
+      {list.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-12 text-center">
+          <Megaphone className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+          <p className="text-sm text-gray-400">Belum ada banner.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {list.slice().sort((a, b) => a.urutan - b.urutan).map(b => (
+            <div key={b.id} className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="h-16 w-24 shrink-0 rounded-xl"
+                style={b.gambar_url
+                  ? { backgroundImage: `url(${b.gambar_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                  : { background: `linear-gradient(135deg, ${b.warna_mulai}, ${b.warna_akhir})` }} />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-gray-900 text-sm truncate">{b.judul}</p>
+                <p className="text-xs text-gray-500 mt-0.5 truncate">
+                  {b.link_type === 'PROYEK'
+                    ? `Link ke proyek: ${proyek.find(p => p.id === b.proyek_id)?.nama_proyek ?? '(proyek dihapus)'}`
+                    : b.link_type === 'URL' ? `Link: ${b.url}` : 'Tanpa link'}
+                </p>
+                {(b.tanggal_mulai || b.tanggal_selesai) && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Tayang: {b.tanggal_mulai ?? '...'} s/d {b.tanggal_selesai ?? '...'}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button onClick={() => handleToggleAktif(b)} disabled={pending}
+                  className={cn('rounded-full px-3 py-1 text-xs font-semibold transition-colors cursor-pointer',
+                    b.aktif ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500')}>
+                  {b.aktif ? 'Aktif' : 'Nonaktif'}
+                </button>
+                <button onClick={() => openEdit(b)}
+                  className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer">
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button onClick={() => handleDelete(b)}
+                  className="rounded-lg p-2 text-red-400 hover:bg-red-50 transition-colors cursor-pointer">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? 'Edit Banner' : 'Tambah Banner'}>
+        <div className="space-y-4">
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Judul *</label>
+            <input type="text" value={form.judul} onChange={e => setForm(f => ({ ...f, judul: e.target.value }))}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Subjudul</label>
+            <input type="text" value={form.subjudul} onChange={e => setForm(f => ({ ...f, subjudul: e.target.value }))}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              URL Gambar <span className="text-gray-400 font-normal">(opsional — kosongkan untuk pakai gradasi warna)</span>
+            </label>
+            <input type="text" value={form.gambar_url} onChange={e => setForm(f => ({ ...f, gambar_url: e.target.value }))}
+              placeholder="https://..."
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500" />
+          </div>
+          {!form.gambar_url && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Warna Awal</label>
+                <input type="color" value={form.warna_mulai} onChange={e => setForm(f => ({ ...f, warna_mulai: e.target.value }))}
+                  className="h-10 w-full cursor-pointer rounded-xl border border-gray-200" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Warna Akhir</label>
+                <input type="color" value={form.warna_akhir} onChange={e => setForm(f => ({ ...f, warna_akhir: e.target.value }))}
+                  className="h-10 w-full cursor-pointer rounded-xl border border-gray-200" />
+              </div>
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tautan Banner</label>
+            <div className="flex gap-2 rounded-xl bg-gray-100 p-1">
+              {(['NONE', 'PROYEK', 'URL'] as const).map(t => (
+                <button key={t} type="button" onClick={() => setForm(f => ({ ...f, link_type: t }))}
+                  className={cn('flex-1 rounded-lg py-2 text-xs font-medium transition-colors cursor-pointer',
+                    form.link_type === t ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+                  {t === 'NONE' ? 'Tanpa Link' : t === 'PROYEK' ? 'Proyek' : 'URL Lain'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {form.link_type === 'PROYEK' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pilih Proyek *</label>
+              <select value={form.proyek_id} onChange={e => setForm(f => ({ ...f, proyek_id: e.target.value }))}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500">
+                <option value="">— Pilih proyek —</option>
+                {proyek.map(p => <option key={p.id} value={p.id}>{p.kode_proyek} — {p.nama_proyek}</option>)}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Anggota diarahkan ke tab Investasi saat menyentuh banner ini.</p>
+            </div>
+          )}
+          {form.link_type === 'URL' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                URL Tujuan * <span className="text-gray-400 font-normal">(placeholder untuk artikel, sebelum modulnya ada)</span>
+              </label>
+              <input type="text" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
+                placeholder="https://..."
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500" />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tayang Mulai <span className="text-gray-400 font-normal">(opsional)</span></label>
+              <input type="date" value={form.tanggal_mulai} onChange={e => setForm(f => ({ ...f, tanggal_mulai: e.target.value }))}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tayang Sampai <span className="text-gray-400 font-normal">(opsional)</span></label>
+              <input type="date" value={form.tanggal_selesai} onChange={e => setForm(f => ({ ...f, tanggal_selesai: e.target.value }))}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Urutan</label>
+            <input type="number" value={form.urutan} onChange={e => setForm(f => ({ ...f, urutan: Number(e.target.value) || 0 }))}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500" />
+          </div>
+          <button onClick={handleSave} disabled={pending || !form.judul.trim()}
+            className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors cursor-pointer">
+            {pending ? 'Menyimpan...' : 'Simpan Banner'}
+          </button>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+
 // ─── TAB: NOTIFIKASI WHATSAPP ─────────────────────────────────────────────────
 
 function TabNotifikasi({ orgId, whatsappSettings, pesanOtomatis }: { orgId: string; whatsappSettings: TenantWhatsappConfig; pesanOtomatis: PesanOtomatisSettings }) {
@@ -6004,12 +6245,12 @@ function TabNotifikasi({ orgId, whatsappSettings, pesanOtomatis }: { orgId: stri
 
 // ─── ROOT CLIENT ──────────────────────────────────────────────────────────────
 
-type ActiveTab = 'dashboard' | 'permohonan' | 'anggota' | 'proyek' | 'simpanan' | 'pelatihan' | 'laporan' | 'tindakan' | 'soal' | 'akun' | 'notifikasi'
+type ActiveTab = 'dashboard' | 'permohonan' | 'anggota' | 'proyek' | 'simpanan' | 'pelatihan' | 'laporan' | 'tindakan' | 'soal' | 'akun' | 'notifikasi' | 'banner'
 
 export default function KojasmatClient({
   orgId, stats, anggota, proyek, pelatihan, pendaftaran, laporan, tindakan,
   bankSoal, moduleSettings, bankAccounts, qrisPreviewUrl, setoranPending,
-  accountMapping, chartOfAccounts, whatsappSettings,
+  accountMapping, chartOfAccounts, whatsappSettings, banner,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -6096,6 +6337,7 @@ export default function KojasmatClient({
     { key: 'soal',        label: 'Bank Soal',       icon: BookOpen,      badge: bankSoal.filter(s => s.is_active && s.jenis === 'MASUK').length < SOAL_MINIMAL.MASUK ? bankSoal.filter(s => s.is_active && s.jenis === 'MASUK').length : undefined, badgeColor: 'bg-red-100 text-red-700' },
     { key: 'akun',        label: 'Pengaturan Akun', icon: Landmark,      badge: (KOJASMAT_ACCOUNT_ROLES.length - KOJASMAT_ACCOUNT_ROLES.filter(r => accountMapping[r]).length) || undefined, badgeColor: 'bg-amber-100 text-amber-700' },
     { key: 'notifikasi',  label: 'Notifikasi',      icon: MessageCircle, badge: whatsappSettings.enabled ? undefined : 1, badgeColor: 'bg-amber-100 text-amber-700' },
+    { key: 'banner',      label: 'Banner Portal',   icon: Megaphone },
   ]
 
   return (
@@ -6195,6 +6437,7 @@ export default function KojasmatClient({
         {activeTab === 'soal'       && <TabBankSoal orgId={orgId} bankSoal={bankSoal} moduleSettings={moduleSettings} bankAccounts={bankAccounts} qrisPreviewUrl={qrisPreviewUrl} />}
         {activeTab === 'akun'       && <TabPengaturanAkun orgId={orgId} accountMapping={accountMapping} accounts={chartOfAccounts} />}
         {activeTab === 'notifikasi' && <TabNotifikasi orgId={orgId} whatsappSettings={whatsappSettings} pesanOtomatis={moduleSettings.pesan_otomatis} />}
+        {activeTab === 'banner'     && <TabPengaturanBanner orgId={orgId} banners={banner} proyek={proyek} />}
       </div>
     </div>
   )

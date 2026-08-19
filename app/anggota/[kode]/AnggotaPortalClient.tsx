@@ -9,7 +9,7 @@ import {
   ChevronDown, ChevronUp, ChevronRight, AlertCircle, Home,
   Heart, Coins, Clock, Users, BadgeCheck, Scale, Banknote, TrendingDown,
   Loader2, MessageCircle, FileSignature, KeyRound, Eye, EyeOff,
-  QrCode, ScanLine, ArrowLeftRight, Lock,
+  QrCode, ScanLine, ArrowLeftRight, Lock, MoreHorizontal,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { BarcodeScanner } from '@/components/shared/BarcodeScanner'
@@ -38,6 +38,7 @@ import {
   type KojasmatLaporanKeuanganProyek, type KojasmatProyekTransaksi, type KojasmatPemodalDenganPotensi,
 } from '@/modules/kojasmat/actions/kojasmat-keuangan.actions'
 import { getInfoPembayaran } from '@/modules/kojasmat/actions/kojasmat-test.actions'
+import { type KojasmatPortalBanner } from '@/modules/kojasmat/actions/kojasmat-banner.actions'
 
 // Payload QR internal anggota — dipindai anggota lain untuk mengirim transfer simpanan.
 const KOJASMAT_QR_TAG = 'kojasmat_member'
@@ -72,6 +73,7 @@ type Props = {
   pelatihan: KojasmatPelatihanTerjadwal[]
   akadIjarah: KojasmatAkadIjarah | null
   testSahabat: KojasmatTestSahabat | null
+  banner: KojasmatPortalBanner[]
   orgNama: string
 }
 
@@ -140,6 +142,28 @@ function Badge({ text, cls }: { text: string; cls: string }) {
 
 // ─── SHEET (bottom drawer modal) ──────────────────────────────────────────────
 
+function NavTabButton({ active, icon: Icon, label, badge, onClick }: {
+  active: boolean; icon: React.ElementType; label: string; badge?: number; onClick: () => void
+}) {
+  return (
+    <button type="button" onClick={onClick}
+      className={cn('relative flex flex-col items-center gap-1 py-3 transition-colors cursor-pointer min-h-[44px]',
+        active ? 'text-emerald-700' : 'text-gray-400 hover:text-gray-600')}>
+      <div className={cn('relative rounded-xl p-1.5 transition-colors', active && 'bg-emerald-50')}>
+        <Icon className="h-5 w-5" />
+        {badge !== undefined && badge > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+            {badge}
+          </span>
+        )}
+      </div>
+      <span className={cn('font-heading text-[10px] font-medium', active ? 'text-emerald-700' : 'text-gray-400')}>
+        {label}
+      </span>
+    </button>
+  )
+}
+
 function Sheet({ open, onClose, title, children }: {
   open: boolean; onClose: () => void; title: string; children: React.ReactNode
 }) {
@@ -164,9 +188,42 @@ function Sheet({ open, onClose, title, children }: {
 
 // ─── TAB: BERANDA ─────────────────────────────────────────────────────────────
 
+function BannerCarousel({ banner, onNavigate }: { banner: KojasmatPortalBanner[]; onNavigate: (tab: ActiveTab) => void }) {
+  if (banner.length === 0) return null
+
+  function handleClick(b: KojasmatPortalBanner) {
+    if (b.link_type === 'PROYEK') onNavigate('investasi')
+    else if (b.link_type === 'URL' && b.url) window.open(b.url, '_blank', 'noopener,noreferrer')
+  }
+
+  return (
+    <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
+      {banner.map(b => {
+        const clickable = b.link_type !== 'NONE'
+        return (
+          <button key={b.id} type="button" onClick={() => handleClick(b)} disabled={!clickable}
+            className={cn('relative flex h-28 w-[85%] shrink-0 snap-start flex-col justify-end overflow-hidden rounded-3xl p-4 text-left shadow-sm transition-transform',
+              clickable && 'cursor-pointer hover:scale-[0.99]')}
+            style={
+              b.gambar_url
+                ? { backgroundImage: `url(${b.gambar_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                : { background: `linear-gradient(135deg, ${b.warna_mulai}, ${b.warna_akhir})` }
+            }>
+            {b.gambar_url && <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />}
+            <div className="relative">
+              <p className="font-heading text-sm font-bold text-white drop-shadow-sm">{b.judul}</p>
+              {b.subjudul && <p className="mt-0.5 text-xs text-white/85 drop-shadow-sm">{b.subjudul}</p>}
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function TabBeranda({
-  anggota, simpanan, proyekDiajukan, proyekTersedia, pembiayaan, penawaran, pelatihan, orgNama, onLihatSemuaProyek,
-}: Props & { onLihatSemuaProyek: () => void }) {
+  anggota, simpanan, proyekDiajukan, proyekTersedia, pembiayaan, penawaran, pelatihan, banner, orgNama, onLihatSemuaProyek, onNavigate,
+}: Props & { onLihatSemuaProyek: () => void; onNavigate: (tab: ActiveTab) => void }) {
   const totalSimpanan = simpanan.reduce((s, x) => s + Number(x.saldo), 0)
   const proyekAktif = proyekDiajukan.filter(p => p.status === 'BERJALAN')
   const penawaranBaru = penawaran.filter(p => p.status === 'TERKIRIM').length
@@ -182,7 +239,7 @@ function TabBeranda({
           <p className="text-emerald-200 text-xs uppercase tracking-widest mb-1">{orgNama}</p>
           <p className="text-emerald-300 text-sm mb-4">{anggota.kode_anggota}</p>
           <p className="text-emerald-200 text-xs mb-0.5">Total Simpanan</p>
-          <p className="text-4xl font-bold tracking-tight text-amber-300">{fmt(totalSimpanan)}</p>
+          <p className="font-heading text-4xl font-bold tracking-tight text-amber-300">{fmt(totalSimpanan)}</p>
 
           <div className="mt-5 grid grid-cols-4 gap-2 border-t border-white/10 pt-4">
             {[
@@ -202,6 +259,33 @@ function TabBeranda({
           </div>
         </div>
       </div>
+
+      {/* Menu Cepat — grid ikon+label besar untuk navigasi utama, gampang
+          dikenali baik oleh anggota yang terbiasa app perbankan (BSI Mobile,
+          dst.) maupun yang baru pertama pakai aplikasi. */}
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          { key: 'simpanan' as const,  label: 'Simpanan',  icon: Wallet },
+          { key: 'proyek' as const,    label: 'Proyek',     icon: Briefcase },
+          { key: 'investasi' as const, label: 'Investasi',  icon: Coins, badge: proyekTersedia.length || undefined },
+          { key: 'penawaran' as const, label: 'Penawaran',  icon: Bell,  badge: penawaranBaru || undefined },
+        ].map(({ key, label, icon: Icon, badge }) => (
+          <button key={key} type="button" onClick={() => onNavigate(key)}
+            className="flex min-h-[44px] flex-col items-center gap-2 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition-all hover:border-teal-200 hover:shadow-md cursor-pointer">
+            <span className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
+              <Icon className="h-5 w-5" />
+              {badge !== undefined && badge > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[9px] font-bold text-white">
+                  {badge}
+                </span>
+              )}
+            </span>
+            <span className="font-heading text-xs font-medium text-gray-700">{label}</span>
+          </button>
+        ))}
+      </div>
+
+      <BannerCarousel banner={banner} onNavigate={onNavigate} />
 
       {/* Status badge */}
       <div className={cn(
@@ -229,17 +313,17 @@ function TabBeranda({
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-2xl border border-gray-100 bg-white p-4 text-center shadow-sm">
           <Briefcase className="h-5 w-5 text-blue-500 mx-auto mb-1" />
-          <p className="text-xl font-bold text-gray-900">{proyekDiajukan.length}</p>
+          <p className="font-heading text-xl font-bold text-gray-900">{proyekDiajukan.length}</p>
           <p className="text-xs text-gray-400 mt-0.5">Proyek</p>
         </div>
         <div className="rounded-2xl border border-gray-100 bg-white p-4 text-center shadow-sm">
           <TrendingUp className="h-5 w-5 text-emerald-500 mx-auto mb-1" />
-          <p className="text-xl font-bold text-gray-900">{pembiayaan.filter(p => p.status === 'AKTIF').length}</p>
+          <p className="font-heading text-xl font-bold text-gray-900">{pembiayaan.filter(p => p.status === 'AKTIF').length}</p>
           <p className="text-xs text-gray-400 mt-0.5">Dibiayai</p>
         </div>
         <div className="rounded-2xl border border-gray-100 bg-white p-4 text-center shadow-sm relative">
           <Bell className="h-5 w-5 text-amber-500 mx-auto mb-1" />
-          <p className="text-xl font-bold text-gray-900">{penawaranBaru}</p>
+          <p className="font-heading text-xl font-bold text-gray-900">{penawaranBaru}</p>
           <p className="text-xs text-gray-400 mt-0.5">Penawaran</p>
           {penawaranBaru > 0 && (
             <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 animate-pulse" />
@@ -409,9 +493,11 @@ async function uploadBuktiSetoran(
   }
 }
 
-function TabSimpanan({ anggota, simpanan, setoran, akadIjarah, onRequestUpgrade }: {
+function TabSimpanan({ anggota, simpanan, setoran, akadIjarah, onRequestUpgrade, autoOpenTransfer, onAutoOpenConsumed }: {
   anggota: KojasmatAnggota; simpanan: KojasmatSimpanan[]; setoran: KojasmatSimpananMutasi[]; akadIjarah: KojasmatAkadIjarah | null
   onRequestUpgrade: () => void
+  autoOpenTransfer?: boolean
+  onAutoOpenConsumed?: () => void
 }) {
   const isSahabat = anggota.tingkat === 'SAHABAT'
   const [pending, startTransition] = useTransition()
@@ -493,6 +579,18 @@ function TabSimpanan({ anggota, simpanan, setoran, akadIjarah, onRequestUpgrade 
     setTransferError(null)
     setTransferSuccess(false)
   }
+
+  // Dipicu dari tombol Transfer di footer (di luar tab Simpanan) — tab ini
+  // baru mount saat anggota berpindah ke Simpanan, jadi cukup dicek sekali
+  // saat mount, lalu langsung "dikonsumsi" supaya kunjungan normal berikutnya
+  // ke tab ini tidak auto-buka lagi.
+  useEffect(() => {
+    if (autoOpenTransfer) {
+      openTransfer()
+      onAutoOpenConsumed?.()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function handleScanTransfer(decoded: string) {
     setScannerOpen(false)
@@ -615,7 +713,7 @@ function TabSimpanan({ anggota, simpanan, setoran, akadIjarah, onRequestUpgrade 
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 to-emerald-950 p-5 text-white ring-1 ring-amber-400/30">
         <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400" />
         <p className="text-emerald-200 text-xs mb-1">Total Simpanan</p>
-        <p className="text-3xl font-bold text-amber-300">{fmt(total)}</p>
+        <p className="font-heading text-3xl font-bold text-amber-300">{fmt(total)}</p>
       </div>
 
       <div className="grid grid-cols-3 gap-2.5">
@@ -633,7 +731,7 @@ function TabSimpanan({ anggota, simpanan, setoran, akadIjarah, onRequestUpgrade 
         </button>
         <button
           onClick={isSahabat ? openTransfer : onRequestUpgrade}
-          className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-amber-500 py-3 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-teal-500 py-3 text-xs font-semibold text-teal-700 hover:bg-teal-50 transition-colors cursor-pointer"
         >
           {isSahabat ? <ArrowLeftRight className="h-4 w-4" /> : <Lock className="h-4 w-4" />} Transfer
         </button>
@@ -1727,7 +1825,7 @@ function TabProyek({ anggota, proyekDiajukan, onRequestUpgrade }: {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="font-semibold text-gray-900">Proyek Saya</p>
+        <p className="font-heading font-semibold text-gray-900">Proyek Saya</p>
         {anggota.is_verified && (
           isSahabat ? (
             <button onClick={() => setSheetOpen(true)}
@@ -2010,7 +2108,7 @@ function TabPenawaran({ anggota, penawaran, simpanan, onRequestUpgrade }: {
 
   return (
     <div className="space-y-4">
-      <p className="font-semibold text-gray-900">Penawaran Proyek</p>
+      <p className="font-heading font-semibold text-gray-900">Penawaran Proyek</p>
 
       {penawaran.length === 0 && (
         <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-12 text-center">
@@ -2455,7 +2553,7 @@ function TabInvestasi({
 
       {pembiayaanList.length > 0 && (
         <div className="space-y-3">
-          <p className="font-semibold text-gray-900">Proyek yang Saya Biayai</p>
+          <p className="font-heading font-semibold text-gray-900">Proyek yang Saya Biayai</p>
           {pembiayaanList.map((pm: KojasmatPembiayaan & {
             proyek_id?: string; nama_proyek?: string; jenis_akad?: string; proyek_status?: string
           }) => {
@@ -3016,14 +3114,35 @@ function SahabatUpgradeSheet({ open, onClose, testSahabat, onUpdated, anggotaId 
 
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 
+const TEXT_SIZE_STORAGE_KEY = 'kojasmat-portal-text-size'
+
 export default function AnggotaPortalClient(props: Props) {
   const { anggota, simpanan, setoran, proyekDiajukan, pembiayaan, penawaran, laporan, proyekTersedia, akadIjarah, testSahabat, orgNama } = props
   const [activeTab, setActiveTab] = useState<ActiveTab>('beranda')
   const [gantiPasswordOpen, setGantiPasswordOpen] = useState(false)
   const [sahabatSheetOpen, setSahabatSheetOpen] = useState(false)
   const [testSahabatState, setTestSahabatState] = useState(testSahabat)
+  const [lainnyaOpen, setLainnyaOpen] = useState(false)
+  const [autoOpenTransfer, setAutoOpenTransfer] = useState(false)
+  const [textSizeBesar, setTextSizeBesar] = useState(false)
   const isSahabat = anggota.tingkat === 'SAHABAT'
   const openUpgradeSheet = () => setSahabatSheetOpen(true)
+
+  // Toggle ukuran teks — aksesibilitas untuk anggota yang kesulitan baca teks
+  // kecil (mis. lansia). Preferensi disimpan per-perangkat dan diterapkan lewat
+  // font-size di <html> supaya seluruh ukuran teks berbasis rem (termasuk
+  // Tailwind text-*) ikut membesar secara konsisten, khusus selama portal ini
+  // aktif — direset begitu anggota meninggalkan halaman.
+  useEffect(() => {
+    const saved = window.localStorage.getItem(TEXT_SIZE_STORAGE_KEY)
+    if (saved === 'besar') setTextSizeBesar(true)
+  }, [])
+
+  useEffect(() => {
+    document.documentElement.style.fontSize = textSizeBesar ? '113%' : ''
+    window.localStorage.setItem(TEXT_SIZE_STORAGE_KEY, textSizeBesar ? 'besar' : 'normal')
+    return () => { document.documentElement.style.fontSize = '' }
+  }, [textSizeBesar])
 
   useEffect(() => {
     const handleHash = () => {
@@ -3046,25 +3165,38 @@ export default function AnggotaPortalClient(props: Props) {
   const proyekBerjalan = proyekDiajukan.filter(p => p.status === 'BERJALAN')
   const penawaranBaru = penawaran.filter(p => p.status === 'TERKIRIM').length
 
-  const tabs: { key: ActiveTab; label: string; icon: React.ElementType; badge?: number }[] = [
-    { key: 'beranda',   label: 'Beranda',   icon: Home },
-    { key: 'simpanan',  label: 'Simpanan',  icon: Wallet },
-    { key: 'proyek',    label: 'Proyek',    icon: Briefcase },
+  // Footer disederhanakan jadi 5 slot tetap (tanpa scroll horizontal) — tab
+  // yang lebih jarang dipakai (Investasi/Penawaran/Laporan) digabung ke
+  // "Lainnya" supaya semua tujuan tetap terlihat & mudah ditemukan tanpa
+  // perlu tahu kalau bar-nya bisa di-scroll.
+  const moreTabs: { key: ActiveTab; label: string; icon: React.ElementType; badge?: number }[] = [
     { key: 'investasi', label: 'Investasi', icon: Coins, badge: proyekTersedia.length || undefined },
     { key: 'penawaran', label: 'Penawaran', icon: Bell, badge: penawaranBaru || undefined },
     ...(proyekBerjalan.length > 0 ? [{ key: 'laporan' as ActiveTab, label: 'Laporan', icon: FileText }] : []),
   ]
+  const lainnyaBadge = moreTabs.reduce((s, t) => s + (t.badge ?? 0), 0)
+
+  const handleTransferFabClick = () => {
+    if (!isSahabat) { openUpgradeSheet(); return }
+    handleTabClick('simpanan')
+    setAutoOpenTransfer(true)
+  }
 
   return (
     <div className="min-h-screen bg-emerald-50/40">
       <MobilePullToRefresh scrollContainerId="anggota-portal-scroll-root" />
       <div id="anggota-portal-scroll-root" className="h-screen overflow-y-auto">
         {/* Top bar */}
-        <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-sm border-b border-amber-200/60 px-4 py-3">
+        <div className="sticky top-0 z-30 border-b border-amber-200/60 bg-white/90 bg-[radial-gradient(circle_at_top_right,rgba(13,148,136,0.06),transparent_55%)] px-4 py-3 backdrop-blur-sm">
           <div className="flex items-center justify-between max-w-lg mx-auto">
-            <div>
-              <p className="text-[10px] text-emerald-600/70 uppercase tracking-widest">{orgNama}</p>
-              <h1 className="font-bold text-gray-900 text-base leading-tight">{anggota.nama}</h1>
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-emerald-700 font-heading text-sm font-bold text-white">
+                {anggota.nama.trim().charAt(0).toUpperCase() || '?'}
+              </span>
+              <div>
+                <p className="text-[10px] text-emerald-600/70 uppercase tracking-widest">{orgNama}</p>
+                <h1 className="font-heading font-bold text-gray-900 text-base leading-tight">{anggota.nama}</h1>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {isSahabat ? (
@@ -3080,6 +3212,15 @@ export default function AnggotaPortalClient(props: Props) {
               <span className="font-mono text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
                 {anggota.kode_anggota}
               </span>
+              <button type="button" onClick={() => setTextSizeBesar(v => !v)}
+                aria-pressed={textSizeBesar}
+                aria-label="Perbesar ukuran teks"
+                title="Perbesar ukuran teks"
+                className={cn('flex h-8 min-w-[44px] items-center justify-center gap-0.5 rounded-full px-2 text-xs font-bold transition-colors cursor-pointer',
+                  textSizeBesar ? 'bg-teal-600 text-white' : 'text-gray-400 hover:bg-gray-100')}>
+                <span className="text-[10px]">A</span>
+                <span>A</span>
+              </button>
               <button type="button" onClick={() => setGantiPasswordOpen(true)}
                 className="rounded-full p-2 text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer">
                 <KeyRound className="h-4 w-4" />
@@ -3094,8 +3235,8 @@ export default function AnggotaPortalClient(props: Props) {
 
         {/* Content */}
         <div className="mx-auto max-w-lg px-4 py-5 pb-28">
-          {activeTab === 'beranda'   && <TabBeranda {...props} onLihatSemuaProyek={() => handleTabClick('investasi')} />}
-          {activeTab === 'simpanan'  && <TabSimpanan anggota={anggota} simpanan={simpanan} setoran={setoran} akadIjarah={akadIjarah} onRequestUpgrade={openUpgradeSheet} />}
+          {activeTab === 'beranda'   && <TabBeranda {...props} onLihatSemuaProyek={() => handleTabClick('investasi')} onNavigate={handleTabClick} />}
+          {activeTab === 'simpanan'  && <TabSimpanan anggota={anggota} simpanan={simpanan} setoran={setoran} akadIjarah={akadIjarah} onRequestUpgrade={openUpgradeSheet} autoOpenTransfer={autoOpenTransfer} onAutoOpenConsumed={() => setAutoOpenTransfer(false)} />}
           {activeTab === 'proyek'    && <TabProyek anggota={anggota} proyekDiajukan={proyekDiajukan} onRequestUpgrade={openUpgradeSheet} />}
           {activeTab === 'investasi' && <TabInvestasi anggota={anggota} simpanan={simpanan} proyekTersedia={proyekTersedia} pembiayaan={pembiayaan} onRequestUpgrade={openUpgradeSheet} />}
           {activeTab === 'penawaran' && <TabPenawaran anggota={anggota} penawaran={penawaran} simpanan={simpanan} onRequestUpgrade={openUpgradeSheet} />}
@@ -3103,32 +3244,60 @@ export default function AnggotaPortalClient(props: Props) {
         </div>
       </div>
 
-      {/* Bottom Nav */}
+      {/* Bottom Nav — 5 slot tetap, tanpa scroll: Beranda, Simpanan, tombol
+          Transfer terangkat di tengah, Proyek, dan Lainnya (Investasi/
+          Penawaran/Laporan digabung supaya tetap kelihatan tanpa perlu tahu
+          bar-nya bisa di-scroll). */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-sm border-t border-amber-200/60 safe-area-pb">
-        <div className="relative mx-auto max-w-lg">
-          <div className="flex overflow-x-auto snap-x snap-mandatory px-2 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            {tabs.map(t => (
-              <button key={t.key} onClick={() => handleTabClick(t.key)}
-                className={cn('relative flex flex-1 min-w-[76px] flex-col items-center gap-1 py-3 transition-colors cursor-pointer snap-start',
-                  activeTab === t.key ? 'text-emerald-700' : 'text-gray-400 hover:text-gray-600')}>
-                <div className={cn('relative p-1.5 rounded-xl transition-colors', activeTab === t.key && 'bg-emerald-50')}>
-                  <t.icon className="h-5 w-5" />
-                  {t.badge !== undefined && t.badge > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
-                      {t.badge}
-                    </span>
-                  )}
-                </div>
-                <span className={cn('text-[10px] font-medium', activeTab === t.key ? 'text-emerald-700' : 'text-gray-400')}>
-                  {t.label}
-                </span>
-              </button>
-            ))}
+        <div className="relative mx-auto grid max-w-lg grid-cols-5 items-end">
+          <NavTabButton active={activeTab === 'beranda'} icon={Home} label="Beranda" onClick={() => handleTabClick('beranda')} />
+          <NavTabButton active={activeTab === 'simpanan'} icon={Wallet} label="Simpanan" onClick={() => handleTabClick('simpanan')} />
+
+          <div className="flex flex-col items-center justify-end pb-2">
+            <button type="button" onClick={handleTransferFabClick}
+              aria-label="Transfer simpanan"
+              title="Transfer simpanan"
+              className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-teal-600 text-white shadow-lg shadow-teal-600/30 ring-4 ring-white transition-transform hover:scale-105 cursor-pointer">
+              <ArrowLeftRight className="h-6 w-6" />
+            </button>
+            <span className="mt-1 text-[10px] font-medium text-teal-700">Transfer</span>
           </div>
-          {/* Scroll Fade Indicator */}
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/90 to-transparent pointer-events-none" />
+
+          <NavTabButton active={activeTab === 'proyek'} icon={Briefcase} label="Proyek" onClick={() => handleTabClick('proyek')} />
+          <NavTabButton
+            active={['investasi', 'penawaran', 'laporan'].includes(activeTab)}
+            icon={MoreHorizontal} label="Lainnya" badge={lainnyaBadge} onClick={() => setLainnyaOpen(true)}
+          />
         </div>
       </nav>
+
+      <Sheet open={lainnyaOpen} onClose={() => setLainnyaOpen(false)} title="Lainnya">
+        <div className="space-y-2">
+          <button type="button" onClick={() => { handleTabClick('beranda'); setLainnyaOpen(false) }}
+            className="flex w-full items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3.5 text-left shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/40 cursor-pointer">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
+              <Home className="h-5 w-5" />
+            </span>
+            <span className="font-heading text-sm font-medium text-gray-800">Kembali ke Beranda</span>
+            <ChevronRight className="ml-auto h-4 w-4 text-gray-300" />
+          </button>
+          {moreTabs.map(t => (
+            <button key={t.key} type="button" onClick={() => { handleTabClick(t.key); setLainnyaOpen(false) }}
+              className="flex w-full items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3.5 text-left shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/40 cursor-pointer">
+              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
+                <t.icon className="h-5 w-5" />
+                {t.badge !== undefined && t.badge > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[9px] font-bold text-white">
+                    {t.badge}
+                  </span>
+                )}
+              </span>
+              <span className="font-heading text-sm font-medium text-gray-800">{t.label}</span>
+              <ChevronRight className="ml-auto h-4 w-4 text-gray-300" />
+            </button>
+          ))}
+        </div>
+      </Sheet>
 
       <GantiPasswordSheet open={gantiPasswordOpen} onClose={() => setGantiPasswordOpen(false)} />
       <SahabatUpgradeSheet

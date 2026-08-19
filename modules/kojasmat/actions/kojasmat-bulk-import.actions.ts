@@ -514,8 +514,8 @@ export async function executeKojasmatBulkImport(
       keterangan: s.keterangan || 'Saldo awal (bulk import)',
       tanggal: s.tanggal,
     })
-    if (res.error || !res.data) {
-      rows.push({ row_no: s.row_no, entity: 'SIMPANAN', status: 'error', error: res.error })
+    if (!('data' in res) || !res.data) {
+      rows.push({ row_no: s.row_no, entity: 'SIMPANAN', status: 'error', error: 'error' in res ? res.error : 'Gagal mencatat setoran' })
       failed++
       continue
     }
@@ -551,8 +551,8 @@ export async function executeKojasmatBulkImport(
       agunan: p.agunan || undefined,
       notes: p.notes || undefined,
     })
-    if (res.error || !res.data) {
-      rows.push({ row_no: p.row_no, entity: 'PROYEK', status: 'error', error: res.error })
+    if (!('data' in res) || !res.data) {
+      rows.push({ row_no: p.row_no, entity: 'PROYEK', status: 'error', error: 'error' in res ? res.error : 'Gagal membuat proyek' })
       failed++
       continue
     }

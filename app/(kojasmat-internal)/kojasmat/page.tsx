@@ -10,6 +10,7 @@ import { getBankSoal, getModuleSettings, getInfoPembayaran } from '@/modules/koj
 import { getBankAccounts } from '@/modules/cash/actions/bank.actions'
 import { getKojasmatAccountMappingData } from '@/modules/kojasmat/lib/kojasmat-account-mapping.server'
 import { getTenantWhatsappSettings } from '@/modules/notifications/whatsapp-settings.server'
+import { getAllPortalBanners } from '@/modules/kojasmat/actions/kojasmat-banner.actions'
 import KojasmatClient from './KojasmatClient'
 
 export const revalidate = 0
@@ -34,6 +35,7 @@ export default async function KojasmatPage() {
   const setoranPending = await getSetoranPendingByOrg(orgId)
   const { mapping: accountMapping, accounts: chartOfAccounts } = await getKojasmatAccountMappingData(orgId)
   const whatsappSettings = await getTenantWhatsappSettings(orgId)
+  const banner = await getAllPortalBanners(orgId)
 
   return (
     <KojasmatClient
@@ -53,6 +55,7 @@ export default async function KojasmatPage() {
       accountMapping={accountMapping}
       chartOfAccounts={chartOfAccounts}
       whatsappSettings={whatsappSettings}
+      banner={banner}
     />
   )
 }
