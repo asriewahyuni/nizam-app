@@ -37,7 +37,14 @@ function mergeJournalEntries(entryGroups: JournalEntryListItem[][]) {
 export default async function JournalPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string | string[]; entry?: string | string[] }>
+  searchParams?: Promise<{
+    status?: string | string[]
+    entry?: string | string[]
+    accountId?: string | string[]
+    accountCode?: string | string[]
+    startDate?: string | string[]
+    endDate?: string | string[]
+  }>
 }) {
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
@@ -47,6 +54,18 @@ export default async function JournalPage({
   const requestedEntry = Array.isArray(resolvedSearchParams.entry)
     ? resolvedSearchParams.entry[0]
     : resolvedSearchParams.entry
+  const requestedAccountId = Array.isArray(resolvedSearchParams.accountId)
+    ? resolvedSearchParams.accountId[0]
+    : resolvedSearchParams.accountId
+  const requestedAccountCode = Array.isArray(resolvedSearchParams.accountCode)
+    ? resolvedSearchParams.accountCode[0]
+    : resolvedSearchParams.accountCode
+  const requestedStartDate = Array.isArray(resolvedSearchParams.startDate)
+    ? resolvedSearchParams.startDate[0]
+    : resolvedSearchParams.startDate
+  const requestedEndDate = Array.isArray(resolvedSearchParams.endDate)
+    ? resolvedSearchParams.endDate[0]
+    : resolvedSearchParams.endDate
 
   // Fetch master data first (lightweight)
   const [accounts, fiscalPeriods] = await Promise.all([
@@ -83,6 +102,10 @@ export default async function JournalPage({
       userRole={orgData.role}
       activeBranchId={activeBranch?.id ?? null}
       activeBranchName={activeBranch?.name ?? null}
+      initialAccountId={requestedAccountId}
+      initialAccountCode={requestedAccountCode}
+      initialStartDate={requestedStartDate}
+      initialEndDate={requestedEndDate}
     />
   )
 }

@@ -28,6 +28,10 @@ interface JournalClientProps {
   userRole: string
   activeBranchId: string | null
   activeBranchName: string | null
+  initialAccountId?: string | null
+  initialAccountCode?: string | null
+  initialStartDate?: string | null
+  initialEndDate?: string | null
 }
 
 type JournalStatusFilter = 'POSTED' | 'VOIDED' | 'DRAFT'
@@ -79,11 +83,20 @@ export default function JournalClient({
   userRole,
   activeBranchId,
   activeBranchName,
+  initialAccountId,
+  initialAccountCode,
+  initialStartDate,
+  initialEndDate,
 }: JournalClientProps) {
   const toAmount = (value: unknown) => {
     const parsed = Number(value ?? 0)
     return Number.isFinite(parsed) ? parsed : 0
   }
+
+  const initialMatchedAccount = accounts.find((a: any) =>
+    (initialAccountId && String(a.id) === String(initialAccountId)) ||
+    (initialAccountCode && String(a.code) === String(initialAccountCode))
+  )
 
   const [entries, setEntries] = useState<JournalEntryItem[]>(initialEntries)
   const { confirm, ConfirmUI } = useConfirm()
@@ -91,15 +104,17 @@ export default function JournalClient({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([])
   const [filterStatus, setFilterStatus] = useState<JournalStatusFilter>(initialFilterStatus)
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startDate, setStartDate] = useState(initialStartDate || '')
+  const [endDate, setEndDate] = useState(initialEndDate || '')
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [searchText, setSearchText] = useState('')
   const [activeSearch, setActiveSearch] = useState('')
   const [searchResults, setSearchResults] = useState<JournalEntryItem[] | null>(null)
   const [searchHasMore, setSearchHasMore] = useState(false)
-  const [accountSearch, setAccountSearch] = useState('')
-  const [selectedAccountId, setSelectedAccountId] = useState('')
+  const [accountSearch, setAccountSearch] = useState(
+    initialMatchedAccount ? `${initialMatchedAccount.code || ''} - ${initialMatchedAccount.name || ''}`.trim() : ''
+  )
+  const [selectedAccountId, setSelectedAccountId] = useState(initialMatchedAccount?.id || '')
   const [accountLedger, setAccountLedger] = useState<AccountLedgerResult>(EMPTY_ACCOUNT_LEDGER)
   const [isLoadingAccountLedger, setIsLoadingAccountLedger] = useState(false)
   const [isLoadingEntries, setIsLoadingEntries] = useState(false)
@@ -109,6 +124,16 @@ export default function JournalClient({
     VOIDED: initialLoadedCounts.VOIDED >= JOURNAL_PAGE_SIZE,
     DRAFT: initialLoadedCounts.DRAFT >= JOURNAL_PAGE_SIZE,
   }))
+
+  React.useEffect(() => {
+    if (initialMatchedAccount?.id) {
+      loadAccountLedgerPage(initialMatchedAccount.id, {
+        reset: true,
+        newStart: initialStartDate || undefined,
+        newEnd: initialEndDate || undefined,
+      })
+    }
+  }, [initialMatchedAccount?.id])
   
   const isOwner = userRole === 'owner' || userRole === 'admin'
 

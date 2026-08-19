@@ -1920,22 +1920,24 @@ export async function getAccountLedger(
   const offset = normalizeAccountLedgerOffset(filters.offset)
 
   try {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accountId)
     const accountResult = await queryPostgres<Record<string, unknown>>(`
       SELECT id, code, name, type, normal_balance
       FROM public.accounts
       WHERE org_id = $1
-        AND id = $2::uuid
+        AND ${isUuid ? 'id = $2::uuid' : 'code = $2'}
       LIMIT 1
     `, [orgId, accountId])
 
     const accountRow = accountResult.rows[0]
     if (!accountRow) return emptyAccountLedgerResult()
 
+    const resolvedAccountId = String(accountRow.id || '')
     const normalBalance = String(accountRow.normal_balance || '').toUpperCase() === 'CREDIT'
       ? 'CREDIT'
       : 'DEBIT'
     const account = {
-      id: String(accountRow.id || ''),
+      id: resolvedAccountId,
       code: String(accountRow.code || ''),
       name: String(accountRow.name || ''),
       type: String(accountRow.type || '') || null,
@@ -1944,7 +1946,7 @@ export async function getAccountLedger(
 
     let openingBalance = 0
     if (filters.fromDate) {
-      const openingParams: unknown[] = [orgId, accountId]
+      const openingParams: unknown[] = [orgId, resolvedAccountId]
       const openingWhere = buildAccountLedgerWhere(openingParams, filters, { beforeDate: filters.fromDate })
       const openingResult = await queryPostgres<Record<string, unknown>>(`
         SELECT
@@ -1958,7 +1960,7 @@ export async function getAccountLedger(
       openingBalance = toLedgerBalance(openingRow.total_debit, openingRow.total_credit, normalBalance)
     }
 
-    const summaryParams: unknown[] = [orgId, accountId]
+    const summaryParams: unknown[] = [orgId, resolvedAccountId]
     const summaryWhere = buildAccountLedgerWhere(summaryParams, filters)
     const summaryResult = await queryPostgres<Record<string, unknown>>(`
       SELECT
@@ -1975,7 +1977,7 @@ export async function getAccountLedger(
     const rowCount = Math.trunc(toNumber(summaryRow.row_count))
     const endingBalance = openingBalance + toLedgerBalance(totalDebit, totalCredit, normalBalance)
 
-    const rowParams: unknown[] = [orgId, accountId]
+    const rowParams: unknown[] = [orgId, resolvedAccountId]
     const rowWhere = buildAccountLedgerWhere(rowParams, filters)
     const normalBalanceParam = rowParams.push(normalBalance)
     const openingBalanceParam = rowParams.push(openingBalance)

@@ -16,11 +16,19 @@ import {
   TrendingDown,
   Percent,
   Filter,
+  ArrowUpRight,
+  ExternalLink,
+  BookOpen,
+  Search,
+  X,
+  Loader2,
+  Calendar,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
 import LineChart from '../contacts/_components/LineChart'
 import type { CogsRevenueTrendRow } from '@/modules/accounting/actions/analytics.actions'
+import { getAccountLedger, type AccountLedgerResult } from '@/modules/accounting/actions/journal.actions'
 
 interface ReportsClientProps {
   orgId: string
@@ -290,6 +298,46 @@ export default function ReportsClient({
     title: '',
     items: []
   })
+
+  // State for Account Ledger Drilldown Drawer
+  const [selectedLedgerAccount, setSelectedLedgerAccount] = useState<{
+    code: string
+    name: string
+    balance: number
+    type?: string
+    id?: string
+  } | null>(null)
+  const [ledgerData, setLedgerData] = useState<AccountLedgerResult | null>(null)
+  const [isLoadingLedger, setIsLoadingLedger] = useState(false)
+  const [ledgerSearch, setLedgerSearch] = useState('')
+
+  const openAccountLedger = async (account: { code: string; name: string; balance: number; type?: string; id?: string }) => {
+    setSelectedLedgerAccount(account)
+    setIsLoadingLedger(true)
+    setLedgerData(null)
+    setLedgerSearch('')
+
+    try {
+      const isBalanceSheet = activeTab === 'BS'
+      const fromDate = isBalanceSheet ? undefined : (startDate || undefined)
+      const toDate = endDate || undefined
+
+      const data = await getAccountLedger(orgId, {
+        account_id: account.id && account.id.includes('-') ? account.id : account.code,
+        branch_id: branchId || undefined,
+        status: 'POSTED',
+        fromDate,
+        toDate,
+        limit: 200,
+      })
+      setLedgerData(data)
+    } catch (err) {
+      console.error('[openAccountLedger] Failed to fetch ledger:', err)
+    } finally {
+      setIsLoadingLedger(false)
+    }
+  }
+
   const assetTreeRows = useMemo(
     () => buildBalanceTreeRows(balanceSheet?.assets || [], showEmptyAccounts),
     [balanceSheet?.assets, showEmptyAccounts]
@@ -312,21 +360,30 @@ export default function ReportsClient({
 
   const renderBalanceRows = (rows: BalanceTreeRow[]) => (
     rows.map((row) => (
-      <div key={row.key} className="flex justify-between items-center text-sm pb-2 border-b border-slate-50 gap-3">
+      <div
+        key={row.key}
+        onClick={() => openAccountLedger({ code: row.code, name: row.name, balance: row.balance, id: row.key })}
+        className="group flex justify-between items-center text-sm py-1 px-2 -mx-2 rounded-xl hover:bg-blue-50/70 border border-transparent hover:border-blue-100 transition-all cursor-pointer gap-3"
+      >
         <div className="flex items-center min-w-0" style={{ paddingLeft: `${row.level * 18}px` }}>
           <span className="w-4 text-slate-300 text-xs">{row.level > 0 ? '-' : ''}</span>
           <span className="w-4 text-slate-400">{row.hasChildren ? <ChevronDown size={12} /> : ''}</span>
-          <span className="text-[10px] font-mono text-slate-400 mr-2">{row.code}</span>
+          <span className="text-[10px] font-mono text-slate-400 mr-2 group-hover:text-blue-600 transition-colors">{row.code}</span>
           <div className="min-w-0 flex items-center gap-2">
-            <span className={`truncate ${row.hasChildren ? 'text-slate-700 font-bold' : 'text-slate-600 font-medium'}`}>{row.name}</span>
+            <span className={`truncate ${row.hasChildren ? 'text-slate-700 font-bold' : 'text-slate-600 font-medium'} group-hover:text-blue-900 transition-colors`}>
+              {row.name}
+            </span>
             {row.isSystemComputed && (
-              <span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-amber-700 border border-amber-100">
+              <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700 border border-amber-100">
                 Otomatis
               </span>
             )}
+            <ArrowUpRight size={12} className="text-slate-300 group-hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all shrink-0" />
           </div>
         </div>
-        <span className="text-slate-900 font-bold w-24 text-right shrink-0">{formatRupiah(row.balance)}</span>
+        <span className="text-slate-900 font-bold w-24 text-right shrink-0 tabular-nums group-hover:text-blue-900 transition-colors">
+          {formatRupiah(row.balance)}
+        </span>
       </div>
     ))
   )
@@ -529,7 +586,9 @@ export default function ReportsClient({
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                   <BarChart size={18} className="text-blue-500"/> Laporan Laba Rugi
                 </h3>
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Periode: Current Month</div>
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                  Periode: {formatDate(startDate)} — {formatDate(endDate)}
+                </div>
               </div>
               
               <div className="p-8 space-y-10">
@@ -537,13 +596,24 @@ export default function ReportsClient({
                 <motion.div variants={item} className="space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                     <span className="text-sm font-semibold text-slate-400 uppercase tracking-wide">Pendapatan</span>
-                    <span className="text-sm font-bold text-emerald-600">{formatRupiah(profitLoss.totalRevenue)}</span>
+                    <span className="text-sm font-bold text-emerald-600 tabular-nums">{formatRupiah(profitLoss.totalRevenue)}</span>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     {profitLoss.revenue.filter((r: any) => showEmptyAccounts || Math.abs(r.balance) > 0.01).map((r: any) => (
-                      <div key={r.code} className="flex justify-between items-center text-sm px-2 py-1">
-                        <span className="text-slate-600 font-medium">{r.code} - {r.name}</span>
-                        <span className="text-slate-900 font-bold">{formatRupiah(r.balance)}</span>
+                      <div
+                        key={r.code}
+                        onClick={() => openAccountLedger(r)}
+                        className="group flex justify-between items-center text-sm px-3 py-2 rounded-xl hover:bg-blue-50/70 border border-transparent hover:border-blue-100 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-slate-700 font-medium group-hover:text-blue-700 transition-colors truncate">
+                            {r.code} - {r.name}
+                          </span>
+                          <ArrowUpRight size={13} className="text-slate-300 group-hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all shrink-0" />
+                        </div>
+                        <span className="text-slate-900 font-bold tabular-nums group-hover:text-blue-900 transition-colors shrink-0 ml-3">
+                          {formatRupiah(r.balance)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -553,13 +623,24 @@ export default function ReportsClient({
                 <motion.div variants={item} className="space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                     <span className="text-sm font-semibold text-slate-400 uppercase tracking-wide">Beban & Biaya Operasional</span>
-                    <span className="text-sm font-bold text-rose-600">({formatRupiah(profitLoss.totalExpenses)})</span>
+                    <span className="text-sm font-bold text-rose-600 tabular-nums">({formatRupiah(profitLoss.totalExpenses)})</span>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     {profitLoss.expenses.filter((e: any) => showEmptyAccounts || Math.abs(e.balance) > 0.01).map((e: any) => (
-                      <div key={e.code} className="flex justify-between items-center text-sm px-2 py-1">
-                        <span className="text-slate-600 font-medium">{e.code} - {e.name}</span>
-                        <span className="text-slate-900 font-bold">{formatRupiah(e.balance)}</span>
+                      <div
+                        key={e.code}
+                        onClick={() => openAccountLedger(e)}
+                        className="group flex justify-between items-center text-sm px-3 py-2 rounded-xl hover:bg-rose-50/70 border border-transparent hover:border-rose-100 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-slate-700 font-medium group-hover:text-rose-700 transition-colors truncate">
+                            {e.code} - {e.name}
+                          </span>
+                          <ArrowUpRight size={13} className="text-slate-300 group-hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all shrink-0" />
+                        </div>
+                        <span className="text-slate-900 font-bold tabular-nums group-hover:text-rose-900 transition-colors shrink-0 ml-3">
+                          {formatRupiah(e.balance)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -863,6 +944,238 @@ export default function ReportsClient({
                 </span>
               </div>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── ACCOUNT LEDGER DRILLDOWN DRAWER ── */}
+      <AnimatePresence>
+        {selectedLedgerAccount && (
+          <div className="fixed inset-0 z-50 overflow-hidden print:hidden">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setSelectedLedgerAccount(null)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs"
+            />
+
+            {/* Drawer Panel */}
+            <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+              <motion.div
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                className="w-screen max-w-2xl bg-white shadow-2xl flex flex-col h-full border-l border-slate-200"
+              >
+                {/* Drawer Header */}
+                <div className="p-6 bg-slate-50/80 border-b border-slate-200/80 flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-lg bg-blue-100/80 text-blue-800 font-mono text-xs font-bold">
+                        {selectedLedgerAccount.code}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        {selectedLedgerAccount.type || (activeTab === 'PL' ? 'Laba Rugi' : 'Neraca')}
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900 leading-tight">
+                      {selectedLedgerAccount.name}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 pt-1">
+                      <Calendar size={13} className="text-slate-400" />
+                      <span>
+                        {activeTab === 'BS' 
+                          ? `Posisi Saldo s/d ${formatDate(endDate)}` 
+                          : `Periode: ${formatDate(startDate)} — ${formatDate(endDate)}`}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const params = new URLSearchParams()
+                        params.set('accountCode', selectedLedgerAccount.code)
+                        if (activeTab !== 'BS' && startDate) params.set('startDate', startDate)
+                        if (endDate) params.set('endDate', endDate)
+                        router.push(`/accounting/journal?${params.toString()}`)
+                      }}
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                      title="Buka di Menu Buku Besar Penuh"
+                    >
+                      <BookOpen size={14} />
+                      <span className="hidden sm:inline">Buku Besar Penuh</span>
+                      <ExternalLink size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLedgerAccount(null)}
+                      className="w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* KPI Summary Cards */}
+                {ledgerData && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-100 bg-slate-50/40 divide-x divide-y sm:divide-y-0 divide-slate-100 text-xs">
+                    <div className="p-4 space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Saldo Awal</span>
+                      <p className="font-bold text-slate-800 tabular-nums">{formatRupiah(ledgerData.summary.openingBalance)}</p>
+                    </div>
+                    <div className="p-4 space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Debit</span>
+                      <p className="font-bold text-emerald-600 tabular-nums">{formatRupiah(ledgerData.summary.totalDebit)}</p>
+                    </div>
+                    <div className="p-4 space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Kredit</span>
+                      <p className="font-bold text-rose-600 tabular-nums">{formatRupiah(ledgerData.summary.totalCredit)}</p>
+                    </div>
+                    <div className="p-4 space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Saldo Akhir</span>
+                      <p className={`font-extrabold tabular-nums ${ledgerData.summary.endingBalance >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
+                        {formatRupiah(ledgerData.summary.endingBalance)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Search Input Filter */}
+                <div className="p-4 border-b border-slate-100 bg-white">
+                  <div className="relative">
+                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={ledgerSearch}
+                      onChange={(e) => setLedgerSearch(e.target.value)}
+                      placeholder="Cari deskripsi, no. jurnal, atau lawan akun..."
+                      className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+                    />
+                    {ledgerSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setLedgerSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Transaction List Body */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-2.5 custom-scrollbar bg-slate-50/30">
+                  {isLoadingLedger ? (
+                    <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
+                      <Loader2 size={28} className="animate-spin text-blue-500" />
+                      <p className="text-xs font-semibold">Mengambil rincian mutasi buku besar...</p>
+                    </div>
+                  ) : !ledgerData || ledgerData.rows.length === 0 ? (
+                    <div className="py-20 text-center space-y-2">
+                      <p className="text-sm font-bold text-slate-600">Tidak ada mutasi jurnal</p>
+                      <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                        Belum ada transaksi jurnal berstatus POSTED yang tercatat untuk akun ini pada periode yang dipilih.
+                      </p>
+                    </div>
+                  ) : (
+                    (() => {
+                      const filteredRows = ledgerData.rows.filter((r) => {
+                        if (!ledgerSearch.trim()) return true
+                        const q = ledgerSearch.toLowerCase()
+                        return (
+                          r.description?.toLowerCase().includes(q) ||
+                          r.entry_number?.toLowerCase().includes(q) ||
+                          r.counterparty_accounts?.toLowerCase().includes(q) ||
+                          r.memo?.toLowerCase().includes(q)
+                        )
+                      })
+
+                      if (filteredRows.length === 0) {
+                        return (
+                          <div className="py-12 text-center text-xs text-slate-400 italic">
+                            Tidak ada transaksi yang cocok dengan pencarian "{ledgerSearch}".
+                          </div>
+                        )
+                      }
+
+                      return filteredRows.map((row) => (
+                        <div
+                          key={row.line_id}
+                          className="p-3.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs hover:border-blue-200 hover:shadow-xs transition-all space-y-2"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-900">
+                                  {row.entry_date ? formatDate(row.entry_date, 'short') : '-'}
+                                </span>
+                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-mono text-[10px] font-bold">
+                                  {row.entry_number}
+                                </span>
+                                {row.reference_type && (
+                                  <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[9px] font-semibold uppercase tracking-wider border border-amber-100">
+                                    {row.reference_type.replaceAll('_', ' ')}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs font-semibold text-slate-700 mt-1 leading-snug">
+                                {row.description || '-'}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Saldo</span>
+                              <span className={`text-xs font-extrabold tabular-nums ${row.running_balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                                {formatRupiah(row.running_balance)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                            <div className="text-[11px] text-slate-500 font-medium truncate max-w-[240px]">
+                              <span className="text-slate-400 font-semibold">Lawan:</span> {row.counterparty_accounts || '-'}
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              {row.debit > 0 && (
+                                <span className="text-emerald-600 font-bold tabular-nums">
+                                  +D: {formatRupiah(row.debit)}
+                                </span>
+                              )}
+                              {row.credit > 0 && (
+                                <span className="text-rose-600 font-bold tabular-nums">
+                                  -K: {formatRupiah(row.credit)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    })()
+                  )}
+                </div>
+
+                {/* Drawer Footer */}
+                {ledgerData && ledgerData.rows.length > 0 && (
+                  <div className="p-4 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex items-center justify-between">
+                    <span className="font-semibold">
+                      Menampilkan {ledgerData.rows.length} dari {ledgerData.summary.rowCount} transaksi
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLedgerAccount(null)}
+                      className="px-4 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-bold text-slate-700 transition-colors cursor-pointer"
+                    >
+                      Tutup
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>
