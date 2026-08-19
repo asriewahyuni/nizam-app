@@ -1427,11 +1427,46 @@ export default function JournalClient({
 	                       <div className="text-[10px] font-bold text-slate-400 mt-1 tabular-nums uppercase tracking-tighter">{entry.entry_number}</div>
                     </td>
                     <td className="px-6 py-6 align-top">
-                       <div className="text-sm font-semibold text-slate-800 leading-tight">{entry.description}</div>
-                       <div className="flex items-center gap-2 mt-2">
-                         <span className="text-[9px] font-semibold text-slate-400 border border-slate-200 bg-white px-2 py-0.5 rounded uppercase tracking-wide">{entry.reference_type}</span>
-                         {disclosureNote && <span className="text-[10px] font-medium text-slate-400 italic truncate max-w-[220px]">{disclosureNote}</span>}
-                       </div>
+                      {(() => {
+                        const docLink = resolveSourceDocumentLink(entry.reference_type, entry.reference_id, entry.description, disclosureNote)
+                        const docCode = docLink?.documentCode || extractDocumentNumber(entry.description) || extractDocumentNumber(disclosureNote)
+                        return (
+                          <div>
+                            <div className="text-sm font-semibold text-slate-800 leading-tight flex items-center flex-wrap gap-1.5">
+                              <span>{entry.description}</span>
+                              {docCode && (
+                                <a
+                                  href={docLink?.url || (docCode.startsWith('SO') ? `/sales?search=${encodeURIComponent(docCode)}` : `/purchasing?search=${encodeURIComponent(docCode)}`)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 shadow-2xs transition-all cursor-pointer"
+                                  title={`Buka Dokumen ${docCode}`}
+                                >
+                                  <span>{docCode}</span>
+                                  <ExternalLink size={10} className="text-emerald-600" />
+                                </a>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              {entry.reference_type && (
+                                <a
+                                  href={docLink?.url || (String(entry.reference_type).toUpperCase().includes('SALE') ? '/sales' : '/purchasing')}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 text-[9px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded uppercase tracking-wide transition-all cursor-pointer"
+                                  title="Buka Dokumen di Modul Asal"
+                                >
+                                  <span>{entry.reference_type.replaceAll('_', ' ')}</span>
+                                  <ExternalLink size={9} className="text-amber-600" />
+                                </a>
+                              )}
+                              {disclosureNote && <span className="text-[10px] font-medium text-slate-400 italic truncate max-w-[220px]">{disclosureNote}</span>}
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </td>
                     <td className="px-6 py-6 align-top">
                        <div className="flex flex-col gap-1.5 w-full min-w-[340px] max-w-lg">
@@ -1564,6 +1599,18 @@ export default function JournalClient({
 	                              </button>
 	                            </>
 	                          )}
+	                          <button
+	                            type="button"
+	                            onClick={() => {
+	                              setSelectedVoucherEntry(entry)
+	                              setShowPrintVoucher(true)
+	                            }}
+	                            className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 hover:text-blue-600 px-2.5 py-1 rounded-lg hover:bg-blue-50 border border-slate-200 shadow-2xs transition-all cursor-pointer"
+	                            title="Cetak Bukti Jurnal Resmi"
+	                          >
+	                            <Printer size={12} className="text-slate-400" />
+	                            <span>Cetak</span>
+	                          </button>
 	                          {(entry.status === 'POSTED') && isOwner && (
 	                            <SafeButton 
 	                              variant="ghost" 
@@ -1783,22 +1830,27 @@ export default function JournalClient({
                         selectedVoucherEntry.description,
                         selectedVoucherEntry.memo
                       )
+                      const refTypeStr = String(selectedVoucherEntry.reference_type || '').toUpperCase()
+                      const fallbackUrl = refTypeStr.includes('SALE') ? '/sales'
+                        : refTypeStr.includes('PURCHASE') ? '/purchasing'
+                        : refTypeStr.includes('CASH') || refTypeStr.includes('EXPENSE') ? '/cash'
+                        : refTypeStr.includes('INVENTORY') ? '/inventory'
+                        : refTypeStr.includes('PAYROLL') ? '/hris'
+                        : '/sales'
+                      const targetUrl = docLink?.url || fallbackUrl
+
                       if (selectedVoucherEntry.reference_type) {
-                        return docLink ? (
+                        return (
                           <a
-                            href={docLink.url}
+                            href={targetUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase tracking-wider border border-amber-200 shadow-2xs transition-all cursor-pointer"
-                            title={`Buka Dokumen Asal di Modul ${docLink.module}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase tracking-wider border border-amber-200 shadow-2xs transition-all cursor-pointer"
+                            title={`Buka Dokumen Asal di Modul ${docLink?.module || 'Operasional'}`}
                           >
                             <span>{selectedVoucherEntry.reference_type.replaceAll('_', ' ')}</span>
                             <ExternalLink size={10} className="text-amber-600" />
                           </a>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-semibold uppercase tracking-wider border border-amber-100">
-                            {selectedVoucherEntry.reference_type.replaceAll('_', ' ')}
-                          </span>
                         )
                       }
                       return null
@@ -1813,15 +1865,21 @@ export default function JournalClient({
                         selectedVoucherEntry.description,
                         selectedVoucherEntry.memo
                       )
-                      const docCode = docLink?.documentCode || extractDocumentNumber(selectedVoucherEntry.description)
-                      if (docLink && docCode) {
+                      const docCode = docLink?.documentCode || extractDocumentNumber(selectedVoucherEntry.description) || extractDocumentNumber(selectedVoucherEntry.memo) || extractDocumentNumber(selectedVoucherEntry.notes)
+                      if (docCode) {
+                        const fallbackUrl = docCode.startsWith('SO') ? `/sales?search=${encodeURIComponent(docCode)}`
+                          : docCode.startsWith('PO') ? `/purchasing?search=${encodeURIComponent(docCode)}`
+                          : docCode.startsWith('EXP') || docCode.startsWith('TRF') ? `/cash`
+                          : `/sales?search=${encodeURIComponent(docCode)}`
+                        const targetUrl = docLink?.url || fallbackUrl
+
                         return (
                           <a
-                            href={docLink.url}
+                            href={targetUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 shadow-2xs transition-all cursor-pointer"
-                            title={`Buka Dokumen ${docCode} di Modul ${docLink.module}`}
+                            title={`Buka Dokumen ${docCode}`}
                           >
                             <span>{docCode}</span>
                             <ExternalLink size={11} className="text-emerald-600" />
@@ -1894,20 +1952,29 @@ export default function JournalClient({
                           <tr key={line.id || Math.random()} className="hover:bg-slate-50/60 transition-colors">
                             <td className="py-3.5 pr-4 font-medium text-slate-800">
                               {(() => {
-                                const matchedAcc = accounts.find((a: any) => String(a.id) === String(line.account_id) || String(a.code) === String(line.accounts?.code))
-                                if (matchedAcc) {
+                                const accCode = line.accounts?.code || line.account_code || (typeof line.accounts === 'string' ? line.accounts : '')
+                                const accName = line.accounts?.name || line.account_name || ''
+                                const accId = line.account_id || accCode
+
+                                const matchedAcc = accounts.find((a: any) => 
+                                  (line.account_id && String(a.id) === String(line.account_id)) || 
+                                  (accCode && String(a.code) === String(accCode))
+                                )
+                                const accToSelect = matchedAcc || (accCode || accId ? { id: accId, code: accCode || accId, name: accName || 'Akun' } : null)
+
+                                if (accToSelect) {
                                   return (
                                     <button
                                       type="button"
                                       onClick={() => {
                                         setSelectedVoucherEntry(null)
-                                        handleSelectAccount(matchedAcc)
+                                        handleSelectAccount(accToSelect)
                                       }}
                                       className="group/modalAcc text-left hover:text-blue-600 cursor-pointer flex items-center gap-1.5 transition-colors"
-                                      title={`Buka Buku Besar ${matchedAcc.code} - ${matchedAcc.name}`}
+                                      title={`Buka Buku Besar ${accToSelect.code} - ${accToSelect.name}`}
                                     >
-                                      <span className="font-mono font-bold text-blue-600 group-hover/modalAcc:underline">{line.accounts?.code || matchedAcc.code}</span>
-                                      <span className="group-hover/modalAcc:underline">{line.accounts?.name || matchedAcc.name}</span>
+                                      <span className="font-mono font-bold text-blue-600 group-hover/modalAcc:underline">{accToSelect.code || '-'}</span>
+                                      <span className="group-hover/modalAcc:underline">{accToSelect.name || '-'}</span>
                                       <ArrowRightLeft size={11} className="text-slate-300 group-hover/modalAcc:text-blue-500 opacity-0 group-hover/modalAcc:opacity-100 transition-all ml-1" />
                                     </button>
                                   )
@@ -1991,6 +2058,16 @@ export default function JournalClient({
           </div>
         )}
       </AnimatePresence>
+
+      {/* ── PRINT-READY JOURNAL VOUCHER MODAL ── */}
+      {showPrintVoucher && selectedVoucherEntry && (
+        <JournalVoucherPrint
+          entry={selectedVoucherEntry}
+          branchName={activeBranchName}
+          onClose={() => setShowPrintVoucher(false)}
+        />
+      )}
+
       {ConfirmUI}
     </motion.div>
   )

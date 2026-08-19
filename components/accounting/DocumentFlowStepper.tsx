@@ -30,7 +30,7 @@ type FlowStep = {
   id: string
   label: string
   docCode?: string
-  url?: string
+  url: string
   status: 'completed' | 'current' | 'upcoming'
   icon: React.ElementType
 }
@@ -45,7 +45,11 @@ export function DocumentFlowStepper({
 }: DocumentFlowStepperProps) {
   const type = String(referenceType || '').toUpperCase().trim()
   const docLink = resolveSourceDocumentLink(referenceType, referenceId, description, memo)
-  const detectedCode = docLink?.documentCode || extractDocumentNumber(description)
+  const detectedCode = docLink?.documentCode || extractDocumentNumber(description) || extractDocumentNumber(memo)
+
+  const salesUrl = detectedCode ? `/sales?search=${encodeURIComponent(detectedCode)}` : '/sales'
+  const purchaseUrl = detectedCode ? `/purchasing?search=${encodeURIComponent(detectedCode)}` : '/purchasing'
+  const journalUrl = entryNumber ? `/accounting/journal?entry=${encodeURIComponent(entryNumber)}` : '/accounting/journal'
 
   // Build steps based on reference type
   let steps: FlowStep[] = []
@@ -56,31 +60,35 @@ export function DocumentFlowStepper({
         id: 'order',
         label: 'Order Penjualan',
         docCode: detectedCode?.startsWith('SO') ? detectedCode : undefined,
-        url: docLink?.url,
+        url: docLink?.url || salesUrl,
         status: 'completed',
         icon: ShoppingCart,
       },
       {
         id: 'delivery',
         label: 'Pengiriman / Stok',
+        url: '/inventory',
         status: 'completed',
         icon: Truck,
       },
       {
         id: 'invoice',
         label: 'Faktur & Piutang',
+        url: docLink?.url || salesUrl,
         status: 'completed',
         icon: FileText,
       },
       {
         id: 'payment',
         label: 'Penerimaan Kas',
+        url: '/cash',
         status: 'completed',
         icon: CreditCard,
       },
       {
         id: 'journal',
         label: `Jurnal (${entryNumber || 'JV'})`,
+        url: journalUrl,
         status: status === 'POSTED' ? 'completed' : 'current',
         icon: BookOpen,
       },
@@ -91,31 +99,35 @@ export function DocumentFlowStepper({
         id: 'po',
         label: 'Pesanan Beli (PO)',
         docCode: detectedCode?.startsWith('PO') ? detectedCode : undefined,
-        url: docLink?.url,
+        url: docLink?.url || purchaseUrl,
         status: 'completed',
         icon: ShoppingCart,
       },
       {
         id: 'receiving',
         label: 'Penerimaan Barang',
+        url: '/inventory',
         status: 'completed',
         icon: Package,
       },
       {
         id: 'bill',
         label: 'Tagihan Supplier',
+        url: docLink?.url || purchaseUrl,
         status: 'completed',
         icon: FileText,
       },
       {
         id: 'payment',
         label: 'Pengeluaran Kas',
+        url: '/cash',
         status: 'completed',
         icon: CreditCard,
       },
       {
         id: 'journal',
         label: `Jurnal (${entryNumber || 'JV'})`,
+        url: journalUrl,
         status: status === 'POSTED' ? 'completed' : 'current',
         icon: BookOpen,
       },
@@ -125,6 +137,7 @@ export function DocumentFlowStepper({
       {
         id: 'request',
         label: 'Pencatatan Beban',
+        url: '/cash',
         status: 'completed',
         icon: FileText,
       },
@@ -138,6 +151,7 @@ export function DocumentFlowStepper({
       {
         id: 'journal',
         label: `Jurnal (${entryNumber || 'JV'})`,
+        url: journalUrl,
         status: status === 'POSTED' ? 'completed' : 'current',
         icon: BookOpen,
       },
@@ -154,12 +168,14 @@ export function DocumentFlowStepper({
       {
         id: 'valuation',
         label: 'Penilaian Persediaan',
+        url: '/inventory',
         status: 'completed',
         icon: Layers,
       },
       {
         id: 'journal',
         label: `Jurnal (${entryNumber || 'JV'})`,
+        url: journalUrl,
         status: status === 'POSTED' ? 'completed' : 'current',
         icon: BookOpen,
       },
@@ -183,12 +199,14 @@ export function DocumentFlowStepper({
       {
         id: 'payment',
         label: 'Disbursement Gaji',
+        url: '/cash',
         status: 'completed',
         icon: CreditCard,
       },
       {
         id: 'journal',
         label: `Jurnal (${entryNumber || 'JV'})`,
+        url: journalUrl,
         status: status === 'POSTED' ? 'completed' : 'current',
         icon: BookOpen,
       },
@@ -199,13 +217,14 @@ export function DocumentFlowStepper({
         id: 'source',
         label: 'Dokumen Sumber',
         docCode: detectedCode || undefined,
-        url: docLink?.url,
+        url: docLink?.url || salesUrl,
         status: 'completed',
         icon: FileText,
       },
       {
         id: 'journal',
         label: `Jurnal Umum (${entryNumber || 'JV'})`,
+        url: journalUrl,
         status: status === 'POSTED' ? 'completed' : 'current',
         icon: BookOpen,
       },
@@ -217,7 +236,7 @@ export function DocumentFlowStepper({
       <div className="flex items-center justify-between mb-3">
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
           <Layers size={13} className="text-blue-600" />
-          Rantai Dokumen Terkait (Document Flow)
+          Rantai Dokumen Terkait (Klik untuk Buka Modul)
         </span>
         {docLink && (
           <a
@@ -239,27 +258,34 @@ export function DocumentFlowStepper({
 
           return (
             <React.Fragment key={step.id}>
-              <div className="flex flex-col items-center text-center shrink-0 min-w-[75px] max-w-[120px]">
+              <a
+                href={step.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group/step flex flex-col items-center text-center shrink-0 min-w-[75px] max-w-[120px] cursor-pointer hover:opacity-90 transition-all"
+                title={`Buka ${step.label} (${step.url})`}
+              >
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                     step.status === 'completed'
-                      ? 'bg-blue-600 text-white shadow-xs'
+                      ? 'bg-blue-600 group-hover/step:bg-blue-700 text-white shadow-xs group-hover/step:scale-110'
                       : step.status === 'current'
-                        ? 'bg-blue-100 text-blue-700 border-2 border-blue-600'
-                        : 'bg-slate-100 text-slate-400'
+                        ? 'bg-blue-100 text-blue-700 border-2 border-blue-600 group-hover/step:scale-110'
+                        : 'bg-slate-100 text-slate-400 group-hover/step:bg-slate-200'
                   }`}
                 >
                   <Icon size={14} />
                 </div>
-                <span className="text-[10px] font-bold text-slate-800 mt-1.5 leading-tight truncate max-w-full">
+                <span className="text-[10px] font-bold text-slate-800 group-hover/step:text-blue-600 mt-1.5 leading-tight truncate max-w-full">
                   {step.label}
                 </span>
                 {step.docCode && (
-                  <span className="text-[9px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60 mt-0.5">
-                    {step.docCode}
+                  <span className="text-[9px] font-mono font-bold text-emerald-600 group-hover/step:text-emerald-700 bg-emerald-50 group-hover/step:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200/60 mt-0.5 inline-flex items-center gap-0.5">
+                    <span>{step.docCode}</span>
+                    <ExternalLink size={8} className="text-emerald-500" />
                   </span>
                 )}
-              </div>
+              </a>
 
               {!isLast && (
                 <div className="flex-1 min-w-[16px] h-0.5 bg-slate-200 self-center -mt-4 shrink" />

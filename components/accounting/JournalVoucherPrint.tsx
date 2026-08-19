@@ -44,21 +44,22 @@ export function JournalVoucherPrint({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 print:p-0 print:bg-white print:static print:inset-auto">
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 print:p-0 print:bg-white print:static print:inset-auto">
       {/* Control Bar (Hidden on Print) */}
-      <div className="fixed top-4 right-4 z-60 flex items-center gap-3 print:hidden">
+      <div className="fixed top-4 right-4 z-[110] flex items-center gap-3 print:hidden">
         <button
           type="button"
           onClick={handlePrint}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-lg transition-all cursor-pointer"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xl transition-all cursor-pointer"
         >
           <Printer size={15} />
-          <span>Cetak Bukti Jurnal</span>
+          <span>Cetak Dokumen (Print / PDF)</span>
         </button>
         <button
           type="button"
           onClick={onClose}
-          className="p-2.5 rounded-xl bg-white/90 hover:bg-white text-slate-700 shadow-lg transition-all cursor-pointer"
+          className="p-2.5 rounded-xl bg-white/90 hover:bg-white text-slate-700 shadow-xl transition-all cursor-pointer"
+          title="Tutup Pratinjau Cetak"
         >
           <X size={18} />
         </button>
