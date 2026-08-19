@@ -143,16 +143,16 @@ function CogsRevenueChart({ data }: { data: CogsRevenueTrendRow[] }) {
     </div>
   )
 
-  const labels      = data.map(r => r.month_label)
-  const hasAnyCogs  = data.some(r => r.cogs > 0)
+  const labels = data.map(r => r.month_label)
+  const hasAnyCogs = data.some(r => r.cogs > 0)
   const totalRevenue = data.reduce((s, r) => s + r.revenue, 0)
-  const totalCogs    = data.reduce((s, r) => s + r.cogs, 0)
-  const totalGp      = totalRevenue - totalCogs
-  const avgMargin    = totalRevenue > 0 ? Math.round((totalGp / totalRevenue) * 100) : 0
+  const totalCogs = data.reduce((s, r) => s + r.cogs, 0)
+  const totalGp = totalRevenue - totalCogs
+  const avgMargin = totalRevenue > 0 ? Math.round((totalGp / totalRevenue) * 100) : 0
 
   const last = data[data.length - 1]
   const prev = data[data.length - 2]
-  const mom  = prev?.revenue > 0
+  const mom = prev?.revenue > 0
     ? Math.round(((last.revenue - prev.revenue) / prev.revenue) * 100)
     : null
 
@@ -203,9 +203,9 @@ function CogsRevenueChart({ data }: { data: CogsRevenueTrendRow[] }) {
         <LineChart
           labels={labels}
           series={[
-            { key: 'revenue', label: 'Revenue',     color: '#10b981', values: data.map(r => r.revenue) },
+            { key: 'revenue', label: 'Revenue', color: '#10b981', values: data.map(r => r.revenue) },
             ...(hasAnyCogs ? [{ key: 'cogs', label: 'COGS (HPP)', color: '#f43f5e', values: data.map(r => r.cogs) }] : []),
-            { key: 'gp',     label: 'Gross Profit', color: '#3b82f6', values: data.map(r => r.gross_profit) },
+            { key: 'gp', label: 'Gross Profit', color: '#3b82f6', values: data.map(r => r.gross_profit) },
           ]}
           height={200}
           formatValue={formatRupiah}
@@ -235,12 +235,11 @@ function CogsRevenueChart({ data }: { data: CogsRevenueTrendRow[] }) {
         {data.some(r => r.revenue > 0) && (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {data.filter(r => r.revenue > 0).map(r => (
-              <div key={r.month_key} className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold ${
-                r.gross_margin >= 40 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                : r.gross_margin >= 20 ? 'bg-blue-50 text-blue-700 border-blue-100'
-                : r.gross_margin >  0  ? 'bg-amber-50 text-amber-700 border-amber-100'
-                : 'bg-rose-50 text-rose-700 border-rose-100'
-              }`}>
+              <div key={r.month_key} className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold ${r.gross_margin >= 40 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                  : r.gross_margin >= 20 ? 'bg-blue-50 text-blue-700 border-blue-100'
+                    : r.gross_margin > 0 ? 'bg-amber-50 text-amber-700 border-amber-100'
+                      : 'bg-rose-50 text-rose-700 border-rose-100'
+                }`}>
                 <span className="text-slate-400 font-medium">{r.month_label}</span>
                 <span>{r.gross_margin}%</span>
               </div>
@@ -422,7 +421,7 @@ export default function ReportsClient({
     hidden: { opacity: 0, y: 10 },
     show: { opacity: 1, y: 0 }
   }
-  
+
   const openDetail = (title: string, items: CashFlowItem[]) => {
     setDetailModal({ show: true, title, items })
   }
@@ -528,11 +527,11 @@ export default function ReportsClient({
           {/* Row 2: KPI Summary Strip */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
             {[
-              { label: 'Revenue',          value: profitLoss.totalRevenue ?? 0,   icon: <TrendingUp size={13} />,  accent: 'text-emerald-300' },
-              { label: 'Total Beban',       value: profitLoss.totalExpenses ?? 0,  icon: <TrendingDown size={13} />, accent: 'text-rose-300' },
-              { label: 'Laba Bersih',       value: profitLoss.netProfit ?? 0,      icon: <BarChart size={13} />,    accent: (profitLoss.netProfit ?? 0) >= 0 ? 'text-blue-300' : 'text-red-300' },
-              { label: 'Total Aset',        value: (balanceSheet.assets ?? []).reduce((s: number, x: any) => s + (x.balance || 0), 0), icon: <PieChart size={13} />, accent: 'text-violet-300' },
-              { label: 'Arus Kas Operasi',  value: cashFlow.ocf ?? 0,             icon: <Triangle size={13} />,   accent: (cashFlow.ocf ?? 0) >= 0 ? 'text-sky-300' : 'text-amber-300' },
+              { label: 'Revenue', value: profitLoss.totalRevenue ?? 0, icon: <TrendingUp size={13} />, accent: 'text-emerald-300' },
+              { label: 'Total Beban', value: profitLoss.totalExpenses ?? 0, icon: <TrendingDown size={13} />, accent: 'text-rose-300' },
+              { label: 'Laba Bersih', value: profitLoss.netProfit ?? 0, icon: <BarChart size={13} />, accent: (profitLoss.netProfit ?? 0) >= 0 ? 'text-blue-300' : 'text-red-300' },
+              { label: 'Total Aset', value: (balanceSheet.assets ?? []).reduce((s: number, x: any) => s + (x.balance || 0), 0), icon: <PieChart size={13} />, accent: 'text-violet-300' },
+              { label: 'Arus Kas Operasi', value: cashFlow.ocf ?? 0, icon: <Triangle size={13} />, accent: (cashFlow.ocf ?? 0) >= 0 ? 'text-sky-300' : 'text-amber-300' },
             ].map(kpi => (
               <div key={kpi.label} className="bg-white/[0.08] border border-white/10 rounded-xl px-4 py-3 flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5">
@@ -555,8 +554,8 @@ export default function ReportsClient({
           <div className="flex bg-white border border-slate-200 rounded-2xl p-1.5 shadow-sm">
             {([
               { key: 'PL', label: 'Laba Rugi', icon: <BarChart size={14} /> },
-              { key: 'BS', label: 'Neraca',     icon: <PieChart size={14} /> },
-              { key: 'CF', label: 'Arus Kas',   icon: <TrendingUp size={14} /> },
+              { key: 'BS', label: 'Neraca', icon: <PieChart size={14} /> },
+              { key: 'CF', label: 'Arus Kas', icon: <TrendingUp size={14} /> },
             ] as const).map(tab => (
               <button
                 key={tab.key}
@@ -574,228 +573,228 @@ export default function ReportsClient({
           </span>
         </div>
 
-      <AnimatePresence mode="wait">
-        {activeTab === 'PL' ? (
-          <motion.div 
-            key="pl" 
-            variants={container} 
-            initial="hidden" 
-            animate="show" 
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-6"
-          >
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                  <BarChart size={18} className="text-blue-500"/> Laporan Laba Rugi
-                </h3>
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">
-                  Periode: {formatDate(startDate)} — {formatDate(endDate)}
+        <AnimatePresence mode="wait">
+          {activeTab === 'PL' ? (
+            <motion.div
+              key="pl"
+              variants={container}
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0, y: -10 }}
+              className="space-y-6"
+            >
+              <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                    <BarChart size={18} className="text-blue-500" /> Laporan Laba Rugi
+                  </h3>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                    Periode: {formatDate(startDate)} — {formatDate(endDate)}
+                  </div>
                 </div>
-              </div>
-              
-              <div className="p-8 space-y-10">
-                {/* Revenue Section */}
-                <motion.div variants={item} className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <span className="text-sm font-semibold text-slate-400 uppercase tracking-wide">Pendapatan</span>
-                    <span className="text-sm font-bold text-emerald-600 tabular-nums">{formatRupiah(profitLoss.totalRevenue)}</span>
-                  </div>
-                  <div className="space-y-1">
-                    {profitLoss.revenue.filter((r: any) => showEmptyAccounts || Math.abs(r.balance) > 0.01).map((r: any) => (
-                      <div
-                        key={r.code}
-                        onClick={() => openAccountLedger(r)}
-                        className="group flex justify-between items-center text-sm px-3 py-2 rounded-xl hover:bg-blue-50/70 border border-transparent hover:border-blue-100 transition-all cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-slate-700 font-medium group-hover:text-blue-700 transition-colors truncate">
-                            {r.code} - {r.name}
-                          </span>
-                          <ArrowUpRight size={13} className="text-slate-300 group-hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all shrink-0" />
-                        </div>
-                        <span className="text-slate-900 font-bold tabular-nums group-hover:text-blue-900 transition-colors shrink-0 ml-3">
-                          {formatRupiah(r.balance)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
 
-                {/* Expenses Section */}
-                <motion.div variants={item} className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <span className="text-sm font-semibold text-slate-400 uppercase tracking-wide">Beban & Biaya Operasional</span>
-                    <span className="text-sm font-bold text-rose-600 tabular-nums">({formatRupiah(profitLoss.totalExpenses)})</span>
-                  </div>
-                  <div className="space-y-1">
-                    {profitLoss.expenses.filter((e: any) => showEmptyAccounts || Math.abs(e.balance) > 0.01).map((e: any) => (
-                      <div
-                        key={e.code}
-                        onClick={() => openAccountLedger(e)}
-                        className="group flex justify-between items-center text-sm px-3 py-2 rounded-xl hover:bg-rose-50/70 border border-transparent hover:border-rose-100 transition-all cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-slate-700 font-medium group-hover:text-rose-700 transition-colors truncate">
-                            {e.code} - {e.name}
-                          </span>
-                          <ArrowUpRight size={13} className="text-slate-300 group-hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all shrink-0" />
-                        </div>
-                        <span className="text-slate-900 font-bold tabular-nums group-hover:text-rose-900 transition-colors shrink-0 ml-3">
-                          {formatRupiah(e.balance)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-
-                {/* Summary Section */}
-                <motion.div variants={item} className="pt-8 border-t-2 border-slate-900 flex justify-between items-center">
-                  <div className="flex flex-col">
-                    <span className="text-xl font-semibold text-slate-900 uppercase">Laba (Rugi) Bersih</span>
-                    <span className="text-xs text-slate-400 font-medium italic">Net Income for the period</span>
-                  </div>
-                  <div className={`px-6 py-3 rounded-xl text-2xl font-semibold ${profitLoss.netProfit >= 0 ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-rose-500 text-white shadow-lg shadow-rose-200'}`}>
-                    {formatRupiah(profitLoss.netProfit)}
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-          </motion.div>
-        ) : activeTab === 'CF' ? (
-          <motion.div 
-            key="cf" 
-            variants={container} 
-            initial="hidden" 
-            animate="show" 
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-8"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[
-                { 
-                  title: 'Operating (OCF - Direct)', 
-                  value: cashFlow.ocf, 
-                  icon: TrendingUp, 
-                  color: 'text-emerald-500', 
-                  hint: 'Arus kas operasional langsung dari jurnal kas/bank.',
-                  metric: cashFlow.ocf > 0 ? 'Sehat' : 'Perlu Perhatian',
-                  items: cashFlow.ocfItems
-                },
-                { 
-                  title: 'Investing (ICF)', 
-                  value: cashFlow.icf, 
-                  icon: BarChart, 
-                  color: 'text-amber-500', 
-                  hint: 'Kas yang digunakan untuk belanja aset tetap/investasi.',
-                  metric: cashFlow.icf < 0 ? 'Ekspansi' : 'Divestasi',
-                  items: cashFlow.icfItems
-                },
-                { 
-                  title: 'Financing (FCF)', 
-                  value: cashFlow.fcf, 
-                  icon: PieChart, 
-                  color: 'text-blue-500', 
-                  hint: 'Aliran kas dari pinjaman bank atau modal pemilik.',
-                  metric: cashFlow.fcf > 0 ? 'Pendanaan Masuk' : 'Pembayaran Hutang/Dividen',
-                  items: cashFlow.fcfItems
-                },
-              ].map((m) => (
-                <div key={m.title} className="bg-white rounded-[32px] p-8 border border-slate-100 shadow-sm space-y-4 flex flex-col relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-blue-50 transition-colors" />
-                  <div className="flex items-center justify-between relative z-10">
-                    <div className={`w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center ${m.color}`}>
-                      <m.icon size={24} />
+                <div className="p-8 space-y-10">
+                  {/* Revenue Section */}
+                  <motion.div variants={item} className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <span className="text-sm font-semibold text-slate-400 uppercase tracking-wide">Pendapatan</span>
+                      <span className="text-sm font-bold text-emerald-600 tabular-nums">{formatRupiah(profitLoss.totalRevenue)}</span>
                     </div>
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide bg-slate-50 px-3 py-1 rounded-full">{m.metric}</span>
-                  </div>
-                  <div className="space-y-1 relative z-10">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">{m.title}</p>
-                    <h4 className={`text-2xl font-semibold ${m.value >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
-                      {formatRupiah(m.value)}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed h-8">{m.hint}</p>
-                  </div>
-                  <div className="pt-2 relative z-10">
-                    <button type="button" 
-                      onClick={() => openDetail(m.title, m.items || [])}
-                      className="w-full py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-semibold uppercase tracking-tighter flex items-center justify-center gap-2 transition-all border border-slate-100 hover:border-slate-200"
-                    >
-                      Lihat Rincian <ArrowRight size={12}/>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                    <div className="space-y-1">
+                      {profitLoss.revenue.filter((r: any) => showEmptyAccounts || Math.abs(r.balance) > 0.01).map((r: any) => (
+                        <div
+                          key={r.code}
+                          onClick={() => openAccountLedger(r)}
+                          className="group flex justify-between items-center text-sm px-3 py-2 rounded-xl hover:bg-blue-50/70 border border-transparent hover:border-blue-100 transition-all cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-slate-700 font-medium group-hover:text-blue-700 transition-colors truncate">
+                              {r.code} - {r.name}
+                            </span>
+                            <ArrowUpRight size={13} className="text-slate-300 group-hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all shrink-0" />
+                          </div>
+                          <span className="text-slate-900 font-bold tabular-nums group-hover:text-blue-900 transition-colors shrink-0 ml-3">
+                            {formatRupiah(r.balance)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
 
-            <div className="bg-slate-900 rounded-xl p-5 text-white flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative shadow-md shadow-blue-500/20">
-               <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-[100px] -mr-40 -mt-40" />
-               <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] -ml-20 -mb-20" />
-               
-               <div className="relative z-10 space-y-2">
-                 <div className="flex items-center gap-3">
+                  {/* Expenses Section */}
+                  <motion.div variants={item} className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <span className="text-sm font-semibold text-slate-400 uppercase tracking-wide">Beban & Biaya Operasional</span>
+                      <span className="text-sm font-bold text-rose-600 tabular-nums">({formatRupiah(profitLoss.totalExpenses)})</span>
+                    </div>
+                    <div className="space-y-1">
+                      {profitLoss.expenses.filter((e: any) => showEmptyAccounts || Math.abs(e.balance) > 0.01).map((e: any) => (
+                        <div
+                          key={e.code}
+                          onClick={() => openAccountLedger(e)}
+                          className="group flex justify-between items-center text-sm px-3 py-2 rounded-xl hover:bg-rose-50/70 border border-transparent hover:border-rose-100 transition-all cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-slate-700 font-medium group-hover:text-rose-700 transition-colors truncate">
+                              {e.code} - {e.name}
+                            </span>
+                            <ArrowUpRight size={13} className="text-slate-300 group-hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all shrink-0" />
+                          </div>
+                          <span className="text-slate-900 font-bold tabular-nums group-hover:text-rose-900 transition-colors shrink-0 ml-3">
+                            {formatRupiah(e.balance)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+
+                  {/* Summary Section */}
+                  <motion.div variants={item} className="pt-8 border-t-2 border-slate-900 flex justify-between items-center">
+                    <div className="flex flex-col">
+                      <span className="text-xl font-semibold text-slate-900 uppercase">Laba (Rugi) Bersih</span>
+                      <span className="text-xs text-slate-400 font-medium italic">Net Income for the period</span>
+                    </div>
+                    <div className={`px-6 py-3 rounded-xl text-2xl font-semibold ${profitLoss.netProfit >= 0 ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : 'bg-rose-500 text-white shadow-lg shadow-rose-200'}`}>
+                      {formatRupiah(profitLoss.netProfit)}
+                    </div>
+                  </motion.div>
+                </div>
+              </div>
+            </motion.div>
+          ) : activeTab === 'CF' ? (
+            <motion.div
+              key="cf"
+              variants={container}
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0, y: -10 }}
+              className="space-y-8"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {[
+                  {
+                    title: 'Operating (OCF - Direct)',
+                    value: cashFlow.ocf,
+                    icon: TrendingUp,
+                    color: 'text-emerald-500',
+                    hint: 'Arus kas operasional langsung dari jurnal kas/bank.',
+                    metric: cashFlow.ocf > 0 ? 'Sehat' : 'Perlu Perhatian',
+                    items: cashFlow.ocfItems
+                  },
+                  {
+                    title: 'Investing (ICF)',
+                    value: cashFlow.icf,
+                    icon: BarChart,
+                    color: 'text-amber-500',
+                    hint: 'Kas yang digunakan untuk belanja aset tetap/investasi.',
+                    metric: cashFlow.icf < 0 ? 'Ekspansi' : 'Divestasi',
+                    items: cashFlow.icfItems
+                  },
+                  {
+                    title: 'Financing (FCF)',
+                    value: cashFlow.fcf,
+                    icon: PieChart,
+                    color: 'text-blue-500',
+                    hint: 'Aliran kas dari pinjaman bank atau modal pemilik.',
+                    metric: cashFlow.fcf > 0 ? 'Pendanaan Masuk' : 'Pembayaran Hutang/Dividen',
+                    items: cashFlow.fcfItems
+                  },
+                ].map((m) => (
+                  <div key={m.title} className="bg-white rounded-[32px] p-8 border border-slate-100 shadow-sm space-y-4 flex flex-col relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-blue-50 transition-colors" />
+                    <div className="flex items-center justify-between relative z-10">
+                      <div className={`w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center ${m.color}`}>
+                        <m.icon size={24} />
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide bg-slate-50 px-3 py-1 rounded-full">{m.metric}</span>
+                    </div>
+                    <div className="space-y-1 relative z-10">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">{m.title}</p>
+                      <h4 className={`text-2xl font-semibold ${m.value >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
+                        {formatRupiah(m.value)}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-medium leading-relaxed h-8">{m.hint}</p>
+                    </div>
+                    <div className="pt-2 relative z-10">
+                      <button type="button"
+                        onClick={() => openDetail(m.title, m.items || [])}
+                        className="w-full py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-semibold uppercase tracking-tighter flex items-center justify-center gap-2 transition-all border border-slate-100 hover:border-slate-200"
+                      >
+                        Lihat Rincian <ArrowRight size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-slate-900 rounded-xl p-5 text-white flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative shadow-md shadow-blue-500/20">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-[100px] -mr-40 -mt-40" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] -ml-20 -mb-20" />
+
+                <div className="relative z-10 space-y-2">
+                  <div className="flex items-center gap-3">
                     <h3 className="text-3xl font-semibold tracking-tight">Net Cash Flow</h3>
                     <div className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-semibold shadow-sm ${cashFlow.netChangeTrend === 'UP' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
-                      <Triangle 
-                        size={10} 
-                        fill="currentColor" 
+                      <Triangle
+                        size={10}
+                        fill="currentColor"
                         className={`${cashFlow.netChangeTrend === 'UP' ? '' : 'rotate-180'} transition-transform duration-500`}
                       />
                       <span>{cashFlow.netChangeTrend === 'UP' ? 'NAIK' : 'TURUN'} {Math.abs(cashFlow.changePercent || 0).toFixed(1)}%</span>
                     </div>
-                 </div>
-                 <p className="text-sm text-slate-400 font-medium font-mono opacity-80 uppercase tracking-wide">Total liquidity changes for current period</p>
-               </div>
+                  </div>
+                  <p className="text-sm text-slate-400 font-medium font-mono opacity-80 uppercase tracking-wide">Total liquidity changes for current period</p>
+                </div>
 
-               <div className="relative z-10 text-5xl font-semibold tracking-tighter text-blue-400 flex flex-col items-end gap-1">
-                 {formatRupiah(cashFlow.netChange)}
-                 <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wide opacity-60">Real-time Balance Match</div>
-               </div>
-            </div>
+                <div className="relative z-10 text-5xl font-semibold tracking-tighter text-blue-400 flex flex-col items-end gap-1">
+                  {formatRupiah(cashFlow.netChange)}
+                  <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wide opacity-60">Real-time Balance Match</div>
+                </div>
+              </div>
 
-            <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm relative overflow-hidden">
-               <div className="absolute top-0 left-0 w-2 h-full bg-blue-600" />
-               <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-8 flex items-center gap-2">
-                 <FileText size={18} className="text-blue-600"/> Insight & Analisis Kinerja
-               </h4>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-2 h-full bg-blue-600" />
+                <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-8 flex items-center gap-2">
+                  <FileText size={18} className="text-blue-600" /> Insight & Analisis Kinerja
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="p-8 rounded-[32px] bg-slate-50 border border-slate-100 space-y-4 hover:border-blue-200 transition-colors">
-                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-semibold text-xs">A</div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Kualitas Laba vs Kas</p>
-                     </div>
-                     <p className="text-sm text-slate-700 leading-relaxed font-medium">
-                       {cashFlow.ocf > profitLoss.netProfit ? 
-                        "Sangat Baik: Kas operasional lebih besar dari laba bersih. Bisnis memiliki kualitas laba yang tinggi karena pendapatan benar-benar cair menjadi uang tunai." : 
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-semibold text-xs">A</div>
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Kualitas Laba vs Kas</p>
+                    </div>
+                    <p className="text-sm text-slate-700 leading-relaxed font-medium">
+                      {cashFlow.ocf > profitLoss.netProfit ?
+                        "Sangat Baik: Kas operasional lebih besar dari laba bersih. Bisnis memiliki kualitas laba yang tinggi karena pendapatan benar-benar cair menjadi uang tunai." :
                         "Waspada: Laba bersih di atas kertas belum sepenuhnya cair menjadi kas. Periksa piutang Anda atau stok yang menumpuk."}
-                     </p>
+                    </p>
                   </div>
                   <div className="p-8 rounded-[32px] bg-slate-50 border border-slate-100 space-y-4 hover:border-emerald-200 transition-colors">
-                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-semibold text-xs">B</div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Arah Investasi</p>
-                     </div>
-                     <p className="text-sm text-slate-700 leading-relaxed font-medium">
-                       {cashFlow.icf < 0 ? 
-                        "Fase Ekspansi: Perusahaan aktif menginvestasikan kasnya untuk menambah aset tetap, pertanda persiapan pertumbuhan kapasitas di masa depan." : 
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-semibold text-xs">B</div>
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Arah Investasi</p>
+                    </div>
+                    <p className="text-sm text-slate-700 leading-relaxed font-medium">
+                      {cashFlow.icf < 0 ?
+                        "Fase Ekspansi: Perusahaan aktif menginvestasikan kasnya untuk menambah aset tetap, pertanda persiapan pertumbuhan kapasitas di masa depan." :
                         "Fase Konservatif: Tidak ada pengeluaran modal besar dideteksi. Fokus saat ini adalah efisiensi operasional dari aset yang ada."}
-                     </p>
+                    </p>
                   </div>
-               </div>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div 
-            key="bs" 
-            variants={container} 
-            initial="hidden" 
-            animate="show" 
-            exit={{ opacity: 0, y: -10 }}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-8"
-          >
-            {/* Asset Side */}
-            <div className="space-y-6">
-               <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="bs"
+              variants={container}
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0, y: -10 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+            >
+              {/* Asset Side */}
+              <div className="space-y-6">
+                <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-semibold text-slate-400 text-xs uppercase tracking-wide">Aktiva (Aset)</h3>
                     <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">{formatDate(endDate)}</div>
@@ -805,15 +804,15 @@ export default function ReportsClient({
                     {renderBalanceRows(assetTreeRows)}
                     <div className="flex justify-between items-center pt-4 text-emerald-600">
                       <span className="font-semibold uppercase text-xs">Total Aktiva</span>
-                      <span className="font-semibold text-lg w-24 text-right shrink-0">{formatRupiah(balanceSheet.assets.reduce((s:any, x:any) => s + (x.balance || 0), 0))}</span>
+                      <span className="font-semibold text-lg w-24 text-right shrink-0">{formatRupiah(balanceSheet.assets.reduce((s: any, x: any) => s + (x.balance || 0), 0))}</span>
                     </div>
                   </div>
-               </div>
-            </div>
+                </div>
+              </div>
 
-            {/* Liability & Equity Side */}
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+              {/* Liability & Equity Side */}
+              <div className="space-y-6">
+                <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-semibold text-slate-400 text-xs uppercase tracking-wide">Kewajiban & Ekuitas</h3>
                     <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">{formatDate(endDate)}</div>
@@ -822,50 +821,50 @@ export default function ReportsClient({
                     {renderBalanceHeader()}
                     {/* Liabilities */}
                     <div className="space-y-2">
-                       <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Pasiva / Hutang</p>
-                       {renderBalanceRows(liabilityTreeRows)}
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Pasiva / Hutang</p>
+                      {renderBalanceRows(liabilityTreeRows)}
                     </div>
                     {/* Equity */}
                     <div className="space-y-2">
-                       <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Modal</p>
-                       <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-                         Akun <span className="font-mono font-semibold">3002</span> menampung laba/rugi periode lampau atau periode yang sudah ditutup, sedangkan <span className="font-mono font-semibold">3003</span> menampung laba/rugi periode berjalan. Beban utilitas tetap dicatat di laba rugi, lalu dampaknya mengurangi laba periode berjalan di neraca.
-                       </p>
-                       {renderBalanceRows(equityTreeRows)}
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Modal</p>
+                      <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                        Akun <span className="font-mono font-semibold">3002</span> menampung laba/rugi periode lampau atau periode yang sudah ditutup, sedangkan <span className="font-mono font-semibold">3003</span> menampung laba/rugi periode berjalan. Beban utilitas tetap dicatat di laba rugi, lalu dampaknya mengurangi laba periode berjalan di neraca.
+                      </p>
+                      {renderBalanceRows(equityTreeRows)}
                     </div>
-                    
-                    <div className="flex justify-between items-center pt-6 text-blue-600 border-t-2 border-slate-100">
+
+                    <div className="flex justify-between items-center pt-6 pr-6 text-blue-600 border-t-2 border-slate-100">
                       <span className="font-semibold uppercase text-xs">Total Pasiva & Ekuitas</span>
                       <span className="font-semibold text-lg w-24 text-right shrink-0">
                         {formatRupiah(
-                          balanceSheet.liabilities.reduce((s:any, x:any) => s + (x.balance || 0), 0) +
-                          balanceSheet.equity.reduce((s:any, x:any) => s + (x.balance || 0), 0)
+                          balanceSheet.liabilities.reduce((s: any, x: any) => s + (x.balance || 0), 0) +
+                          balanceSheet.equity.reduce((s: any, x: any) => s + (x.balance || 0), 0)
                         )}
                       </span>
                     </div>
                   </div>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Drill-down Detail Modal */}
       <AnimatePresence>
         {detailModal.show && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }} 
-              onClick={() => setDetailModal(prev => ({ ...prev, show: false }))} 
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDetailModal(prev => ({ ...prev, show: false }))}
               className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
             />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.9, opacity: 0, y: 20 }} 
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="relative w-full max-w-lg bg-white rounded-xl shadow-md p-5 overflow-hidden"
             >
               <div className="flex items-center justify-between mb-8">
@@ -873,11 +872,11 @@ export default function ReportsClient({
                   <h3 className="text-2xl font-semibold text-slate-900">{detailModal.title}</h3>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">Rincian Arus Kas Langsung</p>
                 </div>
-                <button type="button" 
-                   onClick={() => setDetailModal(prev => ({ ...prev, show: false }))}
-                   className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
+                <button type="button"
+                  onClick={() => setDetailModal(prev => ({ ...prev, show: false }))}
+                  className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
                 >
-                  <ArrowRight className="rotate-45" size={20}/>
+                  <ArrowRight className="rotate-45" size={20} />
                 </button>
               </div>
 
@@ -940,7 +939,7 @@ export default function ReportsClient({
                 )}
               </div>
 
-              <div className="mt-8 pt-6 border-t border-slate-100 flex justify-between items-center">
+              <div className="mt-8 pt-6 pr-6 border-t border-slate-100 flex justify-between items-center">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Total Kontribusi</span>
                 <span className="text-lg font-semibold text-slate-900">
                   {formatRupiah(detailModal.items.reduce((s, x) => s + x.amount, 0))}
@@ -991,8 +990,8 @@ export default function ReportsClient({
                     <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 pt-1">
                       <Calendar size={13} className="text-slate-400" />
                       <span>
-                        {activeTab === 'BS' 
-                          ? `Posisi Saldo s/d ${formatDate(endDate)}` 
+                        {activeTab === 'BS'
+                          ? `Posisi Saldo s/d ${formatDate(endDate)}`
                           : `Periode: ${formatDate(startDate)} — ${formatDate(endDate)}`}
                       </span>
                     </p>
@@ -1029,7 +1028,7 @@ export default function ReportsClient({
                 {ledgerData && (() => {
                   const normalBalance = ledgerData.account?.normal_balance || (
                     ['REVENUE', 'LIABILITY', 'EQUITY'].includes(selectedLedgerAccount.type || '') ||
-                    ['2', '3', '4', '7', '8'].includes(selectedLedgerAccount.code[0])
+                      ['2', '3', '4', '7', '8'].includes(selectedLedgerAccount.code[0])
                       ? 'CREDIT'
                       : 'DEBIT'
                   )
@@ -1226,27 +1225,27 @@ export default function ReportsClient({
                               </div>
                             </div>
 
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                            <div className="text-[11px] text-slate-500 font-medium truncate max-w-[240px]">
-                              <span className="text-slate-400 font-semibold">Lawan:</span> {row.counterparty_accounts || '-'}
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                              {row.debit > 0 && (
-                                <span className="text-emerald-600 font-bold tabular-nums">
-                                  +D: {formatRupiah(row.debit)}
-                                </span>
-                              )}
-                              {row.credit > 0 && (
-                                <span className="text-rose-600 font-bold tabular-nums">
-                                  -K: {formatRupiah(row.credit)}
-                                </span>
-                              )}
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                              <div className="text-[11px] text-slate-500 font-medium truncate max-w-[240px]">
+                                <span className="text-slate-400 font-semibold">Lawan:</span> {row.counterparty_accounts || '-'}
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                {row.debit > 0 && (
+                                  <span className="text-emerald-600 font-bold tabular-nums">
+                                    +D: {formatRupiah(row.debit)}
+                                  </span>
+                                )}
+                                {row.credit > 0 && (
+                                  <span className="text-rose-600 font-bold tabular-nums">
+                                    -K: {formatRupiah(row.credit)}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })
-                  })()
+                        )
+                      })
+                    })()
                   )}
                 </div>
 
