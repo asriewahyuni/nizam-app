@@ -802,7 +802,7 @@ export default function ReportsClient({
                   <div className="p-8 space-y-3">
                     {renderBalanceHeader()}
                     {renderBalanceRows(assetTreeRows)}
-                    <div className="flex justify-between items-center pt-4 text-emerald-600">
+                    <div className="flex justify-between items-center pt-4 pr-12 text-emerald-600">
                       <span className="font-semibold uppercase text-xs">Total Aktiva</span>
                       <span className="font-semibold text-lg w-24 text-right shrink-0">{formatRupiah(balanceSheet.assets.reduce((s: any, x: any) => s + (x.balance || 0), 0))}</span>
                     </div>
