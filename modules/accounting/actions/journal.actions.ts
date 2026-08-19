@@ -1874,6 +1874,12 @@ function toLedgerBalance(debit: unknown, credit: unknown, normalBalance: 'DEBIT'
     : debitAmount - creditAmount
 }
 
+// Tanggal efektif Buku Besar: sama seperti Laba Rugi/Neraca/Cashflow — period_id
+// (override manual) dipakai sapu penuh hanya kalau rentang yang diminta mencakup
+// SELURUH periode entri itu; kalau cuma sebagian (rentang parsial), turun ke
+// entry_date presisi. Entri yang periodenya tidak bersinggungan sama sekali
+// dengan rentang diminta dikecualikan langsung (mencegah entri ber-override
+// period_id "bocor" lewat entry_date mentahnya ke rentang yang bukan periodenya).
 function buildAccountLedgerWhere(
   params: unknown[],
   filters: AccountLedgerFilters,
@@ -1893,14 +1899,37 @@ function buildAccountLedgerWhere(
   }
 
   if (options?.beforeDate) {
-    whereClauses.push(`je.entry_date < $${params.push(options.beforeDate)}`)
-  } else {
-    if (filters.fromDate) {
-      whereClauses.push(`je.entry_date >= $${params.push(filters.fromDate)}`)
-    }
-    if (filters.toDate) {
-      whereClauses.push(`je.entry_date <= $${params.push(filters.toDate)}`)
-    }
+    const p = params.push(options.beforeDate)
+    whereClauses.push(`(
+      (je.period_id IS NULL AND je.entry_date < $${p}::date)
+      OR (
+        je.period_id IS NOT NULL AND fp.start_date < $${p}::date
+        AND (fp.end_date < $${p}::date OR je.entry_date < $${p}::date)
+      )
+    )`)
+  } else if (filters.fromDate || filters.toDate) {
+    const startParam = filters.fromDate ? params.push(filters.fromDate) : null
+    const endParam = filters.toDate ? params.push(filters.toDate) : null
+    const entryDateInRange = [
+      startParam ? `je.entry_date >= $${startParam}::date` : null,
+      endParam ? `je.entry_date <= $${endParam}::date` : null,
+    ].filter(Boolean).join(' AND ')
+    const periodOverlapsRange = [
+      startParam ? `fp.end_date >= $${startParam}::date` : null,
+      endParam ? `fp.start_date <= $${endParam}::date` : null,
+    ].filter(Boolean).join(' AND ')
+    const periodFullyContained = [
+      startParam ? `fp.start_date >= $${startParam}::date` : null,
+      endParam ? `fp.end_date <= $${endParam}::date` : null,
+    ].filter(Boolean).join(' AND ')
+
+    whereClauses.push(`(
+      (je.period_id IS NULL AND ${entryDateInRange})
+      OR (
+        je.period_id IS NOT NULL AND ${periodOverlapsRange}
+        AND ((${periodFullyContained}) OR (${entryDateInRange}))
+      )
+    )`)
   }
 
   return whereClauses.join(' AND ')
@@ -1955,6 +1984,7 @@ export async function getAccountLedger(
           COALESCE(SUM(jl.credit), 0) AS total_credit
         FROM public.journal_lines jl
         JOIN public.journal_entries je ON je.id = jl.entry_id
+        LEFT JOIN public.fiscal_periods fp ON fp.id = je.period_id
         WHERE ${openingWhere}
       `, openingParams)
       const openingRow = openingResult.rows[0] || {}
@@ -1970,6 +2000,7 @@ export async function getAccountLedger(
         COUNT(*) AS row_count
       FROM public.journal_lines jl
       JOIN public.journal_entries je ON je.id = jl.entry_id
+      LEFT JOIN public.fiscal_periods fp ON fp.id = je.period_id
       WHERE ${summaryWhere}
     `, summaryParams)
     const summaryRow = summaryResult.rows[0] || {}
@@ -2008,6 +2039,7 @@ export async function getAccountLedger(
           END AS signed_amount
         FROM public.journal_lines jl
         JOIN public.journal_entries je ON je.id = jl.entry_id
+        LEFT JOIN public.fiscal_periods fp ON fp.id = je.period_id
         LEFT JOIN LATERAL (
           SELECT string_agg(counterparty_label, ', ' ORDER BY counterparty_label) AS accounts
           FROM (
