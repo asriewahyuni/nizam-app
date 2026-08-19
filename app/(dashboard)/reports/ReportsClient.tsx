@@ -236,9 +236,9 @@ function CogsRevenueChart({ data }: { data: CogsRevenueTrendRow[] }) {
           <div className="mt-4 flex flex-wrap gap-1.5">
             {data.filter(r => r.revenue > 0).map(r => (
               <div key={r.month_key} className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold ${r.gross_margin >= 40 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                  : r.gross_margin >= 20 ? 'bg-blue-50 text-blue-700 border-blue-100'
-                    : r.gross_margin > 0 ? 'bg-amber-50 text-amber-700 border-amber-100'
-                      : 'bg-rose-50 text-rose-700 border-rose-100'
+                : r.gross_margin >= 20 ? 'bg-blue-50 text-blue-700 border-blue-100'
+                  : r.gross_margin > 0 ? 'bg-amber-50 text-amber-700 border-amber-100'
+                    : 'bg-rose-50 text-rose-700 border-rose-100'
                 }`}>
                 <span className="text-slate-400 font-medium">{r.month_label}</span>
                 <span>{r.gross_margin}%</span>
@@ -365,7 +365,7 @@ export default function ReportsClient({
       <div
         key={row.key}
         onClick={() => openAccountLedger({ code: row.code, name: row.name, balance: row.balance, id: row.key })}
-        className="group flex justify-between items-center text-sm py-1 px-2 -mx-2 rounded-xl hover:bg-blue-50/70 border border-transparent hover:border-blue-100 transition-all cursor-pointer gap-3"
+        className="group flex justify-between items-center text-sm py-1 px-4 -mx-2 rounded-xl hover:bg-blue-50/70 border border-transparent hover:border-blue-100 transition-all cursor-pointer gap-3"
       >
         <div className="flex items-center min-w-0" style={{ paddingLeft: `${row.level * 18}px` }}>
           <span className="w-4 text-slate-300 text-xs">{row.level > 0 ? '-' : ''}</span>
@@ -833,7 +833,7 @@ export default function ReportsClient({
                       {renderBalanceRows(equityTreeRows)}
                     </div>
 
-                    <div className="flex justify-between items-center pt-6 pr-6 text-blue-600 border-t-2 border-slate-100">
+                    <div className="flex justify-between items-center pt-6 pr-10 text-blue-600 border-t-2 border-slate-100">
                       <span className="font-semibold uppercase text-xs">Total Pasiva & Ekuitas</span>
                       <span className="font-semibold text-lg w-24 text-right shrink-0">
                         {formatRupiah(
@@ -939,7 +939,7 @@ export default function ReportsClient({
                 )}
               </div>
 
-              <div className="mt-8 pt-6 pr-6 border-t border-slate-100 flex justify-between items-center">
+              <div className="mt-8 pt-6 pr-10 border-t border-slate-100 flex justify-between items-center">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Total Kontribusi</span>
                 <span className="text-lg font-semibold text-slate-900">
                   {formatRupiah(detailModal.items.reduce((s, x) => s + x.amount, 0))}
