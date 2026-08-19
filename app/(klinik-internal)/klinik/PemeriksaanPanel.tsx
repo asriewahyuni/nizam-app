@@ -202,6 +202,7 @@ export default function PemeriksaanPanel({
       }
       setMessage({ type: 'success', text: 'Tagihan dibuat.' })
       await loadData()
+      onFinalized()
     })
   }
 
@@ -216,6 +217,10 @@ export default function PemeriksaanPanel({
       }
       setMessage({ type: 'success', text: 'Pembayaran tercatat.' })
       await loadData()
+      // Kanban Antrian Hari Ini memecah kartu SELESAI jadi kolom Kasir/Selesai
+      // berdasarkan tagihan_status — parent perlu refetch supaya kartu pindah
+      // kolom begitu lunas, bukan cuma state lokal panel ini yang ke-update.
+      onFinalized()
     })
   }
 
@@ -231,6 +236,7 @@ export default function PemeriksaanPanel({
       }
       setMessage({ type: 'success', text: 'Tagihan dibatalkan.' })
       await loadData()
+      onFinalized()
     })
   }
 

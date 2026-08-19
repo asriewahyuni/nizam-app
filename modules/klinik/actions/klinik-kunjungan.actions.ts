@@ -82,15 +82,22 @@ export type KlinikAntrianRow = {
   pasien_id: string
   pasien_nama: string
   pasien_no_rm: string
+  // Status tagihan (klinik_tagihan) — null berarti belum ada tagihan dibuat
+  // sama sekali. Dipakai kanban Antrian Hari Ini untuk memecah kunjungan
+  // SELESAI jadi kolom "Kasir" (belum lunas) vs "Selesai" (lunas), tanpa
+  // menambah nilai baru ke CHECK constraint klinik_kunjungan.status.
+  tagihan_status: 'BELUM_BAYAR' | 'LUNAS' | 'VOID' | null
 }
 
 export async function getAntrianHariIni(branchId: string, poliId: string): Promise<KlinikAntrianRow[]> {
   const today = todayDateString()
   const { rows } = await queryPostgres<KlinikAntrianRow>(
     `SELECT k.id::text, k.no_antrian, k.status, k.jenis_kunjungan, k.keluhan, k.created_at::text,
-            p.id::text AS pasien_id, p.nama AS pasien_nama, p.no_rm AS pasien_no_rm
+            p.id::text AS pasien_id, p.nama AS pasien_nama, p.no_rm AS pasien_no_rm,
+            t.status AS tagihan_status
      FROM public.klinik_kunjungan k
      JOIN public.klinik_pasien p ON p.id = k.pasien_id
+     LEFT JOIN public.klinik_tagihan t ON t.kunjungan_id = k.id
      WHERE k.branch_id = $1 AND k.poli_id = $2 AND k.tanggal = $3::date
      ORDER BY k.no_antrian ASC`,
     [branchId, poliId, today],

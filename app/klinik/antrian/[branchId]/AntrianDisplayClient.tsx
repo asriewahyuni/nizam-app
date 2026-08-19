@@ -7,9 +7,16 @@
 
 import { useEffect, useState } from 'react'
 import { Stethoscope, Clock } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { getAntrianDisplayBoard, type KlinikAntrianDisplayPoli } from '@/modules/klinik/actions/klinik-kunjungan.actions'
 
 const POLL_INTERVAL_MS = 8000
+// Layar TV cuma cukup menampilkan 2 poli sekaligus secara nyaman (angka besar +
+// daftar menunggu). Kalau poli aktif lebih dari itu, board berpindah halaman
+// otomatis (swipe) tiap AUTOPLAY_INTERVAL_MS — durasi dipilih agak lebih lama
+// dari POLL_INTERVAL_MS supaya pasien sempat membaca sebelum halaman berganti.
+const POLI_PER_PAGE = 2
+const AUTOPLAY_INTERVAL_MS = 15000
 
 function useClock() {
   // now tetap null saat SSR/hydration awal (menghindari mismatch waktu
@@ -75,6 +82,7 @@ export default function AntrianDisplayClient({
 }) {
   const [poliList, setPoliList] = useState<KlinikAntrianDisplayPoli[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [pageIndex, setPageIndex] = useState(0)
   const now = useClock()
 
   useEffect(() => {
@@ -90,6 +98,26 @@ export default function AntrianDisplayClient({
     const id = setInterval(load, POLL_INTERVAL_MS)
     return () => { cancelled = true; clearInterval(id) }
   }, [branchId])
+
+  const pages: KlinikAntrianDisplayPoli[][] = []
+  for (let i = 0; i < poliList.length; i += POLI_PER_PAGE) {
+    pages.push(poliList.slice(i, i + POLI_PER_PAGE))
+  }
+
+  useEffect(() => {
+    // Poli aktif bisa berubah (poli baru dibuka/ditutup) — jaga pageIndex tetap
+    // valid daripada nge-blank kalau jumlah halaman menyusut.
+    if (pageIndex >= pages.length) setPageIndex(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pages.length])
+
+  useEffect(() => {
+    if (pages.length <= 1) return
+    const id = setInterval(() => {
+      setPageIndex((prev) => (prev + 1) % pages.length)
+    }, AUTOPLAY_INTERVAL_MS)
+    return () => clearInterval(id)
+  }, [pages.length])
 
   return (
     <main className="min-h-screen bg-cyan-50 px-6 py-8 sm:px-10">
@@ -122,11 +150,45 @@ export default function AntrianDisplayClient({
         ) : poliList.length === 0 ? (
           <p className="py-24 text-center text-sm text-slate-400">Belum ada poli aktif di cabang ini.</p>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {poliList.map((poli) => (
-              <PoliCard key={poli.poli_id} poli={poli} />
-            ))}
-          </div>
+          <>
+            <div className="overflow-hidden">
+              <div
+                className="flex transition-transform duration-700 ease-in-out motion-reduce:transition-none"
+                style={{ transform: `translateX(-${pageIndex * 100}%)` }}
+              >
+                {pages.map((page, i) => (
+                  <div key={i} className="grid w-full shrink-0 gap-6 sm:grid-cols-2">
+                    {page.map((poli) => (
+                      <PoliCard key={poli.poli_id} poli={poli} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {pages.length > 1 && (
+              <div className="mt-6 flex items-center justify-center gap-2">
+                {pages.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setPageIndex(i)}
+                    title={`Halaman ${i + 1}`}
+                    aria-label={`Tampilkan halaman ${i + 1} dari ${pages.length}`}
+                    aria-current={i === pageIndex}
+                    className="flex size-11 cursor-pointer items-center justify-center"
+                  >
+                    <span
+                      className={cn(
+                        'block rounded-full transition-all duration-300',
+                        i === pageIndex ? 'h-2.5 w-6 bg-cyan-600' : 'h-2.5 w-2.5 bg-slate-300'
+                      )}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>

@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import {
   Landmark, CheckCircle2, AlertCircle, Stethoscope, Search, UserPlus, Plus,
-  Users, PhoneCall, Ban, ChevronDown, ChevronUp, UserCog, CalendarCheck, LogIn,
+  Users, PhoneCall, Ban, ChevronRight, X, UserCog, CalendarCheck, LogIn,
   Pill, PackagePlus, Send, Boxes, MonitorPlay, ExternalLink, Copy, Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -44,18 +44,37 @@ const JENIS_KUNJUNGAN_LABEL: Record<'umum' | 'bpjs' | 'asuransi', string> = {
   asuransi: 'Asuransi',
 }
 
-const STATUS_BADGE: Record<KlinikAntrianRow['status'], string> = {
-  MENUNGGU: 'bg-amber-50 text-amber-800 border-amber-200',
-  DIPERIKSA: 'bg-cyan-50 text-cyan-800 border-cyan-200',
-  SELESAI: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  BATAL: 'bg-rose-50 text-rose-800 border-rose-200',
+// Kolom kanban "Kasir" bukan nilai baru di klinik_kunjungan.status (CHECK
+// constraint-nya tetap MENUNGGU/DIPERIKSA/SELESAI/BATAL) — murni proyeksi UI:
+// kunjungan SELESAI tanpa tagihan lunas (belum ada tagihan / BELUM_BAYAR /
+// VOID) dianggap masih di kolom Kasir; baru pindah ke Selesai setelah
+// tagihan_status === 'LUNAS'. Lihat getAntrianHariIni() di
+// klinik-kunjungan.actions.ts untuk asal kolom tagihan_status.
+type BoardStatus = 'MENUNGGU' | 'DIPERIKSA' | 'KASIR' | 'SELESAI' | 'BATAL'
+
+function getBoardStatus(row: KlinikAntrianRow): BoardStatus {
+  if (row.status !== 'SELESAI') return row.status
+  return row.tagihan_status === 'LUNAS' ? 'SELESAI' : 'KASIR'
 }
 
-const STATUS_LABEL: Record<KlinikAntrianRow['status'], string> = {
+const STATUS_LABEL: Record<BoardStatus, string> = {
   MENUNGGU: 'Menunggu',
   DIPERIKSA: 'Diperiksa',
+  KASIR: 'Kasir',
   SELESAI: 'Selesai',
   BATAL: 'Batal',
+}
+
+// Urutan kolom kanban antrian — kartu di tiap kolom mengikuti urutan `antrian`
+// apa adanya (query getAntrianHariIni() sudah ORDER BY no_antrian ASC).
+const STATUS_COLUMNS: BoardStatus[] = ['MENUNGGU', 'DIPERIKSA', 'KASIR', 'SELESAI', 'BATAL']
+
+const STATUS_DOT: Record<BoardStatus, string> = {
+  MENUNGGU: 'bg-amber-500',
+  DIPERIKSA: 'bg-cyan-500',
+  KASIR: 'bg-violet-500',
+  SELESAI: 'bg-emerald-500',
+  BATAL: 'bg-rose-500',
 }
 
 function TabPendaftaran({
@@ -74,7 +93,7 @@ function TabPendaftaran({
   const [poliList, setPoliList] = useState(initialPoliList)
   const [poliId, setPoliId] = useState(initialPoliId)
   const [antrian, setAntrian] = useState(initialAntrian)
-  const [expandedKunjunganId, setExpandedKunjunganId] = useState<string | null>(null)
+  const [modalKunjunganId, setModalKunjunganId] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [antrianLinkCopied, setAntrianLinkCopied] = useState(false)
 
@@ -526,78 +545,89 @@ function TabPendaftaran({
             {antrian.length === 0 ? (
               <p className="py-8 text-center text-sm text-slate-400">Belum ada pasien terdaftar untuk poli ini hari ini.</p>
             ) : (
-              <div className="space-y-2">
-                {antrian.map((row) => {
-                  const isExpanded = expandedKunjunganId === row.id
-                  const canExpand = row.status === 'DIPERIKSA' || row.status === 'SELESAI'
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {STATUS_COLUMNS.map((status) => {
+                  const rows = antrian.filter((row) => getBoardStatus(row) === status)
                   return (
-                    <div key={row.id} className="rounded-xl border border-slate-100 p-3">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-base font-bold text-slate-700">
-                            {row.no_antrian}
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900">{row.pasien_nama}</p>
-                            <p className="text-xs text-slate-500">
-                              {row.pasien_no_rm} · {JENIS_KUNJUNGAN_LABEL[row.jenis_kunjungan as 'umum' | 'bpjs' | 'asuransi'] || row.jenis_kunjungan}
-                              {row.keluhan ? ` · ${row.keluhan}` : ''}
-                            </p>
-                          </div>
-                        </div>
-
+                    <div key={status} className="flex min-w-[250px] flex-1 flex-col rounded-xl border border-slate-200/80">
+                      <div className="flex items-center justify-between gap-2 rounded-t-xl border-b border-slate-200/80 bg-slate-50 px-3 py-2.5">
                         <div className="flex items-center gap-2">
-                          <span className={cn('rounded-full border px-2.5 py-1 text-xs font-semibold', STATUS_BADGE[row.status])}>
-                            {STATUS_LABEL[row.status]}
-                          </span>
-                          {row.status === 'MENUNGGU' && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleStatusChange(row.id, 'DIPERIKSA')}
-                                disabled={pending}
-                                title="Panggil pasien"
-                                className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-cyan-600 transition-colors duration-150 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <PhoneCall className="size-4" aria-hidden="true" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleStatusChange(row.id, 'BATAL')}
-                                disabled={pending}
-                                title="Batalkan"
-                                className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-rose-600 transition-colors duration-150 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <Ban className="size-4" aria-hidden="true" />
-                              </button>
-                            </>
-                          )}
-                          {canExpand && (
-                            <button
-                              type="button"
-                              onClick={() => setExpandedKunjunganId(isExpanded ? null : row.id)}
-                              title={isExpanded ? 'Tutup pemeriksaan' : 'Buka pemeriksaan'}
-                              className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-slate-600 transition-colors duration-150 hover:bg-slate-100"
-                            >
-                              {isExpanded ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}
-                            </button>
-                          )}
+                          <span className={cn('size-2 rounded-full', STATUS_DOT[status])} aria-hidden="true" />
+                          <p className="text-xs font-bold uppercase tracking-wide text-slate-600">{STATUS_LABEL[status]}</p>
                         </div>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">
+                          {rows.length}
+                        </span>
                       </div>
 
-                      {isExpanded && branch && (
-                        <PemeriksaanPanel
-                          orgId={orgId}
-                          branchId={branch.id}
-                          kunjunganId={row.id}
-                          pasienId={row.pasien_id}
-                          kunjunganStatus={row.status}
-                          warehouses={warehouses}
-                          dokterList={dokterList}
-                          tarifLayananList={tarifLayananList}
-                          onFinalized={() => { if (poliId) refreshAntrian(poliId) }}
-                        />
-                      )}
+                      <div className="flex-1 space-y-2 overflow-y-auto rounded-b-xl bg-slate-50/40 p-2" style={{ maxHeight: 560 }}>
+                        {rows.length === 0 ? (
+                          <p className="py-6 text-center text-xs text-slate-400">Tidak ada.</p>
+                        ) : (
+                          rows.map((row) => {
+                            const canOpen = row.status === 'DIPERIKSA' || row.status === 'SELESAI'
+                            return (
+                              <div
+                                key={row.id}
+                                role={canOpen ? 'button' : undefined}
+                                tabIndex={canOpen ? 0 : undefined}
+                                onClick={canOpen ? () => setModalKunjunganId(row.id) : undefined}
+                                onKeyDown={canOpen ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setModalKunjunganId(row.id) } } : undefined}
+                                className={cn(
+                                  'rounded-lg border border-slate-100 bg-white p-3 shadow-sm transition-colors duration-150',
+                                  canOpen && 'cursor-pointer hover:border-cyan-200 hover:bg-cyan-50/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500'
+                                )}
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-slate-700">
+                                    {row.no_antrian}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-semibold text-slate-900">{row.pasien_nama}</p>
+                                    <p className="truncate text-xs text-slate-500">
+                                      {row.pasien_no_rm} · {JENIS_KUNJUNGAN_LABEL[row.jenis_kunjungan as 'umum' | 'bpjs' | 'asuransi'] || row.jenis_kunjungan}
+                                    </p>
+                                  </div>
+                                </div>
+                                {row.keluhan && (
+                                  <p className="mt-2 truncate text-xs text-slate-500" title={row.keluhan}>{row.keluhan}</p>
+                                )}
+
+                                {row.status === 'MENUNGGU' && (
+                                  <div className="mt-2.5 flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStatusChange(row.id, 'DIPERIKSA')}
+                                      disabled={pending}
+                                      title="Panggil pasien"
+                                      className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-cyan-50 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      <PhoneCall className="size-3.5" aria-hidden="true" />
+                                      Panggil
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStatusChange(row.id, 'BATAL')}
+                                      disabled={pending}
+                                      title="Batalkan"
+                                      className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-rose-600 transition-colors duration-150 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      <Ban className="size-4" aria-hidden="true" />
+                                    </button>
+                                  </div>
+                                )}
+
+                                {canOpen && (
+                                  <div className="mt-2 flex items-center justify-end gap-0.5 text-xs font-semibold text-cyan-700">
+                                    Lihat pemeriksaan
+                                    <ChevronRight className="size-3.5" aria-hidden="true" />
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
                     </div>
                   )
                 })}
@@ -606,6 +636,50 @@ function TabPendaftaran({
           </div>
         </div>
       </div>
+
+      {modalKunjunganId && branch && (() => {
+        const modalRow = antrian.find((row) => row.id === modalKunjunganId)
+        if (!modalRow) return null
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setModalKunjunganId(null)} />
+            <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-700">
+                    {modalRow.no_antrian}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{modalRow.pasien_nama}</p>
+                    <p className="text-xs text-slate-500">{modalRow.pasien_no_rm}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalKunjunganId(null)}
+                  title="Tutup"
+                  className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="overflow-y-auto p-5">
+                <PemeriksaanPanel
+                  orgId={orgId}
+                  branchId={branch.id}
+                  kunjunganId={modalRow.id}
+                  pasienId={modalRow.pasien_id}
+                  kunjunganStatus={modalRow.status}
+                  warehouses={warehouses}
+                  dokterList={dokterList}
+                  tarifLayananList={tarifLayananList}
+                  onFinalized={() => { if (poliId) refreshAntrian(poliId) }}
+                />
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
