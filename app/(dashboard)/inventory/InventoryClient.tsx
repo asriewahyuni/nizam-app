@@ -948,7 +948,7 @@ export default function InventoryClient({
                        </div>
                     </td>
                     <td className="px-6 py-6 text-right">
-                       <div className="text-xs font-bold text-slate-500 font-mono italic">{formatRupiah(product.purchase_price || 0)}</div>
+                       <div className="text-xs font-bold text-slate-500 font-mono italic" title="Modal (average cost)">{formatRupiah(product.average_cost || product.purchase_price || 0)}</div>
                        <div className="text-sm font-semibold text-slate-900 font-mono mt-0.5">{formatRupiah(product.selling_price || 0)}</div>
                     </td>
                      <td 
