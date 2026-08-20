@@ -89,6 +89,7 @@ export type KlinikAntrianRow = {
   // SELESAI jadi kolom "Kasir" (belum lunas) vs "Selesai" (lunas), tanpa
   // menambah nilai baru ke CHECK constraint klinik_kunjungan.status.
   tagihan_status: 'BELUM_BAYAR' | 'LUNAS' | 'VOID' | null
+  tagihan_total: number | null
   staf_medis_id: string | null
   staf_medis_nama: string | null
 }
@@ -98,7 +99,7 @@ export async function getAntrianHariIni(branchId: string, poliId: string): Promi
   const { rows } = await queryPostgres<KlinikAntrianRow>(
     `SELECT k.id::text, k.no_antrian, k.status, k.jenis_kunjungan, k.keluhan, k.created_at::text,
             p.id::text AS pasien_id, p.nama AS pasien_nama, p.no_rm AS pasien_no_rm,
-            t.status AS tagihan_status,
+            t.status AS tagihan_status, t.total_tagihan AS tagihan_total,
             k.staf_medis_id::text,
             CASE WHEN k.staf_medis_id IS NULL THEN NULL
                  ELSE TRIM(CONCAT(e.first_name, ' ', COALESCE(e.last_name, ''))) END AS staf_medis_nama

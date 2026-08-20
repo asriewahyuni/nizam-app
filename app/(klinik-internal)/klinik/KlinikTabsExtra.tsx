@@ -167,7 +167,23 @@ export function TabDaftarPoli({ orgId, branch }: { orgId: string; branch: Branch
         {loading ? (
           <p className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400"><Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />Memuat poli...</p>
         ) : poliList.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-400">Belum ada poli. Tambahkan poli pertama.</p>
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-600">
+              <DoorOpen className="size-6" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Belum ada poli</p>
+              <p className="text-xs text-slate-400">Tambahkan poli pertama untuk mulai menerima pendaftaran pasien.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowNewForm(true)}
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+            >
+              <Plus className="size-3.5" aria-hidden="true" />
+              Tambah Poli Pertama
+            </button>
+          </div>
         ) : (
           <table className="w-full text-left text-xs">
             <thead>
@@ -455,7 +471,23 @@ export function TabRawatInap({
         {loading ? (
           <p className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400"><Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />Memuat kamar...</p>
         ) : kamarList.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-400">Belum ada kamar. Tambahkan kamar pertama.</p>
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-600">
+              <BedDouble className="size-6" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Belum ada kamar</p>
+              <p className="text-xs text-slate-400">Tambahkan kamar pertama untuk mulai mengelola rawat inap.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowNewKamarForm(true)}
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+            >
+              <Plus className="size-3.5" aria-hidden="true" />
+              Tambah Kamar Pertama
+            </button>
+          </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {kamarList.map((kamar) => (
@@ -757,7 +789,7 @@ export function TabMutasiObat({ orgId, branch }: { orgId: string; branch: Branch
         {loading ? (
           <p className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400"><Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />Memuat mutasi obat...</p>
         ) : rows.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-400">Belum ada mutasi obat untuk filter ini.</p>
+          <p className="py-8 text-center text-sm text-slate-400">Tidak ada mutasi obat yang cocok dengan filter ini — coba ubah rentang tanggal atau jenisnya.</p>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -889,7 +921,7 @@ export function TabDaftarPasien({ orgId }: { orgId: string }) {
         {loading ? (
           <p className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400"><Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />Memuat pasien...</p>
         ) : rows.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-400">Tidak ada pasien ditemukan.</p>
+          <p className="py-8 text-center text-sm text-slate-400">Tidak ada pasien yang cocok — coba kata kunci lain.</p>
         ) : (
           <div className="space-y-2">
             {rows.map((p) => (

@@ -77,6 +77,43 @@ const STATUS_DOT: Record<BoardStatus, string> = {
   BATAL: 'bg-rose-500',
 }
 
+// Aksen warna per kolom — sebelumnya STATUS_DOT cuma dipakai di titik kecil
+// 8px, jadi 5 kolom kelihatan nyaris identik (semua header bg-slate-50).
+// Dipakai di header kolom (tint lembut) + border kiri kartu, supaya tahap
+// alur kunjungan kelihatan sekilas tanpa baca teks.
+const STATUS_HEADER_BG: Record<BoardStatus, string> = {
+  MENUNGGU: 'bg-amber-50/70',
+  DIPERIKSA: 'bg-cyan-50/70',
+  KASIR: 'bg-violet-50/70',
+  SELESAI: 'bg-emerald-50/70',
+  BATAL: 'bg-rose-50/50',
+}
+const STATUS_CARD_BORDER: Record<BoardStatus, string> = {
+  MENUNGGU: 'border-l-amber-400',
+  DIPERIKSA: 'border-l-cyan-400',
+  KASIR: 'border-l-violet-400',
+  SELESAI: 'border-l-emerald-400',
+  BATAL: 'border-l-rose-300',
+}
+
+// Copy kosong dibedakan per kolom — kolom Kasir kosong itu kabar baik
+// (semua tagihan lunas), bukan sekadar "Tidak ada." generik yang sama
+// dengan kolom lain.
+const STATUS_EMPTY_LABEL: Record<BoardStatus, string> = {
+  MENUNGGU: 'Tidak ada pasien menunggu.',
+  DIPERIKSA: 'Tidak ada yang sedang diperiksa.',
+  KASIR: 'Semua tagihan lunas.',
+  SELESAI: 'Belum ada kunjungan selesai hari ini.',
+  BATAL: 'Tidak ada pembatalan.',
+}
+
+function formatWaktuRelatif(iso: string): string {
+  const diffMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (diffMin < 1) return 'Baru saja'
+  if (diffMin < 60) return `${diffMin} menit lalu`
+  return `${Math.floor(diffMin / 60)} jam lalu`
+}
+
 function TabPendaftaran({
   orgId, branch, poliList: initialPoliList, initialPoliId, initialAntrian, warehouses, dokterList, tarifLayananList,
 }: {
@@ -268,6 +305,8 @@ function TabPendaftaran({
     )
   }
 
+  const showDetailKunjungan = Boolean(selectedPasien || newPasien.nama.trim())
+
   return (
     <div className="space-y-6">
       {message && (
@@ -287,10 +326,12 @@ function TabPendaftaran({
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        {/* Form pendaftaran */}
-        <div className="space-y-4 lg:col-span-2">
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+      {/* Pendaftaran — Poli + Pasien berdampingan, ringkas; Detail Kunjungan
+          baru muncul setelah pasien dipilih/diisi (progressive disclosure),
+          supaya langkah pertama tidak menampilkan semua field sekaligus. */}
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
             <div className="mb-3 flex items-center justify-between">
               <label htmlFor="klinik-poli-select" className="text-sm font-bold text-slate-900">Poli</label>
               <button
@@ -346,7 +387,7 @@ function TabPendaftaran({
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div>
             <p className="mb-3 text-sm font-bold text-slate-900">Pasien</p>
 
             <div className="relative">
@@ -448,35 +489,39 @@ function TabPendaftaran({
               </>
             )}
           </div>
+        </div>
 
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+        {showDetailKunjungan && (
+          <div className="animate-fade-in mt-5 border-t border-slate-100 pt-5">
             <p className="mb-3 text-sm font-bold text-slate-900">Detail Kunjungan</p>
-            <div className="space-y-1.5">
-              <label htmlFor="klinik-jenis-kunjungan" className="text-xs font-semibold text-slate-700">Jenis Kunjungan</label>
-              <select
-                id="klinik-jenis-kunjungan"
-                value={jenisKunjungan}
-                onChange={(e) => setJenisKunjungan(e.target.value as 'umum' | 'bpjs' | 'asuransi')}
-                className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
-              >
-                {(Object.keys(JENIS_KUNJUNGAN_LABEL) as Array<keyof typeof JENIS_KUNJUNGAN_LABEL>).map((key) => (
-                  <option key={key} value={key}>{JENIS_KUNJUNGAN_LABEL[key]}</option>
-                ))}
-              </select>
-            </div>
-            <div className="mt-3 space-y-1.5">
-              <label htmlFor="klinik-staf-medis" className="text-xs font-semibold text-slate-700">Dokter/Perawat (opsional)</label>
-              <select
-                id="klinik-staf-medis"
-                value={stafMedisId}
-                onChange={(e) => setStafMedisId(e.target.value)}
-                className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
-              >
-                <option value="">— Belum ditentukan —</option>
-                {dokterOptions.map((d) => (
-                  <option key={d.id} value={d.id}>{d.employee_name} ({d.jenis})</option>
-                ))}
-              </select>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label htmlFor="klinik-jenis-kunjungan" className="text-xs font-semibold text-slate-700">Jenis Kunjungan</label>
+                <select
+                  id="klinik-jenis-kunjungan"
+                  value={jenisKunjungan}
+                  onChange={(e) => setJenisKunjungan(e.target.value as 'umum' | 'bpjs' | 'asuransi')}
+                  className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                >
+                  {(Object.keys(JENIS_KUNJUNGAN_LABEL) as Array<keyof typeof JENIS_KUNJUNGAN_LABEL>).map((key) => (
+                    <option key={key} value={key}>{JENIS_KUNJUNGAN_LABEL[key]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="klinik-staf-medis" className="text-xs font-semibold text-slate-700">Dokter/Perawat (opsional)</label>
+                <select
+                  id="klinik-staf-medis"
+                  value={stafMedisId}
+                  onChange={(e) => setStafMedisId(e.target.value)}
+                  className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                >
+                  <option value="">— Belum ditentukan —</option>
+                  {dokterOptions.map((d) => (
+                    <option key={d.id} value={d.id}>{d.employee_name} ({d.jenis})</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="mt-3 space-y-1.5">
               <label htmlFor="klinik-keluhan" className="text-xs font-semibold text-slate-700">Keluhan (opsional)</label>
@@ -498,172 +543,178 @@ function TabPendaftaran({
               {pending ? 'Memproses...' : 'Daftar & Ambil Nomor Antrian'}
             </button>
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* Antrian hari ini */}
-        <div className="space-y-4 lg:col-span-3">
-          {bookings.length > 0 && (
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <CalendarCheck className="size-4 text-cyan-600" aria-hidden="true" />
-                <p className="text-sm font-bold text-slate-900">Booking Hari Ini — Belum Check-in</p>
-              </div>
-              <div className="space-y-2">
-                {bookings.map((b) => (
-                  <div key={b.id} className="flex flex-col gap-2 rounded-xl border border-cyan-100 bg-cyan-50/40 p-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {new Date(b.starts_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} · {b.pasien_nama}
-                      </p>
-                      <p className="text-xs text-slate-500">{b.staf_medis_name} · {b.pasien_kontak}{b.keluhan ? ` · ${b.keluhan}` : ''}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleCheckIn(b.id)}
-                      disabled={pending}
-                      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
-                    >
-                      <LogIn className="size-3.5" aria-hidden="true" />
-                      Check-in
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Users className="size-4 text-slate-500" aria-hidden="true" />
-                <p className="text-sm font-bold text-slate-900">Antrian Hari Ini</p>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="hidden items-center gap-1.5 pr-1 text-xs font-semibold text-slate-500 sm:flex">
-                  <MonitorPlay className="size-3.5" aria-hidden="true" />
-                  Layar Antrian
-                </span>
-                <a
-                  href={`/klinik/antrian/${branch.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Buka layar antrian (tab baru)"
-                  className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-cyan-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
-                >
-                  <ExternalLink className="size-4" aria-hidden="true" />
-                </a>
+      {bookings.length > 0 && (
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <CalendarCheck className="size-4 text-cyan-600" aria-hidden="true" />
+            <p className="text-sm font-bold text-slate-900">Booking Hari Ini — Belum Check-in</p>
+          </div>
+          <div className="space-y-2">
+            {bookings.map((b) => (
+              <div key={b.id} className="flex flex-col gap-2 rounded-xl border border-cyan-100 bg-cyan-50/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {new Date(b.starts_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} · {b.pasien_nama}
+                  </p>
+                  <p className="text-xs text-slate-500">{b.staf_medis_name} · {b.pasien_kontak}{b.keluhan ? ` · ${b.keluhan}` : ''}</p>
+                </div>
                 <button
                   type="button"
-                  onClick={handleCopyAntrianLink}
-                  title="Salin link layar antrian"
-                  className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-cyan-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+                  onClick={() => handleCheckIn(b.id)}
+                  disabled={pending}
+                  className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
                 >
-                  {antrianLinkCopied
-                    ? <Check className="size-4 text-emerald-600" aria-hidden="true" />
-                    : <Copy className="size-4" aria-hidden="true" />}
+                  <LogIn className="size-3.5" aria-hidden="true" />
+                  Check-in
                 </button>
               </div>
-            </div>
-
-            {antrian.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-400">Belum ada pasien terdaftar untuk poli ini hari ini.</p>
-            ) : (
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {STATUS_COLUMNS.map((status) => {
-                  const rows = antrian.filter((row) => getBoardStatus(row) === status)
-                  return (
-                    <div key={status} className="flex min-w-[250px] flex-1 flex-col rounded-xl border border-slate-200/80">
-                      <div className="flex items-center justify-between gap-2 rounded-t-xl border-b border-slate-200/80 bg-slate-50 px-3 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className={cn('size-2 rounded-full', STATUS_DOT[status])} aria-hidden="true" />
-                          <p className="text-xs font-bold uppercase tracking-wide text-slate-600">{STATUS_LABEL[status]}</p>
-                        </div>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">
-                          {rows.length}
-                        </span>
-                      </div>
-
-                      <div className="flex-1 space-y-2 overflow-y-auto rounded-b-xl bg-slate-50/40 p-2" style={{ maxHeight: 560 }}>
-                        {rows.length === 0 ? (
-                          <p className="py-6 text-center text-xs text-slate-400">Tidak ada.</p>
-                        ) : (
-                          rows.map((row) => {
-                            const canOpen = row.status === 'DIPERIKSA' || row.status === 'SELESAI'
-                            return (
-                              <div
-                                key={row.id}
-                                role={canOpen ? 'button' : undefined}
-                                tabIndex={canOpen ? 0 : undefined}
-                                onClick={canOpen ? () => setModalKunjunganId(row.id) : undefined}
-                                onKeyDown={canOpen ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setModalKunjunganId(row.id) } } : undefined}
-                                className={cn(
-                                  'rounded-lg border border-slate-100 bg-white p-3 shadow-sm transition-colors duration-150',
-                                  canOpen && 'cursor-pointer hover:border-cyan-200 hover:bg-cyan-50/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500'
-                                )}
-                              >
-                                <div className="flex items-center gap-2.5">
-                                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-slate-700">
-                                    {row.no_antrian}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold text-slate-900">{row.pasien_nama}</p>
-                                    <p className="truncate text-xs text-slate-500">
-                                      {row.pasien_no_rm} · {JENIS_KUNJUNGAN_LABEL[row.jenis_kunjungan as 'umum' | 'bpjs' | 'asuransi'] || row.jenis_kunjungan}
-                                    </p>
-                                  </div>
-                                </div>
-                                {row.staf_medis_nama && (
-                                  <p className="mt-1.5 flex items-center gap-1 truncate text-xs text-cyan-700">
-                                    <UserCog className="size-3 shrink-0" aria-hidden="true" />
-                                    {row.staf_medis_nama}
-                                  </p>
-                                )}
-                                {row.keluhan && (
-                                  <p className="mt-2 truncate text-xs text-slate-500" title={row.keluhan}>{row.keluhan}</p>
-                                )}
-
-                                {row.status === 'MENUNGGU' && (
-                                  <div className="mt-2.5 flex items-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleStatusChange(row.id, 'DIPERIKSA')}
-                                      disabled={pending}
-                                      title="Panggil pasien"
-                                      className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-cyan-50 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
-                                    >
-                                      <PhoneCall className="size-3.5" aria-hidden="true" />
-                                      Panggil
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleStatusChange(row.id, 'BATAL')}
-                                      disabled={pending}
-                                      title="Batalkan"
-                                      className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-rose-600 transition-colors duration-150 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
-                                    >
-                                      <Ban className="size-4" aria-hidden="true" />
-                                    </button>
-                                  </div>
-                                )}
-
-                                {canOpen && (
-                                  <div className="mt-2 flex items-center justify-end gap-0.5 text-xs font-semibold text-cyan-700">
-                                    Lihat pemeriksaan
-                                    <ChevronRight className="size-3.5" aria-hidden="true" />
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            ))}
           </div>
         </div>
+      )}
+
+      {/* Antrian Hari Ini — kanban lebar penuh, supaya 5 tahap alur kelihatan
+          sekaligus tanpa scroll horizontal di layar kerja normal. */}
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Users className="size-4 text-slate-500" aria-hidden="true" />
+            <p className="text-sm font-bold text-slate-900">Antrian Hari Ini</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="hidden items-center gap-1.5 pr-1 text-xs font-semibold text-slate-500 sm:flex">
+              <MonitorPlay className="size-3.5" aria-hidden="true" />
+              Layar Antrian
+            </span>
+            <a
+              href={`/klinik/antrian/${branch.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Buka layar antrian (tab baru)"
+              className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-cyan-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+            >
+              <ExternalLink className="size-4" aria-hidden="true" />
+            </a>
+            <button
+              type="button"
+              onClick={handleCopyAntrianLink}
+              title="Salin link layar antrian"
+              className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-cyan-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+            >
+              {antrianLinkCopied
+                ? <Check className="size-4 text-emerald-600" aria-hidden="true" />
+                : <Copy className="size-4" aria-hidden="true" />}
+            </button>
+          </div>
+        </div>
+
+        {antrian.length === 0 ? (
+          <p className="py-8 text-center text-sm text-slate-400">Belum ada pasien terdaftar untuk poli ini hari ini.</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {STATUS_COLUMNS.map((status) => {
+              const rows = antrian.filter((row) => getBoardStatus(row) === status)
+              return (
+                <div key={status} className="flex flex-col rounded-xl border border-slate-200/80">
+                  <div className={cn('flex items-center justify-between gap-2 rounded-t-xl border-b border-slate-200/80 px-3 py-2.5', STATUS_HEADER_BG[status])}>
+                    <div className="flex items-center gap-2">
+                      <span className={cn('size-2 rounded-full', STATUS_DOT[status])} aria-hidden="true" />
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-600">{STATUS_LABEL[status]}</p>
+                    </div>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">
+                      {rows.length}
+                    </span>
+                  </div>
+
+                  <div className="max-h-[65vh] flex-1 space-y-2 overflow-y-auto rounded-b-xl bg-slate-50/40 p-2">
+                    {rows.length === 0 ? (
+                      <p className="py-6 text-center text-xs text-slate-400">{STATUS_EMPTY_LABEL[status]}</p>
+                    ) : (
+                      rows.map((row) => {
+                        const canOpen = row.status === 'DIPERIKSA' || row.status === 'SELESAI'
+                        return (
+                          <div
+                            key={row.id}
+                            role={canOpen ? 'button' : undefined}
+                            tabIndex={canOpen ? 0 : undefined}
+                            onClick={canOpen ? () => setModalKunjunganId(row.id) : undefined}
+                            onKeyDown={canOpen ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setModalKunjunganId(row.id) } } : undefined}
+                            className={cn(
+                              'rounded-lg border border-l-4 border-slate-100 bg-white p-3 shadow-sm transition-colors duration-150',
+                              STATUS_CARD_BORDER[status],
+                              canOpen && 'cursor-pointer hover:border-cyan-200 hover:bg-cyan-50/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500'
+                            )}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-slate-700">
+                                {row.no_antrian}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-slate-900">{row.pasien_nama}</p>
+                                <p className="truncate text-xs text-slate-500">
+                                  {row.pasien_no_rm} · {JENIS_KUNJUNGAN_LABEL[row.jenis_kunjungan as 'umum' | 'bpjs' | 'asuransi'] || row.jenis_kunjungan}
+                                </p>
+                              </div>
+                            </div>
+                            {row.staf_medis_nama && (
+                              <p className="mt-1.5 flex items-center gap-1 truncate text-xs text-cyan-700">
+                                <UserCog className="size-3 shrink-0" aria-hidden="true" />
+                                {row.staf_medis_nama}
+                              </p>
+                            )}
+                            {row.keluhan && (
+                              <p className="mt-2 truncate text-xs text-slate-500" title={row.keluhan}>{row.keluhan}</p>
+                            )}
+                            {status === 'KASIR' && row.tagihan_total != null && (
+                              <p className="mt-1.5 inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700">
+                                Rp {Number(row.tagihan_total).toLocaleString('id-ID')}
+                              </p>
+                            )}
+                            <p className="mt-1.5 text-[11px] text-slate-400">{formatWaktuRelatif(row.created_at)}</p>
+
+                            {row.status === 'MENUNGGU' && (
+                              <div className="mt-2.5 flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(row.id, 'DIPERIKSA')}
+                                  disabled={pending}
+                                  title="Panggil pasien"
+                                  className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-cyan-50 text-xs font-semibold text-cyan-700 transition-colors duration-150 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+                                >
+                                  <PhoneCall className="size-3.5" aria-hidden="true" />
+                                  Panggil
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(row.id, 'BATAL')}
+                                  disabled={pending}
+                                  title="Batalkan"
+                                  className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-rose-50/70 text-rose-600 transition-colors duration-150 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
+                                >
+                                  <Ban className="size-4" aria-hidden="true" />
+                                </button>
+                              </div>
+                            )}
+
+                            {canOpen && (
+                              <div className="mt-2 flex items-center justify-end gap-0.5 text-xs font-semibold text-cyan-700">
+                                Lihat pemeriksaan
+                                <ChevronRight className="size-3.5" aria-hidden="true" />
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {modalKunjunganId && branch && (() => {
@@ -671,8 +722,8 @@ function TabPendaftaran({
         if (!modalRow) return null
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setModalKunjunganId(null)} />
-            <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="animate-fade-in absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setModalKunjunganId(null)} />
+            <div className="animate-modal-in relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-5">
                 <div className="flex items-center gap-3">
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-700">

@@ -277,7 +277,7 @@ export default function PemeriksaanPanel({
   }
 
   return (
-    <div className="space-y-4 border-t border-slate-100 pt-4">
+    <div className="space-y-5 border-t border-slate-100 pt-5">
       {message && (
         <div
           role="status"
@@ -296,7 +296,7 @@ export default function PemeriksaanPanel({
       )}
 
       {/* Rekam Medis */}
-      <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+      <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-5">
         <div className="mb-3 flex items-center justify-between">
           <p className="flex items-center gap-2 text-sm font-bold text-slate-900">
             <FileText className="size-4 text-cyan-600" aria-hidden="true" />
@@ -401,7 +401,7 @@ export default function PemeriksaanPanel({
       </div>
 
       {/* Resep & Apotek */}
-      <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+      <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-5">
         <p className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
           <Pill className="size-4 text-cyan-600" aria-hidden="true" />
           Resep & Apotek
@@ -538,7 +538,7 @@ export default function PemeriksaanPanel({
 
       {/* Kasir & Tagihan — muncul setelah pemeriksaan selesai */}
       {kunjunganStatus === 'SELESAI' && (
-        <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+        <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-5">
           <p className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
             <Receipt className="size-4 text-cyan-600" aria-hidden="true" />
             Kasir &amp; Tagihan

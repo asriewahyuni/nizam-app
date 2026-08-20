@@ -148,7 +148,7 @@ export default function AntrianDisplayClient({
         {!loaded ? (
           <p className="flex items-center justify-center gap-2 py-24 text-sm text-slate-400"><Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />Memuat data antrian...</p>
         ) : poliList.length === 0 ? (
-          <p className="py-24 text-center text-sm text-slate-400">Belum ada poli aktif di cabang ini.</p>
+          <p className="py-24 text-center text-sm text-slate-400">Belum ada poli aktif di cabang ini — aktifkan minimal satu poli untuk mulai menampilkan antrian.</p>
         ) : (
           <>
             <div className="overflow-hidden">
