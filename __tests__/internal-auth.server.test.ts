@@ -82,6 +82,7 @@ describe('internal auth server', () => {
     const result = await signInWithInternalAuth({
       email: 'owner@example.com',
       password: 'secret123',
+      provider: 'platform',
     })
 
     expect(result).toMatchObject({
@@ -130,6 +131,7 @@ describe('internal auth server', () => {
       email: 'owner@example.com',
       password: 'secret123',
       preferredOrgId,
+      provider: 'platform',
     })
 
     expect(result).toMatchObject({

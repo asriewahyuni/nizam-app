@@ -339,10 +339,12 @@ async function findInternalAuthUserByIdentity(input: {
   userId?: string | null
   email?: string | null
   nik?: string | null
+  provider?: string | null
 }) {
   const normalizedUserId = normalizeUuid(input.userId)
   const normalizedEmail = normalizeEmail(input.email)
   const normalizedNik = normalizeNik(input.nik)
+  const provider = normalizeInput(input.provider) || 'platform'
 
   if (!normalizedUserId && !normalizedEmail && !normalizedNik) {
     return null as InternalAuthUserRow | null
@@ -360,8 +362,13 @@ async function findInternalAuthUserByIdentity(input: {
             or legacy_user_id = $1::uuid
           )
         )
-        or ($2::text is not null and lower(login_email) = $2::text)
-        or ($3::text is not null and upper(login_nik) = $3::text)
+        or (
+          coalesce(provider, 'platform') = coalesce($4::text, 'platform')
+          and (
+            ($2::text is not null and lower(login_email) = $2::text)
+            or ($3::text is not null and upper(login_nik) = $3::text)
+          )
+        )
       order by
         case
           when $1::uuid is not null and id = $1::uuid then 0
@@ -373,7 +380,7 @@ async function findInternalAuthUserByIdentity(input: {
         created_at asc
       limit 1
     `,
-    [normalizedUserId, normalizedEmail, normalizedNik]
+    [normalizedUserId, normalizedEmail, normalizedNik, provider]
   )
 
   return lookup.rows[0] || null
@@ -551,12 +558,14 @@ export async function ensureInternalAuthUserRecord(input: {
   nik?: string | null
   fullName?: string | null
   userType?: string | null
+  provider?: string | null
 }) {
   const normalizedUserId = normalizeUuid(input.userId)
   const normalizedEmail = normalizeEmail(input.email)
   const normalizedNik = normalizeNik(input.nik)
   const normalizedFullName = normalizeInput(input.fullName) || null
   const normalizedUserType = normalizeInternalUserType(input.userType || 'staff')
+  const provider = normalizeInput(input.provider) || 'platform'
 
   if (!normalizedUserId && !normalizedEmail && !normalizedNik) {
     return { error: 'Identitas akun internal tidak valid.' as const }
@@ -567,6 +576,7 @@ export async function ensureInternalAuthUserRecord(input: {
       userId: normalizedUserId,
       email: normalizedEmail,
       nik: normalizedNik,
+      provider,
     })
 
     if (existing?.id) {
@@ -645,7 +655,8 @@ export async function ensureInternalAuthUserRecord(input: {
           password_hash,
           display_name,
           user_type,
-          is_active
+          is_active,
+          provider
         )
         values (
           $1::uuid,
@@ -654,7 +665,8 @@ export async function ensureInternalAuthUserRecord(input: {
           $4::text,
           $5::text,
           $6::text,
-          true
+          true,
+          coalesce($7::text, 'platform')
         )
         returning id::text as id
       `,
@@ -665,6 +677,7 @@ export async function ensureInternalAuthUserRecord(input: {
         passwordHash,
         normalizedFullName,
         normalizedUserType,
+        provider,
       ]
     )
 
@@ -710,6 +723,7 @@ export async function createInternalAuthUser(input: {
   userType?: string | null
   legacyUserId?: string | null
   organizationId?: string | null
+  provider: string
 }) {
   const normalizedEmail = normalizeEmail(input.email)
   const normalizedNik = normalizeNik(input.nik)
@@ -717,6 +731,7 @@ export async function createInternalAuthUser(input: {
   const normalizedFullName = normalizeInput(input.fullName)
   const normalizedUserType = normalizeInput(input.userType || 'owner').toLowerCase() || 'owner'
   const normalizedLegacyUserId = normalizeInput(input.legacyUserId) || null
+  const provider = normalizeInput(input.provider) || 'platform'
 
   if (!normalizedEmail && !normalizedNik) {
     return { error: 'Email atau NIK wajib diisi.' as const }
@@ -764,7 +779,8 @@ export async function createInternalAuthUser(input: {
           password_hash,
           display_name,
           user_type,
-          is_active
+          is_active,
+          provider
         )
         values (
           $1::uuid,
@@ -773,7 +789,8 @@ export async function createInternalAuthUser(input: {
           $4::text,
           $5::text,
           $6::text,
-          true
+          true,
+          coalesce($7::text, 'platform')
         )
         returning id
       `,
@@ -784,6 +801,7 @@ export async function createInternalAuthUser(input: {
         passwordHash,
         normalizedFullName || null,
         normalizedUserType,
+        provider,
       ]
     )
 
@@ -1053,6 +1071,7 @@ export async function signInWithInternalAuth(input: {
   preferredOrgId?: string | null
   /** Jika diisi, NIK HARUS terdaftar di org ini — dipakai saat login via slug karyawan */
   strictOrgId?: string | null
+  provider: string
 }) {
   const email = normalizeEmail(input.email)
   const nik = normalizeNik(input.nik)
@@ -1060,6 +1079,7 @@ export async function signInWithInternalAuth(input: {
   const strictOrgId = normalizeUuid(input.strictOrgId)
   // strictOrgId menggantikan preferredOrgId sebagai $3 agar preferred_org_match dihitung untuk org yang benar
   const preferredOrgId = strictOrgId ?? normalizeUuid(input.preferredOrgId)
+  const provider = normalizeInput(input.provider) || 'platform'
 
   if ((!email && !nik) || !password) {
     return { error: 'Kredensial login tidak lengkap.' as const }
@@ -1105,17 +1125,20 @@ export async function signInWithInternalAuth(input: {
           is_active
         from public.internal_auth_users
         where
-          ($1::text is not null and lower(login_email) = $1::text)
-          or (
-            $2::text is not null
-            and (
-              upper(login_nik) = $2::text
-              or legacy_user_id in (
-                select e.user_id
-                from public.employees e
-                where
-                  e.user_id is not null
-                  and upper(trim(coalesce(e.nik, ''))) = $2::text
+          coalesce(provider, 'platform') = coalesce($4::text, 'platform')
+          and (
+            ($1::text is not null and lower(login_email) = $1::text)
+            or (
+              $2::text is not null
+              and (
+                upper(login_nik) = $2::text
+                or legacy_user_id in (
+                  select e.user_id
+                  from public.employees e
+                  where
+                    e.user_id is not null
+                    and upper(trim(coalesce(e.nik, ''))) = $2::text
+                )
               )
             )
           )
@@ -1136,7 +1159,7 @@ export async function signInWithInternalAuth(input: {
           created_at asc
         limit 10
       `,
-      [email, nik, preferredOrgId]
+      [email, nik, preferredOrgId, provider]
     )
 
     const candidates = result.rows.filter((row) => row && row.is_active)

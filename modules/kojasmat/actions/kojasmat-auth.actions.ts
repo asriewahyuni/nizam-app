@@ -63,6 +63,7 @@ export async function signInAsAnggota(formData: FormData): Promise<
     email: (anggota.email as string | null) ?? null,
     nik: (anggota.nik as string | null) ?? null,
     password,
+    provider: 'kojasmat',
   })
 
   if ('error' in result) {

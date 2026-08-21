@@ -19,6 +19,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ACTIVE_BRANCH_COOKIE, ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { resolveAuthTenantBranding } from '@/app/(auth)/tenant-branding.server'
 import {
   getStoredActiveOrgIdForUser,
   persistMembershipActiveContext,
@@ -771,6 +772,7 @@ export async function signUp(formData: FormData) {
         password,
         fullName,
         userType: isPlatformAdminEmail(email) ? 'admin' : 'owner',
+        provider: 'platform',
       })
       if ('error' in internalUser) {
         return { error: internalUser.error }
@@ -825,10 +827,13 @@ export async function signIn(formData: FormData) {
   if (isInternalAuthProvider()) {
     const cookieStore = await cookies()
     const activeOrgIdPreference = normalizeUuid(cookieStore.get(ACTIVE_ORG_COOKIE)?.value)
+    const branding = await resolveAuthTenantBranding()
+    const provider = (branding || redirectTo.startsWith('/lms/') || redirectTo.startsWith('/member/')) ? 'LMS' : 'platform'
     const result = await signInWithInternalAuth({
       email,
       password,
       preferredOrgId: activeOrgIdPreference,
+      provider,
     })
 
     if ('error' in result) {
@@ -948,6 +953,7 @@ export async function registerEmployeeAccount(formData: FormData) {
         nik,
         fullName: staffFullName || nik,
         userType: 'staff',
+        provider: 'platform',
       })
 
       if ('error' in ensuredInternalUser) {
@@ -960,6 +966,7 @@ export async function registerEmployeeAccount(formData: FormData) {
         nik,
         password,
         preferredOrgId: emp.org_id,
+        provider: 'platform',
       })
 
       if ('error' in existingLogin) {
@@ -987,6 +994,7 @@ export async function registerEmployeeAccount(formData: FormData) {
         fullName: staffFullName || nik,
         userType: 'staff',
         organizationId: emp.org_id,
+        provider: 'platform',
       })
 
       if ('error' in internalUser) {
@@ -1159,6 +1167,7 @@ export async function signInWithNik(formData: FormData) {
       strictOrgId,
       // preferredOrgId: soft hint dari cookie (hanya dipakai jika tidak ada strictOrgId)
       preferredOrgId: strictOrgId ? null : cookieOrgIdPreference,
+      provider: 'platform',
     })
 
     if ('error' in result) {
@@ -2251,6 +2260,7 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
         nik,
         fullName: staffFullName || nik,
         userType: 'staff',
+        provider: 'platform',
       })
       if ('error' in ensured) return { error: ensured.error }
       targetUserId = linkedUserId
@@ -2262,6 +2272,7 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
         fullName: staffFullName || nik,
         userType: 'staff',
         organizationId: emp.org_id,
+        provider: 'platform',
       })
       if ('error' in created) return { error: created.error }
       targetUserId = normalizeUuid(created.userId)
@@ -2390,6 +2401,7 @@ export async function registerLmsMember(formData: FormData) {
       fullName,
       userType: 'member',
       organizationId: orgId,
+      provider: 'LMS',
     })
 
     if ('error' in internalUser) {

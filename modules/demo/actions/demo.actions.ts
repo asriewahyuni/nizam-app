@@ -117,6 +117,7 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
   const signInResult = await signInWithInternalAuth({
     email: DEMO_EMAIL,
     password: DEMO_PASSWORD,
+    provider: 'platform',
   })
 
   let userId: string
@@ -127,6 +128,7 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
       email: DEMO_EMAIL,
       password: DEMO_PASSWORD,
       fullName: 'Demo User',
+      provider: 'platform',
     })
 
     if (signUpResult.error || !signUpResult.userId) {
