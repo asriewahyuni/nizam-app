@@ -224,6 +224,7 @@ export async function buatPendaftaran(payload: {
               fullName: payload.nama_lengkap,
               userType: 'anggota',
               organizationId: payload.org_id,
+              provider: 'kojasmat',
             })
             if ('internalUserId' in authResult && authResult.internalUserId) {
               authUserId = authResult.internalUserId
@@ -284,6 +285,7 @@ export async function buatPendaftaran(payload: {
         fullName: payload.nama_lengkap,
         userType: 'anggota',
         organizationId: payload.org_id,
+        provider: 'kojasmat',
       })
       if ('error' in authResult) {
         if ((authResult.error ?? '').toLowerCase().includes('sudah terdaftar')) {
@@ -425,6 +427,7 @@ export async function cekEmailPendaftaran(orgId: string, email?: string, nik?: s
     const { rows: authRows } = await queryPostgres(
       `SELECT id FROM internal_auth_users
        WHERE is_active = true
+         AND provider = 'kojasmat'
          AND (($1 <> '' AND login_nik IS NOT NULL AND UPPER(login_nik) = $1)
               OR ($2 <> '' AND login_email IS NOT NULL AND LOWER(login_email) = $2))
        LIMIT 1`,
@@ -579,6 +582,7 @@ async function createAnggotaFromPendaftaran(
       fullName: pend.nama_lengkap,
       userType: 'member',
       organizationId: pend.org_id,
+      provider: 'kojasmat',
     })
     if ('error' in userResult) {
       // Akun mungkin sudah ada — lanjutkan tanpa error fatal

@@ -19,7 +19,10 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ACTIVE_BRANCH_COOKIE, ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+
+import { resolveAuthTenantBranding } from '@/app/(auth)/tenant-branding.server'
 import { queryPostgres } from '@/lib/db/postgres'
+
 import {
   getStoredActiveOrgIdForUser,
   persistMembershipActiveContext,
@@ -35,18 +38,18 @@ const HRIS_IMPERSONATION_LEGACY_ROLES = new Set(['owner', 'admin', 'hr'])
 
 type AdminImpersonationPayload =
   | {
-      provider?: 'supabase'
-      accessToken: string
-      refreshToken: string
-      email: string
-      activeOrgId: string | null
-    }
+    provider?: 'supabase'
+    accessToken: string
+    refreshToken: string
+    email: string
+    activeOrgId: string | null
+  }
   | {
-      provider: 'internal'
-      internalSessionToken: string
-      email: string
-      activeOrgId: string | null
-    }
+    provider: 'internal'
+    internalSessionToken: string
+    email: string
+    activeOrgId: string | null
+  }
 
 export type HrisImpersonationCandidate = {
   rawUserId: string
@@ -207,9 +210,9 @@ function normalizeSafeRelativeRedirect(value: unknown, fallback: string) {
 function normalizePermissionList(value: unknown) {
   return Array.isArray(value)
     ? value
-        .filter((permission): permission is string => typeof permission === 'string')
-        .map((permission) => permission.trim().toLowerCase())
-        .filter(Boolean)
+      .filter((permission): permission is string => typeof permission === 'string')
+      .map((permission) => permission.trim().toLowerCase())
+      .filter(Boolean)
     : []
 }
 
@@ -276,7 +279,7 @@ async function deleteOwnedOrganizationsForDemoUser(
   try {
     db = (await createAdminClient()) as any
   } catch (adminError) {
-    ;(console as any).warn('signOut cleanup: admin client unavailable, fallback to session client', adminError)
+    ; (console as any).warn('signOut cleanup: admin client unavailable, fallback to session client', adminError)
   }
 
   const { data: memberships, error: membershipError } = await db
@@ -287,7 +290,7 @@ async function deleteOwnedOrganizationsForDemoUser(
     .eq('is_active', true)
 
   if (membershipError) {
-    ;(console as any).error('signOut cleanup: failed to load demo org memberships', membershipError)
+    ; (console as any).error('signOut cleanup: failed to load demo org memberships', membershipError)
     return
   }
 
@@ -306,7 +309,7 @@ async function deleteOwnedOrganizationsForDemoUser(
       .eq('id', orgId)
 
     if (deleteError) {
-      ;(console as any).error('signOut cleanup: failed to delete demo org', orgId, deleteError)
+      ; (console as any).error('signOut cleanup: failed to delete demo org', orgId, deleteError)
     }
   }
 }
@@ -772,6 +775,7 @@ export async function signUp(formData: FormData) {
         password,
         fullName,
         userType: isPlatformAdminEmail(email) ? 'admin' : 'owner',
+        provider: 'platform',
       })
       if ('error' in internalUser) {
         return { error: internalUser.error }
@@ -796,7 +800,7 @@ export async function signUp(formData: FormData) {
     email,
     password,
     options: {
-      data: { 
+      data: {
         full_name: fullName,
         login_type: 'owner',
         is_demo: isDemoSignup
@@ -805,11 +809,11 @@ export async function signUp(formData: FormData) {
   })
 
   if (error) {
-     // Identify duplicate registration errors.
-     if (error.message.includes("Database error saving new user") || error.message.includes("already registered")) {
-        return { error: 'Gagal: Email ini sudah pernah didaftarkan. Silakan Login atau gunakan email lain.' }
-     }
-     return { error: error.message }
+    // Identify duplicate registration errors.
+    if (error.message.includes("Database error saving new user") || error.message.includes("already registered")) {
+      return { error: 'Gagal: Email ini sudah pernah didaftarkan. Silakan Login atau gunakan email lain.' }
+    }
+    return { error: error.message }
   }
 
   return { success: true, email }
@@ -826,10 +830,13 @@ export async function signIn(formData: FormData) {
   if (isInternalAuthProvider()) {
     const cookieStore = await cookies()
     const activeOrgIdPreference = normalizeUuid(cookieStore.get(ACTIVE_ORG_COOKIE)?.value)
+    const branding = await resolveAuthTenantBranding()
+    const provider = (branding || redirectTo.startsWith('/lms/') || redirectTo.startsWith('/member/')) ? 'LMS' : 'platform'
     const result = await signInWithInternalAuth({
       email,
       password,
       preferredOrgId: activeOrgIdPreference,
+      provider,
     })
 
     if ('error' in result) {
@@ -850,7 +857,7 @@ export async function signIn(formData: FormData) {
           resolvedOrgId = parentOrgId
         }
       } catch (parentResolutionError) {
-        ;(console as any).warn('signIn: platform admin parent-org fallback failed', parentResolutionError)
+        ; (console as any).warn('signIn: platform admin parent-org fallback failed', parentResolutionError)
       }
     }
 
@@ -949,6 +956,7 @@ export async function registerEmployeeAccount(formData: FormData) {
         nik,
         fullName: staffFullName || nik,
         userType: 'staff',
+        provider: 'platform',
       })
 
       if ('error' in ensuredInternalUser) {
@@ -961,6 +969,7 @@ export async function registerEmployeeAccount(formData: FormData) {
         nik,
         password,
         preferredOrgId: emp.org_id,
+        provider: 'platform',
       })
 
       if ('error' in existingLogin) {
@@ -988,6 +997,7 @@ export async function registerEmployeeAccount(formData: FormData) {
         fullName: staffFullName || nik,
         userType: 'staff',
         organizationId: emp.org_id,
+        provider: 'platform',
       })
 
       if ('error' in internalUser) {
@@ -1111,13 +1121,13 @@ export async function registerEmployeeAccount(formData: FormData) {
   await trackInvitationUsage(adminClient, invite)
 
   // 9. Now Log in the user on the client side
-  const { error: loginErr } = await publicClient.auth.signInWithPassword({ 
-    email: internalEmail, 
-    password 
+  const { error: loginErr } = await publicClient.auth.signInWithPassword({
+    email: internalEmail,
+    password
   })
 
   if (loginErr) {
-     return { error: 'Akun berhasil dibuat, tapi login otomatis gagal. Silakan login manual pakai NIK & password baru.' }
+    return { error: 'Akun berhasil dibuat, tapi login otomatis gagal. Silakan login manual pakai NIK & password baru.' }
   }
 
   await persistMembershipActiveContext(adminClient as any, {
@@ -1146,7 +1156,7 @@ export async function signInWithNik(formData: FormData) {
   const errorBase = orgSlug ? `/${orgSlug}` : '/login'
 
   if (!nik || !password) {
-     return redirect(`${errorBase}?error=${encodeURIComponent('NIK dan Password wajib diisi.')}`)
+    return redirect(`${errorBase}?error=${encodeURIComponent('NIK dan Password wajib diisi.')}`)
   }
 
   if (isInternalAuthProvider()) {
@@ -1160,6 +1170,7 @@ export async function signInWithNik(formData: FormData) {
       strictOrgId,
       // preferredOrgId: soft hint dari cookie (hanya dipakai jika tidak ada strictOrgId)
       preferredOrgId: strictOrgId ? null : cookieOrgIdPreference,
+      provider: 'platform',
     })
 
     if ('error' in result) {
@@ -1188,7 +1199,7 @@ export async function signInWithNik(formData: FormData) {
     .order('created_at', { ascending: true })
 
   if (empErr) {
-     return redirect(`/login?error=${encodeURIComponent(`Database Error: ${empErr.message}`)}&tab=karyawan`)
+    return redirect(`/login?error=${encodeURIComponent(`Database Error: ${empErr.message}`)}&tab=karyawan`)
   }
 
   const matchingEmployees = Array.isArray(employees) ? employees : []
@@ -1255,11 +1266,11 @@ export async function signInWithNik(formData: FormData) {
         const preferredOrgId = activeOrgIdPreference && candidate.orgIds.includes(activeOrgIdPreference)
           ? activeOrgIdPreference
           : await resolvePreferredOrgIdForStaffLogin(
-              adminClient,
-              candidate.userId,
-              candidate.orgIds,
-              candidate.preferredOrgId
-            )
+            adminClient,
+            candidate.userId,
+            candidate.orgIds,
+            candidate.preferredOrgId
+          )
 
         setActiveOrganizationCookie(cookieStore, preferredOrgId)
         revalidatePath('/', 'layout')
@@ -2064,12 +2075,12 @@ export async function signInAsTenantOwner(orgId: string) {
     return { error: 'Tenant belum memiliki akun owner yang dapat dipakai untuk Login As.' }
   }
 
-    cookieStore.set(
-      ADMIN_IMPERSONATION_COOKIE,
-      encodeAdminImpersonation({
-        accessToken: adminSession.access_token,
-        refreshToken: adminSession.refresh_token,
-        email: adminEmail,
+  cookieStore.set(
+    ADMIN_IMPERSONATION_COOKIE,
+    encodeAdminImpersonation({
+      accessToken: adminSession.access_token,
+      refreshToken: adminSession.refresh_token,
+      email: adminEmail,
       activeOrgId: cookieStore.get(ACTIVE_ORG_COOKIE)?.value || null,
     }),
     {
@@ -2259,10 +2270,10 @@ export async function verifyEmployeeNikByToken(token: string, nik: string) {
       .maybeSingle(),
     invite.role_id
       ? (adminClient as any)
-          .from('roles')
-          .select('id, name')
-          .eq('id', invite.role_id)
-          .maybeSingle()
+        .from('roles')
+        .select('id, name')
+        .eq('id', invite.role_id)
+        .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ])
 
@@ -2285,7 +2296,7 @@ export async function requestPasswordReset(nik: string) {
     .order('created_at', { ascending: true })
 
   if (error) {
-     return { error: `Database Error: ${error.message}` }
+    return { error: `Database Error: ${error.message}` }
   }
 
   const matchingEmployees = Array.isArray(employees) ? employees : []
@@ -2330,7 +2341,7 @@ export async function requestPasswordReset(nik: string) {
     .in('id', employeeIds)
 
   if (updateError) {
-     return { error: `Database Error: ${updateError.message}` }
+    return { error: `Database Error: ${updateError.message}` }
   }
 
   revalidatePath('/hris')
@@ -2377,6 +2388,7 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
         nik,
         fullName: staffFullName || nik,
         userType: 'staff',
+        provider: 'platform',
       })
       if ('error' in ensured) return { error: ensured.error }
       targetUserId = linkedUserId
@@ -2388,6 +2400,7 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
         fullName: staffFullName || nik,
         userType: 'staff',
         organizationId: emp.org_id,
+        provider: 'platform',
       })
       if ('error' in created) return { error: created.error }
       targetUserId = normalizeUuid(created.userId)
@@ -2411,7 +2424,7 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
 
   await (adminClient as any)
     .from('employees')
-    .update({ 
+    .update({
       reset_requested: false,
       reset_requested_at: null
     })
@@ -2453,14 +2466,14 @@ export async function sendPasswordResetEmail(formData: FormData) {
   if (isInternalAuthProvider()) {
     const { createInternalAuthResetTokenByEmail } = await import('@/lib/auth/internal-auth.server')
     const tokenResult = await createInternalAuthResetTokenByEmail(email)
-    
+
     if (tokenResult.error || !tokenResult.token) {
       return { error: tokenResult.error || 'Terjadi kesalahan sistem.' }
     }
 
     const { sendPasswordResetEmailInternal } = await import('@/lib/email/sender')
     const resetLink = `${origin}/update-password?token=${tokenResult.token}`
-    
+
     // We send asynchronously so we don't slow down the UI
     const emailResult = await sendPasswordResetEmailInternal(email, resetLink)
     if (emailResult.error) {
@@ -2489,7 +2502,7 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
     const result = await verifyAndResetInternalAuthPassword(token, newPassword)
     return result
   }
-  
+
   // Untungnya Supabase secara otomatis mengenali session di sisi Client saat URL ?code=...
   return { error: 'Supabase menggunakan flow form client-side tanpa mengirim raw token.' }
 }
@@ -2516,6 +2529,7 @@ export async function registerLmsMember(formData: FormData) {
       fullName,
       userType: 'member',
       organizationId: orgId,
+      provider: 'LMS',
     })
 
     if ('error' in internalUser) {
@@ -2534,7 +2548,7 @@ export async function registerLmsMember(formData: FormData) {
           role: 'member',
           is_active: true
         })
-        
+
       if (insertError) {
         // If it's a duplicate, it's fine, they might already be a member
         if (!insertError.message.includes('duplicate key')) {

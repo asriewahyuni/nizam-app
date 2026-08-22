@@ -588,6 +588,7 @@ describe('Auth Actions', () => {
       fullName: 'Rina Saputri',
       userType: 'staff',
       organizationId: 'org-1',
+      provider: 'platform',
     })
     expect(employeeUpdateQuery.eq).toHaveBeenCalledWith('id', 'emp-1')
     expect(orgMembersTable.upsert).toHaveBeenCalledWith(
