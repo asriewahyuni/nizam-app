@@ -19,7 +19,10 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ACTIVE_BRANCH_COOKIE, ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+
 import { resolveAuthTenantBranding } from '@/app/(auth)/tenant-branding.server'
+import { queryPostgres } from '@/lib/db/postgres'
+
 import {
   getStoredActiveOrgIdForUser,
   persistMembershipActiveContext,
@@ -35,18 +38,18 @@ const HRIS_IMPERSONATION_LEGACY_ROLES = new Set(['owner', 'admin', 'hr'])
 
 type AdminImpersonationPayload =
   | {
-      provider?: 'supabase'
-      accessToken: string
-      refreshToken: string
-      email: string
-      activeOrgId: string | null
-    }
+    provider?: 'supabase'
+    accessToken: string
+    refreshToken: string
+    email: string
+    activeOrgId: string | null
+  }
   | {
-      provider: 'internal'
-      internalSessionToken: string
-      email: string
-      activeOrgId: string | null
-    }
+    provider: 'internal'
+    internalSessionToken: string
+    email: string
+    activeOrgId: string | null
+  }
 
 export type HrisImpersonationCandidate = {
   rawUserId: string
@@ -207,9 +210,9 @@ function normalizeSafeRelativeRedirect(value: unknown, fallback: string) {
 function normalizePermissionList(value: unknown) {
   return Array.isArray(value)
     ? value
-        .filter((permission): permission is string => typeof permission === 'string')
-        .map((permission) => permission.trim().toLowerCase())
-        .filter(Boolean)
+      .filter((permission): permission is string => typeof permission === 'string')
+      .map((permission) => permission.trim().toLowerCase())
+      .filter(Boolean)
     : []
 }
 
@@ -276,7 +279,7 @@ async function deleteOwnedOrganizationsForDemoUser(
   try {
     db = (await createAdminClient()) as any
   } catch (adminError) {
-    ;(console as any).warn('signOut cleanup: admin client unavailable, fallback to session client', adminError)
+    ; (console as any).warn('signOut cleanup: admin client unavailable, fallback to session client', adminError)
   }
 
   const { data: memberships, error: membershipError } = await db
@@ -287,7 +290,7 @@ async function deleteOwnedOrganizationsForDemoUser(
     .eq('is_active', true)
 
   if (membershipError) {
-    ;(console as any).error('signOut cleanup: failed to load demo org memberships', membershipError)
+    ; (console as any).error('signOut cleanup: failed to load demo org memberships', membershipError)
     return
   }
 
@@ -306,7 +309,7 @@ async function deleteOwnedOrganizationsForDemoUser(
       .eq('id', orgId)
 
     if (deleteError) {
-      ;(console as any).error('signOut cleanup: failed to delete demo org', orgId, deleteError)
+      ; (console as any).error('signOut cleanup: failed to delete demo org', orgId, deleteError)
     }
   }
 }
@@ -797,7 +800,7 @@ export async function signUp(formData: FormData) {
     email,
     password,
     options: {
-      data: { 
+      data: {
         full_name: fullName,
         login_type: 'owner',
         is_demo: isDemoSignup
@@ -806,11 +809,11 @@ export async function signUp(formData: FormData) {
   })
 
   if (error) {
-     // Identify duplicate registration errors.
-     if (error.message.includes("Database error saving new user") || error.message.includes("already registered")) {
-        return { error: 'Gagal: Email ini sudah pernah didaftarkan. Silakan Login atau gunakan email lain.' }
-     }
-     return { error: error.message }
+    // Identify duplicate registration errors.
+    if (error.message.includes("Database error saving new user") || error.message.includes("already registered")) {
+      return { error: 'Gagal: Email ini sudah pernah didaftarkan. Silakan Login atau gunakan email lain.' }
+    }
+    return { error: error.message }
   }
 
   return { success: true, email }
@@ -854,7 +857,7 @@ export async function signIn(formData: FormData) {
           resolvedOrgId = parentOrgId
         }
       } catch (parentResolutionError) {
-        ;(console as any).warn('signIn: platform admin parent-org fallback failed', parentResolutionError)
+        ; (console as any).warn('signIn: platform admin parent-org fallback failed', parentResolutionError)
       }
     }
 
@@ -1118,13 +1121,13 @@ export async function registerEmployeeAccount(formData: FormData) {
   await trackInvitationUsage(adminClient, invite)
 
   // 9. Now Log in the user on the client side
-  const { error: loginErr } = await publicClient.auth.signInWithPassword({ 
-    email: internalEmail, 
-    password 
+  const { error: loginErr } = await publicClient.auth.signInWithPassword({
+    email: internalEmail,
+    password
   })
 
   if (loginErr) {
-     return { error: 'Akun berhasil dibuat, tapi login otomatis gagal. Silakan login manual pakai NIK & password baru.' }
+    return { error: 'Akun berhasil dibuat, tapi login otomatis gagal. Silakan login manual pakai NIK & password baru.' }
   }
 
   await persistMembershipActiveContext(adminClient as any, {
@@ -1153,7 +1156,7 @@ export async function signInWithNik(formData: FormData) {
   const errorBase = orgSlug ? `/${orgSlug}` : '/login'
 
   if (!nik || !password) {
-     return redirect(`${errorBase}?error=${encodeURIComponent('NIK dan Password wajib diisi.')}`)
+    return redirect(`${errorBase}?error=${encodeURIComponent('NIK dan Password wajib diisi.')}`)
   }
 
   if (isInternalAuthProvider()) {
@@ -1196,7 +1199,7 @@ export async function signInWithNik(formData: FormData) {
     .order('created_at', { ascending: true })
 
   if (empErr) {
-     return redirect(`/login?error=${encodeURIComponent(`Database Error: ${empErr.message}`)}&tab=karyawan`)
+    return redirect(`/login?error=${encodeURIComponent(`Database Error: ${empErr.message}`)}&tab=karyawan`)
   }
 
   const matchingEmployees = Array.isArray(employees) ? employees : []
@@ -1263,11 +1266,11 @@ export async function signInWithNik(formData: FormData) {
         const preferredOrgId = activeOrgIdPreference && candidate.orgIds.includes(activeOrgIdPreference)
           ? activeOrgIdPreference
           : await resolvePreferredOrgIdForStaffLogin(
-              adminClient,
-              candidate.userId,
-              candidate.orgIds,
-              candidate.preferredOrgId
-            )
+            adminClient,
+            candidate.userId,
+            candidate.orgIds,
+            candidate.preferredOrgId
+          )
 
         setActiveOrganizationCookie(cookieStore, preferredOrgId)
         revalidatePath('/', 'layout')
@@ -1726,6 +1729,131 @@ export async function deleteInactiveTenantByPlatformAdmin(orgId: string) {
   return { success: true }
 }
 
+export async function updateTenantByPlatformAdmin(
+  orgId: string,
+  payload: {
+    name: string
+    is_active: boolean
+    is_demo: boolean
+    owner_email: string
+    subscription_end: string | null
+    settings: any
+  }
+) {
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+  const trimmedOrgId = String(orgId || '').trim()
+
+  if (!trimmedOrgId) {
+    return { error: 'Tenant tidak valid.' }
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  const user = userData.user
+  const adminEmail = normalizeEmail(user?.email) || ''
+
+  if (userError || !user?.id) {
+    return { error: 'Sesi admin tidak ditemukan. Silakan login ulang.' }
+  }
+
+  if (!isPlatformAdminEmail(adminEmail)) {
+    return { error: 'Akses ditolak. Hanya platform admin yang bisa mengubah data tenant.' }
+  }
+
+  // 1. Get current tenant details to compare email changes
+  const { data: org, error: orgError } = await (adminClient as any)
+    .from('organizations')
+    .select('id, owner_email')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
+
+  if (orgError) {
+    return { error: `Gagal membaca data tenant: ${orgError.message}` }
+  }
+
+  if (!org) {
+    return { error: 'Tenant tidak ditemukan.' }
+  }
+
+  // 2. Perform organization updates
+  const { error: updateError } = await (adminClient as any)
+    .from('organizations')
+    .update({
+      name: payload.name,
+      is_active: payload.is_active,
+      is_demo: payload.is_demo,
+      owner_email: payload.owner_email,
+      subscription_end: payload.subscription_end,
+      settings: payload.settings,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', trimmedOrgId)
+
+  if (updateError) {
+    return { error: `Gagal memperbarui organisasi: ${updateError.message}` }
+  }
+
+  // 3. Update the login email in internal_auth_users if owner_email has changed
+  const oldEmail = String(org.owner_email || '').trim().toLowerCase()
+  const newEmail = String(payload.owner_email || '').trim().toLowerCase()
+
+  if (oldEmail && newEmail && oldEmail !== newEmail) {
+    // Find owner user ID from org_members
+    const { data: member, error: memberError } = await (adminClient as any)
+      .from('org_members')
+      .select('user_id')
+      .eq('org_id', trimmedOrgId)
+      .eq('role', 'owner')
+      .maybeSingle()
+
+    if (memberError) {
+      console.error('Gagal memuat data owner dari org_members:', memberError)
+    }
+
+    if (member?.user_id) {
+      // Find the user details from internal_auth_users matching either ID field
+      const { data: internalUser } = await (adminClient as any)
+        .from('internal_auth_users')
+        .select('id, legacy_user_id')
+        .or(`id.eq.${member.user_id},legacy_user_id.eq.${member.user_id}`)
+        .maybeSingle()
+
+      if (internalUser) {
+        // Update public.internal_auth_users
+        const { error: userUpdateError } = await (adminClient as any)
+          .from('internal_auth_users')
+          .update({
+            login_email: newEmail,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', internalUser.id)
+
+        if (userUpdateError) {
+          return { error: `Data organisasi berhasil disimpan, tetapi gagal mengubah email login akun internal: ${userUpdateError.message}` }
+        }
+
+        // Update auth.users if legacy_user_id exists
+        if (internalUser.legacy_user_id) {
+          try {
+            await queryPostgres(
+              `UPDATE auth.users SET email = $1 WHERE id = $2::uuid`,
+              [newEmail, internalUser.legacy_user_id]
+            )
+          } catch (authErr: any) {
+            console.error('Failed to update auth.users email:', authErr)
+            return { error: `Data organisasi dan akun internal berhasil disimpan, tetapi gagal menyinkronkan email legacy auth: ${authErr.message}` }
+          }
+        }
+      } else {
+        return { error: 'Owner user tidak ditemukan di internal auth.' }
+      }
+    }
+  }
+
+  revalidatePath('/admin')
+  return { success: true }
+}
+
 export async function signInAsTenantOwner(orgId: string) {
   const internalProvider = isInternalAuthProvider()
   const adminClient = await createAdminClient()
@@ -1947,12 +2075,12 @@ export async function signInAsTenantOwner(orgId: string) {
     return { error: 'Tenant belum memiliki akun owner yang dapat dipakai untuk Login As.' }
   }
 
-    cookieStore.set(
-      ADMIN_IMPERSONATION_COOKIE,
-      encodeAdminImpersonation({
-        accessToken: adminSession.access_token,
-        refreshToken: adminSession.refresh_token,
-        email: adminEmail,
+  cookieStore.set(
+    ADMIN_IMPERSONATION_COOKIE,
+    encodeAdminImpersonation({
+      accessToken: adminSession.access_token,
+      refreshToken: adminSession.refresh_token,
+      email: adminEmail,
       activeOrgId: cookieStore.get(ACTIVE_ORG_COOKIE)?.value || null,
     }),
     {
@@ -2142,10 +2270,10 @@ export async function verifyEmployeeNikByToken(token: string, nik: string) {
       .maybeSingle(),
     invite.role_id
       ? (adminClient as any)
-          .from('roles')
-          .select('id, name')
-          .eq('id', invite.role_id)
-          .maybeSingle()
+        .from('roles')
+        .select('id, name')
+        .eq('id', invite.role_id)
+        .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ])
 
@@ -2168,7 +2296,7 @@ export async function requestPasswordReset(nik: string) {
     .order('created_at', { ascending: true })
 
   if (error) {
-     return { error: `Database Error: ${error.message}` }
+    return { error: `Database Error: ${error.message}` }
   }
 
   const matchingEmployees = Array.isArray(employees) ? employees : []
@@ -2213,7 +2341,7 @@ export async function requestPasswordReset(nik: string) {
     .in('id', employeeIds)
 
   if (updateError) {
-     return { error: `Database Error: ${updateError.message}` }
+    return { error: `Database Error: ${updateError.message}` }
   }
 
   revalidatePath('/hris')
@@ -2296,7 +2424,7 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
 
   await (adminClient as any)
     .from('employees')
-    .update({ 
+    .update({
       reset_requested: false,
       reset_requested_at: null
     })
@@ -2338,14 +2466,14 @@ export async function sendPasswordResetEmail(formData: FormData) {
   if (isInternalAuthProvider()) {
     const { createInternalAuthResetTokenByEmail } = await import('@/lib/auth/internal-auth.server')
     const tokenResult = await createInternalAuthResetTokenByEmail(email)
-    
+
     if (tokenResult.error || !tokenResult.token) {
       return { error: tokenResult.error || 'Terjadi kesalahan sistem.' }
     }
 
     const { sendPasswordResetEmailInternal } = await import('@/lib/email/sender')
     const resetLink = `${origin}/update-password?token=${tokenResult.token}`
-    
+
     // We send asynchronously so we don't slow down the UI
     const emailResult = await sendPasswordResetEmailInternal(email, resetLink)
     if (emailResult.error) {
@@ -2374,7 +2502,7 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
     const result = await verifyAndResetInternalAuthPassword(token, newPassword)
     return result
   }
-  
+
   // Untungnya Supabase secara otomatis mengenali session di sisi Client saat URL ?code=...
   return { error: 'Supabase menggunakan flow form client-side tanpa mengirim raw token.' }
 }
@@ -2420,7 +2548,7 @@ export async function registerLmsMember(formData: FormData) {
           role: 'member',
           is_active: true
         })
-        
+
       if (insertError) {
         // If it's a duplicate, it's fine, they might already be a member
         if (!insertError.message.includes('duplicate key')) {

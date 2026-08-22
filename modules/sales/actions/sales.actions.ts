@@ -1122,6 +1122,10 @@ export async function getSales(orgId: string, branchId?: string | null) {
           NULLIF(trim(proc_auth.display_name), ''),
           NULL
         )                AS processor_name,
+        COALESCE(
+          NULLIF(trim(concat_ws(' ', sales_emp.first_name, sales_emp.last_name)), ''),
+          NULL
+        )                AS salesperson_name,
         sr.id            AS reseller_id_val,
         sr.name          AS reseller_name,
         sr.reseller_type AS reseller_type,
@@ -1139,6 +1143,7 @@ export async function getSales(orgId: string, branchId?: string | null) {
         LIMIT 1
       ) proc_auth ON TRUE
       LEFT JOIN public.sales_resellers sr ON sr.id = s.reseller_id
+      LEFT JOIN public.employees      sales_emp ON sales_emp.id = s.salesperson_id
       WHERE  s.org_id = $1${branchFilter}
       ORDER  BY s.created_at DESC
     `, baseParams)
@@ -1338,6 +1343,7 @@ export async function createSaleEntry(orgId: string, payload: any) {
     grand_total: computedTotal,
     shariah_mode: shariahMode,
     notes: payload.notes,
+    salesperson_id: payload.salesperson_id || null,
     updated_at: new Date().toISOString(),
   }
 

@@ -28,7 +28,7 @@ import {
 } from 'lucide-react'
 import { SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
 import { createClient } from '@/lib/supabase/client'
-import { deleteInactiveTenantByPlatformAdmin, signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
+import { deleteInactiveTenantByPlatformAdmin, signInAsTenantOwner, updateTenantByPlatformAdmin } from '@/modules/auth/actions/auth.actions'
 import {
   addSaasAssessor,
   deleteSaasAssessor,
@@ -1001,11 +1001,14 @@ export default function SaaSAdminPage() {
           ? orgModal.editData.settings
           : {}
       
+      const orgName = String(fd.get('name') || '').trim()
+      const ownerEmail = String(fd.get('owner_email') || '').trim()
+      
       const payload = {
-         name: fd.get('name'),
+         name: orgName,
          is_active: fd.get('is_active') === 'on',
          is_demo: fd.get('is_demo') === 'on',
-         owner_email: fd.get('owner_email'),
+         owner_email: ownerEmail,
          subscription_end: expiresAt,
          settings: {
             ...currentSettings,
@@ -1015,9 +1018,10 @@ export default function SaaSAdminPage() {
       }
 
       if (orgModal.editData?.id) {
-         await db.from('organizations').update(payload).eq('id', orgModal.editData.id)
+         const res = await updateTenantByPlatformAdmin(orgModal.editData.id, payload)
+         if (res?.error) throw new Error(res.error)
       } else {
-         const slug = (fd.get('name') as string).toLowerCase().replace(/ /g, '-') + '-' + Math.random().toString(36).substring(2,5)
+         const slug = orgName.toLowerCase().replace(/ /g, '-') + '-' + Math.random().toString(36).substring(2,5)
          await db.from('organizations').insert([{ ...payload, slug }])
       }
 
