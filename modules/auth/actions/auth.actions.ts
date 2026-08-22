@@ -19,6 +19,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ACTIVE_BRANCH_COOKIE, ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { queryPostgres } from '@/lib/db/postgres'
 import {
   getStoredActiveOrgIdForUser,
   persistMembershipActiveContext,
@@ -1711,6 +1712,131 @@ export async function deleteInactiveTenantByPlatformAdmin(orgId: string) {
 
   if (deleteError) {
     return { error: `Gagal menghapus tenant: ${deleteError.message}` }
+  }
+
+  revalidatePath('/admin')
+  return { success: true }
+}
+
+export async function updateTenantByPlatformAdmin(
+  orgId: string,
+  payload: {
+    name: string
+    is_active: boolean
+    is_demo: boolean
+    owner_email: string
+    subscription_end: string | null
+    settings: any
+  }
+) {
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+  const trimmedOrgId = String(orgId || '').trim()
+
+  if (!trimmedOrgId) {
+    return { error: 'Tenant tidak valid.' }
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  const user = userData.user
+  const adminEmail = normalizeEmail(user?.email) || ''
+
+  if (userError || !user?.id) {
+    return { error: 'Sesi admin tidak ditemukan. Silakan login ulang.' }
+  }
+
+  if (!isPlatformAdminEmail(adminEmail)) {
+    return { error: 'Akses ditolak. Hanya platform admin yang bisa mengubah data tenant.' }
+  }
+
+  // 1. Get current tenant details to compare email changes
+  const { data: org, error: orgError } = await (adminClient as any)
+    .from('organizations')
+    .select('id, owner_email')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
+
+  if (orgError) {
+    return { error: `Gagal membaca data tenant: ${orgError.message}` }
+  }
+
+  if (!org) {
+    return { error: 'Tenant tidak ditemukan.' }
+  }
+
+  // 2. Perform organization updates
+  const { error: updateError } = await (adminClient as any)
+    .from('organizations')
+    .update({
+      name: payload.name,
+      is_active: payload.is_active,
+      is_demo: payload.is_demo,
+      owner_email: payload.owner_email,
+      subscription_end: payload.subscription_end,
+      settings: payload.settings,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', trimmedOrgId)
+
+  if (updateError) {
+    return { error: `Gagal memperbarui organisasi: ${updateError.message}` }
+  }
+
+  // 3. Update the login email in internal_auth_users if owner_email has changed
+  const oldEmail = String(org.owner_email || '').trim().toLowerCase()
+  const newEmail = String(payload.owner_email || '').trim().toLowerCase()
+
+  if (oldEmail && newEmail && oldEmail !== newEmail) {
+    // Find owner user ID from org_members
+    const { data: member, error: memberError } = await (adminClient as any)
+      .from('org_members')
+      .select('user_id')
+      .eq('org_id', trimmedOrgId)
+      .eq('role', 'owner')
+      .maybeSingle()
+
+    if (memberError) {
+      console.error('Gagal memuat data owner dari org_members:', memberError)
+    }
+
+    if (member?.user_id) {
+      // Find the user details from internal_auth_users matching either ID field
+      const { data: internalUser } = await (adminClient as any)
+        .from('internal_auth_users')
+        .select('id, legacy_user_id')
+        .or(`id.eq.${member.user_id},legacy_user_id.eq.${member.user_id}`)
+        .maybeSingle()
+
+      if (internalUser) {
+        // Update public.internal_auth_users
+        const { error: userUpdateError } = await (adminClient as any)
+          .from('internal_auth_users')
+          .update({
+            login_email: newEmail,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', internalUser.id)
+
+        if (userUpdateError) {
+          return { error: `Data organisasi berhasil disimpan, tetapi gagal mengubah email login akun internal: ${userUpdateError.message}` }
+        }
+
+        // Update auth.users if legacy_user_id exists
+        if (internalUser.legacy_user_id) {
+          try {
+            await queryPostgres(
+              `UPDATE auth.users SET email = $1 WHERE id = $2::uuid`,
+              [newEmail, internalUser.legacy_user_id]
+            )
+          } catch (authErr: any) {
+            console.error('Failed to update auth.users email:', authErr)
+            return { error: `Data organisasi dan akun internal berhasil disimpan, tetapi gagal menyinkronkan email legacy auth: ${authErr.message}` }
+          }
+        }
+      } else {
+        return { error: 'Owner user tidak ditemukan di internal auth.' }
+      }
+    }
   }
 
   revalidatePath('/admin')

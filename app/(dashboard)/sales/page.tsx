@@ -6,6 +6,7 @@ import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 import { getActiveResellers } from '@/modules/sales/actions/commission.actions'
+import { getEmployees } from '@/modules/hris/actions/employee.actions'
 import SalesClient from './SalesClient'
 
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
@@ -19,13 +20,14 @@ export default async function SalesPage() {
   const orgSettings = orgData.org.settings || {}
   const activeBranch = await getActiveBranch(orgId)
 
-  const [sales, customers, products, coa, warehouses, resellers] = await Promise.all([
+  const [sales, customers, products, coa, warehouses, resellers, employees] = await Promise.all([
     getSales(orgId, activeBranch?.id),
     getContacts(orgId, 'CUSTOMER'),
     getProducts(orgId, activeBranch?.id),
     getChartOfAccounts(orgId),
     getWarehouses(orgId, activeBranch?.id),
     getActiveResellers(orgId),
+    getEmployees(orgId, activeBranch?.id),
   ])
 
   return (
@@ -43,6 +45,7 @@ export default async function SalesPage() {
           orgSettings={orgSettings}
           activeBranchName={activeBranch?.name || null}
           userRole={orgData.role}
+          employees={employees}
         />
       </Suspense>
     </div>
